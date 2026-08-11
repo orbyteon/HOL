@@ -51,9 +51,17 @@ verify:
 
 ## 5. Privacy policy hosting
 
-- [ ] GitHub repo → Settings → Pages → Source: `main` branch, `/docs`
-      folder → policy live at `https://orbyteon.github.io/HOL/privacy.html`
-- [ ] Link that URL in the Play Console listing
+GitHub Pages on a **private** repo requires a paid plan (API-verified:
+"Your current plan does not support GitHub Pages for this repository").
+Pick one:
+
+- [ ] **Make the repo public** (if acceptable), then repo → Settings →
+      Pages → Source: `main` branch, `/docs` folder → policy live at
+      `https://orbyteon.github.io/HOL/privacy.html`
+- [ ] Or upgrade the GitHub plan, then same Pages steps
+- [ ] Or host `docs/privacy.html` anywhere public (Netlify Drop, itch.io
+      project page, Google Sites) — any static URL works
+- [ ] Link the final URL in the Play Console listing
 
 ## 6. Security hygiene
 
