@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using System.Collections;
 using TMPro;
 
@@ -9,6 +9,7 @@ public class FakeMatchmaking : MonoBehaviour
     public TMP_Text searchingText;
 
     bool isSearching; // review #8: prevent overlapping searches
+    Coroutine dotsAnimation;
 
     public void StartSearch()
     {
@@ -24,7 +25,9 @@ public class FakeMatchmaking : MonoBehaviour
 
         searchingPanel.SetActive(true);
 
-        searchingText.text = "Searching opponent...";
+        // Animate "Searching opponent" with cycling dots so the panel
+        // doesn't look frozen.
+        dotsAnimation = StartCoroutine(AnimateSearchingText());
 
         // Review #5: shortened waits (were 5/8/10s)
         float waitTime;
@@ -39,6 +42,8 @@ public class FakeMatchmaking : MonoBehaviour
             waitTime = 5f;
 
         yield return new WaitForSeconds(waitTime);
+
+        StopDotsAnimation();
 
         // 1 in 6 searches finds no opponent
         int failChance = Random.Range(0, 6);
@@ -59,5 +64,33 @@ public class FakeMatchmaking : MonoBehaviour
         panelGame.SetActive(true);
 
         isSearching = false;
+    }
+
+    IEnumerator AnimateSearchingText()
+    {
+        const string baseText = "Searching opponent";
+        int dots = 0;
+
+        while (true)
+        {
+            searchingText.text = baseText + new string('.', dots);
+            dots = (dots + 1) % 4;
+            yield return new WaitForSeconds(0.4f);
+        }
+    }
+
+    void StopDotsAnimation()
+    {
+        if (dotsAnimation != null)
+        {
+            StopCoroutine(dotsAnimation);
+            dotsAnimation = null;
+        }
+    }
+
+    void OnDisable()
+    {
+        // Don't leave the animation running if the object is deactivated.
+        StopDotsAnimation();
     }
 }
