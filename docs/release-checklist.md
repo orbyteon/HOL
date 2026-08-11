@@ -9,17 +9,37 @@ Pull `main`, open the project, let package resolution finish (the manifest
 diet removed four packages — let Unity prune them), then press Play and
 verify:
 
+Splash:
+
+- [ ] Indigo gradient background (not flat black), faint drifting digits
+- [ ] Logo blooms in, then breathes; cyan→magenta seam + tagline below it
+- [ ] Gold loading hairline fills at the bottom; tap skips the splash
+
+Main menu / solo:
+
+- [ ] Menu backdrop is indigo-toned (photo dulled, drifting digits behind
+      panels); panels are indigo, never white or red
 - [ ] Consent dialog appears on first launch; ads initialize after a choice
+- [ ] First launch on a Greek-language device starts in Greek
 - [ ] Settings gear opens settings (menu panel hides underneath)
 - [ ] EN/EL buttons switch all labels, including scene labels ("SAVE" → "ΑΠΟΘΗΚΕΥΣΗ")
 - [ ] Difficulty buttons highlight the active choice in gold
 - [ ] Stats label shows on the main menu (wins/losses/streak/best)
 - [ ] Play → searching → Cancel button stops the search; Android back too
-- [ ] Match end → Rematch button restarts via number entry; win bursts confetti
-- [ ] Buttons squash on press; panels fade+rise when shown
+- [ ] Opponent-found stinger plays when found, NOT when tapping Search
+- [ ] Every button clicks (menu, settings, game) and squashes on press;
+      panels fade+rise when shown
+- [ ] Match end → Rematch button restarts via number entry; win bursts
+      confetti, plays the win stinger
+- [ ] Android back during a solo match exits to the menu
 - [ ] "Opponents are simulated" disclosure visible on find/searching panels
+
+PvP:
+
 - [ ] PvP Duel → create room shows a 5-letter code; join from a second
       device/instance; leaving a match notifies the opponent
+- [ ] Duel win/lose plays the stinger, updates the menu stats label, and
+      shows "In X guesses" on a win
 
 ## 2. PlayFab (PvP backend)
 
