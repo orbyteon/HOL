@@ -9,21 +9,29 @@ Under the hood the game is single-player against a lightweight AI, but it's pres
 ## Features
 
 - Turn-based Higher/Lower guessing against an AI opponent
+- **Real PvP duels** with room-code invites (Firebase RTDB or PlayFab backend, both REST, no SDK)
+- **English + native Greek** localization with live language switching
+- **Difficulty modes** — Easy / Normal / Hard / Adaptive (the AI tunes itself to your recent win rate)
+- **Persistent stats** — wins/losses, current + best streak, best winning guess-count (`PlayerPrefs`)
+- Daily-play streak, haptics on win/lose, and a `GameEvents` hub for analytics/notifications
 - Simulated online matchmaking (searching screen, occasional "opponent not found")
 - Randomized opponent names for a multiplayer feel
 - Player name entry and a music on/off toggle, saved between sessions
-- Interstitial ads via Unity LevelPlay (ironSource)
+- Interstitial ads via Unity LevelPlay (ironSource), shown at match end with a frequency cap
+- First-launch ads-consent dialog (zero setup — builds itself from code)
 - Win/lose sound feedback
 
 ## Gameplay
 
-1. A splash screen leads into the main menu.
-2. Press **Play** — an interstitial ad may show, then matchmaking begins.
+1. A splash screen leads into the main menu (tap to skip).
+2. Press **Play** — matchmaking begins (ads show at match end, not here).
 3. Once an "opponent" is found, enter your secret number (1–100).
-4. Take turns: when the opponent guesses, answer **Higher**, **Lower**, or **Correct** relative to your secret number. When it's your turn, guess theirs.
+4. Take turns: when the opponent guesses, answer **Higher**, **Lower**, or **Correct** relative to your secret number. When it's your turn, guess theirs — a live range label and guess history help you play optimally.
 5. First to guess the other's number correctly wins.
 
-The AI narrows its range with a midpoint (binary-search) strategy, guessing randomly about 20% of the time to feel less mechanical. Who goes first is decided by a coin flip each round.
+For a **live PvP duel**, create a room and share the 5-letter invite code, or join with a friend's code. Hints are computed automatically and honestly by the room state.
+
+The AI narrows its range with a midpoint (binary-search) strategy, guessing randomly at a difficulty-dependent rate to feel less mechanical. Who goes first is decided by a coin flip each round.
 
 ## Tech stack
 
@@ -83,16 +91,28 @@ The game uses only two scenes. All gameplay (menu, settings, matchmaking, and th
 
 | Script | Responsibility |
 |---|---|
-| `GameManager.cs` | Core game loop: secret numbers, AI guessing logic, turns, win/lose handling |
+| `GameManager.cs` | Core game loop: secret numbers, AI guessing (difficulty + adaptive), turns, stats, win/lose, match-end ads |
 | `NumberManager.cs` | Validates the player's number, starts the round, routes player guesses |
-| `AdsManager.cs` | LevelPlay initialization and interstitial ads |
-| `FakeMatchmaking.cs` | Simulated opponent search |
-| `MenuManager.cs` | Menu / settings / play panel switching; triggers the ad on Play |
+| `AdsManager.cs` | LevelPlay init (consent-gated), interstitial lifecycle, frequency cap, init retry |
+| `ConsentManager.cs` | First-launch ads-consent dialog; builds its own UI from code if unwired |
+| `FakeMatchmaking.cs` | Simulated opponent search (cancellable, animated) |
+| `MenuManager.cs` | Menu/settings/play panel switching; Android back-button handling |
 | `MusicSettings.cs` | Music on/off toggle, persisted via `PlayerPrefs` |
 | `SavePlayerName.cs` | Saves the player name to `PlayerPrefs` |
-| `SplashLoader.cs` | Splash timer → loads `MainMenu` |
+| `SplashLoader.cs` | Splash timer → loads `MainMenu`; tap to skip |
 | `BlinkText.cs` | Blinking-text UI helper |
 | `QuitGame.cs` | Quits the application |
+| `GameStats.cs` | Persistent W/L, streaks, best guess-count, rolling win-rate window |
+| `Localization/L10n.cs` | EN/EL string table + language persistence |
+| `Localization/LocalizedText.cs` | Drop-in component: TMP_Text follows the selected language |
+| `Localization/LanguageSelector.cs` | Settings-language picker hooks |
+| `SmartHooks/GameEvents.cs` | Static event hub (match ended, daily streak) |
+| `SmartHooks/DailyStreak.cs` | Daily-play streak counter |
+| `SmartHooks/Haptics.cs` | Win/lose haptic feedback |
+| `PvP/PvpBackend.cs` | Abstract PvP room transport |
+| `PvP/PvpClient.cs` | Firebase RTDB REST backend |
+| `PvP/PlayFabPvpClient.cs` | PlayFab REST + CloudScript backend |
+| `PvP/PvpGameController.cs` | PvP UI orchestration on top of `PvpBackend` |
 
 ## Configuration
 
