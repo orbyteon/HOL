@@ -95,7 +95,6 @@ public static class L10n
         { "between_range",           new[] { "Between {0} and {1}", "Ανάμεσα σε {0} και {1}" } },
         { "already_know_range",      new[] { "You already know it's between {0} and {1}!", "Ξέρεις ήδη ότι είναι ανάμεσα σε {0} και {1}!" } },
         { "opponent_found_number",   new[] { "{0} found your number!", "{0} βρήκε τον αριθμό σου!" } },
-        { "caught_cheating",         new[] { "That doesn't add up! {0} caught you cheating.", "Κάτι δεν βγαίνει! {0} σε έπιασε να κλέβεις." } },
 
         // result
         { "you_win",                 new[] { "YOU WIN!", "ΚΕΡΔΙΣΕΣ!" } },

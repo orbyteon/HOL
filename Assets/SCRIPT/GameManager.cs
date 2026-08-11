@@ -182,13 +182,8 @@ public class GameManager : MonoBehaviour
 
     public void Higher()
     {
-        // Cheat detection: this answer contradicts an earlier hint.
-        if (aiGuess + 1 > max)
-        {
-            HandleInconsistentAnswer();
-            return;
-        }
-
+        // Only the truthful answer button is ever shown (see AIGuess), so
+        // this answer is consistent with every earlier hint by construction.
         min = aiGuess + 1;
 
         HideButtons();
@@ -198,13 +193,6 @@ public class GameManager : MonoBehaviour
 
     public void Lower()
     {
-        // Cheat detection: this answer contradicts an earlier hint.
-        if (aiGuess - 1 < min)
-        {
-            HandleInconsistentAnswer();
-            return;
-        }
-
         max = aiGuess - 1;
 
         HideButtons();
@@ -223,15 +211,6 @@ public class GameManager : MonoBehaviour
         if (winRate > 0.6f) return 0.1f;  // streaking player → tougher
         if (winRate < 0.4f) return 0.5f;  // struggling player → friendlier
         return 0.25f;                     // balanced → near Normal
-    }
-
-    void HandleInconsistentAnswer()
-    {
-        // The player gave an answer impossible for their secret number
-        // (e.g. "Higher" when the remaining range is already at 100).
-        // End the round instead of letting the AI guess from an empty range.
-        aiAnswerText.text = L10n.Get("caught_cheating", currentOpponent);
-        EndGame(false);
     }
 
     public void Correct()
