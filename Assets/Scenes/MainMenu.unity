@@ -1421,17 +1421,17 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 928598526}
-        m_TargetAssemblyTypeName: UnityEngine.GameObject, UnityEngine
-        m_MethodName: SetActive
-        m_Mode: 6
+      - m_Target: {fileID: 2033037889}
+        m_TargetAssemblyTypeName: MenuManager, Assembly-CSharp
+        m_MethodName: OpenSettings
+        m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
           m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
           m_IntArgument: 0
           m_FloatArgument: 0
           m_StringArgument: 
-          m_BoolArgument: 1
+          m_BoolArgument: 0
         m_CallState: 2
       - m_Target: {fileID: 133146853}
         m_TargetAssemblyTypeName: UnityEngine.AudioSource, UnityEngine
@@ -3698,6 +3698,9 @@ MonoBehaviour:
   audioSource: {fileID: 968024170}
   winSound: {fileID: 8300000, guid: 0bf2ecb971bf5c344820ddec8adba37f, type: 3}
   loseSound: {fileID: 8300000, guid: d90ccdc94acde654cb080c4e2488ed36, type: 3}
+  numberManager: {fileID: 1090650517}
+  winConfetti: {fileID: 0}
+  adsManager: {fileID: 1155201080}
 --- !u!4 &968024169
 Transform:
   m_ObjectHideFlags: 0
@@ -6984,6 +6987,7 @@ MonoBehaviour:
   panelPlay: {fileID: 1690027942}
   panelSearching: {fileID: 1270644186}
   adsManager: {fileID: 1155201080}
+  matchmaking: {fileID: 1465780213}
 --- !u!4 &2033037890
 Transform:
   m_ObjectHideFlags: 0
