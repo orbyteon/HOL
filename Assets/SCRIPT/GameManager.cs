@@ -42,6 +42,10 @@ public class GameManager : MonoBehaviour
     // swallowing guesses typed during the opponent's turn.
     public bool IsPlayerTurn => playerTurn && !gameFinished;
 
+    // Lets the UI distinguish "not your turn" from "the round is decided"
+    // (post-match submits and back-press handling behave differently).
+    public bool IsMatchOver => gameFinished;
+
     int min = 1;
     int max = 100;
     int aiGuess;
@@ -277,6 +281,12 @@ public class GameManager : MonoBehaviour
         HideButtons();
         stopGameButton.SetActive(true);
 
+        // The soft keyboard may still be up from the player's last guess
+        // (the match can end on the opponent's turn) — close it so it
+        // doesn't cover the result.
+        if (numberManager != null)
+            numberManager.CloseInput();
+
         if (playerWon)
         {
             GameStats.RecordWin(playerGuessCount);
@@ -300,7 +310,9 @@ public class GameManager : MonoBehaviour
             Haptics.Error();
             GameEvents.MatchEnded(false, 0);
 
-            turnText.text = L10n.Get("you_lose");
+            // Reveal the AI's secret — losing without ever learning the
+            // answer leaves the round feeling unresolved.
+            turnText.text = L10n.Get("you_lose") + "\n" + L10n.Get("number_was", aiSecretNumber);
             if (audioSource != null && loseSound != null)
                 audioSource.PlayOneShot(loseSound);
 

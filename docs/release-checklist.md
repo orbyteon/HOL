@@ -3,6 +3,21 @@
 Everything code-side is done on `main`. These are the remaining manual
 steps, in order. Each links to where the details live.
 
+## 0. CI activation (one-time, ~15 min)
+
+`.github/workflows/ci.yml` compile-verifies every PR with a GameCI Android
+build, but skips (with a warning) until the Unity license secrets exist:
+
+- [ ] Follow https://game.ci/docs/github/activation to produce a `.ulf`
+      license file for Unity 2022.3.x (Personal license works)
+- [ ] Repo → Settings → Secrets → Actions: add `UNITY_LICENSE` (file
+      contents), `UNITY_EMAIL`, `UNITY_PASSWORD`
+- [ ] Re-run the workflow on an open PR and confirm the
+      "Build Android (compile check)" job goes green
+
+Until this is done, **no merge without an editor smoke test** — nothing
+else verifies that the project compiles.
+
 ## 1. Smoke test in Unity (on the machine with Unity installed)
 
 Pull `main`, open the project, let package resolution finish (the manifest

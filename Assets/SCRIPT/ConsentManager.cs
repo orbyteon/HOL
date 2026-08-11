@@ -172,6 +172,10 @@ public class ConsentManager : MonoBehaviour
             .GetComponent<RectTransform>()
             .FillParent();
 
+        // A dialog reopened from Settings is built long after the startup
+        // juice pass — attach press feedback + click sound here.
+        RuntimeUI.AttachJuice(button);
+
         return button;
     }
 }

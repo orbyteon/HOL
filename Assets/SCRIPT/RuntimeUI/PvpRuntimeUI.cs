@@ -33,6 +33,17 @@ public class PvpRuntimeUI : MonoBehaviour
 
     void Start()
     {
+        // Release builds must not run the Firebase fallback when PlayFab is
+        // configured: PvpClient is dev-only (secrets readable in the room
+        // document, last-write-wins joins — see its header). A stray
+        // Inspector tick must not silently downgrade production security.
+        if (!usePlayFab && !Debug.isDebugBuild && !string.IsNullOrEmpty(playFabTitleId))
+        {
+            Debug.LogWarning("PvpRuntimeUI: Firebase backend selected in a release build " +
+                "with PlayFab configured — overriding to PlayFab (Firebase is dev-only).");
+            usePlayFab = true;
+        }
+
         // Backend + controller live on this same GameObject. The backend is
         // created here, so its dashboard config comes from our own fields.
         PvpBackend backend;
@@ -110,6 +121,10 @@ public class PvpRuntimeUI : MonoBehaviour
         var joinCode = RuntimeUI.CreateInputField(joinPanel.transform, "CodeInput",
             L10n.Get("pvp_enter_code"), new Vector2(0f, 240f), new Vector2(460f, 90f), 5,
             TMP_InputField.ContentType.Standard);
+        // Codes are shown and shared in caps ("-----" display, invite text);
+        // typing lowercase looked like a different code. Backends already
+        // normalize case — this is purely visual consistency.
+        joinCode.onValidateInput = (text, index, ch) => char.ToUpperInvariant(ch);
         var joinSecret = RuntimeUI.CreateInputField(joinPanel.transform, "SecretInput",
             L10n.Get("pvp_secret"), new Vector2(0f, 110f), new Vector2(460f, 90f));
         var joinGo = RuntimeUI.CreateButton(joinPanel.transform, "GoButton",
@@ -155,6 +170,13 @@ public class PvpRuntimeUI : MonoBehaviour
         controller.createSecretInput = createSecret;
         controller.roomCodeText = AsTmp(codeText);
         controller.createStatusText = AsTmp(createStatus);
+
+        // Waiting-state dots for the create panel's status line; disabled
+        // until the controller shows an animated status (SetCreateStatus).
+        var statusEllipsis = controller.createStatusText.gameObject.AddComponent<AnimatedEllipsis>();
+        statusEllipsis.text = controller.createStatusText;
+        statusEllipsis.enabled = false;
+        controller.createStatusEllipsis = statusEllipsis;
         controller.joinCodeInput = joinCode;
         controller.joinSecretInput = joinSecret;
         controller.joinStatusText = AsTmp(joinStatus);
@@ -175,6 +197,15 @@ public class PvpRuntimeUI : MonoBehaviour
         joinBack.onClick.AddListener(controller.CancelRoomAndLeave);
         guessBtn.onClick.AddListener(controller.OnSubmitGuessPressed);
         leaveBtn.onClick.AddListener(controller.OnLeaveMatchPressed);
+
+        // Soft-keyboard Done (Enter in the editor) submits the field's flow;
+        // the handlers validate and give feedback, so a premature submit is
+        // safe. The join-code field routes to join too — with the secret
+        // still empty it just shows the "enter your secret" status.
+        createSecret.onSubmit.AddListener(_ => controller.OnCreateRoomPressed());
+        joinCode.onSubmit.AddListener(_ => controller.OnJoinRoomPressed());
+        joinSecret.onSubmit.AddListener(_ => controller.OnJoinRoomPressed());
+        guessInput.onSubmit.AddListener(_ => controller.OnSubmitGuessPressed());
 
         // All panels start hidden; OpenPvpMenu shows the menu panel.
         menuPanel.SetActive(false);

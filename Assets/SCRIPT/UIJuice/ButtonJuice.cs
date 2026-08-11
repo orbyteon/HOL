@@ -13,10 +13,12 @@ public class ButtonJuice : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
 
     Vector3 baseScale;
     float target = 1f;
+    UnityEngine.UI.Selectable selectable; // squash/click only when interactable
 
     void Awake()
     {
         baseScale = transform.localScale;
+        selectable = GetComponent<UnityEngine.UI.Selectable>();
     }
 
     void OnEnable()
@@ -27,13 +29,25 @@ public class ButtonJuice : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
 
     void Update()
     {
+        if (baseScale.x == 0f) return; // authored at zero scale — nothing to animate
+
         float current = transform.localScale.x / baseScale.x;
+        if (Mathf.Approximately(current, target))
+            return; // settled — skip the per-frame lerp (dozens of buttons live at once)
+
         float next = Mathf.Lerp(current, target, Time.unscaledDeltaTime * speed);
+        if (Mathf.Abs(next - target) < 0.001f)
+            next = target;
         transform.localScale = baseScale * next;
     }
 
     public void OnPointerDown(PointerEventData e)
     {
+        // A disabled button must feel disabled — squash + click on a control
+        // that won't respond reads as the game being broken.
+        if (selectable != null && !selectable.IsInteractable())
+            return;
+
         target = pressedScale;
         Haptics.Light(); // no-op until a haptics plugin lands; call site is placed
 

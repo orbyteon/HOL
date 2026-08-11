@@ -7,6 +7,33 @@ using TMPro;
 // construction in one place.
 public static class RuntimeUI
 {
+    // Scene click sound, discovered once per scene by JuiceRuntimeWiring.
+    // Buttons built AFTER its one-shot wiring pass (streak-save offer,
+    // reopened consent dialog) pick their sound up from here at creation,
+    // so every button clicks — not just the ones that existed at startup.
+    // The null checks below treat destroyed (scene-reloaded) sources as
+    // absent, so a stale cache can never be handed out.
+    public static AudioSource SharedClickSource;
+    public static AudioClip SharedClickClip;
+
+    // Attaches press-squash feedback (plus the shared click sound when
+    // known). Safe to call on any button; keeps an existing ButtonJuice.
+    public static ButtonJuice AttachJuice(Button button)
+    {
+        if (button == null) return null;
+
+        var juice = button.GetComponent<ButtonJuice>();
+        if (juice == null)
+            juice = button.gameObject.AddComponent<ButtonJuice>();
+
+        if (juice.clickSound == null && SharedClickSource != null && SharedClickClip != null)
+        {
+            juice.audioSource = SharedClickSource;
+            juice.clickSound = SharedClickClip;
+        }
+        return juice;
+    }
+
     // Shared rounded-rect sprite (white, transparent corners) so every
     // runtime-built button/card/input has soft corners instead of hard
     // squares. Generated once, cached; sliced so corners stay round at
@@ -124,6 +151,10 @@ public static class RuntimeUI
 
         var text = CreateText(go.transform, "Label", label, 30, Vector2.zero, size, labelColor);
         Stretch(text.gameObject);
+
+        // Juice at creation time: buttons built after JuiceRuntimeWiring's
+        // one-shot startup pass would otherwise stay flat and silent.
+        AttachJuice(button);
 
         return button;
     }

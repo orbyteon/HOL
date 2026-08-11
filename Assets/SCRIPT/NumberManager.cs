@@ -29,6 +29,12 @@ public class NumberManager : MonoBehaviour
 
     public void SubmitNumber()
     {
+        // Round already decided: any submit — Confirm tap or keyboard Done,
+        // valid or empty — should do nothing. Checked BEFORE validation so a
+        // stray empty submit can't flash "Invalid number" over the result.
+        if (gameManager != null && gameManager.IsMatchOver)
+            return;
+
         int number;
 
         if (!int.TryParse(numberInput.text, out number))
@@ -88,7 +94,20 @@ public class NumberManager : MonoBehaviour
 
         numberInput.text = "";
         numberInput.DeactivateInputField();
-        numberInput.ActivateInputField();
+        // Don't pop the soft keyboard back up over the result screen — the
+        // winning guess ends the match; refocus only while play continues.
+        if (gameManager == null || !gameManager.IsMatchOver)
+            numberInput.ActivateInputField();
+    }
+
+    // Called by GameManager.EndGame: the match can end on the OPPONENT's
+    // turn (AI finds your number), when the soft keyboard was already
+    // refocused after our last guess — close it so it doesn't cover the
+    // result screen.
+    public void CloseInput()
+    {
+        if (numberInput != null)
+            numberInput.DeactivateInputField();
     }
 
     // Review #3: called by GameManager.RestartMatch so a rematch starts from

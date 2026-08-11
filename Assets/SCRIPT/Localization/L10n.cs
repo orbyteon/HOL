@@ -92,6 +92,7 @@ public static class L10n
         { "lower",                   new[] { "Lower", "Χαμηλότερα" } },
         { "correct",                 new[] { "Correct", "Σωστά" } },
         { "stop_game",               new[] { "Stop game", "Τέλος παιχνιδιού" } },
+        { "back_again_to_leave",     new[] { "Press back again to leave the match", "Πάτησε ξανά πίσω για έξοδο από τον αγώνα" } },
         { "between_range",           new[] { "Between {0} and {1}", "Ανάμεσα σε {0} και {1}" } },
         { "already_know_range",      new[] { "You already know it's between {0} and {1}!", "Ξέρεις ήδη ότι είναι ανάμεσα σε {0} και {1}!" } },
         { "opponent_found_number",   new[] { "{0} found your number!", "{0} βρήκε τον αριθμό σου!" } },
@@ -100,6 +101,7 @@ public static class L10n
         { "you_win",                 new[] { "YOU WIN!", "ΚΕΡΔΙΣΕΣ!" } },
         { "you_lose",                new[] { "YOU LOSE!", "ΕΧΑΣΕΣ!" } },
         { "won_in_guesses",          new[] { "In {0} guesses", "Σε {0} προσπάθειες" } },
+        { "number_was",              new[] { "The number was {0}", "Ο αριθμός ήταν {0}" } },
         { "rematch",                 new[] { "Rematch", "Ρεβάνς" } },
 
         // stats
@@ -107,6 +109,7 @@ public static class L10n
         { "stats_losses",            new[] { "Losses", "Ήττες" } },
         { "stats_streak",            new[] { "Streak", "Σερί" } },
         { "stats_best",              new[] { "Best", "Ρεκόρ" } },
+        { "stats_fastest_win",       new[] { "Fastest win: {0} guesses", "Ταχύτερη νίκη: {0} προσπάθειες" } },
         { "guesses",                 new[] { "Guesses:", "Προσπάθειες:" } },
         { "your_number",             new[] { "Your number? (1-100)", "Ο αριθμός σου; (1-100)" } },
 

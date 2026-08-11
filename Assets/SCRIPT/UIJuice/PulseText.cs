@@ -10,6 +10,7 @@ public class PulseText : MonoBehaviour
     public float period = 1.4f;
 
     float phase;
+    float baseAlpha = 1f; // the label's authored alpha — pulse peak and rest state
 
     void Reset()
     {
@@ -18,8 +19,10 @@ public class PulseText : MonoBehaviour
 
     void OnEnable()
     {
-        phase = 0f;
+        // Start at the peak of the sine so enabling never pops the alpha.
+        phase = period * 0.25f;
         if (text == null) text = GetComponent<TMP_Text>();
+        if (text != null) baseAlpha = text.color.a;
     }
 
     void Update()
@@ -29,16 +32,18 @@ public class PulseText : MonoBehaviour
         phase += Time.unscaledDeltaTime;
         float s = 0.5f + 0.5f * Mathf.Sin(phase / period * Mathf.PI * 2f);
         var c = text.color;
-        c.a = Mathf.Lerp(minAlpha, 1f, s);
+        c.a = Mathf.Lerp(minAlpha, baseAlpha, s);
         text.color = c;
     }
 
     void OnDisable()
     {
+        // Restore the authored alpha, not a hardcoded 1 — labels designed
+        // translucent (e.g. 0.6-alpha hints) must not brighten permanently.
         if (text != null)
         {
             var c = text.color;
-            c.a = 1f;
+            c.a = baseAlpha;
             text.color = c;
         }
     }

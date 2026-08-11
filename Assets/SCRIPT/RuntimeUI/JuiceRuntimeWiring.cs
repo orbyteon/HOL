@@ -53,6 +53,10 @@ public class JuiceRuntimeWiring : MonoBehaviour
 
         if (clickSource == null || clickSource.clip == null) return;
 
+        // Cache for buttons built later at runtime (see RuntimeUI.AttachJuice).
+        RuntimeUI.SharedClickSource = clickSource;
+        RuntimeUI.SharedClickClip = clickSource.clip;
+
         foreach (var b in buttons)
         {
             bool alreadyWired = false;
