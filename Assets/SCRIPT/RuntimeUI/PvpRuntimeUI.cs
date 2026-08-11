@@ -33,6 +33,17 @@ public class PvpRuntimeUI : MonoBehaviour
 
     void Start()
     {
+        // Release builds must not run the Firebase fallback when PlayFab is
+        // configured: PvpClient is dev-only (secrets readable in the room
+        // document, last-write-wins joins — see its header). A stray
+        // Inspector tick must not silently downgrade production security.
+        if (!usePlayFab && !Debug.isDebugBuild && !string.IsNullOrEmpty(playFabTitleId))
+        {
+            Debug.LogWarning("PvpRuntimeUI: Firebase backend selected in a release build " +
+                "with PlayFab configured — overriding to PlayFab (Firebase is dev-only).");
+            usePlayFab = true;
+        }
+
         // Backend + controller live on this same GameObject. The backend is
         // created here, so its dashboard config comes from our own fields.
         PvpBackend backend;

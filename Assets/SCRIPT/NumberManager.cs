@@ -29,6 +29,12 @@ public class NumberManager : MonoBehaviour
 
     public void SubmitNumber()
     {
+        // Round already decided: any submit — Confirm tap or keyboard Done,
+        // valid or empty — should do nothing. Checked BEFORE validation so a
+        // stray empty submit can't flash "Invalid number" over the result.
+        if (gameManager != null && gameManager.IsMatchOver)
+            return;
+
         int number;
 
         if (!int.TryParse(numberInput.text, out number))
@@ -68,12 +74,6 @@ public class NumberManager : MonoBehaviour
         }
         else
         {
-            // Round already decided: a stray submit (soft keyboard still
-            // open, or Done pressed twice) should do nothing — claiming
-            // "wait your turn" after the match would be misleading.
-            if (gameManager != null && gameManager.IsMatchOver)
-                return;
-
             // Review #6: don't silently swallow (and erase) a guess typed
             // during the opponent's turn — tell the player and keep the input.
             if (gameManager != null && !gameManager.IsPlayerTurn)
@@ -98,6 +98,16 @@ public class NumberManager : MonoBehaviour
         // winning guess ends the match; refocus only while play continues.
         if (gameManager == null || !gameManager.IsMatchOver)
             numberInput.ActivateInputField();
+    }
+
+    // Called by GameManager.EndGame: the match can end on the OPPONENT's
+    // turn (AI finds your number), when the soft keyboard was already
+    // refocused after our last guess — close it so it doesn't cover the
+    // result screen.
+    public void CloseInput()
+    {
+        if (numberInput != null)
+            numberInput.DeactivateInputField();
     }
 
     // Review #3: called by GameManager.RestartMatch so a rematch starts from

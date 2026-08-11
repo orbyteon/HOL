@@ -281,6 +281,12 @@ public class GameManager : MonoBehaviour
         HideButtons();
         stopGameButton.SetActive(true);
 
+        // The soft keyboard may still be up from the player's last guess
+        // (the match can end on the opponent's turn) — close it so it
+        // doesn't cover the result.
+        if (numberManager != null)
+            numberManager.CloseInput();
+
         if (playerWon)
         {
             GameStats.RecordWin(playerGuessCount);

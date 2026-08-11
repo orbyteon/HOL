@@ -84,7 +84,12 @@ public class PvpGameController : MonoBehaviour
 
     public void OnCreateRoomPressed()
     {
-        if (joinCreateInFlight) return;
+        // A live room means the invite code is already out in the world —
+        // re-creating would orphan it and strand the joining friend. Both
+        // backends clear RoomCode in DeleteRoom, so every leave/cancel path
+        // re-enables this. (Reachable via the Confirm button or the secret
+        // field's keyboard-submit while waiting.)
+        if (joinCreateInFlight || !string.IsNullOrEmpty(client.RoomCode)) return;
 
         int secret;
         if (!TryReadSecret(createSecretInput, out secret))
@@ -170,7 +175,9 @@ public class PvpGameController : MonoBehaviour
 
     public void OnJoinRoomPressed()
     {
-        if (joinCreateInFlight) return;
+        // Same guard as create: already in a room → a stray re-submit
+        // (button or keyboard Done) must not join again.
+        if (joinCreateInFlight || !string.IsNullOrEmpty(client.RoomCode)) return;
 
         int secret;
         if (!TryReadSecret(joinSecretInput, out secret))

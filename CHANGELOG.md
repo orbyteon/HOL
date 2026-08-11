@@ -34,10 +34,33 @@ Play Console versionName in `ProjectSettings.asset`.
 - Disabled buttons no longer play the press-squash animation or click
   sound (`ButtonJuice` checks `Selectable.IsInteractable`)
 
+### Fixed (self-review of this pass)
+
+- Solo keyboard-submit wiring now finds `NumberManager` on the inactive
+  `PanelGAME` (`FindObjectOfType(true)`) — it was silently never wired
+- Create/Join are guarded against re-submission while a room is live: a
+  stray Confirm tap or keyboard Done while "Waiting for your challenger"
+  used to create a second room and orphan the already-shared invite code
+- The post-match submit guard runs before validation, so an empty stray
+  submit can't flash "Invalid number" over the result screen
+- The soft keyboard is closed when the match ends on the opponent's turn
+  (`GameManager.EndGame` → `NumberManager.CloseInput`), not only after the
+  player's own winning guess
+
+### Infrastructure
+
+- GameCI workflow (`.github/workflows/ci.yml`): Android compile-check
+  build on every PR and push to main; skips with a warning until the
+  Unity license secrets are configured (release-checklist step 0)
+- Release builds override a stray Firebase backend selection to PlayFab
+  when a Title ID is configured — the Firebase fallback is dev-only
+  (plaintext secrets in the room document, non-atomic joins)
+
 ### Fixed
 
 - `PulseText` no longer permanently brightens translucent labels to full
-  alpha on disable, and no longer pops on enable
+  alpha on disable, and no longer pops on enable (note: the component is
+  not yet attached anywhere — fixed for future use)
 - `ButtonJuice` skips its per-frame lerp once settled (dozens of live
   buttons on mobile) and guards zero-scale buttons
 - `MenuManager.BackToMenu` is null-guarded like `Update`, so a partially

@@ -242,7 +242,10 @@ public class ExtrasRuntimeWiring : MonoBehaviour
 
     void WireNumberInputSubmit()
     {
-        var nm = FindObjectOfType<NumberManager>();
+        // includeInactive: NumberManager sits on PanelGAME, which is inactive
+        // until a match starts — a plain FindObjectOfType would miss it and
+        // silently never wire the feature.
+        var nm = FindObjectOfType<NumberManager>(true);
         if (nm == null || nm.numberInput == null)
             return;
 
