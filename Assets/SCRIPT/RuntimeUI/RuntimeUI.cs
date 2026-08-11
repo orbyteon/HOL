@@ -128,9 +128,12 @@ public static class RuntimeUI
         return button;
     }
 
-    // Numeric TMP input field built entirely from code.
+    // Numeric TMP input field built entirely from code. Pass contentType
+    // Standard for fields that must accept letters (e.g. PvP room codes —
+    // the backends normalize case, so plain Standard is enough).
     public static TMP_InputField CreateInputField(Transform parent, string name,
-        string placeholder, Vector2 position, Vector2 size, int characterLimit = 3)
+        string placeholder, Vector2 position, Vector2 size, int characterLimit = 3,
+        TMP_InputField.ContentType contentType = TMP_InputField.ContentType.IntegerNumber)
     {
         var go = CreateObject(name, parent);
         var rect = (RectTransform)go.transform;
@@ -145,7 +148,7 @@ public static class RuntimeUI
         image.color = new Color(1f, 1f, 1f, 0.9f);
 
         var input = go.AddComponent<TMP_InputField>();
-        input.contentType = TMP_InputField.ContentType.IntegerNumber;
+        input.contentType = contentType;
         input.characterLimit = characterLimit;
 
         // Viewport (masked text area).

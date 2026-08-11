@@ -108,7 +108,8 @@ public class PvpRuntimeUI : MonoBehaviour
         var joinTitle = RuntimeUI.CreateText(joinPanel.transform, "Title", L10n.Get("pvp_join_room"), 48,
             new Vector2(0f, 420f), new Vector2(800f, 100f));
         var joinCode = RuntimeUI.CreateInputField(joinPanel.transform, "CodeInput",
-            L10n.Get("pvp_enter_code"), new Vector2(0f, 240f), new Vector2(460f, 90f), 5);
+            L10n.Get("pvp_enter_code"), new Vector2(0f, 240f), new Vector2(460f, 90f), 5,
+            TMP_InputField.ContentType.Standard);
         var joinSecret = RuntimeUI.CreateInputField(joinPanel.transform, "SecretInput",
             L10n.Get("pvp_secret"), new Vector2(0f, 110f), new Vector2(460f, 90f));
         var joinGo = RuntimeUI.CreateButton(joinPanel.transform, "GoButton",
