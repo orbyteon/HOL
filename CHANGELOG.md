@@ -27,6 +27,12 @@ Play Console versionName in `ProjectSettings.asset`.
   displayed and shared (backends already normalized case)
 - Main-menu stats now include the fastest win ("Fastest win: N guesses") —
   tracked since launch but never surfaced
+- PvP "Creating room..." / "Waiting for your challenger..." now animate
+  trailing dots (the invite handshake is the longest wait in the game and
+  looked frozen); the copy-invite confirmation shows briefly, then the
+  animated waiting line resumes
+- Disabled buttons no longer play the press-squash animation or click
+  sound (`ButtonJuice` checks `Selectable.IsInteractable`)
 
 ### Fixed
 

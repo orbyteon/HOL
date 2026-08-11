@@ -159,6 +159,13 @@ public class PvpRuntimeUI : MonoBehaviour
         controller.createSecretInput = createSecret;
         controller.roomCodeText = AsTmp(codeText);
         controller.createStatusText = AsTmp(createStatus);
+
+        // Waiting-state dots for the create panel's status line; disabled
+        // until the controller shows an animated status (SetCreateStatus).
+        var statusEllipsis = controller.createStatusText.gameObject.AddComponent<AnimatedEllipsis>();
+        statusEllipsis.text = controller.createStatusText;
+        statusEllipsis.enabled = false;
+        controller.createStatusEllipsis = statusEllipsis;
         controller.joinCodeInput = joinCode;
         controller.joinSecretInput = joinSecret;
         controller.joinStatusText = AsTmp(joinStatus);

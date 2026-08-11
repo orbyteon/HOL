@@ -24,6 +24,7 @@ public class PvpGameController : MonoBehaviour
     public TMP_InputField createSecretInput;
     public TMP_Text roomCodeText;
     public TMP_Text createStatusText;
+    public AnimatedEllipsis createStatusEllipsis; // optional: animates the waiting states
 
     [Header("Join flow")]
     public TMP_InputField joinCodeInput;
@@ -88,7 +89,7 @@ public class PvpGameController : MonoBehaviour
         int secret;
         if (!TryReadSecret(createSecretInput, out secret))
         {
-            createStatusText.text = L10n.Get("pvp_secret");
+            SetCreateStatus(L10n.Get("pvp_secret"), false);
             createPanel.SetActive(true);
             pvpMenuPanel.SetActive(false);
             return;
@@ -96,7 +97,7 @@ public class PvpGameController : MonoBehaviour
 
         pvpMenuPanel.SetActive(false);
         createPanel.SetActive(true);
-        createStatusText.text = L10n.Get("pvp_creating");
+        SetCreateStatus(L10n.Get("pvp_creating"), true);
         roomCodeText.text = "-----";
 
         joinCreateInFlight = true;
@@ -113,11 +114,11 @@ public class PvpGameController : MonoBehaviour
             }
             if (!ok)
             {
-                createStatusText.text = L10n.Get("pvp_network_error");
+                SetCreateStatus(L10n.Get("pvp_network_error"), false);
                 return;
             }
             roomCodeText.text = codeOrError;
-            createStatusText.text = L10n.Get("pvp_waiting");
+            SetCreateStatus(L10n.Get("pvp_waiting"), true);
             BeginMatchPolling();
         });
     }
@@ -127,7 +128,44 @@ public class PvpGameController : MonoBehaviour
         if (string.IsNullOrEmpty(client.RoomCode)) return;
 
         GUIUtility.systemCopyBuffer = L10n.Get("pvp_invite_text", client.RoomCode);
-        createStatusText.text = L10n.Get("pvp_invite_copied");
+        SetCreateStatus(L10n.Get("pvp_invite_copied"), false);
+
+        // The copy confirmation is transient — fall back to the animated
+        // waiting line so the panel doesn't look stalled on old text.
+        CancelInvoke(nameof(ResumeWaitingStatus));
+        Invoke(nameof(ResumeWaitingStatus), 2.5f);
+    }
+
+    // Restores "Waiting for your challenger..." after the copy confirmation,
+    // but only if we are in fact still waiting on this panel.
+    void ResumeWaitingStatus()
+    {
+        if (createPanel == null || !createPanel.activeSelf || matchOver)
+            return;
+        if (string.IsNullOrEmpty(client.RoomCode))
+            return;
+        if (lastState != null && lastState.phase != "waiting")
+            return;
+
+        SetCreateStatus(L10n.Get("pvp_waiting"), true);
+    }
+
+    // Single entry point for the create-panel status line: static messages
+    // stop the ellipsis animation so it can't overwrite them; waiting-style
+    // messages animate trailing dots (a static "Waiting..." over the whole
+    // invite handshake — the longest wait in the game — looked frozen).
+    void SetCreateStatus(string message, bool animateDots)
+    {
+        if (createStatusEllipsis != null)
+            createStatusEllipsis.enabled = false;
+
+        createStatusText.text = message;
+
+        if (animateDots && createStatusEllipsis != null)
+        {
+            createStatusEllipsis.SetBaseText(message);
+            createStatusEllipsis.enabled = true;
+        }
     }
 
     public void OnJoinRoomPressed()
@@ -293,7 +331,7 @@ public class PvpGameController : MonoBehaviour
         }
         else if (createPanel.activeSelf)
         {
-            createStatusText.text = message;
+            SetCreateStatus(message, false);
         }
         else if (joinPanel.activeSelf)
         {
