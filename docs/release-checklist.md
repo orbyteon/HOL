@@ -71,7 +71,9 @@ PvP:
 - [ ] Play Console: create app (bundle id is permanent), upload AAB signed
       with the HOL keystore, content rating, data-safety form (declare:
       device ID via PlayFab + ads, optional display name in PvP), privacy
-      policy URL from step 5
+      policy URL from step 5. Listing copy (EN + EL, short/full
+      descriptions, release notes) is paste-ready in
+      `docs/store-listing.md`
 
 ## 5. Privacy policy hosting
 
