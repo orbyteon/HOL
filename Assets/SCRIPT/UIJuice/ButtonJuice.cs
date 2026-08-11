@@ -35,6 +35,7 @@ public class ButtonJuice : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
     public void OnPointerDown(PointerEventData e)
     {
         target = pressedScale;
+        Haptics.Light(); // no-op until a haptics plugin lands; call site is placed
 
         if (audioSource != null && clickSound != null)
             audioSource.PlayOneShot(clickSound);

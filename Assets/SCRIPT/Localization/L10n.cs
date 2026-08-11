@@ -20,7 +20,16 @@ public static class L10n
 
     public static Language Current
     {
-        get { return (Language)PlayerPrefs.GetInt(PrefKey, (int)Language.English); }
+        get
+        {
+            // First launch (no explicit choice yet): follow the device
+            // language, so Greek phones start in Greek.
+            if (!PlayerPrefs.HasKey(PrefKey))
+                return Application.systemLanguage == SystemLanguage.Greek
+                    ? Language.Greek
+                    : Language.English;
+            return (Language)PlayerPrefs.GetInt(PrefKey, (int)Language.English);
+        }
     }
 
     public static void SetLanguage(Language lang)
