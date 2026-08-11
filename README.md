@@ -113,6 +113,11 @@ The game uses only two scenes. All gameplay (menu, settings, matchmaking, and th
 | `PvP/PvpClient.cs` | Firebase RTDB REST backend |
 | `PvP/PlayFabPvpClient.cs` | PlayFab REST + CloudScript backend |
 | `PvP/PvpGameController.cs` | PvP UI orchestration on top of `PvpBackend` |
+| `RuntimeUI/RuntimeUI.cs` | Code-only UI factory (labels, buttons, inputs) |
+| `RuntimeUI/PvpRuntimeUI.cs` | Builds the whole PvP interface at runtime + entry button |
+| `RuntimeUI/ExtrasRuntimeWiring.cs` | Runtime wiring: rematch, search cancel, language buttons, ads-privacy, stats, disclosures, scene-label localization |
+| `RuntimeUI/JuiceRuntimeWiring.cs` | Attaches UIJuice components at runtime (buttons, panels, confetti) |
+| `UIJuice/` | `ButtonJuice` (press squash), `PanelAnimator` (fade+rise), `ConfettiBurst` (win celebration), `PulseText`, `AnimatedEllipsis` |
 
 ## Configuration
 
@@ -123,9 +128,23 @@ Ad settings are constants at the top of `Assets/SCRIPT/AdsManager.cs`:
 
 Replace these with your own LevelPlay credentials before publishing.
 
+### PvP backend setup
+
+PvP uses **PlayFab** by default (`usePlayFab` on the `PvpRuntimeUI` object in `MainMenu`). One-time setup (free):
+
+1. developer.playfab.com → create a Studio + Title, copy the **Title ID** (4–6 hex chars).
+2. Game Manager → **Automation → CloudScript (Legacy) → Revisions**: paste `playfab/cloudscript.js`, Save, **Deploy**. The client expects the current revision (atomic `joinRoom`) — an old deployed revision breaks joining.
+3. Paste the Title ID into `PlayFabPvpClient.titleId` (Inspector on the `PvpRuntimeUI` object, or the script default).
+
+The **Firebase RTDB** backend (`PvpClient`) is the fallback: untick `usePlayFab` and set `databaseUrl` (setup steps in the `PvpClient.cs` header). Firebase joins are last-write-wins under a two-guest race; PlayFab joins are atomic via CloudScript.
+
 ### Ads consent
 
-On first launch the game shows a consent dialog (`ConsentManager`) before initializing the ads SDK; the choice is stored in `PlayerPrefs` under `AdsConsent` and passed to LevelPlay via `LevelPlayPrivacySettings.SetGDPRConsent` (requires `com.unity.services.levelplay` ≥ 9.5.0, set in `Packages/manifest.json`). The privacy policy lives at `docs/privacy.html` — enable GitHub Pages on this repo to host it and link that URL in the Play Console.
+On first launch the game shows a consent dialog (`ConsentManager`) before initializing the ads SDK; the choice is stored in `PlayerPrefs` under `AdsConsent` and passed to LevelPlay via `LevelPlayPrivacySettings.SetGDPRConsent` (requires `com.unity.services.levelplay` ≥ 9.5.0, set in `Packages/manifest.json`). The choice can be changed any time in-game via **Settings → Ads privacy**. The privacy policy lives at `docs/privacy.html` — enable GitHub Pages on this repo to host it and link that URL in the Play Console.
+
+### Release signing
+
+The project builds with the debug key by default. Before a Play Console upload, generate a **dedicated HOL release keystore** (Player Settings → Keystore Manager → Create New), back it up offline, and never commit it (`*.keystore` is gitignored). Do not reuse a keystore from another title.
 
 ## License
 
