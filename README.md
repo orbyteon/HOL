@@ -14,12 +14,15 @@ Under the hood the game is single-player against a lightweight AI, but it's pres
 - **English + native Greek** localization with live language switching; first launch follows the device language
 - **Difficulty modes** — Easy / Normal / Hard / Adaptive (the AI tunes itself to your recent win rate), selectable in Settings
 - **Persistent stats** — wins/losses, current + best streak, best winning guess-count (`PlayerPrefs`); solo and PvP matches both count
+- **Perfect-run celebration** — win in 7 guesses or fewer and the game calls it out
+- **Rewarded "save your streak"** — lose with a streak of 2+ and you can watch a rewarded ad to keep it alive (`Rewarded_Android` LevelPlay unit)
 - Daily-play streak, haptics on win/lose, and a `GameEvents` hub for analytics/notifications
 - Simulated online matchmaking (searching screen, occasional "opponent not found")
 - Randomized opponent names for a multiplayer feel
 - Player name entry and a music on/off toggle, saved between sessions
 - Full sound coverage: looping music, click on every button, opponent-found stinger, win/lose stingers (solo and PvP)
 - Interstitial ads via Unity LevelPlay (ironSource), shown at match end with a frequency cap
+- **Force-update gate** — PlayFab TitleData `minVersion` blocks outdated builds with a store link; fails open when the backend isn't configured
 - First-launch ads-consent dialog (zero setup — builds itself from code)
 - Android back button handled everywhere — including mid-match exit (solo)
 
@@ -105,6 +108,7 @@ The game uses only two scenes. All gameplay (menu, settings, matchmaking, and th
 | `BlinkText.cs` | Blinking-text UI helper |
 | `QuitGame.cs` | Quits the application |
 | `GameStats.cs` | Persistent W/L, streaks, best guess-count, rolling win-rate window |
+| `ForceUpdate.cs` | PlayFab TitleData `minVersion` gate with blocking store-link dialog (fail-open) |
 | `Localization/L10n.cs` | EN/EL string table + language persistence |
 | `Localization/LocalizedText.cs` | Drop-in component: TMP_Text follows the selected language |
 | `Localization/LanguageSelector.cs` | Settings-language picker hooks |
@@ -120,6 +124,16 @@ The game uses only two scenes. All gameplay (menu, settings, matchmaking, and th
 | `RuntimeUI/ExtrasRuntimeWiring.cs` | Runtime wiring: rematch, search cancel, language buttons, ads-privacy, stats, disclosures, scene-label localization |
 | `RuntimeUI/JuiceRuntimeWiring.cs` | Attaches UIJuice components at runtime (buttons, panels, confetti) |
 | `UIJuice/` | `ButtonJuice` (press squash), `PanelAnimator` (fade+rise), `ConfettiBurst` (win celebration), `PulseText`, `AnimatedEllipsis` |
+| `Design/ConvergingLight.cs` | Palette + gradient/texture canon (indigo depth, cyan/gold accents) |
+| `Design/SplashDesign.cs` | Builds the animated splash (logo bloom, loading hairline) from code |
+| `Design/DesignRuntimeWiring.cs` | Applies the Converging Light layer to runtime-built panels |
+| `Design/NumberDrift.cs` | Drifting background number fields |
+
+## Release docs
+
+- `docs/release-checklist.md` — ordered go-live checklist (Unity smoke test → PlayFab → keystore → dashboards → privacy hosting → token rotation)
+- `docs/store-listing.md` — paste-ready Play Store listing copy (EN + EL) and release notes
+- `docs/privacy.html` — privacy policy, ready for static hosting
 
 ## Configuration
 
@@ -127,6 +141,7 @@ Ad settings are constants at the top of `Assets/SCRIPT/AdsManager.cs`:
 
 - **LevelPlay Game ID:** `6076495`
 - **Interstitial ad unit:** `Interstitial_Android` (an `Interstitial_iOS` unit is selected automatically on iOS builds via `#if UNITY_IOS` — create it in the LevelPlay dashboard before shipping iOS)
+- **Rewarded ad unit:** `Rewarded_Android` (same `#if UNITY_IOS` pattern with `Rewarded_iOS`) — powers the save-your-streak offer; create it in the dashboard or the offer silently never appears
 
 Replace these with your own LevelPlay credentials before publishing.
 
