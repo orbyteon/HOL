@@ -216,16 +216,25 @@ public class PvpRuntimeUI : MonoBehaviour
     }
 
     // The controller's fields are TMP_Text; RuntimeUI builds legacy Text for
-    // labels, so swap in a TMP_Text on the same object and copy the content.
+    // labels, so replace the legacy Text with a TMP_Text on the same object.
+    // Both are Graphic components and Unity allows only one Graphic per
+    // GameObject, so the legacy Text must be destroyed first — immediately,
+    // since Destroy() is deferred to end-of-frame and AddComponent would
+    // still conflict (and return null).
     static TMP_Text AsTmp(Text legacy)
     {
-        var tmp = legacy.gameObject.AddComponent<TextMeshProUGUI>();
-        tmp.text = legacy.text;
-        tmp.fontSize = legacy.fontSize;
-        tmp.color = legacy.color;
+        var go = legacy.gameObject;
+        string content = legacy.text;
+        int fontSize = legacy.fontSize;
+        Color color = legacy.color;
+        DestroyImmediate(legacy);
+
+        var tmp = go.AddComponent<TextMeshProUGUI>();
+        tmp.text = content;
+        tmp.fontSize = fontSize;
+        tmp.color = color;
         tmp.alignment = TextAlignmentOptions.Center;
         tmp.enableWordWrapping = true;
-        legacy.enabled = false; // TMP renders instead
         return tmp;
     }
 }
