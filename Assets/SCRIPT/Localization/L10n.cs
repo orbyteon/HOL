@@ -121,5 +121,6 @@ public static class L10n
         { "consent_message",         new[] { "This game shows ads. Allow personalized ads?", "Το παιχνίδι εμφανίζει διαφημίσεις. Να επιτρέπονται εξατομικευμένες;" } },
         { "yes",                     new[] { "Yes", "Ναι" } },
         { "no",                      new[] { "No", "Όχι" } },
+        { "ads_privacy",             new[] { "Ads privacy", "Απόρρητο διαφημίσεων" } },
     };
 }
