@@ -3,6 +3,30 @@
 All notable changes to HOL. Dates are commit dates; versions follow the
 Play Console versionName in `ProjectSettings.asset`.
 
+## [Unreleased]
+
+### Improved (frontend experience pass)
+
+- Losses now reveal the secret number you were hunting (solo and PvP) —
+  no more finishing a round without ever learning the answer
+- The soft keyboard's Done key (Enter in the editor) submits everywhere:
+  solo number entry and all PvP inputs (secret, room code, guess)
+- Settings language buttons highlight the active language in gold, same
+  as the difficulty row (they used to look identical either way)
+- PvP: a guess rejected by a network error is put back into the input for
+  retry instead of being erased (matches solo behavior)
+- Buttons built after startup (streak-save offer, reopened consent dialog)
+  now get press-squash feedback and the shared click sound too
+
+### Fixed
+
+- `PulseText` no longer permanently brightens translucent labels to full
+  alpha on disable, and no longer pops on enable
+- `ButtonJuice` skips its per-frame lerp once settled (dozens of live
+  buttons on mobile) and guards zero-scale buttons
+- `MenuManager.BackToMenu` is null-guarded like `Update`, so a partially
+  wired scene can't crash back-navigation
+
 ## [0.2.0] — 2026-08-11 (release candidate: `v0.2.0-rc2`)
 
 First public release candidate.

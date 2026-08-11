@@ -20,7 +20,6 @@ using TMPro;
 public class ExtrasRuntimeWiring : MonoBehaviour
 {
     // Converging Light palette (design/philosophy.md).
-    static readonly Color AccentBlue = new Color(0.25f, 0.85f, 1f); // cyan seam
     static readonly Color Neutral = new Color(0.16f, 0.15f, 0.26f);   // indigo gray
     static readonly Color DarkLabel = new Color(0.10f, 0.09f, 0.18f);
 
@@ -39,6 +38,7 @@ public class ExtrasRuntimeWiring : MonoBehaviour
 
         EnsureDailyStreak();
         WireRematchButton();
+        WireNumberInputSubmit();
         WireMatchmakingCancel();
         WireLanguageButtons();
         WireConsentSettings();
@@ -197,21 +197,7 @@ public class ExtrasRuntimeWiring : MonoBehaviour
     {
         int current = Mathf.Clamp(PlayerPrefs.GetInt(DifficultyPrefKey, 1), 0, 3);
         for (int i = 0; i < difficultyButtons.Length; i++)
-        {
-            if (difficultyButtons[i] == null)
-                continue;
-
-            bool selected = i == current;
-
-            var image = difficultyButtons[i].GetComponent<Image>();
-            if (image != null)
-                image.color = selected ? Gold : Neutral;
-
-            // Keep label contrast with the button tint.
-            var label = difficultyButtons[i].GetComponentInChildren<Text>();
-            if (label != null)
-                label.color = selected ? DarkLabel : new Color(0.91f, 0.93f, 1f);
-        }
+            TintSelectable(difficultyButtons[i], i == current);
     }
 
     // --- 1. Rematch -------------------------------------------------------
@@ -248,6 +234,21 @@ public class ExtrasRuntimeWiring : MonoBehaviour
         }
     }
 
+    // --- 1b. Keyboard submit --------------------------------------------------
+    //
+    // The soft keyboard's Done key (Enter in the editor) submits the number,
+    // instead of forcing a reach for the Confirm button. SubmitNumber already
+    // validates turn/range, so a mistimed submit just shows the usual message.
+
+    void WireNumberInputSubmit()
+    {
+        var nm = FindObjectOfType<NumberManager>();
+        if (nm == null || nm.numberInput == null)
+            return;
+
+        nm.numberInput.onSubmit.AddListener(_ => nm.SubmitNumber());
+    }
+
     // --- 2. Matchmaking cancel ---------------------------------------------
 
     void WireMatchmakingCancel()
@@ -280,15 +281,45 @@ public class ExtrasRuntimeWiring : MonoBehaviour
             new Vector2(0f, -480f), new Vector2(400f, 50f));
         RuntimeUI.Localize(languageLabel, "language");
 
-        var en = RuntimeUI.CreateButton(menu.settingsPanel.transform,
+        englishButton = RuntimeUI.CreateButton(menu.settingsPanel.transform,
             "EnglishButton", "English",
-            new Vector2(-130f, -560f), new Vector2(220f, 80f), AccentBlue, DarkLabel);
-        en.onClick.AddListener(selector.SetEnglish);
+            new Vector2(-130f, -560f), new Vector2(220f, 80f), Neutral);
+        englishButton.onClick.AddListener(selector.SetEnglish);
 
-        var el = RuntimeUI.CreateButton(menu.settingsPanel.transform,
+        greekButton = RuntimeUI.CreateButton(menu.settingsPanel.transform,
             "GreekButton", "Ελληνικά",
-            new Vector2(130f, -560f), new Vector2(220f, 80f), AccentBlue, DarkLabel);
-        el.onClick.AddListener(selector.SetGreek);
+            new Vector2(130f, -560f), new Vector2(220f, 80f), Neutral);
+        greekButton.onClick.AddListener(selector.SetGreek);
+
+        RefreshLanguageButtons();
+        L10n.OnLanguageChanged += RefreshLanguageButtons;
+    }
+
+    // Mirror the difficulty row: the active language is tinted gold so the
+    // current choice is visible at a glance (before, both buttons looked
+    // identical whichever language was on).
+    Button englishButton;
+    Button greekButton;
+
+    void RefreshLanguageButtons()
+    {
+        bool english = L10n.Current == L10n.Language.English;
+        TintSelectable(englishButton, english);
+        TintSelectable(greekButton, !english);
+    }
+
+    static void TintSelectable(Button button, bool selected)
+    {
+        if (button == null)
+            return;
+
+        var image = button.GetComponent<Image>();
+        if (image != null)
+            image.color = selected ? Gold : Neutral;
+
+        var label = button.GetComponentInChildren<Text>();
+        if (label != null)
+            label.color = selected ? DarkLabel : new Color(0.91f, 0.93f, 1f);
     }
 
     // --- 4. Stats label ------------------------------------------------------
@@ -368,6 +399,7 @@ public class ExtrasRuntimeWiring : MonoBehaviour
     {
         L10n.OnLanguageChanged -= RefreshStats;
         L10n.OnLanguageChanged -= RefreshDisclosure;
+        L10n.OnLanguageChanged -= RefreshLanguageButtons;
         L10n.OnLanguageChanged -= RefreshLegacySceneTexts;
         GameEvents.OnMatchEnded -= OnMatchEnded;
     }

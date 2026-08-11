@@ -176,6 +176,15 @@ public class PvpRuntimeUI : MonoBehaviour
         guessBtn.onClick.AddListener(controller.OnSubmitGuessPressed);
         leaveBtn.onClick.AddListener(controller.OnLeaveMatchPressed);
 
+        // Soft-keyboard Done (Enter in the editor) submits the field's flow;
+        // the handlers validate and give feedback, so a premature submit is
+        // safe. The join-code field routes to join too — with the secret
+        // still empty it just shows the "enter your secret" status.
+        createSecret.onSubmit.AddListener(_ => controller.OnCreateRoomPressed());
+        joinCode.onSubmit.AddListener(_ => controller.OnJoinRoomPressed());
+        joinSecret.onSubmit.AddListener(_ => controller.OnJoinRoomPressed());
+        guessInput.onSubmit.AddListener(_ => controller.OnSubmitGuessPressed());
+
         // All panels start hidden; OpenPvpMenu shows the menu panel.
         menuPanel.SetActive(false);
         createPanel.SetActive(false);

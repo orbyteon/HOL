@@ -188,6 +188,7 @@ public class PvpGameController : MonoBehaviour
             return;
         }
 
+        string typed = guessInput.text;
         guessInput.text = "";
         turnText.text = L10n.Get("pvp_sending");
         guessInFlight = true;
@@ -195,7 +196,13 @@ public class PvpGameController : MonoBehaviour
         {
             guessInFlight = false;
             if (ok) myGuessCount++; // count only guesses the room accepted
-            else turnText.text = L10n.Get("pvp_network_error");
+            else
+            {
+                // Same rule as solo: a guess the room never accepted is kept
+                // in the input so the player can retry, not retype.
+                guessInput.text = typed;
+                turnText.text = L10n.Get("pvp_network_error");
+            }
         });
     }
 
@@ -382,9 +389,12 @@ public class PvpGameController : MonoBehaviour
             client.StopPolling();
 
             bool iWon = s.winner == (client.IsHost ? "host" : "guest");
+            // On a loss, reveal the number we were hunting (the opponent's
+            // secret) — same closure the solo endgame gives.
+            int huntedSecret = client.IsHost ? s.guestSecret : s.hostSecret;
             resultText.text = iWon
                 ? L10n.Get("you_win") + "\n" + L10n.Get("won_in_guesses", myGuessCount)
-                : L10n.Get("you_lose");
+                : L10n.Get("you_lose") + "\n" + L10n.Get("number_was", huntedSecret);
             turnText.text = "";
 
             // Same endgame treatment as solo: stats, stinger, haptic, confetti.

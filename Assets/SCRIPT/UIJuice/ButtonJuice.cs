@@ -27,8 +27,15 @@ public class ButtonJuice : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
 
     void Update()
     {
+        if (baseScale.x == 0f) return; // authored at zero scale — nothing to animate
+
         float current = transform.localScale.x / baseScale.x;
+        if (Mathf.Approximately(current, target))
+            return; // settled — skip the per-frame lerp (dozens of buttons live at once)
+
         float next = Mathf.Lerp(current, target, Time.unscaledDeltaTime * speed);
+        if (Mathf.Abs(next - target) < 0.001f)
+            next = target;
         transform.localScale = baseScale * next;
     }
 

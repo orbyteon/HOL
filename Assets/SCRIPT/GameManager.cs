@@ -300,7 +300,9 @@ public class GameManager : MonoBehaviour
             Haptics.Error();
             GameEvents.MatchEnded(false, 0);
 
-            turnText.text = L10n.Get("you_lose");
+            // Reveal the AI's secret — losing without ever learning the
+            // answer leaves the round feeling unresolved.
+            turnText.text = L10n.Get("you_lose") + "\n" + L10n.Get("number_was", aiSecretNumber);
             if (audioSource != null && loseSound != null)
                 audioSource.PlayOneShot(loseSound);
 

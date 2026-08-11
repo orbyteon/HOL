@@ -49,11 +49,13 @@ public class MenuManager : MonoBehaviour
         if (matchmaking != null)
             matchmaking.CancelSearch();
 
-        settingsPanel.SetActive(false);
-        panelPlay.SetActive(false);
-        panelSearching.SetActive(false);
+        // Null-guarded like Update: a partially wired scene must not NRE out
+        // of the back-navigation path.
+        if (settingsPanel != null) settingsPanel.SetActive(false);
+        if (panelPlay != null) panelPlay.SetActive(false);
+        if (panelSearching != null) panelSearching.SetActive(false);
 
-        mainMenuPanel.SetActive(true);
+        if (mainMenuPanel != null) mainMenuPanel.SetActive(true);
     }
 
     public void OnPlayPressed()

@@ -100,6 +100,7 @@ public static class L10n
         { "you_win",                 new[] { "YOU WIN!", "ΚΕΡΔΙΣΕΣ!" } },
         { "you_lose",                new[] { "YOU LOSE!", "ΕΧΑΣΕΣ!" } },
         { "won_in_guesses",          new[] { "In {0} guesses", "Σε {0} προσπάθειες" } },
+        { "number_was",              new[] { "The number was {0}", "Ο αριθμός ήταν {0}" } },
         { "rematch",                 new[] { "Rematch", "Ρεβάνς" } },
 
         // stats
