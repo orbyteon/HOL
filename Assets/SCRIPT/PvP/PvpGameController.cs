@@ -60,7 +60,7 @@ public class PvpGameController : MonoBehaviour
         int secret;
         if (!TryReadSecret(createSecretInput, out secret))
         {
-            createStatusText.text = "Enter your secret number (1-100) first";
+            createStatusText.text = L10n.Get("pvp_secret");
             createPanel.SetActive(true);
             pvpMenuPanel.SetActive(false);
             return;
@@ -68,18 +68,18 @@ public class PvpGameController : MonoBehaviour
 
         pvpMenuPanel.SetActive(false);
         createPanel.SetActive(true);
-        createStatusText.text = "Creating room...";
+        createStatusText.text = L10n.Get("pvp_creating");
         roomCodeText.text = "-----";
 
         client.CreateRoom(MyName, secret, (ok, codeOrError) =>
         {
             if (!ok)
             {
-                createStatusText.text = "Could not create room. Check connection.";
+                createStatusText.text = L10n.Get("pvp_network_error");
                 return;
             }
             roomCodeText.text = codeOrError;
-            createStatusText.text = "Waiting for your challenger...";
+            createStatusText.text = L10n.Get("pvp_waiting");
             BeginMatchPolling();
         });
     }
@@ -88,9 +88,8 @@ public class PvpGameController : MonoBehaviour
     {
         if (string.IsNullOrEmpty(client.RoomCode)) return;
 
-        GUIUtility.systemCopyBuffer =
-            "Duel me in HOL — Higher or Lower! My room code: " + client.RoomCode;
-        createStatusText.text = "Invite copied! Send it to a friend.";
+        GUIUtility.systemCopyBuffer = L10n.Get("pvp_invite_text", client.RoomCode);
+        createStatusText.text = L10n.Get("pvp_invite_copied");
     }
 
     public void OnJoinRoomPressed()
@@ -98,16 +97,16 @@ public class PvpGameController : MonoBehaviour
         int secret;
         if (!TryReadSecret(joinSecretInput, out secret))
         {
-            joinStatusText.text = "Enter your secret number (1-100)";
+            joinStatusText.text = L10n.Get("pvp_secret");
             return;
         }
         if (string.IsNullOrEmpty(joinCodeInput.text.Trim()))
         {
-            joinStatusText.text = "Enter the room code";
+            joinStatusText.text = L10n.Get("pvp_enter_code");
             return;
         }
 
-        joinStatusText.text = "Joining...";
+        joinStatusText.text = L10n.Get("pvp_joining");
         client.JoinRoom(joinCodeInput.text, MyName, secret, (ok, error) =>
         {
             if (!ok)
@@ -126,29 +125,31 @@ public class PvpGameController : MonoBehaviour
         string me = client.IsHost ? "host" : "guest";
         if (lastState.turn != me || lastState.phase != "play")
         {
-            turnText.text = "Wait for your turn...";
+            turnText.text = L10n.Get("pvp_wait_turn");
             return;
         }
 
         int guess;
         if (!TryReadSecret(guessInput, out guess))
         {
-            turnText.text = "Guess a number 1-100";
+            turnText.text = L10n.Get("enter_your_number");
             return;
         }
 
         guessInput.text = "";
-        turnText.text = "Sending...";
+        turnText.text = L10n.Get("pvp_sending");
         client.SubmitGuess(guess, lastState, ok =>
         {
-            if (!ok) turnText.text = "Network hiccup — try again";
+            if (!ok) turnText.text = L10n.Get("pvp_network_error");
         });
     }
 
     public void OnLeaveMatchPressed()
     {
         client.StopPolling();
-        if (client.IsHost) client.DeleteRoom();
+        // Either side leaving closes the room: Firebase deletes it (the other
+        // poller sees it vanish), PlayFab marks phase "closed".
+        client.DeleteRoom();
         matchOver = false;
         lastState = null;
         shownGuessKey = "";
@@ -161,11 +162,50 @@ public class PvpGameController : MonoBehaviour
     {
         matchOver = false;
         shownGuessKey = "";
+        client.OnRoomClosed = HandleRoomClosed;
+        client.OnConnectionLost = HandleConnectionLost;
         client.StartPolling(OnState);
+    }
+
+    void HandleRoomClosed()
+    {
+        ShowTerminalStatus(L10n.Get("pvp_opponent_left"));
+    }
+
+    void HandleConnectionLost()
+    {
+        ShowTerminalStatus(L10n.Get("pvp_connection_lost"));
+    }
+
+    // Match-ending status that works from whichever panel is visible.
+    void ShowTerminalStatus(string message)
+    {
+        if (matchPanel.activeSelf)
+        {
+            matchOver = true;
+            resultText.text = message;
+            turnText.text = "";
+        }
+        else if (createPanel.activeSelf)
+        {
+            createStatusText.text = message;
+        }
+        else if (joinPanel.activeSelf)
+        {
+            joinStatusText.text = message;
+        }
     }
 
     void OnState(PvpBackend.RoomState s)
     {
+        // PlayFab rooms can't be deleted; a leaver marks them closed instead.
+        if (s.phase == "closed")
+        {
+            client.StopPolling();
+            HandleRoomClosed();
+            return;
+        }
+
         lastState = s;
 
         // still waiting for a guest?
@@ -184,7 +224,7 @@ public class PvpGameController : MonoBehaviour
         }
 
         string opponentName = client.IsHost ? s.guestName : s.hostName;
-        opponentNameText.text = "Opponent: " + opponentName;
+        opponentNameText.text = L10n.Get("opponent_label", opponentName);
 
         // show the latest guess with an honest, auto-computed hint
         string key = s.lastBy + ":" + s.lastGuess;
@@ -193,12 +233,12 @@ public class PvpGameController : MonoBehaviour
             shownGuessKey = key;
             bool guessWasMine = (s.lastBy == (client.IsHost ? "host" : "guest"));
             int targetSecret = s.lastBy == "host" ? s.guestSecret : s.hostSecret;
-            string who = guessWasMine ? "You" : opponentName;
+            string who = guessWasMine ? L10n.Get("you") : opponentName;
 
             string hint;
-            if (s.lastGuess == targetSecret) hint = "CORRECT!";
-            else if (s.lastGuess < targetSecret) hint = "Higher";
-            else hint = "Lower";
+            if (s.lastGuess == targetSecret) hint = L10n.Get("correct") + "!";
+            else if (s.lastGuess < targetSecret) hint = L10n.Get("higher");
+            else hint = L10n.Get("lower");
 
             historyText.text = who + ": " + s.lastGuess + "  →  " + hint;
         }
@@ -209,7 +249,7 @@ public class PvpGameController : MonoBehaviour
             client.StopPolling();
 
             bool iWon = s.winner == (client.IsHost ? "host" : "guest");
-            resultText.text = iWon ? "YOU WIN!" : "YOU LOSE!";
+            resultText.text = iWon ? L10n.Get("you_win") : L10n.Get("you_lose");
             turnText.text = "";
 
             if (iWon && winConfetti != null)
@@ -220,7 +260,7 @@ public class PvpGameController : MonoBehaviour
         if (!matchOver)
         {
             bool myTurn = s.turn == (client.IsHost ? "host" : "guest");
-            turnText.text = myTurn ? "Your guess" : opponentName + " is thinking...";
+            turnText.text = myTurn ? L10n.Get("your_guess") : L10n.Get("opponent_thinking", opponentName);
         }
     }
 
