@@ -18,8 +18,10 @@ using TMPro;
 //   8. Scene-authored English labels -> LocalizedText via content mapping.
 public class ExtrasRuntimeWiring : MonoBehaviour
 {
-    static readonly Color AccentBlue = new Color(0.20f, 0.50f, 0.90f);
-    static readonly Color Neutral = new Color(0.25f, 0.25f, 0.30f);
+    // Converging Light palette (design/philosophy.md).
+    static readonly Color AccentBlue = new Color(0.25f, 0.85f, 1f); // cyan seam
+    static readonly Color Neutral = new Color(0.16f, 0.15f, 0.26f);   // indigo gray
+    static readonly Color DarkLabel = new Color(0.10f, 0.09f, 0.18f);
 
     Text statsLabel;
     Text disclosurePlay;
@@ -203,12 +205,12 @@ public class ExtrasRuntimeWiring : MonoBehaviour
 
         var en = RuntimeUI.CreateButton(menu.settingsPanel.transform,
             "EnglishButton", "English",
-            new Vector2(-130f, -560f), new Vector2(220f, 80f), AccentBlue);
+            new Vector2(-130f, -560f), new Vector2(220f, 80f), AccentBlue, DarkLabel);
         en.onClick.AddListener(selector.SetEnglish);
 
         var el = RuntimeUI.CreateButton(menu.settingsPanel.transform,
             "GreekButton", "Ελληνικά",
-            new Vector2(130f, -560f), new Vector2(220f, 80f), AccentBlue);
+            new Vector2(130f, -560f), new Vector2(220f, 80f), AccentBlue, DarkLabel);
         el.onClick.AddListener(selector.SetGreek);
     }
 
@@ -223,7 +225,7 @@ public class ExtrasRuntimeWiring : MonoBehaviour
         statsLabel = RuntimeUI.CreateText(menu.mainMenuPanel.transform,
             "StatsLabel", "", 28,
             new Vector2(0f, 820f), new Vector2(700f, 90f),
-            new Color(1f, 1f, 1f, 0.8f));
+            new Color(0.91f, 0.93f, 1f, 0.8f));
 
         RefreshStats();
         L10n.OnLanguageChanged += RefreshStats;
@@ -260,7 +262,7 @@ public class ExtrasRuntimeWiring : MonoBehaviour
             disclosurePlay = RuntimeUI.CreateText(menu.panelPlay.transform,
                 "DisclosureLabel", "", 22,
                 new Vector2(0f, -560f), new Vector2(760f, 70f),
-                new Color(1f, 1f, 1f, 0.6f));
+                new Color(0.91f, 0.93f, 1f, 0.6f));
         }
 
         var mm = FindObjectOfType<FakeMatchmaking>();
@@ -269,7 +271,7 @@ public class ExtrasRuntimeWiring : MonoBehaviour
             disclosureSearch = RuntimeUI.CreateText(mm.searchingPanel.transform,
                 "DisclosureLabel", "", 22,
                 new Vector2(0f, -540f), new Vector2(760f, 70f),
-                new Color(1f, 1f, 1f, 0.6f));
+                new Color(0.91f, 0.93f, 1f, 0.6f));
         }
 
         RefreshDisclosure();

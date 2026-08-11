@@ -17,10 +17,14 @@ public class PvpRuntimeUI : MonoBehaviour
     [Tooltip("Use PlayFab backend instead of Firebase")]
     public bool usePlayFab;
 
+    // Converging Light palette (design/philosophy.md): indigo depth, cyan and
+    // gold as the disciplined lights, near-white text. Gold is reserved for
+    // the single most important action on each screen (primary CTA).
     static readonly Color PanelColor = new Color(0.08f, 0.05f, 0.15f, 0.97f);
-    static readonly Color Accent = new Color(0.65f, 0.2f, 0.8f, 1f);
-    static readonly Color AccentBlue = new Color(0.25f, 0.55f, 0.95f, 1f);
-    static readonly Color Neutral = new Color(0.35f, 0.35f, 0.4f, 1f);
+    static readonly Color Accent = new Color(1f, 0.78f, 0.34f, 1f);   // muted gold
+    static readonly Color AccentBlue = new Color(0.25f, 0.85f, 1f, 1f); // cyan seam
+    static readonly Color Neutral = new Color(0.16f, 0.15f, 0.26f, 1f); // indigo gray
+    static readonly Color DarkLabel = new Color(0.10f, 0.09f, 0.18f, 1f);
 
     void Start()
     {
@@ -46,9 +50,9 @@ public class PvpRuntimeUI : MonoBehaviour
         RuntimeUI.CreateText(menuPanel.transform, "Title", L10n.Get("pvp_duel"), 64,
             new Vector2(0f, 420f), new Vector2(800f, 120f));
         var createBtn = RuntimeUI.CreateButton(menuPanel.transform, "CreateButton",
-            L10n.Get("pvp_create_room"), new Vector2(0f, 120f), new Vector2(460f, 100f), Accent);
+            L10n.Get("pvp_create_room"), new Vector2(0f, 120f), new Vector2(460f, 100f), Accent, DarkLabel);
         var joinBtn = RuntimeUI.CreateButton(menuPanel.transform, "JoinButton",
-            L10n.Get("pvp_join_room"), new Vector2(0f, -20f), new Vector2(460f, 100f), AccentBlue);
+            L10n.Get("pvp_join_room"), new Vector2(0f, -20f), new Vector2(460f, 100f), AccentBlue, DarkLabel);
         var closeBtn = RuntimeUI.CreateButton(menuPanel.transform, "CloseButton",
             L10n.Get("back"), new Vector2(0f, -200f), new Vector2(300f, 80f), Neutral);
 
@@ -59,11 +63,11 @@ public class PvpRuntimeUI : MonoBehaviour
         var createSecret = RuntimeUI.CreateInputField(createPanel.transform, "SecretInput",
             L10n.Get("pvp_secret"), new Vector2(0f, 240f), new Vector2(460f, 90f));
         var createGo = RuntimeUI.CreateButton(createPanel.transform, "GoButton",
-            L10n.Get("confirm"), new Vector2(0f, 110f), new Vector2(460f, 90f), Accent);
+            L10n.Get("confirm"), new Vector2(0f, 110f), new Vector2(460f, 90f), Accent, DarkLabel);
         var codeText = RuntimeUI.CreateText(createPanel.transform, "RoomCode", "-----", 96,
             new Vector2(0f, -80f), new Vector2(800f, 140f));
         var copyBtn = RuntimeUI.CreateButton(createPanel.transform, "CopyButton",
-            L10n.Get("pvp_copy"), new Vector2(0f, -220f), new Vector2(460f, 90f), AccentBlue);
+            L10n.Get("pvp_copy"), new Vector2(0f, -220f), new Vector2(460f, 90f), AccentBlue, DarkLabel);
         var createStatus = RuntimeUI.CreateText(createPanel.transform, "Status", "", 32,
             new Vector2(0f, -380f), new Vector2(900f, 120f));
         var createBack = RuntimeUI.CreateButton(createPanel.transform, "BackButton",
@@ -78,7 +82,7 @@ public class PvpRuntimeUI : MonoBehaviour
         var joinSecret = RuntimeUI.CreateInputField(joinPanel.transform, "SecretInput",
             L10n.Get("pvp_secret"), new Vector2(0f, 110f), new Vector2(460f, 90f));
         var joinGo = RuntimeUI.CreateButton(joinPanel.transform, "GoButton",
-            L10n.Get("confirm"), new Vector2(0f, -20f), new Vector2(460f, 90f), AccentBlue);
+            L10n.Get("confirm"), new Vector2(0f, -20f), new Vector2(460f, 90f), AccentBlue, DarkLabel);
         var joinStatus = RuntimeUI.CreateText(joinPanel.transform, "Status", "", 32,
             new Vector2(0f, -200f), new Vector2(900f, 120f));
         var joinBack = RuntimeUI.CreateButton(joinPanel.transform, "BackButton",
@@ -95,7 +99,7 @@ public class PvpRuntimeUI : MonoBehaviour
         var guessInput = RuntimeUI.CreateInputField(matchPanel.transform, "GuessInput",
             "1-100", new Vector2(0f, -80f), new Vector2(460f, 90f));
         var guessBtn = RuntimeUI.CreateButton(matchPanel.transform, "GuessButton",
-            L10n.Get("pvp_guess"), new Vector2(0f, -210f), new Vector2(460f, 90f), Accent);
+            L10n.Get("pvp_guess"), new Vector2(0f, -210f), new Vector2(460f, 90f), Accent, DarkLabel);
         var resultText = RuntimeUI.CreateText(matchPanel.transform, "Result", "", 72,
             new Vector2(0f, -400f), new Vector2(1000f, 120f));
         var leaveBtn = RuntimeUI.CreateButton(matchPanel.transform, "LeaveButton",
@@ -149,7 +153,7 @@ public class PvpRuntimeUI : MonoBehaviour
         }
 
         var entry = RuntimeUI.CreateButton(mainCanvasGo.transform, "ButtonPvP",
-            L10n.Get("pvp_duel"), new Vector2(0f, -620f), new Vector2(460f, 100f), Accent);
+            L10n.Get("pvp_duel"), new Vector2(0f, -620f), new Vector2(460f, 100f), Accent, DarkLabel);
         entry.onClick.AddListener(controller.OpenPvpMenu);
     }
 

@@ -81,11 +81,11 @@ public class ConsentManager : MonoBehaviour
 
     GameObject BuildRuntimeDialog()
     {
-        // Dimmed fullscreen backdrop.
+        // Dimmed fullscreen backdrop (Converging Light: indigo night, not black).
         var panel = CreateUIObject("ConsentPanel", transform);
         Stretch(panel);
         var bg = panel.AddComponent<Image>();
-        bg.color = new Color(0f, 0f, 0f, 0.85f);
+        bg.color = new Color(0.05f, 0.05f, 0.12f, 0.92f);
         bg.raycastTarget = true; // block taps through the dialog
 
         // Centered card.
@@ -95,7 +95,7 @@ public class ConsentManager : MonoBehaviour
         cardRect.anchorMax = new Vector2(0.5f, 0.5f);
         cardRect.sizeDelta = new Vector2(600f, 420f);
         var cardImage = card.AddComponent<Image>();
-        cardImage.color = new Color(0.16f, 0.16f, 0.2f, 1f);
+        cardImage.color = new Color(0.10f, 0.09f, 0.18f, 1f);
 
         // Message.
         var message = CreateText(card.transform, "Message",
@@ -103,11 +103,11 @@ public class ConsentManager : MonoBehaviour
 
         // Buttons.
         var yes = CreateButton(card.transform, "YesButton", L10n.Get("yes"),
-            new Vector2(0f, -80f), new Color(0.25f, 0.55f, 0.95f));
+            new Vector2(0f, -80f), new Color(0.25f, 0.85f, 1f), new Color(0.10f, 0.09f, 0.18f));
         yes.onClick.AddListener(AcceptPersonalized);
 
         var no = CreateButton(card.transform, "NoButton", L10n.Get("no"),
-            new Vector2(0f, -170f), new Color(0.35f, 0.35f, 0.4f));
+            new Vector2(0f, -170f), new Color(0.16f, 0.15f, 0.26f));
         no.onClick.AddListener(DeclinePersonalized);
 
         return panel;
@@ -129,7 +129,8 @@ public class ConsentManager : MonoBehaviour
         rect.offsetMax = Vector2.zero;
     }
 
-    static Text CreateText(Transform parent, string name, string content, int fontSize, Vector2 position)
+    static Text CreateText(Transform parent, string name, string content, int fontSize, Vector2 position,
+        Color? color = null)
     {
         var go = CreateUIObject(name, parent);
         var rect = (RectTransform)go.transform;
@@ -141,13 +142,14 @@ public class ConsentManager : MonoBehaviour
         var text = go.AddComponent<Text>();
         text.text = content;
         text.fontSize = fontSize;
-        text.color = Color.white;
+        text.color = color ?? new Color(0.91f, 0.93f, 1f); // near-white, never pure white
         text.alignment = TextAnchor.MiddleCenter;
         text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         return text;
     }
 
-    static Button CreateButton(Transform parent, string name, string label, Vector2 position, Color color)
+    static Button CreateButton(Transform parent, string name, string label, Vector2 position, Color color,
+        Color? labelColor = null)
     {
         var go = CreateUIObject(name, parent);
         var rect = (RectTransform)go.transform;
@@ -162,7 +164,7 @@ public class ConsentManager : MonoBehaviour
         var button = go.AddComponent<Button>();
         button.targetGraphic = image;
 
-        CreateText(go.transform, "Label", label, 30, Vector2.zero)
+        CreateText(go.transform, "Label", label, 30, Vector2.zero, labelColor)
             .GetComponent<RectTransform>()
             .FillParent();
 
