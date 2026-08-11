@@ -8,14 +8,19 @@ using TMPro;
 //
 // Backend choice: Firebase (PvpClient) by default; tick usePlayFab to use
 // PlayFabPvpClient instead. Either way the backend component needs its
-// dashboard config (Firebase databaseUrl / PlayFab titleId) — set it on the
-// component that gets added to this GameObject, or edit the default in the
-// backend script.
+// dashboard config (Firebase databaseUrl / PlayFab titleId) — set it in the
+// fields below; they are copied onto the backend component created at Start.
 [RequireComponent(typeof(Canvas), typeof(GraphicRaycaster))]
 public class PvpRuntimeUI : MonoBehaviour
 {
     [Tooltip("Use PlayFab backend instead of Firebase")]
     public bool usePlayFab;
+
+    [Tooltip("PlayFab Title ID from Game Manager — copied onto the PlayFab backend")]
+    public string playFabTitleId = "";
+
+    [Tooltip("Firebase Realtime Database URL — copied onto the Firebase backend")]
+    public string firebaseDatabaseUrl = "";
 
     // Converging Light palette (design/philosophy.md): indigo depth, cyan and
     // gold as the disciplined lights, near-white text. Gold is reserved for
@@ -28,10 +33,22 @@ public class PvpRuntimeUI : MonoBehaviour
 
     void Start()
     {
-        // Backend + controller live on this same GameObject.
-        PvpBackend backend = usePlayFab
-            ? (PvpBackend)gameObject.AddComponent<PlayFabPvpClient>()
-            : gameObject.AddComponent<PvpClient>();
+        // Backend + controller live on this same GameObject. The backend is
+        // created here, so its dashboard config comes from our own fields.
+        PvpBackend backend;
+        if (usePlayFab)
+        {
+            var playFab = gameObject.AddComponent<PlayFabPvpClient>();
+            playFab.titleId = playFabTitleId;
+            backend = playFab;
+        }
+        else
+        {
+            var firebase = gameObject.AddComponent<PvpClient>();
+            if (!string.IsNullOrEmpty(firebaseDatabaseUrl))
+                firebase.databaseUrl = firebaseDatabaseUrl;
+            backend = firebase;
+        }
 
         var controller = gameObject.AddComponent<PvpGameController>();
         controller.client = backend;
@@ -126,12 +143,12 @@ public class PvpRuntimeUI : MonoBehaviour
         // Button hooks.
         createBtn.onClick.AddListener(() => ShowOnly(controller, createPanel));
         joinBtn.onClick.AddListener(() => ShowOnly(controller, joinPanel));
-        closeBtn.onClick.AddListener(() => menuPanel.SetActive(false));
+        closeBtn.onClick.AddListener(controller.ClosePvpMenu);
         createGo.onClick.AddListener(controller.OnCreateRoomPressed);
         copyBtn.onClick.AddListener(controller.OnCopyInvitePressed);
-        createBack.onClick.AddListener(controller.OpenPvpMenu);
+        createBack.onClick.AddListener(controller.CancelRoomAndLeave);
         joinGo.onClick.AddListener(controller.OnJoinRoomPressed);
-        joinBack.onClick.AddListener(controller.OpenPvpMenu);
+        joinBack.onClick.AddListener(controller.CancelRoomAndLeave);
         guessBtn.onClick.AddListener(controller.OnSubmitGuessPressed);
         leaveBtn.onClick.AddListener(controller.OnLeaveMatchPressed);
 
@@ -155,6 +172,12 @@ public class PvpRuntimeUI : MonoBehaviour
         var entry = RuntimeUI.CreateButton(mainCanvasGo.transform, "ButtonPvP",
             L10n.Get("pvp_duel"), new Vector2(0f, -620f), new Vector2(460f, 100f), Accent, DarkLabel);
         entry.onClick.AddListener(controller.OpenPvpMenu);
+
+        // Sit right after the settings button instead of as the last child,
+        // so scene panels opened later render/raycast above this button.
+        var settingsButton = GameObject.Find("Buttonsettings");
+        if (settingsButton != null && settingsButton.transform.parent == mainCanvasGo.transform)
+            entry.transform.SetSiblingIndex(settingsButton.transform.GetSiblingIndex() + 1);
     }
 
     // ------------------------------------------------------------ helpers

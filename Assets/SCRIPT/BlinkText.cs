@@ -13,6 +13,7 @@ public class BlinkText : MonoBehaviour
     // stuck invisible). OnEnable/OnDisable restart the blink every time.
     void OnEnable()
     {
+        if (textToBlink == null) return; // unwired reference — nothing to blink
         blinkRoutine = StartCoroutine(Blink());
     }
 

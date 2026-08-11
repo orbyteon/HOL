@@ -47,8 +47,8 @@ PvP:
 - [ ] Automation → CloudScript (Legacy) → paste `playfab/cloudscript.js`
       → Save → **Deploy** (the client requires the atomic `joinRoom`
       revision — an old deployed revision breaks joining)
-- [ ] Paste the Title ID into `PlayFabPvpClient.titleId` (Inspector on the
-      `PvpRuntimeUI` object in `MainMenu`, or the script default)
+- [ ] Paste the Title ID into `PvpRuntimeUI.playFabTitleId` (Inspector on the
+      `PvpRuntimeUI` object in `MainMenu`; copied onto the backend at startup)
 - [ ] Optional force-update gate: Title Data → add key `minVersion`
       (e.g. `0.1`). Builds older than it get a blocking update dialog;
       while the key is absent every version plays (fail-open)

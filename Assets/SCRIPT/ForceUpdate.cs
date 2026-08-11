@@ -125,10 +125,18 @@ public class ForceUpdate : MonoBehaviour
         return false;
     }
 
+    // Segments may carry a non-numeric suffix (e.g. "0.2b"): compare on the
+    // leading digits so the tail doesn't collapse the whole segment to 0.
     static int ParseSegment(string s)
     {
+        if (string.IsNullOrEmpty(s)) return 0;
+
+        int len = 0;
+        while (len < s.Length && char.IsDigit(s[len])) len++;
+        if (len == 0) return 0;
+
         int v;
-        return int.TryParse(s, out v) ? v : 0;
+        return int.TryParse(s.Substring(0, len), out v) ? v : 0;
     }
 
     // ---------------------------------------------------------- blocking dialog

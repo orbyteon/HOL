@@ -54,8 +54,10 @@ smoke test (there is no CLI build/verify loop on this machine).
 
 - PvP backend is **PlayFab** (`usePlayFab: 1` in scene); Firebase client
   (`PvpClient`) is the fallback and needs its RTDB URL in the Inspector.
-- PlayFab requires the **Title ID** in `PlayFabPvpClient.titleId` and
-  `playfab/cloudscript.js` deployed, or PvP fails gracefully at login.
+- PlayFab requires the **Title ID** in `PvpRuntimeUI.playFabTitleId`
+  (Inspector on the `PvpRuntimeUI` object; copied onto the backend created
+  at Start) and `playfab/cloudscript.js` deployed, or PvP fails gracefully
+  at login.
 - Ads: LevelPlay app key `6076495` (Android) in `AdsManager`; iOS keys
   are placeholders. Consent gates init; Settings → Ads privacy re-opens it.
   Interstitial unit `Interstitial_Android` plus rewarded unit

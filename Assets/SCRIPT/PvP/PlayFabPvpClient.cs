@@ -252,6 +252,7 @@ public class PlayFabPvpClient : PvpBackend
         req.downloadHandler = new DownloadHandlerBuffer();
         req.SetRequestHeader("Content-Type", "application/json");
         if (authed) req.SetRequestHeader("X-Authorization", sessionTicket);
+        req.timeout = 10; // a stalled connection must fail, not freeze the poller
 
         yield return req.SendWebRequest();
 

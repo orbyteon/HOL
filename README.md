@@ -151,9 +151,9 @@ PvP uses **PlayFab** by default (`usePlayFab` on the `PvpRuntimeUI` object in `M
 
 1. developer.playfab.com → create a Studio + Title, copy the **Title ID** (4–6 hex chars).
 2. Game Manager → **Automation → CloudScript (Legacy) → Revisions**: paste `playfab/cloudscript.js`, Save, **Deploy**. The client expects the current revision (atomic `joinRoom`) — an old deployed revision breaks joining.
-3. Paste the Title ID into `PlayFabPvpClient.titleId` (Inspector on the `PvpRuntimeUI` object, or the script default).
+3. Paste the Title ID into `PvpRuntimeUI.playFabTitleId` (Inspector on the `PvpRuntimeUI` object — it's copied onto the backend component created at startup).
 
-The **Firebase RTDB** backend (`PvpClient`) is the fallback: untick `usePlayFab` and set `databaseUrl` (setup steps in the `PvpClient.cs` header). Firebase joins are last-write-wins under a two-guest race; PlayFab joins are atomic via CloudScript.
+The **Firebase RTDB** backend (`PvpClient`) is the fallback: untick `usePlayFab` and set `PvpRuntimeUI.firebaseDatabaseUrl` (setup steps in the `PvpClient.cs` header). Firebase joins are last-write-wins under a two-guest race; PlayFab joins are atomic via CloudScript.
 
 ### Ads consent
 

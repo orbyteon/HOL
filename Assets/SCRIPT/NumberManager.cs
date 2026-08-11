@@ -78,7 +78,12 @@ public class NumberManager : MonoBehaviour
             }
 
             if (gameManager != null)
-                gameManager.PlayerGuess(number);
+            {
+                // A rejected guess (e.g. outside the known range) keeps the
+                // input so the player can adjust it instead of retyping.
+                if (!gameManager.PlayerGuess(number))
+                    return;
+            }
         }
 
         numberInput.text = "";

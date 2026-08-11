@@ -161,6 +161,44 @@ public class PvpGameController : MonoBehaviour
         OpenPvpMenu();
     }
 
+    // Backing out of the create/join flow: same teardown as leaving a match
+    // (DeleteRoom is a safe no-op when no room exists), then the PvP menu.
+    // Without this a late joiner would hijack the screen after we navigated
+    // away while the room and poller were still live.
+    public void CancelRoomAndLeave()
+    {
+        OnLeaveMatchPressed();
+    }
+
+    // Close button on the PvP menu: tear down any live room/polling first,
+    // then hide the whole PvP menu.
+    public void ClosePvpMenu()
+    {
+        OnLeaveMatchPressed();
+        if (pvpMenuPanel != null)
+            pvpMenuPanel.SetActive(false);
+    }
+
+    void Update()
+    {
+        // Android back button on the PvP panels (Escape in the editor).
+        if (!Input.GetKeyDown(KeyCode.Escape))
+            return;
+
+        if (matchPanel != null && matchPanel.activeSelf)
+            return; // mid-match: the Leave button closes the room cleanly
+
+        if ((createPanel != null && createPanel.activeSelf) ||
+            (joinPanel != null && joinPanel.activeSelf))
+        {
+            CancelRoomAndLeave();
+        }
+        else if (pvpMenuPanel != null && pvpMenuPanel.activeSelf)
+        {
+            ClosePvpMenu();
+        }
+    }
+
     // ---------------------------------------------------------- state handling
 
     void BeginMatchPolling()
@@ -218,9 +256,14 @@ public class PvpGameController : MonoBehaviour
         if (s.phase == "waiting")
             return;
 
-        // first transition into the match
+        // first transition into the match — only while the player is still
+        // in the PvP flow. If they backed out (all PvP panels inactive), a
+        // late joiner must not force the match UI over the main menu.
         if (!matchPanel.activeSelf)
         {
+            if (!createPanel.activeSelf && !joinPanel.activeSelf && !pvpMenuPanel.activeSelf)
+                return;
+
             createPanel.SetActive(false);
             joinPanel.SetActive(false);
             pvpMenuPanel.SetActive(false);

@@ -21,16 +21,18 @@ public class MenuManager : MonoBehaviour
             BackToMenu();
         else if (panelSearching != null && panelSearching.activeSelf)
             BackToMenu(); // cancels the running search via matchmaking
-        else if (panelPlay != null && panelPlay.activeSelf)
-            BackToMenu();
         else if (matchmaking != null && matchmaking.panelGame != null
             && matchmaking.panelGame.activeSelf)
         {
             // Mid-match exit, same as the old stop button: reload the scene
             // for a clean state. Solo only — live PvP duels keep their
             // explicit Leave button so the room closes cleanly.
+            // Checked BEFORE panelPlay: panelPlay stays active for the
+            // whole match, so it must not shadow this branch.
             SceneManager.LoadScene("MainMenu");
         }
+        else if (panelPlay != null && panelPlay.activeSelf)
+            BackToMenu();
         // On the main menu, back is a no-op — exit happens via the Quit
         // button so an accidental tap can't kill the app.
     }
