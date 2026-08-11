@@ -12,12 +12,15 @@ using TMPro;
 //   2. Matchmaking search panel -> gets a Cancel button (CancelSearch).
 //   3. Settings panel -> gets EN/EL language buttons (LanguageSelector).
 //   4. Main menu -> gets a stats label fed by GameStats.
+//   5. Solo matchmaking panels -> "opponents are simulated" disclosure.
 public class ExtrasRuntimeWiring : MonoBehaviour
 {
     static readonly Color AccentBlue = new Color(0.20f, 0.50f, 0.90f);
     static readonly Color Neutral = new Color(0.25f, 0.25f, 0.30f);
 
     Text statsLabel;
+    Text disclosurePlay;
+    Text disclosureSearch;
 
     void Start()
     {
@@ -32,6 +35,7 @@ public class ExtrasRuntimeWiring : MonoBehaviour
         WireMatchmakingCancel();
         WireLanguageButtons();
         AddStatsLabel();
+        AddDisclosureLabels();
     }
 
     // --- 1. Rematch -------------------------------------------------------
@@ -143,9 +147,49 @@ public class ExtrasRuntimeWiring : MonoBehaviour
             statsLabel.text = summary;
     }
 
+    // --- 5. Simulated-opponent disclosure -----------------------------------
+    //
+    // The solo "Find challenger" flow uses a simulated on-device opponent;
+    // honesty requires telling the player. (PvP Duel is real multiplayer and
+    // lives on separate panels, so it gets no such label.)
+
+    void AddDisclosureLabels()
+    {
+        var menu = FindObjectOfType<MenuManager>();
+        if (menu != null && menu.panelPlay != null)
+        {
+            disclosurePlay = RuntimeUI.CreateText(menu.panelPlay.transform,
+                "DisclosureLabel", "", 22,
+                new Vector2(0f, -560f), new Vector2(760f, 70f),
+                new Color(1f, 1f, 1f, 0.6f));
+        }
+
+        var mm = FindObjectOfType<FakeMatchmaking>();
+        if (mm != null && mm.searchingPanel != null)
+        {
+            disclosureSearch = RuntimeUI.CreateText(mm.searchingPanel.transform,
+                "DisclosureLabel", "", 22,
+                new Vector2(0f, -540f), new Vector2(760f, 70f),
+                new Color(1f, 1f, 1f, 0.6f));
+        }
+
+        RefreshDisclosure();
+        L10n.OnLanguageChanged += RefreshDisclosure;
+    }
+
+    void RefreshDisclosure()
+    {
+        string text = L10n.Get("simulated_opponents");
+        if (disclosurePlay != null)
+            disclosurePlay.text = text;
+        if (disclosureSearch != null)
+            disclosureSearch.text = text;
+    }
+
     void OnDestroy()
     {
         L10n.OnLanguageChanged -= RefreshStats;
+        L10n.OnLanguageChanged -= RefreshDisclosure;
         GameEvents.OnMatchEnded -= OnMatchEnded;
     }
 }
