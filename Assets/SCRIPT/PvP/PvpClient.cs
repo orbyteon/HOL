@@ -150,9 +150,12 @@ public class PvpClient : PvpBackend
                 continue;
             }
 
-            if (state == null)
+            if (state == null || string.IsNullOrEmpty(state.hostName))
             {
-                // GET succeeded but the room is gone — the host left.
+                // GET succeeded but the room is gone — the host left. A PATCH
+                // landing after the leaver's DELETE can also recreate a ghost
+                // document holding only guess fields (no hostName); treating
+                // it as valid would strand the player against a phantom.
                 pollRoutine = null;
                 OnRoomClosed?.Invoke();
                 yield break;

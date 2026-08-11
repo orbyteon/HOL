@@ -180,4 +180,38 @@ public static class RuntimeUI
 
         return input;
     }
+
+    // ---------------------------------------------------------- live localization
+
+    // Runtime-built labels bake one language at construction time. Attaching
+    // a localizer with the L10n key makes them follow language changes live.
+    // Dynamic labels (room codes, statuses, results) stay plain text.
+
+    public static void Localize(TMP_Text text, string key)
+    {
+        if (text == null) return;
+        var loc = text.gameObject.AddComponent<LocalizedText>();
+        loc.key = key;
+    }
+
+    public static void Localize(Text text, string key)
+    {
+        if (text == null) return;
+        var loc = text.gameObject.AddComponent<LocalizedLegacyText>();
+        loc.key = key;
+    }
+
+    // Same, for a button's child label.
+    public static void Localize(Button button, string key)
+    {
+        if (button == null) return;
+        Localize(button.GetComponentInChildren<Text>(true), key);
+    }
+
+    // Same, for an input field's placeholder.
+    public static void LocalizePlaceholder(TMP_InputField input, string key)
+    {
+        if (input == null) return;
+        Localize(input.placeholder as TMP_Text, key);
+    }
 }

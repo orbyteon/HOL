@@ -62,6 +62,7 @@ public static class L10n
         // main menu
         { "play",                    new[] { "Play", "Παίξε" } },
         { "back",                    new[] { "Back", "Πίσω" } },
+        { "quit",                    new[] { "Quit", "Έξοδος" } },
         { "save",                    new[] { "Save", "Αποθήκευση" } },
         { "language",                new[] { "Language", "Γλώσσα" } },
         { "music",                   new[] { "Music", "Μουσική" } },

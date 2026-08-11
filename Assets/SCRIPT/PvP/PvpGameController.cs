@@ -45,6 +45,7 @@ public class PvpGameController : MonoBehaviour
     PvpBackend.RoomState lastState;
     string shownGuessKey = "";
     bool matchOver;
+    bool guessInFlight;
     int myGuessCount;
 
     string MyName => PlayerPrefs.GetString("PlayerName", "Player");
@@ -124,7 +125,9 @@ public class PvpGameController : MonoBehaviour
 
     public void OnSubmitGuessPressed()
     {
-        if (matchOver || lastState == null) return;
+        // guessInFlight: the button stays tappable until the next poll, so a
+        // fast second tap would overwrite the guess and inflate the count.
+        if (matchOver || lastState == null || guessInFlight) return;
 
         string me = client.IsHost ? "host" : "guest";
         if (lastState.turn != me || lastState.phase != "play")
@@ -142,10 +145,12 @@ public class PvpGameController : MonoBehaviour
 
         guessInput.text = "";
         turnText.text = L10n.Get("pvp_sending");
-        myGuessCount++;
+        guessInFlight = true;
         client.SubmitGuess(guess, lastState, ok =>
         {
-            if (!ok) turnText.text = L10n.Get("pvp_network_error");
+            guessInFlight = false;
+            if (ok) myGuessCount++; // count only guesses the room accepted
+            else turnText.text = L10n.Get("pvp_network_error");
         });
     }
 
@@ -204,6 +209,7 @@ public class PvpGameController : MonoBehaviour
     void BeginMatchPolling()
     {
         matchOver = false;
+        guessInFlight = false;
         myGuessCount = 0;
         shownGuessKey = "";
         client.OnRoomClosed = HandleRoomClosed;
@@ -304,15 +310,17 @@ public class PvpGameController : MonoBehaviour
             turnText.text = "";
 
             // Same endgame treatment as solo: stats, stinger, haptic, confetti.
+            // countRecent: false — PvP results must not re-tune the solo
+            // adaptive AI's recent-win-rate window.
             if (iWon)
             {
-                GameStats.RecordWin(myGuessCount);
+                GameStats.RecordWin(myGuessCount, false);
                 Haptics.Success();
                 GameEvents.MatchEnded(true, myGuessCount);
             }
             else
             {
-                GameStats.RecordLoss();
+                GameStats.RecordLoss(false);
                 Haptics.Error();
                 GameEvents.MatchEnded(false, 0);
             }

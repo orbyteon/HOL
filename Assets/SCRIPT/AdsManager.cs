@@ -18,6 +18,11 @@ public class AdsManager : MonoBehaviour
 #endif
 
     const string ConsentPrefKey = "AdsConsent";
+    // Pending-reward persistence: if the app is killed after the reward is
+    // earned but before the ad-close callback, the next launch still grants
+    // it (GameManager reconciles). Public so GameManager uses the same keys.
+    public const string PendingStreakRestoreKey = "PendingStreakRestore"; // streak value, written by GameManager when the ad shows
+    public const string PendingRewardEarnedKey = "PendingRewardEarned";   // 1 once OnRewardedEarned fires
     const float ShowAdSafetyTimeout = 120f; // review #1: only a genuinely lost callback should trip this — normal interstitials run 15-30s
     const float MinSecondsBetweenAds = 60f; // interstitial frequency cap (Play policy)
     const int MaxInitRetries = 3;
@@ -172,6 +177,10 @@ public class AdsManager : MonoBehaviour
     void OnRewardedEarned(LevelPlayAdInfo adInfo, LevelPlayReward reward)
     {
         rewardGranted = true;
+        // Persist immediately: the streak restore normally happens in the
+        // close callback, but an app kill before it must not lose the reward.
+        PlayerPrefs.SetInt(PendingRewardEarnedKey, 1);
+        PlayerPrefs.Save();
     }
 
     void OnRewardedClosed(LevelPlayAdInfo adInfo)
@@ -206,6 +215,17 @@ public class AdsManager : MonoBehaviour
         var cb = rewardGranted ? onRewardEarned : null;
         onRewardEarned = null;
         onRewardUnavailable = null;
+
+        if (!rewardGranted)
+        {
+            // Closed/failed without earning: drop any pending-restore keys so
+            // the next launch can't resurrect a streak that wasn't saved.
+            // (The earned case is cleared by the reward callback instead.)
+            PlayerPrefs.DeleteKey(PendingStreakRestoreKey);
+            PlayerPrefs.DeleteKey(PendingRewardEarnedKey);
+            PlayerPrefs.Save();
+        }
+
         rewardGranted = false;
         cb?.Invoke();
     }

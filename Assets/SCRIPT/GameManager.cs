@@ -75,6 +75,8 @@ public class GameManager : MonoBehaviour
 
     void Start()
     {
+        ReconcilePendingStreakRestore();
+
         stopGameButton.SetActive(false);
         HideButtons();
 
@@ -338,6 +340,23 @@ public class GameManager : MonoBehaviour
     const int MinStreakToSave = 2;
     GameObject streakSaveButton;
 
+    // A rewarded ad that earned its reward but whose close callback was lost
+    // (app killed mid-ad) restores its streak here on the next launch. An ad
+    // that was shown but never earned leaves no PendingRewardEarned flag, so
+    // there is nothing to restore — the stale key is just swept.
+    void ReconcilePendingStreakRestore()
+    {
+        int pending = PlayerPrefs.GetInt(AdsManager.PendingStreakRestoreKey, 0);
+        if (pending <= 0) return;
+
+        if (PlayerPrefs.GetInt(AdsManager.PendingRewardEarnedKey, 0) == 1)
+            GameStats.RestoreStreak(pending);
+
+        PlayerPrefs.DeleteKey(AdsManager.PendingStreakRestoreKey);
+        PlayerPrefs.DeleteKey(AdsManager.PendingRewardEarnedKey);
+        PlayerPrefs.Save();
+    }
+
     void OfferStreakSave(int streak)
     {
         if (streak < MinStreakToSave || adsManager == null || !adsManager.IsRewardedReady())
@@ -365,6 +384,9 @@ public class GameManager : MonoBehaviour
             bool shown = adsManager.ShowRewardedAd(() =>
             {
                 GameStats.RestoreStreak(streak);
+                PlayerPrefs.DeleteKey(AdsManager.PendingStreakRestoreKey);
+                PlayerPrefs.DeleteKey(AdsManager.PendingRewardEarnedKey);
+                PlayerPrefs.Save();
                 GameEvents.MatchEnded(false, 0); // refresh the menu stats label
             },
             () =>
@@ -375,6 +397,11 @@ public class GameManager : MonoBehaviour
 
             if (shown)
             {
+                // Persist in case the app is killed after the reward is
+                // earned but before the ad-close callback (see Start).
+                PlayerPrefs.SetInt(AdsManager.PendingStreakRestoreKey, streak);
+                PlayerPrefs.Save();
+
                 Destroy(streakSaveButton);
                 streakSaveButton = null;
             }

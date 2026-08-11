@@ -18,7 +18,10 @@ using UnityEngine.UI;
 public class ForceUpdate : MonoBehaviour
 {
     const string TitleDataKey = "minVersion";
-    const string StoreUrl = "market://details?id=com.Orbyteon.HOL";
+    // https Play URL deep-links into the store app when present and works in
+    // a plain browser otherwise — a market:// tap no-ops on devices without
+    // the Play Store, which would lock the player out of this dialog.
+    const string StoreUrl = "https://play.google.com/store/apps/details?id=com.Orbyteon.HOL";
 
     string sessionTicket = "";
 
@@ -148,7 +151,7 @@ public class ForceUpdate : MonoBehaviour
             ConvergingLight.WithAlpha(ConvergingLight.ScrimIndigo, 0.96f));
 
         var card = RuntimeUI.CreateObject("Card", panel.transform);
-        ConvergingLight.Center(card, Vector2.zero, new Vector2(640f, 460f));
+        ConvergingLight.Center(card, Vector2.zero, new Vector2(640f, 560f));
         var cardImage = card.AddComponent<Image>();
         cardImage.sprite = RuntimeUI.RoundedRectSprite;
         cardImage.type = Image.Type.Sliced;
@@ -161,6 +164,13 @@ public class ForceUpdate : MonoBehaviour
             L10n.Get("update_now"), new Vector2(0f, -110f), new Vector2(420f, 100f),
             ConvergingLight.Gold, ConvergingLight.WithAlpha(ConvergingLight.PanelIndigo, 1f));
         update.onClick.AddListener(OpenStore);
+
+        // Always offer an exit: on devices where the store link can't open,
+        // Update alone would lock the player out with no escape.
+        var quit = RuntimeUI.CreateButton(card.transform, "QuitButton",
+            L10n.Get("quit"), new Vector2(0f, -220f), new Vector2(420f, 100f),
+            ConvergingLight.TrackIndigo);
+        quit.onClick.AddListener(Application.Quit);
     }
 
     void OpenStore()

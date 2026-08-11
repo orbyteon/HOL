@@ -64,7 +64,7 @@ public class PvpRuntimeUI : MonoBehaviour
     {
         // PvP menu: create or join.
         var menuPanel = RuntimeUI.FullscreenPanel(transform, "PvPMenuPanel", PanelColor);
-        RuntimeUI.CreateText(menuPanel.transform, "Title", L10n.Get("pvp_duel"), 64,
+        var menuTitle = RuntimeUI.CreateText(menuPanel.transform, "Title", L10n.Get("pvp_duel"), 64,
             new Vector2(0f, 420f), new Vector2(800f, 120f));
         var createBtn = RuntimeUI.CreateButton(menuPanel.transform, "CreateButton",
             L10n.Get("pvp_create_room"), new Vector2(0f, 120f), new Vector2(460f, 100f), Accent, DarkLabel);
@@ -73,9 +73,16 @@ public class PvpRuntimeUI : MonoBehaviour
         var closeBtn = RuntimeUI.CreateButton(menuPanel.transform, "CloseButton",
             L10n.Get("back"), new Vector2(0f, -200f), new Vector2(300f, 80f), Neutral);
 
+        // Static labels follow language changes; dynamic ones (room code,
+        // status lines, results) are set per-event and stay plain.
+        RuntimeUI.Localize(menuTitle, "pvp_duel");
+        RuntimeUI.Localize(createBtn, "pvp_create_room");
+        RuntimeUI.Localize(joinBtn, "pvp_join_room");
+        RuntimeUI.Localize(closeBtn, "back");
+
         // Create flow.
         var createPanel = RuntimeUI.FullscreenPanel(transform, "PvPCreatePanel", PanelColor);
-        RuntimeUI.CreateText(createPanel.transform, "Title", L10n.Get("pvp_create_room"), 48,
+        var createTitle = RuntimeUI.CreateText(createPanel.transform, "Title", L10n.Get("pvp_create_room"), 48,
             new Vector2(0f, 420f), new Vector2(800f, 100f));
         var createSecret = RuntimeUI.CreateInputField(createPanel.transform, "SecretInput",
             L10n.Get("pvp_secret"), new Vector2(0f, 240f), new Vector2(460f, 90f));
@@ -90,9 +97,15 @@ public class PvpRuntimeUI : MonoBehaviour
         var createBack = RuntimeUI.CreateButton(createPanel.transform, "BackButton",
             L10n.Get("back"), new Vector2(0f, -540f), new Vector2(300f, 80f), Neutral);
 
+        RuntimeUI.Localize(createTitle, "pvp_create_room");
+        RuntimeUI.LocalizePlaceholder(createSecret, "pvp_secret");
+        RuntimeUI.Localize(createGo, "confirm");
+        RuntimeUI.Localize(copyBtn, "pvp_copy");
+        RuntimeUI.Localize(createBack, "back");
+
         // Join flow.
         var joinPanel = RuntimeUI.FullscreenPanel(transform, "PvPJoinPanel", PanelColor);
-        RuntimeUI.CreateText(joinPanel.transform, "Title", L10n.Get("pvp_join_room"), 48,
+        var joinTitle = RuntimeUI.CreateText(joinPanel.transform, "Title", L10n.Get("pvp_join_room"), 48,
             new Vector2(0f, 420f), new Vector2(800f, 100f));
         var joinCode = RuntimeUI.CreateInputField(joinPanel.transform, "CodeInput",
             L10n.Get("pvp_enter_code"), new Vector2(0f, 240f), new Vector2(460f, 90f), 5);
@@ -104,6 +117,12 @@ public class PvpRuntimeUI : MonoBehaviour
             new Vector2(0f, -200f), new Vector2(900f, 120f));
         var joinBack = RuntimeUI.CreateButton(joinPanel.transform, "BackButton",
             L10n.Get("back"), new Vector2(0f, -380f), new Vector2(300f, 80f), Neutral);
+
+        RuntimeUI.Localize(joinTitle, "pvp_join_room");
+        RuntimeUI.LocalizePlaceholder(joinCode, "pvp_enter_code");
+        RuntimeUI.LocalizePlaceholder(joinSecret, "pvp_secret");
+        RuntimeUI.Localize(joinGo, "confirm");
+        RuntimeUI.Localize(joinBack, "back");
 
         // Match.
         var matchPanel = RuntimeUI.FullscreenPanel(transform, "PvPMatchPanel", PanelColor);
@@ -121,6 +140,10 @@ public class PvpRuntimeUI : MonoBehaviour
             new Vector2(0f, -400f), new Vector2(1000f, 120f));
         var leaveBtn = RuntimeUI.CreateButton(matchPanel.transform, "LeaveButton",
             L10n.Get("pvp_leave"), new Vector2(0f, -560f), new Vector2(300f, 80f), Neutral);
+
+        RuntimeUI.LocalizePlaceholder(guessInput, "number_placeholder");
+        RuntimeUI.Localize(guessBtn, "pvp_guess");
+        RuntimeUI.Localize(leaveBtn, "pvp_leave");
 
         // Wire the controller.
         controller.pvpMenuPanel = menuPanel;
@@ -172,6 +195,7 @@ public class PvpRuntimeUI : MonoBehaviour
         var entry = RuntimeUI.CreateButton(mainCanvasGo.transform, "ButtonPvP",
             L10n.Get("pvp_duel"), new Vector2(0f, -620f), new Vector2(460f, 100f), Accent, DarkLabel);
         entry.onClick.AddListener(controller.OpenPvpMenu);
+        RuntimeUI.Localize(entry, "pvp_duel");
 
         // Sit right after the settings button instead of as the last child,
         // so scene panels opened later render/raycast above this button.
