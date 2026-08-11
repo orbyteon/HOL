@@ -238,15 +238,17 @@ public class GameManager : MonoBehaviour
         EndGame(false);
     }
 
-    public void PlayerGuess(int guess)
+    // Returns true when the guess was accepted, so the caller knows whether
+    // to clear the input. Rejected guesses (wrong turn, out of range) keep it.
+    public bool PlayerGuess(int guess)
     {
-        if (!playerTurn || gameFinished) return;
+        if (!playerTurn || gameFinished) return false;
 
         // Reject guesses outside the range the player has already narrowed to.
         if (guess < playerMin || guess > playerMax)
         {
             aiAnswerText.text = L10n.Get("already_know_range", playerMin, playerMax);
-            return;
+            return false;
         }
 
         playerGuessCount++;
@@ -264,7 +266,7 @@ public class GameManager : MonoBehaviour
         {
             aiAnswerText.text = playerLabel + ": " + guess + "\n" + L10n.Get("you_win");
             EndGame(true);
-            return;
+            return true;
         }
 
         if (guess < aiSecretNumber)
@@ -284,6 +286,7 @@ public class GameManager : MonoBehaviour
 
         turnText.text = L10n.Get("opponent_thinking", currentOpponent);
         Invoke(nameof(AIGuess), Random.Range(1.5f, 3.5f)); // review #5: tighter pacing (was 2.8–6.5)
+        return true;
     }
 
     void EndGame(bool playerWon)
@@ -356,13 +359,25 @@ public class GameManager : MonoBehaviour
         streakSaveButton = btn.gameObject;
         btn.onClick.AddListener(() =>
         {
-            adsManager.ShowRewardedAd(() =>
+            // Destroy the button only once an ad is actually on its way. If
+            // the ad is unavailable, keep the button and tell the player —
+            // otherwise the tap would leave no button, no ad, no feedback.
+            bool shown = adsManager.ShowRewardedAd(() =>
             {
                 GameStats.RestoreStreak(streak);
                 GameEvents.MatchEnded(false, 0); // refresh the menu stats label
+            },
+            () =>
+            {
+                if (aiAnswerText != null)
+                    aiAnswerText.text = L10n.Get("ad_not_ready");
             });
-            Destroy(streakSaveButton);
-            streakSaveButton = null;
+
+            if (shown)
+            {
+                Destroy(streakSaveButton);
+                streakSaveButton = null;
+            }
         });
     }
 

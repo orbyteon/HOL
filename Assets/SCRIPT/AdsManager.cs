@@ -18,7 +18,7 @@ public class AdsManager : MonoBehaviour
 #endif
 
     const string ConsentPrefKey = "AdsConsent";
-    const float ShowAdSafetyTimeout = 10f; // review #1: never block the player longer than this
+    const float ShowAdSafetyTimeout = 120f; // review #1: only a genuinely lost callback should trip this — normal interstitials run 15-30s
     const float MinSecondsBetweenAds = 60f; // interstitial frequency cap (Play policy)
     const int MaxInitRetries = 3;
 
@@ -32,6 +32,7 @@ public class AdsManager : MonoBehaviour
     int initRetries;
 
     System.Action onRewardEarned;
+    System.Action onRewardUnavailable;
     bool rewardGranted;
 
     void Start()
@@ -113,6 +114,10 @@ public class AdsManager : MonoBehaviour
     {
         Debug.Log("Ad Closed");
 
+        // Frequency cap stamps here — only an ad that was actually shown and
+        // dismissed counts, not a skipped/failed attempt.
+        lastAdShowTime = Time.realtimeSinceStartup;
+
         FinishAndContinue();
 
         interstitialAd.LoadAd(); // preload the next ad
@@ -144,18 +149,24 @@ public class AdsManager : MonoBehaviour
     }
 
     // Shows a rewarded ad. onReward fires only if the player earns the
-    // reward (watched through); closes/failures just end the flow quietly.
-    public void ShowRewardedAd(System.Action onReward)
+    // reward (watched through); closes just end the flow quietly.
+    // onUnavailable fires when no ad can be shown right now (not loaded or
+    // the display failed) so the caller can keep its UI alive and tell the
+    // player. Returns false in that case, true once an ad is on its way.
+    public bool ShowRewardedAd(System.Action onReward, System.Action onUnavailable = null)
     {
         if (!IsRewardedReady())
         {
             Debug.Log("Rewarded ad not ready");
-            return;
+            onUnavailable?.Invoke();
+            return false;
         }
 
         onRewardEarned = onReward;
+        onRewardUnavailable = onUnavailable;
         rewardGranted = false;
         rewardedAd.ShowAd();
+        return true;
     }
 
     void OnRewardedEarned(LevelPlayAdInfo adInfo, LevelPlayReward reward)
@@ -172,7 +183,9 @@ public class AdsManager : MonoBehaviour
     void OnRewardedDisplayFailed(LevelPlayAdInfo adInfo, LevelPlayAdError error)
     {
         Debug.Log("Rewarded display failed: " + error);
+        var unavailable = onRewardUnavailable;
         FinishRewarded();
+        unavailable?.Invoke(); // caller keeps its UI alive and tells the player
         rewardedAd.LoadAd();
     }
 
@@ -192,6 +205,7 @@ public class AdsManager : MonoBehaviour
     {
         var cb = rewardGranted ? onRewardEarned : null;
         onRewardEarned = null;
+        onRewardUnavailable = null;
         rewardGranted = false;
         cb?.Invoke();
     }
@@ -230,7 +244,6 @@ public class AdsManager : MonoBehaviour
         if (interstitialAd != null && interstitialAd.IsAdReady())
         {
             adInProgress = true;
-            lastAdShowTime = Time.realtimeSinceStartup;
 
             // Review #1: if no close/fail event arrives, force the game to continue.
             Invoke(nameof(ForceContinue), ShowAdSafetyTimeout);

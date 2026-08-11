@@ -185,6 +185,7 @@ public class PvpClient : PvpBackend
     IEnumerator GetRoom(string code, Action<bool, RoomState> done)
     {
         var req = UnityWebRequest.Get(RoomUrl(code));
+        req.timeout = 10; // a stalled connection must fail, not freeze the poller
         yield return req.SendWebRequest();
         bool ok = req.result == UnityWebRequest.Result.Success;
         RoomState state = null;
@@ -203,6 +204,7 @@ public class PvpClient : PvpBackend
 
     IEnumerator Send(UnityWebRequest req, Action<bool> done)
     {
+        req.timeout = 10; // a stalled connection must fail, not freeze the poller
         yield return req.SendWebRequest();
         bool ok = req.result == UnityWebRequest.Result.Success;
         if (!ok) Debug.Log("PvP request failed: " + req.error + " " + req.downloadHandler?.text);
