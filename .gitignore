@@ -78,6 +78,7 @@ crashlytics-build.properties
 # Session leftovers — never commit these
 hol.bundle
 _to_delete/
+*.tgz
 
 # Signing — keystores and credentials never go into git
 *.keystore
