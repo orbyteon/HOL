@@ -48,6 +48,27 @@ public class PvpGameController : MonoBehaviour
     bool guessInFlight;
     int myGuessCount;
 
+    // Bumped on every leave/cancel/close. Create/join callbacks capture the
+    // value at request time and bail — closing the room they just made —
+    // when it has moved: the player backed out while the request was in
+    // flight, and polling an explicitly-cancelled room would hijack them
+    // into a match (or poll invisibly forever, stranding the opponent).
+    int flowGeneration;
+    // Double-tap guard for Create/Join (guessInFlight's equivalent). Cleared
+    // only by the callback, never by cancel: two room requests can never be
+    // in flight at once, so a stale callback can't close a newer flow's room.
+    bool joinCreateInFlight;
+    // Opponent-inactivity watchdog: consecutive polls with zero state change
+    // while it is the opponent's turn. Leaving closes the room with a
+    // fire-and-forget write; if that write fails (going offline is the usual
+    // reason to leave), the room stays "play" and we'd poll a dead room
+    // forever without this.
+    string lastStateSignature = "";
+    int silentPolls;
+    // ~5 minutes at the 1.5s poll interval. Generous on purpose: a slow
+    // thinker must never be punished, only a genuinely abandoned room.
+    const int MaxSilentPolls = 200;
+
     string MyName => PlayerPrefs.GetString("PlayerName", "Player");
 
     // ---------------------------------------------------------- UI entry points
@@ -62,6 +83,8 @@ public class PvpGameController : MonoBehaviour
 
     public void OnCreateRoomPressed()
     {
+        if (joinCreateInFlight) return;
+
         int secret;
         if (!TryReadSecret(createSecretInput, out secret))
         {
@@ -76,8 +99,18 @@ public class PvpGameController : MonoBehaviour
         createStatusText.text = L10n.Get("pvp_creating");
         roomCodeText.text = "-----";
 
+        joinCreateInFlight = true;
+        int gen = flowGeneration;
         client.CreateRoom(MyName, secret, (ok, codeOrError) =>
         {
+            joinCreateInFlight = false;
+            if (gen != flowGeneration)
+            {
+                // Backed out mid-flight: close the room we just created
+                // instead of polling it (safe no-op if the request failed).
+                client.DeleteRoom();
+                return;
+            }
             if (!ok)
             {
                 createStatusText.text = L10n.Get("pvp_network_error");
@@ -99,6 +132,8 @@ public class PvpGameController : MonoBehaviour
 
     public void OnJoinRoomPressed()
     {
+        if (joinCreateInFlight) return;
+
         int secret;
         if (!TryReadSecret(joinSecretInput, out secret))
         {
@@ -112,8 +147,18 @@ public class PvpGameController : MonoBehaviour
         }
 
         joinStatusText.text = L10n.Get("pvp_joining");
+        joinCreateInFlight = true;
+        int gen = flowGeneration;
         client.JoinRoom(joinCodeInput.text, MyName, secret, (ok, error) =>
         {
+            joinCreateInFlight = false;
+            if (gen != flowGeneration)
+            {
+                // Backed out mid-flight: leave the room we just joined
+                // instead of polling it (safe no-op if the request failed).
+                client.DeleteRoom();
+                return;
+            }
             if (!ok)
             {
                 joinStatusText.text = error;
@@ -156,6 +201,7 @@ public class PvpGameController : MonoBehaviour
 
     public void OnLeaveMatchPressed()
     {
+        flowGeneration++; // invalidate any create/join callback still in flight
         client.StopPolling();
         // Either side leaving closes the room: Firebase deletes it (the other
         // poller sees it vanish), PlayFab marks phase "closed".
@@ -212,6 +258,8 @@ public class PvpGameController : MonoBehaviour
         guessInFlight = false;
         myGuessCount = 0;
         shownGuessKey = "";
+        silentPolls = 0;
+        lastStateSignature = "";
         client.OnRoomClosed = HandleRoomClosed;
         client.OnConnectionLost = HandleConnectionLost;
         client.StartPolling(OnState);
@@ -258,17 +306,47 @@ public class PvpGameController : MonoBehaviour
 
         lastState = s;
 
+        // Opponent-inactivity watchdog. Leaving closes the room with a
+        // fire-and-forget write; when that write fails (the leaver went
+        // offline — the usual reason to leave), the room stays "play" and
+        // without this we'd poll a dead room forever. Only counted on the
+        // opponent's turn, so a slow thinker on our side never triggers it.
+        string me = client.IsHost ? "host" : "guest";
+        string signature = s.phase + "|" + s.turn + "|" + s.lastBy + "|" + s.lastGuess + "|" + s.winner;
+        if (signature != lastStateSignature)
+        {
+            lastStateSignature = signature;
+            silentPolls = 0;
+        }
+        else if (s.phase == "play" && s.turn != me && !matchOver)
+        {
+            if (++silentPolls >= MaxSilentPolls)
+            {
+                silentPolls = 0;
+                client.StopPolling();
+                client.DeleteRoom(); // best-effort cleanup of the dead room
+                HandleConnectionLost();
+                return;
+            }
+        }
+        else silentPolls = 0;
+
         // still waiting for a guest?
         if (s.phase == "waiting")
             return;
 
         // first transition into the match — only while the player is still
         // in the PvP flow. If they backed out (all PvP panels inactive), a
-        // late joiner must not force the match UI over the main menu.
+        // late joiner must not force the match UI over the main menu — and
+        // the orphaned poller must die here, not run silently forever.
         if (!matchPanel.activeSelf)
         {
             if (!createPanel.activeSelf && !joinPanel.activeSelf && !pvpMenuPanel.activeSelf)
+            {
+                client.StopPolling();
+                client.DeleteRoom();
                 return;
+            }
 
             createPanel.SetActive(false);
             joinPanel.SetActive(false);
