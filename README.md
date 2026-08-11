@@ -10,16 +10,18 @@ Under the hood the game is single-player against a lightweight AI, but it's pres
 
 - Turn-based Higher/Lower guessing against an AI opponent
 - **Real PvP duels** with room-code invites (Firebase RTDB or PlayFab backend, both REST, no SDK)
-- **English + native Greek** localization with live language switching
+- **Converging Light design** (`design/philosophy.md`) — indigo depth gradients, drifting number fields, a cyan→magenta seam, gold reserved for primary actions; animated splash with logo bloom and a loading hairline
+- **English + native Greek** localization with live language switching; first launch follows the device language
 - **Difficulty modes** — Easy / Normal / Hard / Adaptive (the AI tunes itself to your recent win rate), selectable in Settings
-- **Persistent stats** — wins/losses, current + best streak, best winning guess-count (`PlayerPrefs`)
+- **Persistent stats** — wins/losses, current + best streak, best winning guess-count (`PlayerPrefs`); solo and PvP matches both count
 - Daily-play streak, haptics on win/lose, and a `GameEvents` hub for analytics/notifications
 - Simulated online matchmaking (searching screen, occasional "opponent not found")
 - Randomized opponent names for a multiplayer feel
 - Player name entry and a music on/off toggle, saved between sessions
+- Full sound coverage: looping music, click on every button, opponent-found stinger, win/lose stingers (solo and PvP)
 - Interstitial ads via Unity LevelPlay (ironSource), shown at match end with a frequency cap
 - First-launch ads-consent dialog (zero setup — builds itself from code)
-- Win/lose sound feedback
+- Android back button handled everywhere — including mid-match exit (solo)
 
 ## Gameplay
 
