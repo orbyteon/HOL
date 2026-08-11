@@ -1,0 +1,119 @@
+using System.Collections.Generic;
+using UnityEngine;
+
+// Lightweight localization (English + native Greek). Static so any script
+// or UI component can use it without scene wiring.
+//
+// Usage:
+//   string s = L10n.Get("play");                     // current language
+//   string s = L10n.Get("opponent_thinking", name);  // formatted entry
+//   L10n.SetLanguage(L10n.Language.Greek);           // persisted via PlayerPrefs
+//
+// UI wiring: put a LocalizedText on any TMP_Text and set its key.
+public static class L10n
+{
+    public enum Language { English = 0, Greek = 1 }
+
+    const string PrefKey = "Language";
+
+    public static System.Action OnLanguageChanged;
+
+    public static Language Current
+    {
+        get { return (Language)PlayerPrefs.GetInt(PrefKey, (int)Language.English); }
+    }
+
+    public static void SetLanguage(Language lang)
+    {
+        PlayerPrefs.SetInt(PrefKey, (int)lang);
+        PlayerPrefs.Save();
+        OnLanguageChanged?.Invoke();
+    }
+
+    public static string Get(string key, params object[] args)
+    {
+        string[] pair;
+        if (!Table.TryGetValue(key, out pair))
+        {
+            Debug.LogWarning("L10n: missing key '" + key + "'");
+            return key;
+        }
+
+        string s = pair[(int)Current];
+
+        if (args != null && args.Length > 0)
+            s = string.Format(s, args);
+
+        return s;
+    }
+
+    // { English, Greek }
+    static readonly Dictionary<string, string[]> Table = new Dictionary<string, string[]>
+    {
+        // main menu
+        { "play",                    new[] { "Play", "Παίξε" } },
+        { "settings",                new[] { "Settings", "Ρυθμίσεις" } },
+        { "quit",                    new[] { "Quit", "Έξοδος" } },
+        { "back",                    new[] { "Back", "Πίσω" } },
+        { "save",                    new[] { "Save", "Αποθήκευση" } },
+        { "language",                new[] { "Language", "Γλώσσα" } },
+        { "music",                   new[] { "Music", "Μουσική" } },
+        { "player_name",             new[] { "Your name", "Το όνομά σου" } },
+
+        // matchmaking
+        { "find_challenger",         new[] { "Find challenger", "Εύρεση αντιπάλου" } },
+        { "searching",               new[] { "Searching opponent", "Αναζήτηση αντιπάλου" } },
+        { "opponent_found",          new[] { "Opponent found!", "Βρέθηκε αντίπαλος!" } },
+        { "opponent_not_found",      new[] { "Opponent not found. Try again.", "Δεν βρέθηκε αντίπαλος. Δοκίμασε ξανά." } },
+        { "cancel",                  new[] { "Cancel", "Ακύρωση" } },
+
+        // game setup
+        { "enter_your_number",       new[] { "Enter your number", "Βάλε τον αριθμό σου" } },
+        { "confirm",                 new[] { "Confirm", "Επιβεβαίωση" } },
+        { "invalid_number",          new[] { "Enter a valid number", "Βάλε έγκυρο αριθμό" } },
+        { "number_out_of_range",     new[] { "Number must be between 1 and 100", "Ο αριθμός πρέπει να είναι από 1 έως 100" } },
+
+        // duel
+        { "opponent_label",          new[] { "Opponent: {0}", "Αντίπαλος: {0}" } },
+        { "your_guess",              new[] { "Your guess", "Η σειρά σου" } },
+        { "opponent_thinking",       new[] { "{0} thinking...", "{0} σκέφτεται..." } },
+        { "answer_opponent",         new[] { "Answer {0}", "Απάντησε στον/στην {0}" } },
+        { "wait_your_turn",          new[] { "Wait for your turn...", "Περίμενε τη σειρά σου..." } },
+        { "higher",                  new[] { "Higher", "Ψηλότερα" } },
+        { "lower",                   new[] { "Lower", "Χαμηλότερα" } },
+        { "correct",                 new[] { "Correct", "Σωστά" } },
+        { "between_range",           new[] { "Between {0} and {1}", "Ανάμεσα σε {0} και {1}" } },
+        { "already_know_range",      new[] { "You already know it's between {0} and {1}!", "Ξέρεις ήδη ότι είναι ανάμεσα σε {0} και {1}!" } },
+        { "opponent_found_number",   new[] { "{0} found your number!", "{0} βρήκε τον αριθμό σου!" } },
+        { "caught_cheating",         new[] { "That doesn't add up! {0} caught you cheating.", "Κάτι δεν βγαίνει! {0} σε έπιασε να κλείνεις ματιά." } },
+
+        // result
+        { "you_win",                 new[] { "YOU WIN!", "ΚΕΡΔΙΣΕΣ!" } },
+        { "you_lose",                new[] { "YOU LOSE!", "ΕΧΑΣΕΣ!" } },
+        { "won_in_guesses",          new[] { "In {0} guesses", "Σε {0} προσπάθειες" } },
+        { "rematch",                 new[] { "Rematch", "Ρεβάνς" } },
+        { "menu",                    new[] { "Menu", "Μενού" } },
+
+        // stats
+        { "stats_wins",              new[] { "Wins", "Νίκες" } },
+        { "stats_losses",            new[] { "Losses", "Ήττες" } },
+        { "stats_streak",            new[] { "Streak", "Σερί" } },
+        { "stats_best",              new[] { "Best", "Ρεκόρ" } },
+
+        // pvp
+        { "pvp_create_room",         new[] { "Create room", "Δημιουργία δωματίου" } },
+        { "pvp_join_room",           new[] { "Join room", "Σύνδεση σε δωμάτιο" } },
+        { "pvp_room_code",           new[] { "Room code", "Κωδικός δωματίου" } },
+        { "pvp_waiting",             new[] { "Waiting for your challenger...", "Περιμένω τον αντίπαλό σου..." } },
+        { "pvp_invite_copied",       new[] { "Invite copied! Send it to a friend.", "Η πρόσκληση αντιγράφηκε! Στείλ'τη σε έναν φίλο." } },
+        { "pvp_room_not_found",      new[] { "Room not found. Check the code.", "Το δωμάτιο δεν βρέθηκε. Έλεγξε τον κωδικό." } },
+        { "pvp_room_full",           new[] { "Room is already full.", "Το δωμάτιο είναι γεμάτο." } },
+        { "pvp_network_error",       new[] { "Network hiccup — try again", "Πρόβλημα δικτύου — δοκίμασε ξανά" } },
+
+        // disclosure / consent
+        { "simulated_opponents",     new[] { "Opponents are simulated by an on-device AI.", "Οι αντίπαλοι προσομοιώνονται από τεχνητή νοημοσύνη στη συσκευή." } },
+        { "consent_message",         new[] { "This game shows ads. Allow personalized ads?", "Το παιχνίδι εμφανίζει διαφημίσεις. Να επιτρέπονται εξατομικευμένες;" } },
+        { "yes",                     new[] { "Yes", "Ναι" } },
+        { "no",                      new[] { "No", "Όχι" } },
+    };
+}
