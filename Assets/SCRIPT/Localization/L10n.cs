@@ -109,6 +109,12 @@ public static class L10n
         { "pvp_room_not_found",      new[] { "Room not found. Check the code.", "Το δωμάτιο δεν βρέθηκε. Έλεγξε τον κωδικό." } },
         { "pvp_room_full",           new[] { "Room is already full.", "Το δωμάτιο είναι γεμάτο." } },
         { "pvp_network_error",       new[] { "Network hiccup — try again", "Πρόβλημα δικτύου — δοκίμασε ξανά" } },
+        { "pvp_duel",                new[] { "PvP Duel", "Μονομαχία PvP" } },
+        { "pvp_secret",              new[] { "Your secret number (1-100)", "Ο μυστικός σου αριθμός (1-100)" } },
+        { "pvp_enter_code",          new[] { "Room code", "Κωδικός δωματίου" } },
+        { "pvp_guess",               new[] { "Guess", "Μάντεψε" } },
+        { "pvp_leave",               new[] { "Leave match", "Έξοδος από τον αγώνα" } },
+        { "pvp_copy",                new[] { "Copy invite", "Αντιγραφή πρόσκλησης" } },
 
         // disclosure / consent
         { "simulated_opponents",     new[] { "Opponents are simulated by an on-device AI.", "Οι αντίπαλοι προσομοιώνονται από τεχνητή νοημοσύνη στη συσκευή." } },
