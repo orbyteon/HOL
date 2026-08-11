@@ -1,20 +1,24 @@
 using UnityEngine;
+using UnityEngine.UI;
 
 // Review #9: first-launch ads-consent dialog.
 //
-// Unity editor wiring required:
-//   1. Create a UI panel (ConsentPanel) in MainMenu with a short message, e.g.
-//      "This game shows ads. Allow personalized ads?" and two buttons: Yes / No.
-//   2. Add this component to a scene object; drag the panel and the AdsManager in.
-//   3. Wire the Yes button OnClick -> ConsentManager.AcceptPersonalized
-//      and the No button OnClick -> ConsentManager.DeclinePersonalized.
+// Two ways to use:
+//   A) No wiring at all (default): on first launch the component builds a
+//      simple consent dialog from code (BuildRuntimeDialog) and shows it.
+//      This is the zero-setup path so the consent flow — and therefore ads
+//      initialization, which is gated on it — works out of the box.
+//   B) Custom UI: create a ConsentPanel in the scene, drag it + AdsManager
+//      into the fields below, and wire Yes/No buttons to AcceptPersonalized /
+//      DeclinePersonalized. The runtime dialog is then never built.
 //
-// The panel shows only until the player answers once; the choice is stored in
-// PlayerPrefs ("AdsConsent") and AdsManager initializes the SDK after it.
+// The choice is stored in PlayerPrefs ("AdsConsent"); AdsManager initializes
+// the SDK only after a choice exists.
+[RequireComponent(typeof(Canvas), typeof(UnityEngine.UI.GraphicRaycaster))]
 public class ConsentManager : MonoBehaviour
 {
-    public GameObject consentPanel;
-    public AdsManager adsManager;
+    public GameObject consentPanel; // optional — built from code if null
+    public AdsManager adsManager;   // optional — found in scene if null
 
     const string ConsentPrefKey = "AdsConsent";
 
@@ -22,10 +26,14 @@ public class ConsentManager : MonoBehaviour
     {
         bool alreadyAnswered = PlayerPrefs.HasKey(ConsentPrefKey);
 
+        if (consentPanel == null && !alreadyAnswered)
+            consentPanel = BuildRuntimeDialog();
+
         if (consentPanel != null)
             consentPanel.SetActive(!alreadyAnswered);
-        else
-            Debug.LogError("ConsentManager: consentPanel reference is not wired in the Inspector.");
+
+        if (adsManager == null)
+            adsManager = FindFirstObjectByType<AdsManager>();
     }
 
     public void AcceptPersonalized()
@@ -40,16 +48,123 @@ public class ConsentManager : MonoBehaviour
 
     void Choose(bool consent)
     {
-        consentPanel.SetActive(false);
+        if (consentPanel != null)
+            consentPanel.SetActive(false);
 
         // Persist here as the single source of truth — the choice must be
         // saved even if the AdsManager reference is missing in the scene.
         PlayerPrefs.SetInt(ConsentPrefKey, consent ? 1 : 0);
         PlayerPrefs.Save();
 
+        if (adsManager == null)
+            adsManager = FindFirstObjectByType<AdsManager>();
+
         if (adsManager != null)
             adsManager.OnConsentChosen(consent);
         else
-            Debug.LogError("ConsentManager: adsManager reference is not wired in the Inspector — consent saved, but ads will not initialize this session.");
+            Debug.LogError("ConsentManager: no AdsManager in scene — consent saved, but ads will not initialize this session.");
+    }
+
+    // ------------------------------------------------ zero-setup runtime UI
+
+    GameObject BuildRuntimeDialog()
+    {
+        // Dimmed fullscreen backdrop.
+        var panel = CreateUIObject("ConsentPanel", transform);
+        Stretch(panel);
+        var bg = panel.AddComponent<Image>();
+        bg.color = new Color(0f, 0f, 0f, 0.85f);
+        bg.raycastTarget = true; // block taps through the dialog
+
+        // Centered card.
+        var card = CreateUIObject("Card", panel.transform);
+        var cardRect = (RectTransform)card.transform;
+        cardRect.anchorMin = new Vector2(0.5f, 0.5f);
+        cardRect.anchorMax = new Vector2(0.5f, 0.5f);
+        cardRect.sizeDelta = new Vector2(600f, 420f);
+        var cardImage = card.AddComponent<Image>();
+        cardImage.color = new Color(0.16f, 0.16f, 0.2f, 1f);
+
+        // Message.
+        var message = CreateText(card.transform, "Message",
+            "This game shows ads. Allow personalized ads?", 34, new Vector2(0f, 60f));
+
+        // Buttons.
+        var yes = CreateButton(card.transform, "YesButton", "YES",
+            new Vector2(0f, -80f), new Color(0.25f, 0.55f, 0.95f));
+        yes.onClick.AddListener(AcceptPersonalized);
+
+        var no = CreateButton(card.transform, "NoButton", "NO",
+            new Vector2(0f, -170f), new Color(0.35f, 0.35f, 0.4f));
+        no.onClick.AddListener(DeclinePersonalized);
+
+        return panel;
+    }
+
+    static GameObject CreateUIObject(string name, Transform parent)
+    {
+        var go = new GameObject(name, typeof(RectTransform));
+        go.transform.SetParent(parent, false);
+        return go;
+    }
+
+    static void Stretch(GameObject go)
+    {
+        var rect = (RectTransform)go.transform;
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+    }
+
+    static Text CreateText(Transform parent, string name, string content, int fontSize, Vector2 position)
+    {
+        var go = CreateUIObject(name, parent);
+        var rect = (RectTransform)go.transform;
+        rect.anchorMin = new Vector2(0.5f, 0.5f);
+        rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.sizeDelta = new Vector2(520f, 160f);
+        rect.anchoredPosition = position;
+
+        var text = go.AddComponent<Text>();
+        text.text = content;
+        text.fontSize = fontSize;
+        text.color = Color.white;
+        text.alignment = TextAnchor.MiddleCenter;
+        text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        return text;
+    }
+
+    static Button CreateButton(Transform parent, string name, string label, Vector2 position, Color color)
+    {
+        var go = CreateUIObject(name, parent);
+        var rect = (RectTransform)go.transform;
+        rect.anchorMin = new Vector2(0.5f, 0.5f);
+        rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.sizeDelta = new Vector2(300f, 70f);
+        rect.anchoredPosition = position;
+
+        var image = go.AddComponent<Image>();
+        image.color = color;
+
+        var button = go.AddComponent<Button>();
+        button.targetGraphic = image;
+
+        CreateText(go.transform, "Label", label, 30, Vector2.zero)
+            .GetComponent<RectTransform>()
+            .FillParent();
+
+        return button;
+    }
+}
+
+static class RectTransformConsentExtensions
+{
+    public static void FillParent(this RectTransform rect)
+    {
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
     }
 }
