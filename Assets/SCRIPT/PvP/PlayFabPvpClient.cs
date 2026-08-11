@@ -59,12 +59,12 @@ public class PlayFabPvpClient : PvpBackend
     {
         EnsureLogin(ok =>
         {
-            if (!ok) { done?.Invoke(false, "Could not sign in. Check connection / Title ID."); return; }
+            if (!ok) { done?.Invoke(false, L10n.Get("pvp_network_error")); return; }
 
             var code = GenerateCode();
             StartCoroutine(Post(Api("CreateSharedGroup"), "{\"SharedGroupId\":\"" + code + "\"}", true, (ok2, _) =>
             {
-                if (!ok2) { done?.Invoke(false, "Could not create room."); return; }
+                if (!ok2) { done?.Invoke(false, L10n.Get("pvp_network_error")); return; }
 
                 var state = new RoomState
                 {
@@ -76,7 +76,7 @@ public class PlayFabPvpClient : PvpBackend
                 WriteState(code, state, ok3 =>
                 {
                     if (ok3) { RoomCode = code; IsHost = true; }
-                    done?.Invoke(ok3, ok3 ? code : "Could not initialize room.");
+                    done?.Invoke(ok3, ok3 ? code : L10n.Get("pvp_network_error"));
                 });
             }));
         });
@@ -87,40 +87,39 @@ public class PlayFabPvpClient : PvpBackend
         code = (code ?? "").Trim().ToUpperInvariant();
         EnsureLogin(ok =>
         {
-            if (!ok) { done?.Invoke(false, "Could not sign in. Check connection / Title ID."); return; }
+            if (!ok) { done?.Invoke(false, L10n.Get("pvp_network_error")); return; }
 
-            // CloudScript adds us as a member (server authority).
-            string body = "{\"FunctionName\":\"joinRoom\",\"FunctionParameter\":{\"roomId\":\"" + code + "\"}}";
+            // CloudScript joins us AND claims the guest slot atomically
+            // (server authority) — no client-side check-then-write race.
+            string body = "{\"FunctionName\":\"joinRoom\",\"FunctionParameter\":{\"roomId\":\"" + code +
+                          "\",\"guestName\":\"" + EscapeJson(guestName) +
+                          "\",\"guestSecret\":" + guestSecret + "}}";
             StartCoroutine(Post(Api("ExecuteCloudScript"), body, true, (ok2, resp) =>
             {
-                if (!ok2 || resp.Contains("\"Error\"") && !resp.Contains("\"Error\":null"))
+                if (!ok2)
                 {
-                    done?.Invoke(false, "Room not found. Check the code.");
+                    done?.Invoke(false, L10n.Get("pvp_network_error"));
+                    return;
+                }
+                if (resp.Contains("\"room full\""))
+                {
+                    done?.Invoke(false, L10n.Get("pvp_room_full"));
+                    return;
+                }
+                if (resp.Contains("\"room not found\"") || resp.Contains("\"room corrupt\"") || resp.Contains("\"bad secret\""))
+                {
+                    done?.Invoke(false, L10n.Get("pvp_room_not_found"));
+                    return;
+                }
+                if (!resp.Contains("\"ok\":true"))
+                {
+                    done?.Invoke(false, L10n.Get("pvp_network_error"));
                     return;
                 }
 
-                ReadState(code, (ok3, state) =>
-                {
-                    if (!ok3 || state == null || string.IsNullOrEmpty(state.hostName))
-                    {
-                        done?.Invoke(false, "Room not found. Check the code.");
-                        return;
-                    }
-                    if (!string.IsNullOrEmpty(state.guestName))
-                    {
-                        done?.Invoke(false, "Room is already full.");
-                        return;
-                    }
-
-                    state.guestName = guestName;
-                    state.guestSecret = guestSecret;
-                    state.phase = "play";
-                    WriteState(code, state, ok4 =>
-                    {
-                        if (ok4) { RoomCode = code; IsHost = false; }
-                        done?.Invoke(ok4, ok4 ? "" : "Could not join. Try again.");
-                    });
-                });
+                RoomCode = code;
+                IsHost = false;
+                done?.Invoke(true, "");
             }));
         });
     }
