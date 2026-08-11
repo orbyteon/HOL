@@ -96,12 +96,16 @@ The game uses only two scenes. All gameplay (menu, settings, matchmaking, and th
 
 ## Configuration
 
-Ad settings are defined in `Assets/SCRIPT/AdsManager.cs`:
+Ad settings are constants at the top of `Assets/SCRIPT/AdsManager.cs`:
 
 - **LevelPlay Game ID:** `6076495`
-- **Interstitial ad unit:** `Interstitial_Android`
+- **Interstitial ad unit:** `Interstitial_Android` (an `Interstitial_iOS` unit is selected automatically on iOS builds via `#if UNITY_IOS` — create it in the LevelPlay dashboard before shipping iOS)
 
 Replace these with your own LevelPlay credentials before publishing.
+
+### Ads consent
+
+On first launch the game shows a consent dialog (`ConsentManager`) before initializing the ads SDK; the choice is stored in `PlayerPrefs` under `AdsConsent` and passed to LevelPlay via `LevelPlayPrivacySettings.SetGDPRConsent` (requires `com.unity.services.levelplay` ≥ 9.5.0, set in `Packages/manifest.json`). The privacy policy lives at `docs/privacy.html` — enable GitHub Pages on this repo to host it and link that URL in the Play Console.
 
 ## License
 
