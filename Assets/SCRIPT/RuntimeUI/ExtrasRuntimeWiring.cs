@@ -141,6 +141,7 @@ public class ExtrasRuntimeWiring : MonoBehaviour
             "AdsPrivacyButton", L10n.Get("ads_privacy"),
             new Vector2(0f, -680f), new Vector2(360f, 80f), Neutral);
         button.onClick.AddListener(consent.ReopenConsent);
+        RuntimeUI.Localize(button, "ads_privacy");
     }
 
     // --- 3b. Difficulty selector ---------------------------------------------
@@ -162,9 +163,10 @@ public class ExtrasRuntimeWiring : MonoBehaviour
         if (menu == null || menu.settingsPanel == null)
             return;
 
-        RuntimeUI.CreateText(menu.settingsPanel.transform, "DifficultyLabel",
+        var difficultyLabel = RuntimeUI.CreateText(menu.settingsPanel.transform, "DifficultyLabel",
             L10n.Get("difficulty"), 32,
             new Vector2(0f, -780f), new Vector2(400f, 50f));
+        RuntimeUI.Localize(difficultyLabel, "difficulty");
 
         string[] keys = { "easy", "normal", "hard", "adaptive" };
         for (int i = 0; i < 4; i++)
@@ -174,6 +176,7 @@ public class ExtrasRuntimeWiring : MonoBehaviour
                 "Difficulty" + i, L10n.Get(keys[i]),
                 new Vector2(-300f + i * 200f, -860f), new Vector2(180f, 70f), Neutral);
             button.onClick.AddListener(() => SetDifficulty(difficulty));
+            RuntimeUI.Localize(button, keys[i]);
             difficultyButtons[i] = button;
         }
 
@@ -254,6 +257,7 @@ public class ExtrasRuntimeWiring : MonoBehaviour
             "CancelButton", L10n.Get("cancel"),
             new Vector2(0f, -420f), new Vector2(300f, 80f), Neutral);
         cancel.onClick.AddListener(mm.CancelSearch);
+        RuntimeUI.Localize(cancel, "cancel");
     }
 
     // --- 3. Language buttons ------------------------------------------------
@@ -268,9 +272,10 @@ public class ExtrasRuntimeWiring : MonoBehaviour
         if (selector == null)
             selector = menu.settingsPanel.AddComponent<LanguageSelector>();
 
-        RuntimeUI.CreateText(menu.settingsPanel.transform, "LanguageLabel",
+        var languageLabel = RuntimeUI.CreateText(menu.settingsPanel.transform, "LanguageLabel",
             L10n.Get("language"), 32,
             new Vector2(0f, -480f), new Vector2(400f, 50f));
+        RuntimeUI.Localize(languageLabel, "language");
 
         var en = RuntimeUI.CreateButton(menu.settingsPanel.transform,
             "EnglishButton", "English",

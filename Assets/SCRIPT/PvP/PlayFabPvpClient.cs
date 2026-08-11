@@ -37,11 +37,13 @@ public class PlayFabPvpClient : PvpBackend
     void EnsureLogin(Action<bool> done)
     {
         if (!string.IsNullOrEmpty(sessionTicket)) { done(true); return; }
+        StartCoroutine(Login(done));
+    }
 
-        string body = "{\"TitleId\":\"" + titleId.Trim() + "\",\"CustomId\":\"" +
-                      SystemInfo.deviceUniqueIdentifier + "\",\"CreateAccount\":true}";
-
-        StartCoroutine(Post(Api("LoginWithCustomID"), body, false, (ok, resp) =>
+    // Anonymous device-bound login; shared by EnsureLogin and the 401 retry.
+    IEnumerator Login(Action<bool> done)
+    {
+        yield return StartCoroutine(Post(Api("LoginWithCustomID"), LoginBody(), false, (ok, resp) =>
         {
             if (ok)
             {
@@ -51,6 +53,12 @@ public class PlayFabPvpClient : PvpBackend
             }
             done(ok);
         }));
+    }
+
+    string LoginBody()
+    {
+        return "{\"TitleId\":\"" + titleId.Trim() + "\",\"CustomId\":\"" +
+               SystemInfo.deviceUniqueIdentifier + "\",\"CreateAccount\":true}";
     }
 
     // ------------------------------------------------ create / join
@@ -131,18 +139,30 @@ public class PlayFabPvpClient : PvpBackend
         string me = IsHost ? "host" : "guest";
         int opponentSecret = IsHost ? current.guestSecret : current.hostSecret;
 
-        current.lastGuess = guess;
-        current.lastBy = me;
+        // Write a copy: mutating the caller's shared snapshot in place would
+        // corrupt the poll comparison and any retry of this request.
+        var outgoing = new RoomState
+        {
+            hostName = current.hostName,
+            guestName = current.guestName,
+            hostSecret = current.hostSecret,
+            guestSecret = current.guestSecret,
+            turn = current.turn,
+            phase = current.phase,
+            winner = current.winner,
+            lastGuess = guess,
+            lastBy = me,
+        };
         if (guess == opponentSecret)
         {
-            current.phase = "done";
-            current.winner = me;
+            outgoing.phase = "done";
+            outgoing.winner = me;
         }
         else
         {
-            current.turn = IsHost ? "guest" : "host";
+            outgoing.turn = IsHost ? "guest" : "host";
         }
-        WriteState(RoomCode, current, done);
+        WriteState(RoomCode, outgoing, done);
     }
 
     public override void StartPolling(Action<RoomState> onState)
@@ -247,6 +267,34 @@ public class PlayFabPvpClient : PvpBackend
 
     IEnumerator Post(string url, string body, bool authed, Action<bool, string> done)
     {
+        bool ok = false, expired = false;
+        string text = "";
+        yield return StartCoroutine(PostOnce(url, body, authed, (o, t, e) =>
+        {
+            ok = o; text = t; expired = e;
+        }));
+
+        // Session tickets expire (~24h) while EnsureLogin caches the first
+        // one: after expiry every authed call would 401 until app restart
+        // (and the poller would falsely report connection-lost). On a 401,
+        // re-login once and retry the request once, then give up.
+        if (!ok && expired && authed)
+        {
+            sessionTicket = "";
+            bool loggedIn = false;
+            yield return StartCoroutine(Login(r => loggedIn = r));
+            if (loggedIn)
+                yield return StartCoroutine(PostOnce(url, body, authed, (o, t, e2) =>
+                {
+                    ok = o; text = t;
+                }));
+        }
+
+        done?.Invoke(ok, text);
+    }
+
+    IEnumerator PostOnce(string url, string body, bool authed, Action<bool, string, bool> done)
+    {
         var req = new UnityWebRequest(url, "POST");
         req.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(body));
         req.downloadHandler = new DownloadHandlerBuffer();
@@ -258,8 +306,9 @@ public class PlayFabPvpClient : PvpBackend
 
         bool ok = req.result == UnityWebRequest.Result.Success;
         string text = req.downloadHandler.text ?? "";
+        bool expired = req.responseCode == 401 || text.Contains("InvalidSessionTicket");
         if (!ok) Debug.Log("PlayFab request failed: " + req.error + " " + text);
-        done?.Invoke(ok, text);
+        done?.Invoke(ok, text, expired);
         req.Dispose();
     }
 

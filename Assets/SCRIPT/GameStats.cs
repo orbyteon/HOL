@@ -2,6 +2,11 @@ using UnityEngine;
 
 // Persistent match statistics (PlayerPrefs-backed). Static helper so both
 // GameManager and menu UI can read/write without a scene reference.
+//
+// RecordWin/RecordLoss take an optional countRecent: PvP passes false so
+// real-multiplayer results still count toward wins/losses/streaks but do
+// NOT enter the rolling recent-results window that tunes the solo
+// adaptive AI (AdaptiveRandomChance in GameManager).
 public static class GameStats
 {
     const string WinsKey = "StatWins";
@@ -20,7 +25,7 @@ public static class GameStats
     public static int BestWinningGuesses => PlayerPrefs.GetInt(BestGuessesKey, 0);
     public static int Matches => PlayerPrefs.GetInt(MatchesKey, 0);
 
-    public static void RecordWin(int guessCount)
+    public static void RecordWin(int guessCount, bool countRecent = true)
     {
         PlayerPrefs.SetInt(WinsKey, Wins + 1);
         PlayerPrefs.SetInt(MatchesKey, Matches + 1);
@@ -33,17 +38,17 @@ public static class GameStats
         if (BestWinningGuesses == 0 || guessCount < BestWinningGuesses)
             PlayerPrefs.SetInt(BestGuessesKey, guessCount);
 
-        PushRecent(true);
+        if (countRecent) PushRecent(true);
         PlayerPrefs.Save();
     }
 
-    public static void RecordLoss()
+    public static void RecordLoss(bool countRecent = true)
     {
         PlayerPrefs.SetInt(LossesKey, Losses + 1);
         PlayerPrefs.SetInt(MatchesKey, Matches + 1);
         PlayerPrefs.SetInt(StreakKey, 0);
 
-        PushRecent(false);
+        if (countRecent) PushRecent(false);
         PlayerPrefs.Save();
     }
 
