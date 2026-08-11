@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 public class MenuManager : MonoBehaviour
 {
@@ -7,7 +7,8 @@ public class MenuManager : MonoBehaviour
     public GameObject panelPlay;
     public GameObject panelSearching;
 
-    public AdsManager adsManager; // 🔥 NEW
+    public AdsManager adsManager;         // legacy reference; ads now show at match end (GameManager)
+    public FakeMatchmaking matchmaking;   // optional: lets BackToMenu cancel a running search
 
     public void OpenSettings()
     {
@@ -17,6 +18,10 @@ public class MenuManager : MonoBehaviour
 
     public void BackToMenu()
     {
+        // Never let a backgrounded search coroutine fire panelGame over the menu.
+        if (matchmaking != null)
+            matchmaking.CancelSearch();
+
         settingsPanel.SetActive(false);
         panelPlay.SetActive(false);
         panelSearching.SetActive(false);
@@ -26,7 +31,10 @@ public class MenuManager : MonoBehaviour
 
     public void OnPlayPressed()
     {
-        adsManager.ShowAd(OpenFindChallengerPanel); // 🔥 FIX
+        // Ads moved to match end (GameManager.EndGame): gating every Play
+        // press with an interstitial hurt retention and monetized the fake
+        // "opponent not found" retry loop.
+        OpenFindChallengerPanel();
     }
 
     void OpenFindChallengerPanel()
