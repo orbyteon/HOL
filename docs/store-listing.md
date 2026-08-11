@@ -35,7 +35,6 @@ REAL PvP DUELS
 YOUR GAME, YOUR WAY
 • English and native Greek, switches instantly
 • Stats that persist: wins, streaks, best runs
-• Easy / Normal / Hard / Adaptive difficulty
 • Daily streaks, haptics, confetti, and a design worth staring at
 
 A CONVERGING LIGHT
