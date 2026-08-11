@@ -67,6 +67,7 @@ public class ExtrasRuntimeWiring : MonoBehaviour
         { "HIGHER", "higher" },
         { "LOWER", "lower" },
         { "ENTERANUBMER(1-100)", "enter_your_number" }, // scene typo
+        { "ENTERTEXT...", "number_placeholder" }, // number-input placeholder
         { "ENTERYOURNAME..", "player_name" },
         { "GUESSES:", "guesses" },
         { "GUSEEES:", "guesses" }, // scene typo
