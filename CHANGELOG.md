@@ -71,6 +71,13 @@ Play Console versionName in `ProjectSettings.asset`.
 - Release builds override a stray Firebase backend selection to PlayFab
   when a Title ID is configured — the Firebase fallback is dev-only
   (plaintext secrets in the room document, non-atomic joins)
+- Background music track imports as Streaming (was Decompress On Load —
+  the whole 6 MB track unpacked into RAM at startup on device) with
+  load-in-background on and Vorbis quality 0.7; short SFX stay
+  Decompress On Load, which is correct for them. Release-audit checks
+  passed alongside: IL2CPP + ARM64 + targetSdk 35 confirmed, both scenes
+  in the build list in order, no missing-script components or broken
+  event wiring in either scene, app icon reference intact
 
 ### Fixed
 
