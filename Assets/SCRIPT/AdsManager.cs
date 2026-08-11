@@ -1,10 +1,14 @@
-﻿using UnityEngine;
+using UnityEngine;
 using Unity.Services.LevelPlay;
 
 public class AdsManager : MonoBehaviour
 {
     // Review #10: platform-safe, single-place ad configuration
+#if UNITY_IOS
+    const string GameId = "SET_IOS_APP_KEY"; // iOS needs its own LevelPlay app + key in the dashboard
+#else
     const string GameId = "6076495";
+#endif
 #if UNITY_IOS
     const string InterstitialUnit = "Interstitial_iOS"; // create this unit in the LevelPlay dashboard before an iOS release
 #else
@@ -13,10 +17,16 @@ public class AdsManager : MonoBehaviour
 
     const string ConsentPrefKey = "AdsConsent";
     const float ShowAdSafetyTimeout = 10f; // review #1: never block the player longer than this
+    const float MinSecondsBetweenAds = 60f; // interstitial frequency cap (Play policy)
+    const int MaxInitRetries = 3;
 
     private LevelPlayInterstitialAd interstitialAd;
 
     public System.Action onAdFinished;
+
+    bool adInProgress;
+    float lastAdShowTime = -999f;
+    int initRetries;
 
     void Start()
     {
@@ -27,6 +37,19 @@ public class AdsManager : MonoBehaviour
         // On first launch ConsentManager shows the dialog and calls OnConsentChosen.
         if (PlayerPrefs.HasKey(ConsentPrefKey))
             InitAds();
+    }
+
+    void OnDestroy()
+    {
+        LevelPlay.OnInitSuccess -= OnInitSuccess;
+        LevelPlay.OnInitFailed -= OnInitFailed;
+
+        if (interstitialAd != null)
+        {
+            interstitialAd.OnAdClosed -= OnAdClosed;
+            interstitialAd.OnAdDisplayFailed -= OnAdDisplayFailed;
+            interstitialAd.OnAdLoadFailed -= OnAdLoadFailed;
+        }
     }
 
     // Called by ConsentManager after the player answers the consent dialog.
@@ -51,6 +74,8 @@ public class AdsManager : MonoBehaviour
     void OnInitSuccess(LevelPlayConfiguration config)
     {
         Debug.Log("Ads Initialized");
+
+        initRetries = 0;
 
         interstitialAd = new LevelPlayInterstitialAd(InterstitialUnit);
 
@@ -94,10 +119,23 @@ public class AdsManager : MonoBehaviour
 
     public void ShowAd(System.Action callback)
     {
+        // Re-entrancy + frequency cap: never stack interstitials or show
+        // them back-to-back (Play interstitial policy). Player continues.
+        if (adInProgress || Time.realtimeSinceStartup - lastAdShowTime < MinSecondsBetweenAds)
+        {
+            Debug.Log("Ad skipped (in progress or frequency cap) → continue");
+            onAdFinished = callback;
+            FinishAndContinue();
+            return;
+        }
+
         onAdFinished = callback;
 
         if (interstitialAd != null && interstitialAd.IsAdReady())
         {
+            adInProgress = true;
+            lastAdShowTime = Time.realtimeSinceStartup;
+
             // Review #1: if no close/fail event arrives, force the game to continue.
             Invoke(nameof(ForceContinue), ShowAdSafetyTimeout);
             interstitialAd.ShowAd();
@@ -121,6 +159,8 @@ public class AdsManager : MonoBehaviour
     {
         CancelInvoke(nameof(ForceContinue));
 
+        adInProgress = false;
+
         var cb = onAdFinished;
         onAdFinished = null;
         cb?.Invoke();
@@ -129,5 +169,18 @@ public class AdsManager : MonoBehaviour
     void OnInitFailed(LevelPlayInitError error)
     {
         Debug.Log("Ads Init Failed: " + error);
+
+        // Transient failures (e.g. no network at launch) shouldn't kill ads
+        // for the whole session — retry a few times, spaced out.
+        if (initRetries < MaxInitRetries)
+            Invoke(nameof(RetryInit), 60f);
+    }
+
+    void RetryInit()
+    {
+        initRetries++;
+
+        if (PlayerPrefs.HasKey(ConsentPrefKey))
+            InitAds();
     }
 }
