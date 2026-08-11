@@ -251,25 +251,30 @@ public class GameManager : MonoBehaviour
 
         playerGuessCount++;
 
-        aiAnswerText.text = "Player: " + guess;
+        // Show the player's own name (fall back to "You"), like NumberManager.
+        string playerLabel = PlayerPrefs.GetString("PlayerName", "");
+        if (string.IsNullOrEmpty(playerLabel))
+            playerLabel = L10n.Get("you");
+
+        aiAnswerText.text = playerLabel + ": " + guess;
 
         AppendHistory(playerHistory, playerHistoryText, guess);
 
         if (guess == aiSecretNumber)
         {
-            aiAnswerText.text = "Player: " + guess + "\n" + L10n.Get("you_win");
+            aiAnswerText.text = playerLabel + ": " + guess + "\n" + L10n.Get("you_win");
             EndGame(true);
             return;
         }
 
         if (guess < aiSecretNumber)
         {
-            aiAnswerText.text = "Player: " + guess + "\n" + currentOpponent + ": " + L10n.Get("higher");
+            aiAnswerText.text = playerLabel + ": " + guess + "\n" + currentOpponent + ": " + L10n.Get("higher");
             if (guess + 1 > playerMin) playerMin = guess + 1;
         }
         else
         {
-            aiAnswerText.text = "Player: " + guess + "\n" + currentOpponent + ": " + L10n.Get("lower");
+            aiAnswerText.text = playerLabel + ": " + guess + "\n" + currentOpponent + ": " + L10n.Get("lower");
             if (guess - 1 < playerMax) playerMax = guess - 1;
         }
 
