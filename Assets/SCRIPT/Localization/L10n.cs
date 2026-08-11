@@ -132,5 +132,10 @@ public static class L10n
         { "yes",                     new[] { "Yes", "Ναι" } },
         { "no",                      new[] { "No", "Όχι" } },
         { "ads_privacy",             new[] { "Ads privacy", "Απόρρητο διαφημίσεων" } },
+        { "difficulty",              new[] { "Difficulty", "Δυσκολία" } },
+        { "easy",                    new[] { "Easy", "Εύκολο" } },
+        { "normal",                  new[] { "Normal", "Κανονικό" } },
+        { "hard",                    new[] { "Hard", "Δύσκολο" } },
+        { "adaptive",                new[] { "Adaptive", "Προσαρμοστικό" } },
     };
 }

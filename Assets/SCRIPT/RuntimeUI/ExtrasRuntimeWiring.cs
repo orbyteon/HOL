@@ -16,6 +16,7 @@ using TMPro;
 //   6. Settings -> "Ads privacy" button re-opens the consent dialog.
 //   7. Attaches DailyStreak (it is placed in no scene) so streaks count.
 //   8. Scene-authored English labels -> LocalizedText via content mapping.
+//   9. Settings -> difficulty selector (Easy/Normal/Hard/Adaptive).
 public class ExtrasRuntimeWiring : MonoBehaviour
 {
     // Converging Light palette (design/philosophy.md).
@@ -41,6 +42,7 @@ public class ExtrasRuntimeWiring : MonoBehaviour
         WireMatchmakingCancel();
         WireLanguageButtons();
         WireConsentSettings();
+        WireDifficultyButtons();
         AddStatsLabel();
         AddDisclosureLabels();
         LocalizeSceneTexts();
@@ -137,6 +139,71 @@ public class ExtrasRuntimeWiring : MonoBehaviour
             "AdsPrivacyButton", L10n.Get("ads_privacy"),
             new Vector2(0f, -680f), new Vector2(360f, 80f), Neutral);
         button.onClick.AddListener(consent.ReopenConsent);
+    }
+
+    // --- 3b. Difficulty selector ---------------------------------------------
+    //
+    // GameManager supports Easy/Normal/Hard/Adaptive via the "AIDifficulty"
+    // PlayerPrefs key (read per AI guess, so changes apply immediately) but
+    // shipped with no UI. These buttons expose it in Settings; the active
+    // choice is tinted gold.
+
+    const string DifficultyPrefKey = "AIDifficulty"; // mirrors GameManager
+
+    static readonly Color Gold = new Color(1f, 0.78f, 0.34f);
+
+    readonly Button[] difficultyButtons = new Button[4];
+
+    void WireDifficultyButtons()
+    {
+        var menu = FindObjectOfType<MenuManager>();
+        if (menu == null || menu.settingsPanel == null)
+            return;
+
+        RuntimeUI.CreateText(menu.settingsPanel.transform, "DifficultyLabel",
+            L10n.Get("difficulty"), 32,
+            new Vector2(0f, -780f), new Vector2(400f, 50f));
+
+        string[] keys = { "easy", "normal", "hard", "adaptive" };
+        for (int i = 0; i < 4; i++)
+        {
+            int difficulty = i; // captured for the lambda
+            var button = RuntimeUI.CreateButton(menu.settingsPanel.transform,
+                "Difficulty" + i, L10n.Get(keys[i]),
+                new Vector2(-300f + i * 200f, -860f), new Vector2(180f, 70f), Neutral);
+            button.onClick.AddListener(() => SetDifficulty(difficulty));
+            difficultyButtons[i] = button;
+        }
+
+        RefreshDifficultyButtons();
+    }
+
+    void SetDifficulty(int difficulty)
+    {
+        PlayerPrefs.SetInt(DifficultyPrefKey, difficulty);
+        PlayerPrefs.Save();
+        RefreshDifficultyButtons();
+    }
+
+    void RefreshDifficultyButtons()
+    {
+        int current = Mathf.Clamp(PlayerPrefs.GetInt(DifficultyPrefKey, 1), 0, 3);
+        for (int i = 0; i < difficultyButtons.Length; i++)
+        {
+            if (difficultyButtons[i] == null)
+                continue;
+
+            bool selected = i == current;
+
+            var image = difficultyButtons[i].GetComponent<Image>();
+            if (image != null)
+                image.color = selected ? Gold : Neutral;
+
+            // Keep label contrast with the button tint.
+            var label = difficultyButtons[i].GetComponentInChildren<Text>();
+            if (label != null)
+                label.color = selected ? DarkLabel : new Color(0.91f, 0.93f, 1f);
+        }
     }
 
     // --- 1. Rematch -------------------------------------------------------
