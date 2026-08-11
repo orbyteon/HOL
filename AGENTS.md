@@ -10,6 +10,7 @@ smoke test (there is no CLI build/verify loop on this machine).
   (everything: menu, solo game, PvP UI hooks).
 - `Assets/SCRIPT/` — gameplay (`GameManager`, `NumberManager`,
   `FakeMatchmaking`, `MenuManager`), ads (`AdsManager`, `ConsentManager`),
+  ops (`ForceUpdate` — PlayFab TitleData `minVersion` gate, fail-open),
   `PvP/` (backend abstraction + Firebase/PlayFab clients + controller),
   `Localization/` (`L10n` table, `LocalizedText`, `LanguageSelector`),
   `SmartHooks/` (`GameEvents`, `DailyStreak`, `Haptics`),
@@ -57,9 +58,15 @@ smoke test (there is no CLI build/verify loop on this machine).
   `playfab/cloudscript.js` deployed, or PvP fails gracefully at login.
 - Ads: LevelPlay app key `6076495` (Android) in `AdsManager`; iOS keys
   are placeholders. Consent gates init; Settings → Ads privacy re-opens it.
+  Interstitial unit `Interstitial_Android` plus rewarded unit
+  `Rewarded_Android` (save-your-streak offer on losses with streak ≥ 2 —
+  create it in the dashboard or the offer never appears).
   The pinned unityads-adapter 5.6.0 is catalog-verified compatible with
   LevelPlay 9.5.0 (`Assets/LevelPlay/Editor/LevelPlayVersions.json` →
   adapters → UnityAds → ironSourceSdkVersion [9.0.0, 10.0[).
+- Force update: optional PlayFab TitleData key `minVersion` (e.g. "0.2")
+  blocks older builds with a store-link dialog. Missing key / no Title ID
+  / offline → players just play (fail-open).
 - Signing: debug only. No release keystore exists yet — generate one on a
   machine with Unity/JDK, keep it out of git, back it up offline. Never
   sign with another title's key (the project once pointed at RideCore's).
