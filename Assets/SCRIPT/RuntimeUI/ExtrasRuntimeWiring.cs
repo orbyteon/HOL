@@ -15,6 +15,7 @@ using TMPro;
 //   5. Solo matchmaking panels -> "opponents are simulated" disclosure.
 //   6. Settings -> "Ads privacy" button re-opens the consent dialog.
 //   7. Attaches DailyStreak (it is placed in no scene) so streaks count.
+//   8. Scene-authored English labels -> LocalizedText via content mapping.
 public class ExtrasRuntimeWiring : MonoBehaviour
 {
     static readonly Color AccentBlue = new Color(0.20f, 0.50f, 0.90f);
@@ -40,6 +41,78 @@ public class ExtrasRuntimeWiring : MonoBehaviour
         WireConsentSettings();
         AddStatsLabel();
         AddDisclosureLabels();
+        LocalizeSceneTexts();
+    }
+
+    // --- 8. Scene-authored static labels ------------------------------------
+    //
+    // The scene's static labels were authored in English (with letter-spaced
+    // styling like "S A V E" and a few typos like "Enter a nubmer") and have
+    // no LocalizedText attached. Map them by normalized content (uppercase,
+    // spaces and zero-width spaces stripped) onto L10n keys: TMP labels get a
+    // live LocalizedText, legacy Text labels are refreshed on language change.
+
+    static readonly System.Collections.Generic.Dictionary<string, string> SceneTextKeys =
+        new System.Collections.Generic.Dictionary<string, string>
+    {
+        { "SEARCHCHALLENGER", "find_challenger" },
+        { "SAVE", "save" },
+        { "CORRECT", "correct" },
+        { "CONFIRMNUMBER", "confirm" },
+        { "BACK", "back" },
+        { "HIGHER", "higher" },
+        { "LOWER", "lower" },
+        { "ENTERANUBMER(1-100)", "enter_your_number" }, // scene typo
+        { "ENTERYOURNAME..", "player_name" },
+        { "GUESSES:", "guesses" },
+        { "GUSEEES:", "guesses" }, // scene typo
+        { "YOURNUMBER?(1-100)", "your_number" },
+        { "MUSIC", "music" },
+    };
+
+    readonly System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<Text, string>> legacySceneTexts =
+        new System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<Text, string>>();
+
+    static string NormalizeSceneText(string s)
+    {
+        return (s ?? "").Replace(" ", "").Replace("\u200B", "").ToUpperInvariant();
+    }
+
+    void LocalizeSceneTexts()
+    {
+        foreach (var tmp in FindObjectsOfType<TMP_Text>(true))
+        {
+            string key;
+            if (!SceneTextKeys.TryGetValue(NormalizeSceneText(tmp.text), out key))
+                continue;
+            if (tmp.GetComponent<LocalizedText>() != null)
+                continue;
+
+            var localized = tmp.gameObject.AddComponent<LocalizedText>();
+            localized.key = key;
+            localized.enabled = false; // force re-apply
+            localized.enabled = true;
+        }
+
+        foreach (var legacy in FindObjectsOfType<Text>(true))
+        {
+            string key;
+            if (SceneTextKeys.TryGetValue(NormalizeSceneText(legacy.text), out key))
+            {
+                legacy.text = L10n.Get(key);
+                legacySceneTexts.Add(new System.Collections.Generic.KeyValuePair<Text, string>(legacy, key));
+            }
+        }
+
+        if (legacySceneTexts.Count > 0)
+            L10n.OnLanguageChanged += RefreshLegacySceneTexts;
+    }
+
+    void RefreshLegacySceneTexts()
+    {
+        foreach (var pair in legacySceneTexts)
+            if (pair.Key != null)
+                pair.Key.text = L10n.Get(pair.Value);
     }
 
     // DailyStreak is not placed in any scene; attach it here so the streak
@@ -216,6 +289,7 @@ public class ExtrasRuntimeWiring : MonoBehaviour
     {
         L10n.OnLanguageChanged -= RefreshStats;
         L10n.OnLanguageChanged -= RefreshDisclosure;
+        L10n.OnLanguageChanged -= RefreshLegacySceneTexts;
         GameEvents.OnMatchEnded -= OnMatchEnded;
     }
 }

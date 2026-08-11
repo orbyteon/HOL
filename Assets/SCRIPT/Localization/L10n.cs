@@ -99,6 +99,8 @@ public static class L10n
         { "stats_losses",            new[] { "Losses", "Ήττες" } },
         { "stats_streak",            new[] { "Streak", "Σερί" } },
         { "stats_best",              new[] { "Best", "Ρεκόρ" } },
+        { "guesses",                 new[] { "Guesses:", "Προσπάθειες:" } },
+        { "your_number",             new[] { "Your number? (1-100)", "Ο αριθμός σου; (1-100)" } },
 
         // pvp
         { "pvp_create_room",         new[] { "Create room", "Δημιουργία δωματίου" } },
