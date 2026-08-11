@@ -46,7 +46,9 @@ public static class RuntimeUI
         var text = go.AddComponent<Text>();
         text.text = content;
         text.fontSize = fontSize;
-        text.color = color ?? Color.white;
+        // Converging Light (design/philosophy.md): white exists only as
+        // near-white, softened so it belongs to the night.
+        text.color = color ?? new Color(0.91f, 0.93f, 1f);
         text.alignment = TextAnchor.MiddleCenter;
         text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         text.horizontalOverflow = HorizontalWrapMode.Wrap;
@@ -55,7 +57,7 @@ public static class RuntimeUI
     }
 
     public static Button CreateButton(Transform parent, string name, string label,
-        Vector2 position, Vector2 size, Color color)
+        Vector2 position, Vector2 size, Color color, Color? labelColor = null)
     {
         var go = CreateObject(name, parent);
         var rect = (RectTransform)go.transform;
@@ -70,7 +72,7 @@ public static class RuntimeUI
         var button = go.AddComponent<Button>();
         button.targetGraphic = image;
 
-        var text = CreateText(go.transform, "Label", label, 30, Vector2.zero, size);
+        var text = CreateText(go.transform, "Label", label, 30, Vector2.zero, size, labelColor);
         Stretch(text.gameObject);
 
         return button;
