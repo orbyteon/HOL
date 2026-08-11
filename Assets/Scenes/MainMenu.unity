@@ -7306,7 +7306,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cf3948b5b3c4458385edee39ffa88596, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  usePlayFab: 0
+  usePlayFab: 1
 --- !u!223 &2000000104
 Canvas:
   m_ObjectHideFlags: 0
