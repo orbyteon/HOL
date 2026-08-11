@@ -41,6 +41,31 @@ PvP:
 - [ ] Duel win/lose plays the stinger, updates the menu stats label, and
       shows "In X guesses" on a win
 
+Regression checks for the QA fixes (rounds 1–3):
+
+- [ ] Solo: a guess outside the narrowed range is rejected but keeps the
+      typed number in the input (no retyping)
+- [ ] Solo: STOP GAME and the number-input placeholder ("1-100") follow the
+      selected language
+- [ ] Solo: Android back mid-match lands on a clean menu in ONE press —
+      no menu/game overlap, no second press needed
+- [ ] The gold PvP Duel button is covered by panels (not tappable) during
+      a solo match and while settings are open
+- [ ] Switch language with the PvP menu open: every PvP label, button, and
+      placeholder relabels live (no restart)
+- [ ] PvP: back out of create/join, then have a friend join the code →
+      they get "room not found"; no match panel hijacks your screen
+- [ ] PvP: Android back navigates PvP panels (create/join → menu, menu →
+      closed); mid-match back does nothing (Leave button is the way out)
+- [ ] PvP: double-tap Guess quickly → only one guess counted and sent
+- [ ] Lose with a streak ≥ 2 → save-streak offer; if no rewarded ad is
+      available (e.g. unit missing), a "no ad available" message shows and
+      the button STAYS for retry
+- [ ] Force-update dialog (set TitleData minVersion higher than the build)
+      shows Update AND Quit buttons
+- [ ] Player Settings → Icon shows the HOL icon (indigo, chevrons, gold
+      dot), not the Unity default
+
 ## 2. PlayFab (PvP backend)
 
 - [ ] developer.playfab.com → create Studio + Title, copy the Title ID
