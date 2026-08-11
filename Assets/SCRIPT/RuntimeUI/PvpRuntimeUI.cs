@@ -110,6 +110,10 @@ public class PvpRuntimeUI : MonoBehaviour
         var joinCode = RuntimeUI.CreateInputField(joinPanel.transform, "CodeInput",
             L10n.Get("pvp_enter_code"), new Vector2(0f, 240f), new Vector2(460f, 90f), 5,
             TMP_InputField.ContentType.Standard);
+        // Codes are shown and shared in caps ("-----" display, invite text);
+        // typing lowercase looked like a different code. Backends already
+        // normalize case — this is purely visual consistency.
+        joinCode.onValidateInput = (text, index, ch) => char.ToUpperInvariant(ch);
         var joinSecret = RuntimeUI.CreateInputField(joinPanel.transform, "SecretInput",
             L10n.Get("pvp_secret"), new Vector2(0f, 110f), new Vector2(460f, 90f));
         var joinGo = RuntimeUI.CreateButton(joinPanel.transform, "GoButton",

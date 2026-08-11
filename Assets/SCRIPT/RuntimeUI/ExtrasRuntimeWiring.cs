@@ -352,6 +352,10 @@ public class ExtrasRuntimeWiring : MonoBehaviour
             "\n" + L10n.Get("stats_streak") + ": " + GameStats.CurrentStreak +
             "   " + L10n.Get("stats_best") + ": " + GameStats.BestStreak;
 
+        // Fewest-guesses win: tracked since launch but never surfaced.
+        if (GameStats.BestWinningGuesses > 0)
+            summary += "\n" + L10n.Get("stats_fastest_win", GameStats.BestWinningGuesses);
+
         if (statsLabel != null)
             statsLabel.text = summary;
     }

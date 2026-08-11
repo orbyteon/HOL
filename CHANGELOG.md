@@ -17,6 +17,16 @@ Play Console versionName in `ProjectSettings.asset`.
   retry instead of being erased (matches solo behavior)
 - Buttons built after startup (streak-save offer, reopened consent dialog)
   now get press-squash feedback and the shared click sound too
+- Android back mid-match now asks for a second press ("Press back again to
+  leave the match") instead of instantly forfeiting on one stray gesture;
+  once the match is decided, back exits immediately
+- The soft keyboard no longer pops back up over the result screen after a
+  winning guess, and a stray post-match submit no longer claims
+  "Wait for your turn..."
+- PvP room-code input auto-uppercases as you type, matching how codes are
+  displayed and shared (backends already normalized case)
+- Main-menu stats now include the fastest win ("Fastest win: N guesses") —
+  tracked since launch but never surfaced
 
 ### Fixed
 

@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 public class MenuManager : MonoBehaviour
 {
@@ -10,6 +11,21 @@ public class MenuManager : MonoBehaviour
 
     public AdsManager adsManager;         // legacy reference; ads now show at match end (GameManager)
     public FakeMatchmaking matchmaking;   // optional: lets BackToMenu cancel a running search
+
+    // Leaving mid-match must be deliberate: one stray back gesture used to
+    // reload the scene and forfeit the whole match. The first press now
+    // shows a hint; a second within this window exits. Once the match is
+    // decided there is nothing left to forfeit, so back exits immediately.
+    const float BackConfirmSeconds = 2f;
+    float lastMatchBackTime = -10f;
+    Text backHintLabel; // transient, built lazily on the game panel
+
+    GameManager gameManager; // found once; used to detect the decided state
+
+    void Start()
+    {
+        gameManager = FindObjectOfType<GameManager>();
+    }
 
     void Update()
     {
@@ -29,12 +45,50 @@ public class MenuManager : MonoBehaviour
             // explicit Leave button so the room closes cleanly.
             // Checked BEFORE panelPlay: panelPlay stays active for the
             // whole match, so it must not shadow this branch.
-            SceneManager.LoadScene("MainMenu");
+            ConfirmMatchExit();
         }
         else if (panelPlay != null && panelPlay.activeSelf)
             BackToMenu();
         // On the main menu, back is a no-op — exit happens via the Quit
         // button so an accidental tap can't kill the app.
+    }
+
+    void ConfirmMatchExit()
+    {
+        // A decided match has nothing to forfeit — exit on the first press.
+        bool matchLive = gameManager == null || !gameManager.IsMatchOver;
+
+        if (!matchLive || Time.unscaledTime - lastMatchBackTime <= BackConfirmSeconds)
+        {
+            SceneManager.LoadScene("MainMenu");
+            return;
+        }
+
+        lastMatchBackTime = Time.unscaledTime;
+        ShowBackHint();
+    }
+
+    void ShowBackHint()
+    {
+        if (backHintLabel == null)
+        {
+            backHintLabel = RuntimeUI.CreateText(matchmaking.panelGame.transform,
+                "BackExitHint", "", 26, new Vector2(0f, -760f), new Vector2(820f, 60f),
+                new Color(0.91f, 0.93f, 1f, 0.85f));
+            backHintLabel.raycastTarget = false;
+        }
+
+        backHintLabel.text = L10n.Get("back_again_to_leave");
+        backHintLabel.gameObject.SetActive(true);
+
+        CancelInvoke(nameof(HideBackHint));
+        Invoke(nameof(HideBackHint), BackConfirmSeconds);
+    }
+
+    void HideBackHint()
+    {
+        if (backHintLabel != null)
+            backHintLabel.gameObject.SetActive(false);
     }
 
     public void OpenSettings()

@@ -42,6 +42,10 @@ public class GameManager : MonoBehaviour
     // swallowing guesses typed during the opponent's turn.
     public bool IsPlayerTurn => playerTurn && !gameFinished;
 
+    // Lets the UI distinguish "not your turn" from "the round is decided"
+    // (post-match submits and back-press handling behave differently).
+    public bool IsMatchOver => gameFinished;
+
     int min = 1;
     int max = 100;
     int aiGuess;

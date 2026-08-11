@@ -68,6 +68,12 @@ public class NumberManager : MonoBehaviour
         }
         else
         {
+            // Round already decided: a stray submit (soft keyboard still
+            // open, or Done pressed twice) should do nothing — claiming
+            // "wait your turn" after the match would be misleading.
+            if (gameManager != null && gameManager.IsMatchOver)
+                return;
+
             // Review #6: don't silently swallow (and erase) a guess typed
             // during the opponent's turn — tell the player and keep the input.
             if (gameManager != null && !gameManager.IsPlayerTurn)
@@ -88,7 +94,10 @@ public class NumberManager : MonoBehaviour
 
         numberInput.text = "";
         numberInput.DeactivateInputField();
-        numberInput.ActivateInputField();
+        // Don't pop the soft keyboard back up over the result screen — the
+        // winning guess ends the match; refocus only while play continues.
+        if (gameManager == null || !gameManager.IsMatchOver)
+            numberInput.ActivateInputField();
     }
 
     // Review #3: called by GameManager.RestartMatch so a rematch starts from
