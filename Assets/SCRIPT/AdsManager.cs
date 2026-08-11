@@ -118,7 +118,7 @@ public class AdsManager : MonoBehaviour
         interstitialAd.LoadAd(); // preload the next ad
     }
 
-    void OnAdDisplayFailed(LevelPlayAdDisplayInfoError error)
+    void OnAdDisplayFailed(LevelPlayAdInfo adInfo, LevelPlayAdError error)
     {
         Debug.Log("Ad display failed: " + error);
 
@@ -169,7 +169,7 @@ public class AdsManager : MonoBehaviour
         rewardedAd.LoadAd(); // preload the next one
     }
 
-    void OnRewardedDisplayFailed(LevelPlayAdDisplayInfoError error)
+    void OnRewardedDisplayFailed(LevelPlayAdInfo adInfo, LevelPlayAdError error)
     {
         Debug.Log("Rewarded display failed: " + error);
         FinishRewarded();
