@@ -61,7 +61,7 @@ public static class L10n
         { "player_name",             new[] { "Your name", "Το όνομά σου" } },
 
         // matchmaking
-        { "find_challenger",         new[] { "Find challenger", "Εύρεση αντιπάλου" } },
+        { "find_challenger",         new[] { "Find challenger", "Βρες αντίπαλο" } },
         { "searching",               new[] { "Searching opponent", "Αναζήτηση αντιπάλου" } },
         { "opponent_found",          new[] { "Opponent found!", "Βρέθηκε αντίπαλος!" } },
         { "opponent_not_found",      new[] { "Opponent not found. Try again.", "Δεν βρέθηκε αντίπαλος. Δοκίμασε ξανά." } },
@@ -75,7 +75,7 @@ public static class L10n
 
         // duel
         { "opponent_label",          new[] { "Opponent: {0}", "Αντίπαλος: {0}" } },
-        { "your_guess",              new[] { "Your guess", "Η σειρά σου" } },
+        { "your_guess",              new[] { "Your guess", "Η μαντεψιά σου" } },
         { "opponent_thinking",       new[] { "{0} thinking...", "{0} σκέφτεται..." } },
         { "answer_opponent",         new[] { "Answer {0}", "Απάντησε στον/στην {0}" } },
         { "wait_your_turn",          new[] { "Wait for your turn...", "Περίμενε τη σειρά σου..." } },
@@ -85,7 +85,7 @@ public static class L10n
         { "between_range",           new[] { "Between {0} and {1}", "Ανάμεσα σε {0} και {1}" } },
         { "already_know_range",      new[] { "You already know it's between {0} and {1}!", "Ξέρεις ήδη ότι είναι ανάμεσα σε {0} και {1}!" } },
         { "opponent_found_number",   new[] { "{0} found your number!", "{0} βρήκε τον αριθμό σου!" } },
-        { "caught_cheating",         new[] { "That doesn't add up! {0} caught you cheating.", "Κάτι δεν βγαίνει! {0} σε έπιασε να κλείνεις ματιά." } },
+        { "caught_cheating",         new[] { "That doesn't add up! {0} caught you cheating.", "Κάτι δεν βγαίνει! {0} σε έπιασε να κλέβεις." } },
 
         // result
         { "you_win",                 new[] { "YOU WIN!", "ΚΕΡΔΙΣΕΣ!" } },
@@ -104,10 +104,10 @@ public static class L10n
 
         // pvp
         { "pvp_create_room",         new[] { "Create room", "Δημιουργία δωματίου" } },
-        { "pvp_join_room",           new[] { "Join room", "Σύνδεση σε δωμάτιο" } },
+        { "pvp_join_room",           new[] { "Join room", "Μπες σε δωμάτιο" } },
         { "pvp_room_code",           new[] { "Room code", "Κωδικός δωματίου" } },
-        { "pvp_waiting",             new[] { "Waiting for your challenger...", "Περιμένω τον αντίπαλό σου..." } },
-        { "pvp_invite_copied",       new[] { "Invite copied! Send it to a friend.", "Η πρόσκληση αντιγράφηκε! Στείλ'τη σε έναν φίλο." } },
+        { "pvp_waiting",             new[] { "Waiting for your challenger...", "Αναμονή για τον αντίπαλό σου..." } },
+        { "pvp_invite_copied",       new[] { "Invite copied! Send it to a friend.", "Η πρόσκληση αντιγράφηκε! Στείλ'τη σε φίλο σου." } },
         { "pvp_room_not_found",      new[] { "Room not found. Check the code.", "Το δωμάτιο δεν βρέθηκε. Έλεγξε τον κωδικό." } },
         { "pvp_room_full",           new[] { "Room is already full.", "Το δωμάτιο είναι γεμάτο." } },
         { "pvp_network_error",       new[] { "Network hiccup — try again", "Πρόβλημα δικτύου — δοκίμασε ξανά" } },
