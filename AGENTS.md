@@ -38,6 +38,10 @@ smoke test (there is no CLI build/verify loop on this machine).
 - **All user-facing strings go through `L10n.Get(key)`** with both EN and
   EL entries in `Assets/SCRIPT/Localization/L10n.cs`. Never add hardcoded
   English UI text. Formatted entries take args: `L10n.Get("key", arg)`.
+  Runtime-built labels must also follow live language switching: attach
+  `LocalizedText` (TMP) or `LocalizedLegacyText` (legacy `Text`) with the
+  key instead of baking `L10n.Get` at build time — the
+  `RuntimeUI.Localize*(..., key)` helpers do this in one call.
 - **UI colors follow Converging Light** (`design/philosophy.md`): indigo
   depth backgrounds, cyan `(0.25, 0.85, 1)` for secondary actions, muted
   gold `(1, 0.78, 0.34)` reserved for the primary CTA, text near-white
