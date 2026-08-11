@@ -80,12 +80,14 @@ public class L10nIntegrityTests
     {
         // string.Format throws on malformed braces ("{0", "{}"). L10n.Get
         // formats every entry that receives args — a typo must fail here,
-        // not in front of a player mid-match.
+        // not in front of a player mid-match. Ten dummy args so a valid
+        // future {3}+ placeholder isn't misreported as malformed.
         foreach (DictionaryEntry entry in L10nTable())
         {
             var values = (string[])entry.Value;
             foreach (var s in values)
-                Assert.DoesNotThrow(() => string.Format(s, 1, 2, 3),
+                Assert.DoesNotThrow(
+                    () => string.Format(s, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10),
                     $"Key '{entry.Key}': malformed format string '{s}'");
         }
     }

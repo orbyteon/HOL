@@ -50,6 +50,12 @@ jobs:
     needs: check-license
     if: needs.check-license.outputs.has-license == 'true'
     runs-on: ubuntu-latest
+    # unity-test-runner reports results via the Checks API; the default
+    # workflow token is read-only, so grant it explicitly or the job goes
+    # red on the reporting step even when every test passed.
+    permissions:
+      checks: write
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
