@@ -11,7 +11,7 @@ Under the hood the game is single-player against a lightweight AI, but it's pres
 - Turn-based Higher/Lower guessing against an AI opponent
 - **Real PvP duels** with room-code invites (Firebase RTDB or PlayFab backend, both REST, no SDK)
 - **English + native Greek** localization with live language switching
-- **Difficulty modes** — Easy / Normal / Hard / Adaptive (the AI tunes itself to your recent win rate)
+- **Difficulty modes** — Easy / Normal / Hard / Adaptive (the AI tunes itself to your recent win rate), selectable in Settings
 - **Persistent stats** — wins/losses, current + best streak, best winning guess-count (`PlayerPrefs`)
 - Daily-play streak, haptics on win/lose, and a `GameEvents` hub for analytics/notifications
 - Simulated online matchmaking (searching screen, occasional "opponent not found")
