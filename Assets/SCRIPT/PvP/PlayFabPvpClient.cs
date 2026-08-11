@@ -376,6 +376,22 @@ public class PlayFabPvpClient : PvpBackend
                 else if (n == '\\') sb.Append('\\');
                 else if (n == 'n') sb.Append('\n');
                 else if (n == 't') sb.Append('\t');
+                else if (n == 'u' && i + 6 <= resp.Length)
+                {
+                    // \uXXXX — PlayFab escapes non-ASCII (Greek player
+                    // names!) as unicode sequences; without this branch
+                    // they surface as literal "u039A..." garbage.
+                    int code;
+                    if (int.TryParse(resp.Substring(i + 2, 4),
+                            System.Globalization.NumberStyles.HexNumber,
+                            System.Globalization.CultureInfo.InvariantCulture, out code))
+                    {
+                        sb.Append((char)code);
+                        i += 6;
+                        continue;
+                    }
+                    sb.Append(n); // malformed escape: keep the literal
+                }
                 else sb.Append(n);
                 i += 2;
                 continue;

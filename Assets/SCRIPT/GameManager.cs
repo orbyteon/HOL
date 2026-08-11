@@ -357,19 +357,28 @@ public class GameManager : MonoBehaviour
         streakSaveButton = btn.gameObject;
         btn.onClick.AddListener(() =>
         {
-            // Destroy the button only once an ad is actually on its way. If
-            // the ad is unavailable, keep the button and tell the player —
-            // otherwise the tap would leave no button, no ad, no feedback.
             bool shown = adsManager.ShowRewardedAd(() =>
             {
+                // Reward earned: streak restored, button consumed. (The
+                // destroy lives here, not at show time — a display failure
+                // after Show() must leave the player a button to retry.)
                 GameStats.RestoreStreak(streak);
                 PlayerPrefs.DeleteKey(AdsManager.PendingStreakRestoreKey);
                 PlayerPrefs.DeleteKey(AdsManager.PendingRewardEarnedKey);
                 PlayerPrefs.Save();
                 GameEvents.MatchEnded(false, 0); // refresh the menu stats label
+                if (streakSaveButton != null)
+                {
+                    Destroy(streakSaveButton);
+                    streakSaveButton = null;
+                }
             },
             () =>
             {
+                // Ad unavailable or display failed: clear the pending-restore
+                // marker (no reward was earned) and keep the button alive.
+                PlayerPrefs.DeleteKey(AdsManager.PendingStreakRestoreKey);
+                PlayerPrefs.Save();
                 if (aiAnswerText != null)
                     aiAnswerText.text = L10n.Get("ad_not_ready");
             });
@@ -380,9 +389,6 @@ public class GameManager : MonoBehaviour
                 // earned but before the ad-close callback (see Start).
                 PlayerPrefs.SetInt(AdsManager.PendingStreakRestoreKey, streak);
                 PlayerPrefs.Save();
-
-                Destroy(streakSaveButton);
-                streakSaveButton = null;
             }
         });
     }

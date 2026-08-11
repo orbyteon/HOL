@@ -93,6 +93,7 @@ public class ForceUpdate : MonoBehaviour
         req.downloadHandler = new DownloadHandlerBuffer();
         req.SetRequestHeader("Content-Type", "application/json");
         if (authed) req.SetRequestHeader("X-Authorization", sessionTicket);
+        req.timeout = 10; // a stalled connection must fail, not hang startup
 
         yield return req.SendWebRequest();
 
