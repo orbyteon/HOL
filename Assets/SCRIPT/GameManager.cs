@@ -8,6 +8,12 @@ public class GameManager : MonoBehaviour
     public TMP_Text turnText;
     public TMP_Text opponentNameText;
 
+    // Optional UI (wire in Inspector): shows the player's narrowed guess
+    // range and running guess histories for both sides.
+    public TMP_Text rangeText;
+    public TMP_Text playerHistoryText;
+    public TMP_Text aiHistoryText;
+
     public GameObject higherButton;
     public GameObject lowerButton;
     public GameObject correctButton;
@@ -38,6 +44,9 @@ public class GameManager : MonoBehaviour
 
     int playerSecretNumber;
     int aiSecretNumber;
+
+    readonly System.Text.StringBuilder playerHistory = new System.Text.StringBuilder();
+    readonly System.Text.StringBuilder aiHistory = new System.Text.StringBuilder();
 
     string currentOpponent;
 
@@ -87,6 +96,9 @@ public class GameManager : MonoBehaviour
         aiNumberText.text = "?";
         aiAnswerText.text = "";
 
+        ResetHistory();
+        UpdateRangeText();
+
         stopGameButton.SetActive(false);
         HideButtons();
 
@@ -130,6 +142,8 @@ public class GameManager : MonoBehaviour
         }
 
         aiNumberText.text = currentOpponent + ": " + aiGuess;
+
+        AppendHistory(aiHistory, aiHistoryText, aiGuess);
 
         playerTurn = false;
         turnText.text = "Answer " + currentOpponent;
@@ -204,6 +218,8 @@ public class GameManager : MonoBehaviour
 
         aiAnswerText.text = "Player: " + guess;
 
+        AppendHistory(playerHistory, playerHistoryText, guess);
+
         if (guess == aiSecretNumber)
         {
             aiAnswerText.text = "Player: " + guess + "\nPlayer wins!";
@@ -221,6 +237,8 @@ public class GameManager : MonoBehaviour
             aiAnswerText.text = "Player: " + guess + "\n" + currentOpponent + ": Lower";
             if (guess - 1 < playerMax) playerMax = guess - 1;
         }
+
+        UpdateRangeText();
 
         playerTurn = false;
 
@@ -267,10 +285,39 @@ public class GameManager : MonoBehaviour
         aiAnswerText.text = "";
         turnText.text = "Enter your number";
 
+        ResetHistory();
+
         stopGameButton.SetActive(false);
         HideButtons();
 
         if (numberManager != null)
             numberManager.ResetForNewMatch();
+    }
+
+    void ResetHistory()
+    {
+        playerHistory.Length = 0;
+        aiHistory.Length = 0;
+
+        if (playerHistoryText != null)
+            playerHistoryText.text = "";
+        if (aiHistoryText != null)
+            aiHistoryText.text = "";
+    }
+
+    static void AppendHistory(System.Text.StringBuilder history, TMP_Text target, int guess)
+    {
+        if (history.Length > 0)
+            history.Append("  ");
+        history.Append(guess);
+
+        if (target != null)
+            target.text = history.ToString();
+    }
+
+    void UpdateRangeText()
+    {
+        if (rangeText != null)
+            rangeText.text = "Between " + playerMin + " and " + playerMax;
     }
 }
