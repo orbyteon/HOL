@@ -249,13 +249,24 @@ public class AdsManager : MonoBehaviour
 
     public void ShowAd(System.Action callback)
     {
-        // Re-entrancy + frequency cap: never stack interstitials or show
-        // them back-to-back (Play interstitial policy). Player continues.
-        if (adInProgress || Time.realtimeSinceStartup - lastAdShowTime < MinSecondsBetweenAds)
+        // Re-entrancy: an interstitial is already on screen. The new caller
+        // just continues — the live ad's state must not be touched (routing
+        // through FinishAndContinue here used to overwrite the pending
+        // callback, cancel the live ad's safety timer, and clear
+        // adInProgress mid-ad).
+        if (adInProgress)
         {
-            Debug.Log("Ad skipped (in progress or frequency cap) → continue");
-            onAdFinished = callback;
-            FinishAndContinue();
+            Debug.Log("Ad already in progress → continue");
+            callback?.Invoke();
+            return;
+        }
+
+        // Frequency cap: never show interstitials back-to-back (Play
+        // interstitial policy). Player continues.
+        if (Time.realtimeSinceStartup - lastAdShowTime < MinSecondsBetweenAds)
+        {
+            Debug.Log("Ad skipped (frequency cap) → continue");
+            callback?.Invoke();
             return;
         }
 

@@ -47,6 +47,15 @@ Play Console versionName in `ProjectSettings.asset`.
   (`GameManager.EndGame` → `NumberManager.CloseInput`), not only after the
   player's own winning guess
 
+### Fixed (backend/ads sweep)
+
+- `AdsManager.ShowAd` re-entrancy: a second call while an interstitial was
+  on screen overwrote the pending callback, cancelled the live ad's
+  safety timer, and cleared the in-progress flag mid-ad; blocked calls
+  now invoke their callback directly without touching the live ad's state
+  (`AdsManager`, `ForceUpdate`, and both PvP backends were audited in the
+  same sweep — no other findings)
+
 ### Infrastructure
 
 - GameCI workflow (`.github/workflows/ci.yml`): Android compile-check
