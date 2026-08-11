@@ -10,6 +10,22 @@ public class MenuManager : MonoBehaviour
     public AdsManager adsManager;         // legacy reference; ads now show at match end (GameManager)
     public FakeMatchmaking matchmaking;   // optional: lets BackToMenu cancel a running search
 
+    void Update()
+    {
+        // Android back button / gesture. Escape is Unity's mapping for it.
+        if (!Input.GetKeyDown(KeyCode.Escape))
+            return;
+
+        if (settingsPanel != null && settingsPanel.activeSelf)
+            BackToMenu();
+        else if (panelSearching != null && panelSearching.activeSelf)
+            BackToMenu(); // cancels the running search via matchmaking
+        else if (panelPlay != null && panelPlay.activeSelf)
+            BackToMenu();
+        // On the main menu, back is a no-op — exit happens via the Quit
+        // button so an accidental tap can't kill the app.
+    }
+
     public void OpenSettings()
     {
         mainMenuPanel.SetActive(false);
