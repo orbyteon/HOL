@@ -51,10 +51,12 @@ public class ExtrasRuntimeWiring : MonoBehaviour
     // --- 8. Scene-authored static labels ------------------------------------
     //
     // The scene's static labels were authored in English (with letter-spaced
-    // styling like "S A V E" and a few typos like "Enter a nubmer") and have
-    // no LocalizedText attached. Map them by normalized content (uppercase,
-    // spaces and zero-width spaces stripped) onto L10n keys: TMP labels get a
-    // live LocalizedText, legacy Text labels are refreshed on language change.
+    // styling like "S A V E"; a few historical typos have since been fixed in
+    // the scene, and their normalized forms are kept below as fallbacks) and
+    // have no LocalizedText attached. Map them by normalized content
+    // (uppercase, spaces and zero-width spaces stripped) onto L10n keys: TMP
+    // labels get a live LocalizedText, legacy Text labels are refreshed on
+    // language change.
 
     static readonly System.Collections.Generic.Dictionary<string, string> SceneTextKeys =
         new System.Collections.Generic.Dictionary<string, string>
@@ -66,7 +68,8 @@ public class ExtrasRuntimeWiring : MonoBehaviour
         { "BACK", "back" },
         { "HIGHER", "higher" },
         { "LOWER", "lower" },
-        { "ENTERANUBMER(1-100)", "enter_your_number" }, // scene typo
+        { "ENTERANUMBER(1-100)", "enter_your_number" },
+        { "ENTERANUBMER(1-100)", "enter_your_number" }, // legacy scene typo (fixed in scene; kept as fallback)
         { "ENTERTEXT...", "number_placeholder" }, // number-input placeholder
         { "ENTERYOURNAME..", "player_name" },
         { "GUESSES:", "guesses" },
