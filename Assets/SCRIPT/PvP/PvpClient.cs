@@ -56,19 +56,24 @@ public class PvpClient : PvpBackend
         {
             if (!ok || state == null || string.IsNullOrEmpty(state.hostName))
             {
-                done?.Invoke(false, "Room not found. Check the code.");
+                done?.Invoke(false, L10n.Get("pvp_room_not_found"));
+                return;
+            }
+            if (state.phase == "closed")
+            {
+                done?.Invoke(false, L10n.Get("pvp_room_not_found"));
                 return;
             }
             if (!string.IsNullOrEmpty(state.guestName))
             {
-                done?.Invoke(false, "Room is already full.");
+                done?.Invoke(false, L10n.Get("pvp_room_full"));
                 return;
             }
             var patch = "{\"guestName\":\"" + Escape(guestName) + "\",\"guestSecret\":" + guestSecret + ",\"phase\":\"play\"}";
             StartCoroutine(PatchRoom(code, patch, ok2 =>
             {
                 if (ok2) { RoomCode = code; IsHost = false; }
-                done?.Invoke(ok2, ok2 ? "" : "Could not join. Try again.");
+                done?.Invoke(ok2, ok2 ? "" : L10n.Get("pvp_network_error"));
             }));
         }));
     }

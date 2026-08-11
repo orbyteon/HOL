@@ -57,15 +57,23 @@ public class JuiceRuntimeWiring : MonoBehaviour
     {
         var gm = FindObjectOfType<GameManager>();
         var mm = FindObjectOfType<FakeMatchmaking>();
-        if (gm == null || mm == null || mm.panelGame == null)
-            return;
-        if (gm.winConfetti != null)
-            return;
+        if (gm != null && mm != null && mm.panelGame != null && gm.winConfetti == null)
+        {
+            // Burst origin: invisible, centered on the game panel.
+            var origin = RuntimeUI.CreateObject("ConfettiBurst", mm.panelGame.transform);
+            RuntimeUI.Stretch(origin);
 
-        // Burst origin: invisible, centered on the game panel.
-        var origin = RuntimeUI.CreateObject("ConfettiBurst", mm.panelGame.transform);
-        RuntimeUI.Stretch(origin);
+            gm.winConfetti = origin.AddComponent<ConfettiBurst>();
+        }
 
-        gm.winConfetti = origin.AddComponent<ConfettiBurst>();
+        // PvP match panel gets its own burst origin for duel wins.
+        var pvp = FindObjectOfType<PvpGameController>();
+        if (pvp != null && pvp.matchPanel != null && pvp.winConfetti == null)
+        {
+            var origin = RuntimeUI.CreateObject("PvpConfettiBurst", pvp.matchPanel.transform);
+            RuntimeUI.Stretch(origin);
+
+            pvp.winConfetti = origin.AddComponent<ConfettiBurst>();
+        }
     }
 }
