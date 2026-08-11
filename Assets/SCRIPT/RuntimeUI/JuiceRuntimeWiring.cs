@@ -126,5 +126,13 @@ public class JuiceRuntimeWiring : MonoBehaviour
 
             pvp.winConfetti = origin.AddComponent<ConfettiBurst>();
         }
+
+        // PvP endgame reuses solo's scene-wired stingers.
+        if (pvp != null && gm != null && pvp.audioSource == null)
+        {
+            pvp.audioSource = gm.audioSource;
+            pvp.winSound = gm.winSound;
+            pvp.loseSound = gm.loseSound;
+        }
     }
 }

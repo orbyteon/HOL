@@ -38,6 +38,9 @@ public class PvpGameController : MonoBehaviour
     public TMP_Text resultText;
 
     public ConfettiBurst winConfetti; // optional
+    public AudioSource audioSource;   // optional, shared with solo
+    public AudioClip winSound;        // optional
+    public AudioClip loseSound;       // optional
 
     PvpBackend.RoomState lastState;
     string shownGuessKey = "";
@@ -252,6 +255,13 @@ public class PvpGameController : MonoBehaviour
             resultText.text = iWon ? L10n.Get("you_win") : L10n.Get("you_lose");
             turnText.text = "";
 
+            // Same endgame feedback as solo: stinger + haptic + confetti.
+            if (audioSource != null)
+            {
+                var clip = iWon ? winSound : loseSound;
+                if (clip != null) audioSource.PlayOneShot(clip);
+            }
+            if (iWon) Haptics.Success(); else Haptics.Error();
             if (iWon && winConfetti != null)
                 winConfetti.Burst();
             return;
