@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using TMPro;
 using UnityEngine.SceneManagement;
 
@@ -20,10 +20,10 @@ public class NumberManager : MonoBehaviour
 
     void Start()
     {
-        // Φορτώνουμε το όνομα του παίκτη από τα Settings
+        // Load the player name saved in Settings.
         string playerName = PlayerPrefs.GetString("PlayerName", "Player");
 
-        // Εμφανίζουμε το όνομα πριν ξεκινήσει το παιχνίδι
+        // Show the name before the game starts.
         playerNumberText.text = playerName + ": ?";
     }
 
@@ -51,10 +51,10 @@ public class NumberManager : MonoBehaviour
         {
             playerNumber = number;
 
-            // Παίρνουμε το όνομα που αποθηκεύτηκε
+            // Use the saved player name.
             string playerName = PlayerPrefs.GetString("PlayerName", "Player");
 
-            // Εμφανίζουμε όνομα + αριθμό
+            // Show name + secret number.
             playerNumberText.text = playerName + ": " + playerNumber;
 
             stopButton.SetActive(true);
