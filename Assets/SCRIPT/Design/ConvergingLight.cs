@@ -15,6 +15,8 @@ public static class ConvergingLight
     public static readonly Color Gold = new Color(1f, 0.78f, 0.34f);
     public static readonly Color NearWhite = new Color(0.91f, 0.93f, 1f);
     public static readonly Color TrackIndigo = new Color(0.16f, 0.15f, 0.26f);
+    public static readonly Color PanelIndigo = new Color(0.09f, 0.08f, 0.19f);
+    public static readonly Color ScrimIndigo = new Color(0.05f, 0.05f, 0.12f);
 
     public static Color WithAlpha(Color c, float a)
     {
