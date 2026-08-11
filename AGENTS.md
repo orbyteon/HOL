@@ -55,6 +55,9 @@ smoke test (there is no CLI build/verify loop on this machine).
   `playfab/cloudscript.js` deployed, or PvP fails gracefully at login.
 - Ads: LevelPlay app key `6076495` (Android) in `AdsManager`; iOS keys
   are placeholders. Consent gates init; Settings → Ads privacy re-opens it.
+  The pinned unityads-adapter 5.6.0 is catalog-verified compatible with
+  LevelPlay 9.5.0 (`Assets/LevelPlay/Editor/LevelPlayVersions.json` →
+  adapters → UnityAds → ironSourceSdkVersion [9.0.0, 10.0[).
 - Signing: debug only. No release keystore exists yet — generate one on a
   machine with Unity/JDK, keep it out of git, back it up offline. Never
   sign with another title's key (the project once pointed at RideCore's).
