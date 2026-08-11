@@ -150,5 +150,6 @@ public static class L10n
         { "update_required",         new[] { "A new version of HOL is available. Update to keep playing.", "Βγήκε νέα έκδοση του HOL. Ενημέρωσε για να συνεχίσεις να παίζεις." } },
         { "update_now",              new[] { "Update", "Ενημέρωση" } },
         { "save_streak_ad",          new[] { "Watch an ad to keep your {0}-win streak!", "Δες διαφήμιση για να κρατήσεις το σερί σου ({0})!" } },
+        { "perfect_game",            new[] { "PERFECT RUN!", "ΤΕΛΕΙΟ!" } },
     };
 }
