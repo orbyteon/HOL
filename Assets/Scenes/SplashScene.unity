@@ -564,6 +564,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1153917298}
   - component: {fileID: 1153917297}
+  - component: {fileID: 2000000101}
   m_Layer: 0
   m_Name: Spalsh
   m_TagString: Untagged
@@ -674,6 +675,18 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1168050051}
   m_CullTransparentMesh: 1
+--- !u!114 &2000000101
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1153917296}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e3ad28eeab3541a08fd72b4be33dfe14, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

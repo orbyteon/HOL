@@ -14,7 +14,9 @@ smoke test (there is no CLI build/verify loop on this machine).
   `Localization/` (`L10n` table, `LocalizedText`, `LanguageSelector`),
   `SmartHooks/` (`GameEvents`, `DailyStreak`, `Haptics`),
   `UIJuice/` (`ButtonJuice`, `PanelAnimator`, `ConfettiBurst`, …),
-  `RuntimeUI/` (`RuntimeUI` factory + runtime wiring components).
+  `RuntimeUI/` (`RuntimeUI` factory + runtime wiring components),
+  `Design/` (Converging Light layer: `ConvergingLight` palette/textures,
+  `SplashDesign`, `DesignRuntimeWiring`, `NumberDrift`).
 - `playfab/cloudscript.js` — deploy to PlayFab → Automation → CloudScript.
 - `docs/privacy.html` — privacy policy; keep it truthful when data
   practices change.
@@ -25,13 +27,13 @@ smoke test (there is no CLI build/verify loop on this machine).
   metas got random GUIDs per machine in the past; don't let it happen
   again. MonoImporter metas use the standard block, new GUID per file.
 - **Scene edits are hand-edited YAML.** Use fileIDs in the `20000001xx`
-  range for new documents on the `PvpRuntimeUI` root GameObject, register
-  new roots in the `SceneRoots` block at file end, and reuse the
-  ConsentManager block as the template.
+  range for new documents on the `PvpRuntimeUI` root GameObject (next free:
+  2000000110), register new roots in the `SceneRoots` block at file end,
+  and reuse the ConsentManager block as the template.
 - **Prefer runtime wiring over scene surgery** for new UI: the
   `RuntimeUI/` components (`PvpRuntimeUI`, `ExtrasRuntimeWiring`,
-  `JuiceRuntimeWiring`) build/attach UI one frame after `Start`, so
-  runtime-built panels are covered too.
+  `JuiceRuntimeWiring`) and `Design/DesignRuntimeWiring` build/attach UI
+  one frame after `Start`, so runtime-built panels are covered too.
 - **All user-facing strings go through `L10n.Get(key)`** with both EN and
   EL entries in `Assets/SCRIPT/Localization/L10n.cs`. Never add hardcoded
   English UI text. Formatted entries take args: `L10n.Get("key", arg)`.

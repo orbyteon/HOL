@@ -137,5 +137,6 @@ public static class L10n
         { "normal",                  new[] { "Normal", "Κανονικό" } },
         { "hard",                    new[] { "Hard", "Δύσκολο" } },
         { "adaptive",                new[] { "Adaptive", "Προσαρμοστικό" } },
+        { "splash_tagline",          new[] { "H I G H E R   O R   L O W E R", "Ψ Η Λ Ο Τ Ε Ρ Α   Ή   Χ Α Μ Η Λ Ο Τ Ε Ρ Α" } },
     };
 }
