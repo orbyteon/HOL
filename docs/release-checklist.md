@@ -45,8 +45,9 @@ PvP:
 
 - [ ] developer.playfab.com → create Studio + Title, copy the Title ID
 - [ ] Automation → CloudScript (Legacy) → paste `playfab/cloudscript.js`
-      → Save → **Deploy** (the client requires the atomic `joinRoom`
-      revision — an old deployed revision breaks joining)
+      → Save → **Deploy** (the client requires the revision with the atomic
+      `joinRoom` + server-authoritative `submitGuess` — an old deployed
+      revision breaks joining and makes every guess fail)
 - [ ] Paste the Title ID into `PvpRuntimeUI.playFabTitleId` (Inspector on the
       `PvpRuntimeUI` object in `MainMenu`; copied onto the backend at startup)
 - [ ] Optional force-update gate: Title Data → add key `minVersion`

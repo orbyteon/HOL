@@ -10,7 +10,9 @@ using UnityEngine.Networking;
 //
 // Joining uses a one-line CloudScript function, because PlayFab's rule is
 // "only members can add members" — the CloudScript (server authority) adds
-// the joiner. See playfab/cloudscript.js in the repo.
+// the joiner. Guess submission is also server-authoritative (submitGuess),
+// closing the leave-vs-guess last-write-wins race. See playfab/cloudscript.js
+// in the repo.
 //
 // SETUP (one-time, free):
 //   1. developer.playfab.com → sign in with a Microsoft account → create a
@@ -136,33 +138,47 @@ public class PlayFabPvpClient : PvpBackend
 
     public override void SubmitGuess(int guess, RoomState current, Action<bool> done)
     {
-        string me = IsHost ? "host" : "guest";
-        int opponentSecret = IsHost ? current.guestSecret : current.hostSecret;
+        // Server-authoritative submit (CloudScript submitGuess): the turn and
+        // phase checks plus the state write happen atomically server-side, so
+        // a leaver's closed-write can't erase a landed guess and this stale
+        // client can't resurrect a closed room. REQUIRES the cloudscript.js
+        // revision with handlers.submitGuess deployed — without it every
+        // submit fails gracefully via done(false).
+        string body = "{\"FunctionName\":\"submitGuess\",\"FunctionParameter\":{\"roomId\":\"" + RoomCode +
+                      "\",\"side\":\"" + (IsHost ? "host" : "guest") +
+                      "\",\"guess\":" + guess + "}}";
+        StartCoroutine(Post(Api("ExecuteCloudScript"), body, true, (ok, resp) =>
+        {
+            // Any failure (network, or a server-side reject like "not your
+            // turn") collapses onto the existing done(false) contract.
+            if (!ok || !resp.Contains("\"ok\":true"))
+            {
+                done?.Invoke(false);
+                return;
+            }
 
-        // Write a copy: mutating the caller's shared snapshot in place would
-        // corrupt the poll comparison and any retry of this request.
-        var outgoing = new RoomState
-        {
-            hostName = current.hostName,
-            guestName = current.guestName,
-            hostSecret = current.hostSecret,
-            guestSecret = current.guestSecret,
-            turn = current.turn,
-            phase = current.phase,
-            winner = current.winner,
-            lastGuess = guess,
-            lastBy = me,
-        };
-        if (guess == opponentSecret)
-        {
-            outgoing.phase = "done";
-            outgoing.winner = me;
-        }
-        else
-        {
-            outgoing.turn = IsHost ? "guest" : "host";
-        }
-        WriteState(RoomCode, outgoing, done);
+            // Apply the server-returned state onto the caller's cached
+            // snapshot so the next poll can't regress it to the pre-guess
+            // state. (This is the only state mutation left on this path.)
+            string inner = ExtractStateJson(resp);
+            if (!string.IsNullOrEmpty(inner))
+            {
+                try
+                {
+                    var applied = JsonUtility.FromJson<RoomState>(inner);
+                    if (applied != null)
+                    {
+                        current.turn = applied.turn;
+                        current.phase = applied.phase;
+                        current.lastGuess = applied.lastGuess;
+                        current.lastBy = applied.lastBy;
+                        current.winner = applied.winner;
+                    }
+                }
+                catch { }
+            }
+            done?.Invoke(true);
+        }));
     }
 
     public override void StartPolling(Action<RoomState> onState)
@@ -331,8 +347,24 @@ public class PlayFabPvpClient : PvpBackend
         string marker = "\"Value\":\"";
         int i = resp.IndexOf(marker, s, StringComparison.Ordinal);
         if (i < 0) return "";
-        i += marker.Length;
+        return UnescapeJsonValue(resp, i + marker.Length);
+    }
 
+    // CloudScript's FunctionResult carries the state as a plain
+    // "state":"..." string (no "Value" wrapper like GetSharedGroupData has) —
+    // same escape-aware extraction, different anchor.
+    static string ExtractStateJson(string resp)
+    {
+        string marker = "\"state\":\"";
+        int i = resp.IndexOf(marker, StringComparison.Ordinal);
+        if (i < 0) return "";
+        return UnescapeJsonValue(resp, i + marker.Length);
+    }
+
+    // Reads a JSON string value starting at index i, resolving escapes and
+    // stopping at the closing unescaped quote.
+    static string UnescapeJsonValue(string resp, int i)
+    {
         var sb = new StringBuilder();
         while (i < resp.Length)
         {
