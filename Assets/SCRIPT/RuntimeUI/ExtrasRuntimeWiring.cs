@@ -13,6 +13,8 @@ using TMPro;
 //   3. Settings panel -> gets EN/EL language buttons (LanguageSelector).
 //   4. Main menu -> gets a stats label fed by GameStats.
 //   5. Solo matchmaking panels -> "opponents are simulated" disclosure.
+//   6. Settings -> "Ads privacy" button re-opens the consent dialog.
+//   7. Attaches DailyStreak (it is placed in no scene) so streaks count.
 public class ExtrasRuntimeWiring : MonoBehaviour
 {
     static readonly Color AccentBlue = new Color(0.20f, 0.50f, 0.90f);
@@ -31,11 +33,35 @@ public class ExtrasRuntimeWiring : MonoBehaviour
     {
         yield return null; // let every other Start() finish first
 
+        EnsureDailyStreak();
         WireRematchButton();
         WireMatchmakingCancel();
         WireLanguageButtons();
+        WireConsentSettings();
         AddStatsLabel();
         AddDisclosureLabels();
+    }
+
+    // DailyStreak is not placed in any scene; attach it here so the streak
+    // hook actually counts (it self-registers in its own Start).
+    void EnsureDailyStreak()
+    {
+        if (FindFirstObjectByType<DailyStreak>() == null)
+            gameObject.AddComponent<DailyStreak>();
+    }
+
+    // "Ads privacy" button in Settings -> re-opens the consent dialog.
+    void WireConsentSettings()
+    {
+        var menu = FindObjectOfType<MenuManager>();
+        var consent = FindFirstObjectByType<ConsentManager>();
+        if (menu == null || menu.settingsPanel == null || consent == null)
+            return;
+
+        var button = RuntimeUI.CreateButton(menu.settingsPanel.transform,
+            "AdsPrivacyButton", L10n.Get("ads_privacy"),
+            new Vector2(0f, -680f), new Vector2(360f, 80f), Neutral);
+        button.onClick.AddListener(consent.ReopenConsent);
     }
 
     // --- 1. Rematch -------------------------------------------------------

@@ -65,16 +65,22 @@ public class AdsManager : MonoBehaviour
         bool consent = PlayerPrefs.GetInt(ConsentPrefKey, 0) == 1;
 
         // Requires com.unity.services.levelplay 9.5.0+ (set in Packages/manifest.json).
-        // Privacy flags must be set BEFORE LevelPlay.Init.
+        // Privacy flags must be set BEFORE LevelPlay.Init, and can be updated
+        // any time after — so a consent change from Settings applies live.
         LevelPlayPrivacySettings.SetGDPRConsent(consent);
 
-        LevelPlay.Init(GameId);
+        // Init exactly once: re-choosing consent must not re-initialize the SDK.
+        if (!initialized)
+            LevelPlay.Init(GameId);
     }
+
+    bool initialized;
 
     void OnInitSuccess(LevelPlayConfiguration config)
     {
         Debug.Log("Ads Initialized");
 
+        initialized = true;
         initRetries = 0;
 
         interstitialAd = new LevelPlayInterstitialAd(InterstitialUnit);

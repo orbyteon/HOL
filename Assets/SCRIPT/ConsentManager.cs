@@ -46,6 +46,18 @@ public class ConsentManager : MonoBehaviour
         Choose(false);
     }
 
+    // Re-open the consent dialog from Settings so the player can change
+    // their ads-privacy choice in-app (GDPR: withdrawing consent must be
+    // as easy as giving it). Choosing again overwrites the stored pref and
+    // updates the SDK's privacy flags; AdsManager guards against re-init.
+    public void ReopenConsent()
+    {
+        if (consentPanel == null)
+            consentPanel = BuildRuntimeDialog();
+
+        consentPanel.SetActive(true);
+    }
+
     void Choose(bool consent)
     {
         if (consentPanel != null)
@@ -87,14 +99,14 @@ public class ConsentManager : MonoBehaviour
 
         // Message.
         var message = CreateText(card.transform, "Message",
-            "This game shows ads. Allow personalized ads?", 34, new Vector2(0f, 60f));
+            L10n.Get("consent_message"), 34, new Vector2(0f, 60f));
 
         // Buttons.
-        var yes = CreateButton(card.transform, "YesButton", "YES",
+        var yes = CreateButton(card.transform, "YesButton", L10n.Get("yes"),
             new Vector2(0f, -80f), new Color(0.25f, 0.55f, 0.95f));
         yes.onClick.AddListener(AcceptPersonalized);
 
-        var no = CreateButton(card.transform, "NoButton", "NO",
+        var no = CreateButton(card.transform, "NoButton", L10n.Get("no"),
             new Vector2(0f, -170f), new Color(0.35f, 0.35f, 0.4f));
         no.onClick.AddListener(DeclinePersonalized);
 
