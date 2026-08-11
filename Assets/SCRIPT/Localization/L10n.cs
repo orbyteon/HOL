@@ -149,5 +149,6 @@ public static class L10n
         { "splash_tagline",          new[] { "H I G H E R   O R   L O W E R", "Ψ Η Λ Ο Τ Ε Ρ Α   Ή   Χ Α Μ Η Λ Ο Τ Ε Ρ Α" } },
         { "update_required",         new[] { "A new version of HOL is available. Update to keep playing.", "Βγήκε νέα έκδοση του HOL. Ενημέρωσε για να συνεχίσεις να παίζεις." } },
         { "update_now",              new[] { "Update", "Ενημέρωση" } },
+        { "save_streak_ad",          new[] { "Watch an ad to keep your {0}-win streak!", "Δες διαφήμιση για να κρατήσεις το σερί σου ({0})!" } },
     };
 }

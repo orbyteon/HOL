@@ -11,8 +11,10 @@ public class AdsManager : MonoBehaviour
 #endif
 #if UNITY_IOS
     const string InterstitialUnit = "Interstitial_iOS"; // create this unit in the LevelPlay dashboard before an iOS release
+    const string RewardedUnit = "Rewarded_iOS";         // same — dashboard unit needed
 #else
     const string InterstitialUnit = "Interstitial_Android";
+    const string RewardedUnit = "Rewarded_Android"; // create this unit in the LevelPlay dashboard
 #endif
 
     const string ConsentPrefKey = "AdsConsent";
@@ -21,12 +23,16 @@ public class AdsManager : MonoBehaviour
     const int MaxInitRetries = 3;
 
     private LevelPlayInterstitialAd interstitialAd;
+    private LevelPlayRewardedAd rewardedAd;
 
     public System.Action onAdFinished;
 
     bool adInProgress;
     float lastAdShowTime = -999f;
     int initRetries;
+
+    System.Action onRewardEarned;
+    bool rewardGranted;
 
     void Start()
     {
@@ -50,6 +56,8 @@ public class AdsManager : MonoBehaviour
             interstitialAd.OnAdDisplayFailed -= OnAdDisplayFailed;
             interstitialAd.OnAdLoadFailed -= OnAdLoadFailed;
         }
+
+        OnDestroyRewardedCleanup();
     }
 
     // Called by ConsentManager after the player answers the consent dialog.
@@ -90,6 +98,15 @@ public class AdsManager : MonoBehaviour
         interstitialAd.OnAdLoadFailed += OnAdLoadFailed;
 
         interstitialAd.LoadAd();
+
+        rewardedAd = new LevelPlayRewardedAd(RewardedUnit);
+
+        rewardedAd.OnAdClosed += OnRewardedClosed;
+        rewardedAd.OnAdDisplayFailed += OnRewardedDisplayFailed;
+        rewardedAd.OnAdLoadFailed += OnRewardedLoadFailed;
+        rewardedAd.OnAdRewarded += OnRewardedEarned;
+
+        rewardedAd.LoadAd();
     }
 
     void OnAdClosed(LevelPlayAdInfo adInfo)
@@ -115,6 +132,79 @@ public class AdsManager : MonoBehaviour
         Debug.Log("Ad load failed: " + error);
 
         Invoke(nameof(RetryLoad), 30f); // gentle retry, no tight loop
+    }
+
+    // ---------------------------------------------------------- rewarded
+
+    // Used to decide whether to offer a rewarded placement (e.g. the
+    // save-your-streak button) at all.
+    public bool IsRewardedReady()
+    {
+        return rewardedAd != null && rewardedAd.IsAdReady();
+    }
+
+    // Shows a rewarded ad. onReward fires only if the player earns the
+    // reward (watched through); closes/failures just end the flow quietly.
+    public void ShowRewardedAd(System.Action onReward)
+    {
+        if (!IsRewardedReady())
+        {
+            Debug.Log("Rewarded ad not ready");
+            return;
+        }
+
+        onRewardEarned = onReward;
+        rewardGranted = false;
+        rewardedAd.ShowAd();
+    }
+
+    void OnRewardedEarned(LevelPlayAdInfo adInfo, LevelPlayReward reward)
+    {
+        rewardGranted = true;
+    }
+
+    void OnRewardedClosed(LevelPlayAdInfo adInfo)
+    {
+        FinishRewarded();
+        rewardedAd.LoadAd(); // preload the next one
+    }
+
+    void OnRewardedDisplayFailed(LevelPlayAdDisplayInfoError error)
+    {
+        Debug.Log("Rewarded display failed: " + error);
+        FinishRewarded();
+        rewardedAd.LoadAd();
+    }
+
+    void OnRewardedLoadFailed(LevelPlayAdError error)
+    {
+        Debug.Log("Rewarded load failed: " + error);
+        Invoke(nameof(RetryRewardedLoad), 30f);
+    }
+
+    void RetryRewardedLoad()
+    {
+        if (rewardedAd != null)
+            rewardedAd.LoadAd();
+    }
+
+    void FinishRewarded()
+    {
+        var cb = rewardGranted ? onRewardEarned : null;
+        onRewardEarned = null;
+        rewardGranted = false;
+        cb?.Invoke();
+    }
+
+    void OnDestroyRewardedCleanup()
+    {
+        if (rewardedAd != null)
+        {
+            rewardedAd.OnAdClosed -= OnRewardedClosed;
+            rewardedAd.OnAdDisplayFailed -= OnRewardedDisplayFailed;
+            rewardedAd.OnAdLoadFailed -= OnRewardedLoadFailed;
+            rewardedAd.OnAdRewarded -= OnRewardedEarned;
+        }
     }
 
     void RetryLoad()
