@@ -72,6 +72,7 @@ public class ExtrasRuntimeWiring : MonoBehaviour
         { "GUSEEES:", "guesses" }, // scene typo
         { "YOURNUMBER?(1-100)", "your_number" },
         { "MUSIC", "music" },
+        { "STOPGAME", "stop_game" },
     };
 
     readonly System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<Text, string>> legacySceneTexts =

@@ -61,8 +61,6 @@ public static class L10n
     {
         // main menu
         { "play",                    new[] { "Play", "Παίξε" } },
-        { "settings",                new[] { "Settings", "Ρυθμίσεις" } },
-        { "quit",                    new[] { "Quit", "Έξοδος" } },
         { "back",                    new[] { "Back", "Πίσω" } },
         { "save",                    new[] { "Save", "Αποθήκευση" } },
         { "language",                new[] { "Language", "Γλώσσα" } },
@@ -91,6 +89,7 @@ public static class L10n
         { "higher",                  new[] { "Higher", "Ψηλότερα" } },
         { "lower",                   new[] { "Lower", "Χαμηλότερα" } },
         { "correct",                 new[] { "Correct", "Σωστά" } },
+        { "stop_game",               new[] { "Stop game", "Τέλος παιχνιδιού" } },
         { "between_range",           new[] { "Between {0} and {1}", "Ανάμεσα σε {0} και {1}" } },
         { "already_know_range",      new[] { "You already know it's between {0} and {1}!", "Ξέρεις ήδη ότι είναι ανάμεσα σε {0} και {1}!" } },
         { "opponent_found_number",   new[] { "{0} found your number!", "{0} βρήκε τον αριθμό σου!" } },
@@ -101,7 +100,6 @@ public static class L10n
         { "you_lose",                new[] { "YOU LOSE!", "ΕΧΑΣΕΣ!" } },
         { "won_in_guesses",          new[] { "In {0} guesses", "Σε {0} προσπάθειες" } },
         { "rematch",                 new[] { "Rematch", "Ρεβάνς" } },
-        { "menu",                    new[] { "Menu", "Μενού" } },
 
         // stats
         { "stats_wins",              new[] { "Wins", "Νίκες" } },
@@ -114,7 +112,6 @@ public static class L10n
         // pvp
         { "pvp_create_room",         new[] { "Create room", "Δημιουργία δωματίου" } },
         { "pvp_join_room",           new[] { "Join room", "Μπες σε δωμάτιο" } },
-        { "pvp_room_code",           new[] { "Room code", "Κωδικός δωματίου" } },
         { "pvp_waiting",             new[] { "Waiting for your challenger...", "Αναμονή για τον αντίπαλό σου..." } },
         { "pvp_invite_copied",       new[] { "Invite copied! Send it to a friend.", "Η πρόσκληση αντιγράφηκε! Στείλ'τη σε φίλο σου." } },
         { "pvp_room_not_found",      new[] { "Room not found. Check the code.", "Το δωμάτιο δεν βρέθηκε. Έλεγξε τον κωδικό." } },
