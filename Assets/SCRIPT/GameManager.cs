@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using TMPro;
 
 public class GameManager : MonoBehaviour
@@ -7,12 +7,6 @@ public class GameManager : MonoBehaviour
     public TMP_Text aiAnswerText;
     public TMP_Text turnText;
     public TMP_Text opponentNameText;
-
-    // Optional UI (wire in Inspector): shows the player's narrowed guess
-    // range and running guess histories for both sides.
-    public TMP_Text rangeText;
-    public TMP_Text playerHistoryText;
-    public TMP_Text aiHistoryText;
 
     public GameObject higherButton;
     public GameObject lowerButton;
@@ -24,6 +18,7 @@ public class GameManager : MonoBehaviour
     public AudioClip loseSound;
 
     public NumberManager numberManager; // review #3: wire in Inspector
+    public ConfettiBurst winConfetti;   // optional: drag a ConfettiBurst for win celebration
 
     // Review #6: lets NumberManager give feedback instead of silently
     // swallowing guesses typed during the opponent's turn.
@@ -33,20 +28,12 @@ public class GameManager : MonoBehaviour
     int max = 100;
     int aiGuess;
 
-    // Bounds on what the player still knows about the AI's secret number.
-    // Narrowed by each Higher/Lower hint; used to reject out-of-range guesses.
-    int playerMin = 1;
-    int playerMax = 100;
-
     bool playerTurn = false;
     bool gameFinished = false;
     bool firstAIGuess = true;
 
     int playerSecretNumber;
     int aiSecretNumber;
-
-    readonly System.Text.StringBuilder playerHistory = new System.Text.StringBuilder();
-    readonly System.Text.StringBuilder aiHistory = new System.Text.StringBuilder();
 
     string currentOpponent;
 
@@ -84,8 +71,6 @@ public class GameManager : MonoBehaviour
 
         min = 1;
         max = 100;
-        playerMin = 1;
-        playerMax = 100;
 
         gameFinished = false;
         playerTurn = false;
@@ -96,13 +81,10 @@ public class GameManager : MonoBehaviour
         aiNumberText.text = "?";
         aiAnswerText.text = "";
 
-        ResetHistory();
-        UpdateRangeText();
-
         stopGameButton.SetActive(false);
         HideButtons();
 
-        // Randomly decide who starts.
+        // 🔥 RANDOM START (ΜΟΝΗ ΑΛΛΑΓΗ)
         bool aiStarts = Random.value < 0.5f;
 
         if (aiStarts)
@@ -143,8 +125,6 @@ public class GameManager : MonoBehaviour
 
         aiNumberText.text = currentOpponent + ": " + aiGuess;
 
-        AppendHistory(aiHistory, aiHistoryText, aiGuess);
-
         playerTurn = false;
         turnText.text = "Answer " + currentOpponent;
 
@@ -160,13 +140,6 @@ public class GameManager : MonoBehaviour
 
     public void Higher()
     {
-        // Cheat detection: this answer contradicts an earlier hint.
-        if (aiGuess + 1 > max)
-        {
-            HandleInconsistentAnswer();
-            return;
-        }
-
         min = aiGuess + 1;
 
         HideButtons();
@@ -176,27 +149,11 @@ public class GameManager : MonoBehaviour
 
     public void Lower()
     {
-        // Cheat detection: this answer contradicts an earlier hint.
-        if (aiGuess - 1 < min)
-        {
-            HandleInconsistentAnswer();
-            return;
-        }
-
         max = aiGuess - 1;
 
         HideButtons();
         turnText.text = "Your guess";
         playerTurn = true;
-    }
-
-    void HandleInconsistentAnswer()
-    {
-        // The player gave an answer impossible for their secret number
-        // (e.g. "Higher" when the remaining range is already at 100).
-        // End the round instead of letting the AI guess from an empty range.
-        aiAnswerText.text = "That doesn't add up! " + currentOpponent + " caught you cheating.";
-        EndGame(false);
     }
 
     public void Correct()
@@ -209,16 +166,7 @@ public class GameManager : MonoBehaviour
     {
         if (!playerTurn || gameFinished) return;
 
-        // Reject guesses outside the range the player has already narrowed to.
-        if (guess < playerMin || guess > playerMax)
-        {
-            aiAnswerText.text = "You already know it's between " + playerMin + " and " + playerMax + "!";
-            return;
-        }
-
         aiAnswerText.text = "Player: " + guess;
-
-        AppendHistory(playerHistory, playerHistoryText, guess);
 
         if (guess == aiSecretNumber)
         {
@@ -228,17 +176,9 @@ public class GameManager : MonoBehaviour
         }
 
         if (guess < aiSecretNumber)
-        {
             aiAnswerText.text = "Player: " + guess + "\n" + currentOpponent + ": Higher";
-            if (guess + 1 > playerMin) playerMin = guess + 1;
-        }
         else
-        {
             aiAnswerText.text = "Player: " + guess + "\n" + currentOpponent + ": Lower";
-            if (guess - 1 < playerMax) playerMax = guess - 1;
-        }
-
-        UpdateRangeText();
 
         playerTurn = false;
 
@@ -258,6 +198,8 @@ public class GameManager : MonoBehaviour
             turnText.text = "YOU WIN!";
             if (audioSource != null && winSound != null) // review #14: don't throw on unwired scenes
                 audioSource.PlayOneShot(winSound);
+            if (winConfetti != null)
+                winConfetti.Burst();
         }
         else
         {
@@ -285,39 +227,10 @@ public class GameManager : MonoBehaviour
         aiAnswerText.text = "";
         turnText.text = "Enter your number";
 
-        ResetHistory();
-
         stopGameButton.SetActive(false);
         HideButtons();
 
         if (numberManager != null)
             numberManager.ResetForNewMatch();
-    }
-
-    void ResetHistory()
-    {
-        playerHistory.Length = 0;
-        aiHistory.Length = 0;
-
-        if (playerHistoryText != null)
-            playerHistoryText.text = "";
-        if (aiHistoryText != null)
-            aiHistoryText.text = "";
-    }
-
-    static void AppendHistory(System.Text.StringBuilder history, TMP_Text target, int guess)
-    {
-        if (history.Length > 0)
-            history.Append("  ");
-        history.Append(guess);
-
-        if (target != null)
-            target.text = history.ToString();
-    }
-
-    void UpdateRangeText()
-    {
-        if (rangeText != null)
-            rangeText.text = "Between " + playerMin + " and " + playerMax;
     }
 }
