@@ -6,11 +6,13 @@ public class GameManager : MonoBehaviour
     // Disclosure hook: show this line in-game / store listing.
     public const string SimulatedOpponentDisclosure = "Opponents are simulated by an on-device AI.";
 
-    // AI difficulty (PlayerPrefs "AIDifficulty"): 0 = Easy, 1 = Normal, 2 = Hard.
-    // The value is the chance the AI guesses randomly instead of taking the
-    // binary-search midpoint — higher means a weaker, more human opponent.
+    // AI difficulty (PlayerPrefs "AIDifficulty"): 0 = Easy, 1 = Normal, 2 = Hard,
+    // 3 = Adaptive (tunes itself from the player's recent win rate, see
+    // AdaptiveRandomChance). The value is the chance the AI guesses randomly
+    // instead of taking the binary-search midpoint — higher means a weaker,
+    // more human opponent.
     const string DifficultyPrefKey = "AIDifficulty";
-    static readonly float[] DifficultyRandomChance = { 0.6f, 0.2f, 0f };
+    static readonly float[] DifficultyRandomChance = { 0.6f, 0.2f, 0f, -1f };
 
     public TMP_Text aiNumberText;
     public TMP_Text aiAnswerText;
@@ -148,7 +150,10 @@ public class GameManager : MonoBehaviour
         }
         else
         {
-            float randomChance = DifficultyRandomChance[PlayerPrefs.GetInt(DifficultyPrefKey, 1)];
+            int difficulty = Mathf.Clamp(PlayerPrefs.GetInt(DifficultyPrefKey, 1), 0, 3);
+            float randomChance = difficulty == 3
+                ? AdaptiveRandomChance()
+                : DifficultyRandomChance[difficulty];
 
             if (Random.value < randomChance)
                 aiGuess = Random.Range(min, max + 1);
@@ -203,6 +208,19 @@ public class GameManager : MonoBehaviour
         HideButtons();
         turnText.text = "Your guess";
         playerTurn = true;
+    }
+
+    // Adaptive difficulty: aims the AI so a regular player wins about half
+    // their matches. Winning a lot → tougher AI (less randomness); losing a
+    // lot → friendlier AI. Falls back to Normal with little/no history.
+    static float AdaptiveRandomChance()
+    {
+        float winRate = GameStats.RecentWinRate();
+        if (winRate < 0f) return DifficultyRandomChance[1]; // no data → Normal
+
+        if (winRate > 0.6f) return 0.1f;  // streaking player → tougher
+        if (winRate < 0.4f) return 0.5f;  // struggling player → friendlier
+        return 0.25f;                     // balanced → near Normal
     }
 
     void HandleInconsistentAnswer()
@@ -273,6 +291,8 @@ public class GameManager : MonoBehaviour
         if (playerWon)
         {
             GameStats.RecordWin(playerGuessCount);
+            Haptics.Success();
+            GameEvents.MatchEnded(true, playerGuessCount);
 
             turnText.text = "YOU WIN!\nIn " + playerGuessCount + " guesses";
             if (audioSource != null && winSound != null) // review #14: don't throw on unwired scenes
@@ -283,6 +303,8 @@ public class GameManager : MonoBehaviour
         else
         {
             GameStats.RecordLoss();
+            Haptics.Error();
+            GameEvents.MatchEnded(false, 0);
 
             turnText.text = "YOU LOSE!";
             if (audioSource != null && loseSound != null)
