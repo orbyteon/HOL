@@ -7,6 +7,7 @@ public class FakeMatchmaking : MonoBehaviour
     public GameObject searchingPanel;
     public GameObject panelGame;
     public TMP_Text searchingText;
+    public AudioSource foundSound; // stinger, plays when an opponent is found
 
     bool isSearching; // review #8: prevent overlapping searches
     Coroutine dotsAnimation;
@@ -69,6 +70,8 @@ public class FakeMatchmaking : MonoBehaviour
         }
 
         searchingText.text = L10n.Get("opponent_found");
+        if (foundSound != null)
+            foundSound.Play();
         yield return new WaitForSeconds(1.5f);
 
         searchingPanel.SetActive(false);
