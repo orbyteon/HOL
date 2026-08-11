@@ -28,7 +28,7 @@ smoke test (there is no CLI build/verify loop on this machine).
   again. MonoImporter metas use the standard block, new GUID per file.
 - **Scene edits are hand-edited YAML.** Use fileIDs in the `20000001xx`
   range for new documents on the `PvpRuntimeUI` root GameObject (next free:
-  2000000110), register new roots in the `SceneRoots` block at file end,
+  2000000111), register new roots in the `SceneRoots` block at file end,
   and reuse the ConsentManager block as the template.
 - **Prefer runtime wiring over scene surgery** for new UI: the
   `RuntimeUI/` components (`PvpRuntimeUI`, `ExtrasRuntimeWiring`,
