@@ -1,0 +1,129 @@
+using UnityEngine;
+using UnityEngine.UI;
+using TMPro;
+
+// Shared helpers for building simple UI from code at runtime. Used by
+// PvpRuntimeUI and the zero-wire extras; keeps ConsentManager-style
+// construction in one place.
+public static class RuntimeUI
+{
+    public static GameObject CreateObject(string name, Transform parent)
+    {
+        var go = new GameObject(name, typeof(RectTransform));
+        go.transform.SetParent(parent, false);
+        return go;
+    }
+
+    public static void Stretch(GameObject go)
+    {
+        var rect = (RectTransform)go.transform;
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+    }
+
+    public static GameObject FullscreenPanel(Transform parent, string name, Color color)
+    {
+        var panel = CreateObject(name, parent);
+        Stretch(panel);
+        var image = panel.AddComponent<Image>();
+        image.color = color;
+        image.raycastTarget = true;
+        return panel;
+    }
+
+    public static Text CreateText(Transform parent, string name, string content,
+        int fontSize, Vector2 position, Vector2 size, Color? color = null)
+    {
+        var go = CreateObject(name, parent);
+        var rect = (RectTransform)go.transform;
+        rect.anchorMin = new Vector2(0.5f, 0.5f);
+        rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.sizeDelta = size;
+        rect.anchoredPosition = position;
+
+        var text = go.AddComponent<Text>();
+        text.text = content;
+        text.fontSize = fontSize;
+        text.color = color ?? Color.white;
+        text.alignment = TextAnchor.MiddleCenter;
+        text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        text.horizontalOverflow = HorizontalWrapMode.Wrap;
+        text.verticalOverflow = VerticalWrapMode.Overflow;
+        return text;
+    }
+
+    public static Button CreateButton(Transform parent, string name, string label,
+        Vector2 position, Vector2 size, Color color)
+    {
+        var go = CreateObject(name, parent);
+        var rect = (RectTransform)go.transform;
+        rect.anchorMin = new Vector2(0.5f, 0.5f);
+        rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.sizeDelta = size;
+        rect.anchoredPosition = position;
+
+        var image = go.AddComponent<Image>();
+        image.color = color;
+
+        var button = go.AddComponent<Button>();
+        button.targetGraphic = image;
+
+        var text = CreateText(go.transform, "Label", label, 30, Vector2.zero, size);
+        Stretch(text.gameObject);
+
+        return button;
+    }
+
+    // Numeric TMP input field built entirely from code.
+    public static TMP_InputField CreateInputField(Transform parent, string name,
+        string placeholder, Vector2 position, Vector2 size, int characterLimit = 3)
+    {
+        var go = CreateObject(name, parent);
+        var rect = (RectTransform)go.transform;
+        rect.anchorMin = new Vector2(0.5f, 0.5f);
+        rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.sizeDelta = size;
+        rect.anchoredPosition = position;
+
+        var image = go.AddComponent<Image>();
+        image.color = new Color(1f, 1f, 1f, 0.9f);
+
+        var input = go.AddComponent<TMP_InputField>();
+        input.contentType = TMP_InputField.ContentType.IntegerNumber;
+        input.characterLimit = characterLimit;
+
+        // Viewport (masked text area).
+        var viewport = CreateObject("Text Area", go.transform);
+        var viewportRect = (RectTransform)viewport.transform;
+        viewportRect.anchorMin = Vector2.zero;
+        viewportRect.anchorMax = Vector2.one;
+        viewportRect.offsetMin = new Vector2(12f, 6f);
+        viewportRect.offsetMax = new Vector2(-12f, -6f);
+        viewport.AddComponent<RectMask2D>();
+        input.textViewport = viewportRect;
+
+        // Text.
+        var textGo = CreateObject("Text", viewport.transform);
+        Stretch(textGo);
+        var text = textGo.AddComponent<TextMeshProUGUI>();
+        text.text = "";
+        text.fontSize = 36;
+        text.color = Color.black;
+        text.alignment = TextAlignmentOptions.Center;
+        input.textComponent = text;
+
+        // Placeholder.
+        var phGo = CreateObject("Placeholder", viewport.transform);
+        Stretch(phGo);
+        var ph = phGo.AddComponent<TextMeshProUGUI>();
+        ph.text = placeholder;
+        ph.fontSize = 36;
+        ph.color = new Color(0f, 0f, 0f, 0.4f);
+        ph.alignment = TextAlignmentOptions.Center;
+        input.placeholder = ph;
+
+        return input;
+    }
+}
