@@ -68,6 +68,15 @@ public class NumberManager : MonoBehaviour
         }
         else
         {
+            // Review #6: don't silently swallow (and erase) a guess typed
+            // during the opponent's turn — tell the player and keep the input.
+            if (gameManager != null && !gameManager.IsPlayerTurn)
+            {
+                messageText.gameObject.SetActive(true);
+                messageText.text = "Wait for your turn...";
+                return;
+            }
+
             if (gameManager != null)
                 gameManager.PlayerGuess(number);
         }
@@ -77,7 +86,26 @@ public class NumberManager : MonoBehaviour
         numberInput.ActivateInputField();
     }
 
-    public void StopGame()
+    // Review #3: called by GameManager.RestartMatch so a rematch starts from
+    // the number-entry state instead of reusing the old secret.
+    public void ResetForNewMatch()
+    {
+        gameStarted = false;
+
+        string playerName = PlayerPrefs.GetString("PlayerName", "Player");
+        playerNumberText.text = playerName + ": ?";
+
+        messageText.gameObject.SetActive(false);
+        stopButton.SetActive(false);
+        playerGuessesPanel.SetActive(false);
+        aiGuessesPanel.SetActive(false);
+
+        numberInput.text = "";
+    }
+
+    // Review #4: renamed from StopGame (which collided with GameManager's
+    // opposite-behavior StopGame). Re-wire the exit button's OnClick to this.
+    public void ExitToMenu()
     {
         SceneManager.LoadScene("MainMenu");
     }

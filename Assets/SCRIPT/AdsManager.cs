@@ -3,6 +3,17 @@ using Unity.Services.LevelPlay;
 
 public class AdsManager : MonoBehaviour
 {
+    // Review #10: platform-safe, single-place ad configuration
+    const string GameId = "6076495";
+#if UNITY_IOS
+    const string InterstitialUnit = "Interstitial_iOS"; // create this unit in the LevelPlay dashboard before an iOS release
+#else
+    const string InterstitialUnit = "Interstitial_Android";
+#endif
+
+    const string ConsentPrefKey = "AdsConsent";
+    const float ShowAdSafetyTimeout = 10f; // review #1: never block the player longer than this
+
     private LevelPlayInterstitialAd interstitialAd;
 
     public System.Action onAdFinished;
@@ -12,16 +23,40 @@ public class AdsManager : MonoBehaviour
         LevelPlay.OnInitSuccess += OnInitSuccess;
         LevelPlay.OnInitFailed += OnInitFailed;
 
-        LevelPlay.Init("6076495"); // 🔥 Game ID σου
+        // Review #9: only initialize ads once the player has made a consent choice.
+        // On first launch ConsentManager shows the dialog and calls OnConsentChosen.
+        if (PlayerPrefs.HasKey(ConsentPrefKey))
+            InitAds();
+    }
+
+    // Called by ConsentManager after the player answers the consent dialog.
+    public void OnConsentChosen(bool consent)
+    {
+        PlayerPrefs.SetInt(ConsentPrefKey, consent ? 1 : 0);
+        PlayerPrefs.Save();
+        InitAds();
+    }
+
+    void InitAds()
+    {
+        bool consent = PlayerPrefs.GetInt(ConsentPrefKey, 0) == 1;
+
+        // Requires com.unity.services.levelplay 9.5.0+ (set in Packages/manifest.json).
+        // Privacy flags must be set BEFORE LevelPlay.Init.
+        LevelPlayPrivacySettings.SetGDPRConsent(consent);
+
+        LevelPlay.Init(GameId);
     }
 
     void OnInitSuccess(LevelPlayConfiguration config)
     {
         Debug.Log("Ads Initialized");
 
-        interstitialAd = new LevelPlayInterstitialAd("Interstitial_Android");
+        interstitialAd = new LevelPlayInterstitialAd(InterstitialUnit);
 
         interstitialAd.OnAdClosed += OnAdClosed;
+        interstitialAd.OnAdDisplayFailed += OnAdDisplayFailed; // review #1: a failed display must never soft-lock Play
+        interstitialAd.OnAdLoadFailed += OnAdLoadFailed;
 
         interstitialAd.LoadAd();
     }
@@ -30,9 +65,31 @@ public class AdsManager : MonoBehaviour
     {
         Debug.Log("Ad Closed");
 
-        onAdFinished?.Invoke(); // 🔥 συνεχίζει μετά το ad
+        FinishAndContinue();
 
-        interstitialAd.LoadAd(); // 🔥 φορτώνει επόμενο ad
+        interstitialAd.LoadAd(); // preload the next ad
+    }
+
+    void OnAdDisplayFailed(LevelPlayAdDisplayInfoError error)
+    {
+        Debug.Log("Ad display failed: " + error);
+
+        FinishAndContinue(); // let the player through anyway
+
+        interstitialAd.LoadAd();
+    }
+
+    void OnAdLoadFailed(LevelPlayAdError error)
+    {
+        Debug.Log("Ad load failed: " + error);
+
+        Invoke(nameof(RetryLoad), 30f); // gentle retry, no tight loop
+    }
+
+    void RetryLoad()
+    {
+        if (interstitialAd != null)
+            interstitialAd.LoadAd();
     }
 
     public void ShowAd(System.Action callback)
@@ -41,13 +98,32 @@ public class AdsManager : MonoBehaviour
 
         if (interstitialAd != null && interstitialAd.IsAdReady())
         {
+            // Review #1: if no close/fail event arrives, force the game to continue.
+            Invoke(nameof(ForceContinue), ShowAdSafetyTimeout);
             interstitialAd.ShowAd();
         }
         else
         {
             Debug.Log("Ad not ready → start anyway");
-            callback?.Invoke();
+            FinishAndContinue();
         }
+    }
+
+    void ForceContinue()
+    {
+        Debug.Log("Ad safety timeout hit → continuing without ad callback");
+        FinishAndContinue();
+    }
+
+    // Single exit point: cancels the safety timer and guarantees the
+    // callback fires exactly once per ShowAd call.
+    void FinishAndContinue()
+    {
+        CancelInvoke(nameof(ForceContinue));
+
+        var cb = onAdFinished;
+        onAdFinished = null;
+        cb?.Invoke();
     }
 
     void OnInitFailed(LevelPlayInitError error)

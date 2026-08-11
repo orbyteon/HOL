@@ -17,6 +17,12 @@ public class GameManager : MonoBehaviour
     public AudioClip winSound;
     public AudioClip loseSound;
 
+    public NumberManager numberManager; // review #3: wire in Inspector
+
+    // Review #6: lets NumberManager give feedback instead of silently
+    // swallowing guesses typed during the opponent's turn.
+    public bool IsPlayerTurn => playerTurn && !gameFinished;
+
     int min = 1;
     int max = 100;
     int aiGuess;
@@ -176,7 +182,7 @@ public class GameManager : MonoBehaviour
         playerTurn = false;
 
         turnText.text = currentOpponent + " thinking...";
-        Invoke("AIGuess", Random.Range(02.8f, 6.5f));
+        Invoke("AIGuess", Random.Range(1.5f, 3.5f)); // review #5: tighter pacing (was 2.8–6.5)
     }
 
     void EndGame(bool playerWon)
@@ -189,17 +195,39 @@ public class GameManager : MonoBehaviour
         if (playerWon)
         {
             turnText.text = "YOU WIN!";
-            audioSource.PlayOneShot(winSound);
+            if (audioSource != null && winSound != null) // review #14: don't throw on unwired scenes
+                audioSource.PlayOneShot(winSound);
         }
         else
         {
             turnText.text = "YOU LOSE!";
-            audioSource.PlayOneShot(loseSound);
+            if (audioSource != null && loseSound != null)
+                audioSource.PlayOneShot(loseSound);
         }
     }
 
-    public void StopGame()
+    // Review #3 + #4: replaces the old StopGame(), which silently replayed
+    // with the player's stale secret number and the same opponent.
+    // IMPORTANT: re-wire the stop-game button's OnClick to this method.
+    public void RestartMatch()
     {
-        StartGame();
+        CancelInvoke();
+
+        gameFinished = false;
+        playerTurn = false;
+
+        int randomIndex = Random.Range(0, fakeNames.Length);
+        currentOpponent = fakeNames[randomIndex];
+        opponentNameText.text = "Opponent: " + currentOpponent;
+
+        aiNumberText.text = "?";
+        aiAnswerText.text = "";
+        turnText.text = "Enter your number";
+
+        stopGameButton.SetActive(false);
+        HideButtons();
+
+        if (numberManager != null)
+            numberManager.ResetForNewMatch();
     }
 }
