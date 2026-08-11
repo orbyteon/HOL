@@ -49,6 +49,9 @@ PvP:
       revision — an old deployed revision breaks joining)
 - [ ] Paste the Title ID into `PlayFabPvpClient.titleId` (Inspector on the
       `PvpRuntimeUI` object in `MainMenu`, or the script default)
+- [ ] Optional force-update gate: Title Data → add key `minVersion`
+      (e.g. `0.1`). Builds older than it get a blocking update dialog;
+      while the key is absent every version plays (fail-open)
 
 ## 3. Release keystore
 

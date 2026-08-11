@@ -147,5 +147,7 @@ public static class L10n
         { "hard",                    new[] { "Hard", "Δύσκολο" } },
         { "adaptive",                new[] { "Adaptive", "Προσαρμοστικό" } },
         { "splash_tagline",          new[] { "H I G H E R   O R   L O W E R", "Ψ Η Λ Ο Τ Ε Ρ Α   Ή   Χ Α Μ Η Λ Ο Τ Ε Ρ Α" } },
+        { "update_required",         new[] { "A new version of HOL is available. Update to keep playing.", "Βγήκε νέα έκδοση του HOL. Ενημέρωσε για να συνεχίσεις να παίζεις." } },
+        { "update_now",              new[] { "Update", "Ενημέρωση" } },
     };
 }
