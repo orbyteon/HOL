@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using System.Collections;
 using TMPro;
 
@@ -16,6 +16,17 @@ public class FakeMatchmaking : MonoBehaviour
             return;
 
         StartCoroutine(SearchRoutine());
+    }
+
+    // Call this from a Cancel/Back button on the searching panel.
+    public void CancelSearch()
+    {
+        if (!isSearching)
+            return;
+
+        StopAllCoroutines();
+        isSearching = false;
+        searchingPanel.SetActive(false);
     }
 
     IEnumerator SearchRoutine()
