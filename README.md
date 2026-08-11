@@ -30,7 +30,7 @@ The AI narrows its range with a midpoint (binary-search) strategy, guessing rand
 - **Engine:** Unity `2022.3.62f3` (LTS)
 - **Target platform:** Android
 - **UI:** Unity UGUI + TextMesh Pro
-- **Ads:** Unity LevelPlay (ironSource) `9.3.0` — interstitial ads
+- **Ads:** Unity LevelPlay (ironSource) `9.5.0` — interstitial ads
 - **Persistence:** `PlayerPrefs` (player name, music setting)
 - **Language:** C#
 

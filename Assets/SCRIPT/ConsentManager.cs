@@ -21,7 +21,11 @@ public class ConsentManager : MonoBehaviour
     void Start()
     {
         bool alreadyAnswered = PlayerPrefs.HasKey(ConsentPrefKey);
-        consentPanel.SetActive(!alreadyAnswered);
+
+        if (consentPanel != null)
+            consentPanel.SetActive(!alreadyAnswered);
+        else
+            Debug.LogError("ConsentManager: consentPanel reference is not wired in the Inspector.");
     }
 
     public void AcceptPersonalized()
@@ -38,7 +42,14 @@ public class ConsentManager : MonoBehaviour
     {
         consentPanel.SetActive(false);
 
+        // Persist here as the single source of truth — the choice must be
+        // saved even if the AdsManager reference is missing in the scene.
+        PlayerPrefs.SetInt(ConsentPrefKey, consent ? 1 : 0);
+        PlayerPrefs.Save();
+
         if (adsManager != null)
             adsManager.OnConsentChosen(consent);
+        else
+            Debug.LogError("ConsentManager: adsManager reference is not wired in the Inspector — consent saved, but ads will not initialize this session.");
     }
 }
