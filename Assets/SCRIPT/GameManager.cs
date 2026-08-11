@@ -300,6 +300,10 @@ public class GameManager : MonoBehaviour
             GameEvents.MatchEnded(true, playerGuessCount);
 
             turnText.text = L10n.Get("you_win") + "\n" + L10n.Get("won_in_guesses", playerGuessCount);
+            // Optimal binary search solves 1-100 in at most 7 guesses —
+            // celebrate a perfect run.
+            if (playerGuessCount <= 7)
+                turnText.text += "\n" + L10n.Get("perfect_game");
             if (audioSource != null && winSound != null) // review #14: don't throw on unwired scenes
                 audioSource.PlayOneShot(winSound);
             if (winConfetti != null)
