@@ -45,6 +45,7 @@ public class PvpGameController : MonoBehaviour
     PvpBackend.RoomState lastState;
     string shownGuessKey = "";
     bool matchOver;
+    int myGuessCount;
 
     string MyName => PlayerPrefs.GetString("PlayerName", "Player");
 
@@ -141,6 +142,7 @@ public class PvpGameController : MonoBehaviour
 
         guessInput.text = "";
         turnText.text = L10n.Get("pvp_sending");
+        myGuessCount++;
         client.SubmitGuess(guess, lastState, ok =>
         {
             if (!ok) turnText.text = L10n.Get("pvp_network_error");
@@ -164,6 +166,7 @@ public class PvpGameController : MonoBehaviour
     void BeginMatchPolling()
     {
         matchOver = false;
+        myGuessCount = 0;
         shownGuessKey = "";
         client.OnRoomClosed = HandleRoomClosed;
         client.OnConnectionLost = HandleConnectionLost;
@@ -252,16 +255,29 @@ public class PvpGameController : MonoBehaviour
             client.StopPolling();
 
             bool iWon = s.winner == (client.IsHost ? "host" : "guest");
-            resultText.text = iWon ? L10n.Get("you_win") : L10n.Get("you_lose");
+            resultText.text = iWon
+                ? L10n.Get("you_win") + "\n" + L10n.Get("won_in_guesses", myGuessCount)
+                : L10n.Get("you_lose");
             turnText.text = "";
 
-            // Same endgame feedback as solo: stinger + haptic + confetti.
+            // Same endgame treatment as solo: stats, stinger, haptic, confetti.
+            if (iWon)
+            {
+                GameStats.RecordWin(myGuessCount);
+                Haptics.Success();
+                GameEvents.MatchEnded(true, myGuessCount);
+            }
+            else
+            {
+                GameStats.RecordLoss();
+                Haptics.Error();
+                GameEvents.MatchEnded(false, 0);
+            }
             if (audioSource != null)
             {
                 var clip = iWon ? winSound : loseSound;
                 if (clip != null) audioSource.PlayOneShot(clip);
             }
-            if (iWon) Haptics.Success(); else Haptics.Error();
             if (iWon && winConfetti != null)
                 winConfetti.Burst();
             return;
