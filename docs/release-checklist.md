@@ -99,9 +99,10 @@ Regression checks for the QA fixes (rounds 1–3):
       device ID via PlayFab + ads, optional display name in PvP), privacy
       policy URL from step 5. Listing copy (EN + EL, short/full
       descriptions, release notes) is paste-ready in
-      `docs/store-listing.md`. Promo video: upload `promo/hol_teaser.mp4`
-      to YouTube (unlisted is fine) and paste its URL into the listing's
-      promo-video field
+      `docs/store-listing.md`. Mandatory listing assets are ready in
+      `docs/store/` (feature graphic 1024×500, hi-res icon 512×512).
+      Promo video: upload `promo/hol_teaser.mp4` to YouTube (unlisted is
+      fine) and paste its URL into the listing's promo-video field
 
 ## 5. Privacy policy hosting
 
