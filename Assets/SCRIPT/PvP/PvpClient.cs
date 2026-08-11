@@ -115,17 +115,47 @@ public class PvpClient : PvpBackend
 
     IEnumerator Poll(Action<RoomState> onState)
     {
-        var wait = new WaitForSeconds(pollIntervalSeconds);
+        const int maxConsecutiveFailures = 10;
+        int failures = 0;
+
         while (true)
         {
             bool finished = false;
-            StartCoroutine(GetRoom(RoomCode, (ok, state) =>
+            bool ok = false;
+            RoomState state = null;
+            StartCoroutine(GetRoom(RoomCode, (o, s) =>
             {
-                if (ok && state != null) onState?.Invoke(state);
+                ok = o; state = s;
                 finished = true;
             }));
             while (!finished) yield return null;
-            yield return wait;
+
+            if (!ok)
+            {
+                // Network/backend failure: back off, and give up (loudly)
+                // after too many in a row instead of hammering forever.
+                if (++failures >= maxConsecutiveFailures)
+                {
+                    pollRoutine = null;
+                    OnConnectionLost?.Invoke();
+                    yield break;
+                }
+                yield return new WaitForSeconds(
+                    Mathf.Min(pollIntervalSeconds * (1f + failures * 0.5f), 10f));
+                continue;
+            }
+
+            if (state == null)
+            {
+                // GET succeeded but the room is gone — the host left.
+                pollRoutine = null;
+                OnRoomClosed?.Invoke();
+                yield break;
+            }
+
+            failures = 0;
+            onState?.Invoke(state);
+            yield return new WaitForSeconds(pollIntervalSeconds);
         }
     }
 

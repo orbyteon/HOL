@@ -160,23 +160,58 @@ public class PlayFabPvpClient : PvpBackend
 
     public override void DeleteRoom()
     {
-        // Shared groups cannot be deleted from the Client API; mark done instead.
+        // Shared groups cannot be deleted from the Client API; mark the room
+        // closed instead so the other player's poller sees phase == "closed".
+        if (!string.IsNullOrEmpty(RoomCode))
+        {
+            string code = RoomCode;
+            ReadState(code, (ok, state) =>
+            {
+                if (ok && state != null)
+                {
+                    state.phase = "closed";
+                    WriteState(code, state, _ => { });
+                }
+            });
+        }
         RoomCode = "";
     }
 
     IEnumerator Poll(Action<RoomState> onState)
     {
-        var wait = new WaitForSeconds(pollIntervalSeconds);
+        const int maxConsecutiveFailures = 10;
+        int failures = 0;
+
         while (true)
         {
             bool finished = false;
-            ReadState(RoomCode, (ok, state) =>
+            bool ok = false;
+            RoomState state = null;
+            ReadState(RoomCode, (o, s) =>
             {
-                if (ok && state != null) onState?.Invoke(state);
+                ok = o; state = s;
                 finished = true;
             });
             while (!finished) yield return null;
-            yield return wait;
+
+            if (!ok || state == null)
+            {
+                // Network/backend failure: back off, and give up (loudly)
+                // after too many in a row instead of hammering forever.
+                if (++failures >= maxConsecutiveFailures)
+                {
+                    pollRoutine = null;
+                    OnConnectionLost?.Invoke();
+                    yield break;
+                }
+                yield return new WaitForSeconds(
+                    Mathf.Min(pollIntervalSeconds * (1f + failures * 0.5f), 10f));
+                continue;
+            }
+
+            failures = 0;
+            onState?.Invoke(state);
+            yield return new WaitForSeconds(pollIntervalSeconds);
         }
     }
 

@@ -115,6 +115,14 @@ public static class L10n
         { "pvp_guess",               new[] { "Guess", "Μάντεψε" } },
         { "pvp_leave",               new[] { "Leave match", "Έξοδος από τον αγώνα" } },
         { "pvp_copy",                new[] { "Copy invite", "Αντιγραφή πρόσκλησης" } },
+        { "pvp_creating",            new[] { "Creating room...", "Δημιουργία δωματίου..." } },
+        { "pvp_joining",             new[] { "Joining...", "Σύνδεση..." } },
+        { "pvp_sending",             new[] { "Sending...", "Αποστολή..." } },
+        { "pvp_wait_turn",           new[] { "Wait for your turn...", "Περίμενε τη σειρά σου..." } },
+        { "pvp_opponent_left",       new[] { "Your opponent left the match.", "Ο αντίπαλός σου αποχώρησε." } },
+        { "pvp_connection_lost",     new[] { "Connection lost. Try again later.", "Χάθηκε η σύνδεση. Δοκίμασε αργότερα." } },
+        { "pvp_invite_text",         new[] { "Duel me in HOL — Higher or Lower! My room code: {0}", "Έλα για μονομαχία στο HOL! Κωδικός δωματίου: {0}" } },
+        { "you",                     new[] { "You", "Εσύ" } },
 
         // disclosure / consent
         { "simulated_opponents",     new[] { "Opponents are simulated by an on-device AI.", "Οι αντίπαλοι προσομοιώνονται από τεχνητή νοημοσύνη στη συσκευή." } },

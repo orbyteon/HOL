@@ -16,7 +16,7 @@ public abstract class PvpBackend : MonoBehaviour
         public int hostSecret;     // 0 = not set yet
         public int guestSecret;    // 0 = not set yet
         public string turn = "";    // "host" | "guest"
-        public string phase = "";   // "waiting" | "play" | "done"
+        public string phase = "";   // "waiting" | "play" | "done" | "closed"
         public int lastGuess;
         public string lastBy = "";
         public string winner = "";  // "host" | "guest" when phase == "done"
@@ -24,6 +24,15 @@ public abstract class PvpBackend : MonoBehaviour
 
     public string RoomCode { get; protected set; } = "";
     public bool IsHost { get; protected set; }
+
+    // Fired by the poller when the room disappears or is marked "closed"
+    // (the opponent left). Also surfaced as phase == "closed" via onState
+    // on backends that can't delete rooms (PlayFab).
+    public Action OnRoomClosed;
+
+    // Fired by the poller after too many consecutive failed polls
+    // (network down, backend unreachable). Polling stops at that point.
+    public Action OnConnectionLost;
 
     public abstract void CreateRoom(string hostName, int hostSecret, Action<bool, string> done);
     public abstract void JoinRoom(string code, string guestName, int guestSecret, Action<bool, string> done);
