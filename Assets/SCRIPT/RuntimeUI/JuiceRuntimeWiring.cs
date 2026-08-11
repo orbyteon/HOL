@@ -7,6 +7,7 @@ using UnityEngine.UI;
 //   - ButtonJuice on every Button (press squash + springy release)
 //   - PanelAnimator on the menu panels (fade + rise on open)
 //   - ConfettiBurst on the game panel, wired into GameManager.winConfetti
+//   - the scene's click AudioSource handed to every unwired ButtonJuice
 // Runs one frame after Start so runtime-built UI (PvP panels, consent
 // dialog) already exists and gets juice too.
 public class JuiceRuntimeWiring : MonoBehaviour
@@ -23,6 +24,56 @@ public class JuiceRuntimeWiring : MonoBehaviour
         AddButtonJuice();
         AddPanelAnimators();
         AddConfetti();
+        WireClickSounds();
+    }
+
+    // The scene has a dedicated click AudioSource, but only a few buttons
+    // call Play() on it via serialized onClick — the rest are silent.
+    // Discover that source from the existing persistent calls and hand it
+    // (plus its clip) to every ButtonJuice whose button lacks the wiring,
+    // so every button clicks exactly once.
+    void WireClickSounds()
+    {
+        AudioSource clickSource = null;
+        var buttons = FindObjectsOfType<Button>(true);
+
+        foreach (var b in buttons)
+        {
+            for (int i = 0; i < b.onClick.GetPersistentEventCount(); i++)
+            {
+                if (b.onClick.GetPersistentMethodName(i) == "Play"
+                    && b.onClick.GetPersistentTarget(i) is AudioSource)
+                {
+                    clickSource = (AudioSource)b.onClick.GetPersistentTarget(i);
+                    break;
+                }
+            }
+            if (clickSource != null) break;
+        }
+
+        if (clickSource == null || clickSource.clip == null) return;
+
+        foreach (var b in buttons)
+        {
+            bool alreadyWired = false;
+            for (int i = 0; i < b.onClick.GetPersistentEventCount(); i++)
+            {
+                if (b.onClick.GetPersistentMethodName(i) == "Play"
+                    && b.onClick.GetPersistentTarget(i) == clickSource)
+                {
+                    alreadyWired = true;
+                    break;
+                }
+            }
+            if (alreadyWired) continue;
+
+            var juice = b.GetComponent<ButtonJuice>();
+            if (juice != null && juice.clickSound == null)
+            {
+                juice.audioSource = clickSource;
+                juice.clickSound = clickSource.clip;
+            }
+        }
     }
 
     void AddButtonJuice()
