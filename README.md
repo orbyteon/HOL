@@ -165,4 +165,4 @@ The project builds with the debug key by default. Before a Play Console upload, 
 
 ## License
 
-No license file is currently included in this repository. Add one to clarify how others may use the code.
+Proprietary — see `LICENSE` (© 2026 Orbyteon, all rights reserved). Third-party Unity packages remain under their own licenses.
