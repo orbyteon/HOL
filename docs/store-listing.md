@@ -92,11 +92,13 @@ CONVERGING LIGHT
 
 - EN: `New look: Converging Light design with animated splash. Live PvP
   duels now count in your stats, with full sound and haptics. Save a lost
-  streak with a rewarded ad. Greek-first devices start in Greek.`
+  streak with a rewarded ad. Greek-first devices start in Greek. Rock-solid
+  PvP under the hood: atomic room joins, auto-reconnect, server-fair turns.`
 - EL: `Νέα εμφάνιση Converging Light με κινούμενο splash. Οι ζωντανές
   μονομαχίες PvP μετράνε πλέον στα στατιστικά σου, με ήχους και δόνηση.
   Σώσε ένα χαμένο σερί με επιβραβευμένη διαφήμιση. Ελληνικές συσκευές
-  ξεκινούν στα ελληνικά.`
+  ξεκινούν στα ελληνικά. Πιο αξιόπιστο PvP: ατομική είσοδο σε δωμάτιο,
+  αυτόματη επανασύνδεση, δίκαιες σειρές από τον server.`
 
 ## Category & tags suggestion
 
