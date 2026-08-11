@@ -307,6 +307,7 @@ public class GameManager : MonoBehaviour
         }
         else
         {
+            int streakBeforeLoss = GameStats.CurrentStreak; // captured before reset
             GameStats.RecordLoss();
             Haptics.Error();
             GameEvents.MatchEnded(false, 0);
@@ -314,6 +315,8 @@ public class GameManager : MonoBehaviour
             turnText.text = L10n.Get("you_lose");
             if (audioSource != null && loseSound != null)
                 audioSource.PlayOneShot(loseSound);
+
+            OfferStreakSave(streakBeforeLoss);
         }
 
         // Interstitial at a natural break (match end), every 2nd match —
@@ -322,12 +325,55 @@ public class GameManager : MonoBehaviour
             adsManager.ShowAd(null);
     }
 
+    // Rewarded "save your streak": offered on a loss when the streak was
+    // worth saving and a rewarded ad is loaded. The loss still counts —
+    // only the streak survives.
+    const int MinStreakToSave = 2;
+    GameObject streakSaveButton;
+
+    void OfferStreakSave(int streak)
+    {
+        if (streak < MinStreakToSave || adsManager == null || !adsManager.IsRewardedReady())
+            return;
+        if (stopGameButton == null) return;
+
+        var btn = RuntimeUI.CreateButton(stopGameButton.transform.parent, "SaveStreakButton",
+            L10n.Get("save_streak_ad", streak), Vector2.zero, new Vector2(560f, 90f),
+            ConvergingLight.Gold, ConvergingLight.WithAlpha(ConvergingLight.PanelIndigo, 1f));
+
+        // Sit just above the rematch button.
+        var stopRect = (RectTransform)stopGameButton.transform;
+        var rect = (RectTransform)btn.transform;
+        rect.anchorMin = stopRect.anchorMin;
+        rect.anchorMax = stopRect.anchorMax;
+        rect.pivot = stopRect.pivot;
+        rect.anchoredPosition = stopRect.anchoredPosition + new Vector2(0f, 120f);
+
+        streakSaveButton = btn.gameObject;
+        btn.onClick.AddListener(() =>
+        {
+            adsManager.ShowRewardedAd(() =>
+            {
+                GameStats.RestoreStreak(streak);
+                GameEvents.MatchEnded(false, 0); // refresh the menu stats label
+            });
+            Destroy(streakSaveButton);
+            streakSaveButton = null;
+        });
+    }
+
     // Review #3 + #4: replaces the old StopGame(), which silently replayed
     // with the player's stale secret number and the same opponent.
     // IMPORTANT: re-wire the stop-game button's OnClick to this method.
     public void RestartMatch()
     {
         CancelInvoke();
+
+        if (streakSaveButton != null)
+        {
+            Destroy(streakSaveButton);
+            streakSaveButton = null;
+        }
 
         gameFinished = false;
         playerTurn = false;

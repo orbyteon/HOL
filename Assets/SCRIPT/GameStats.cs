@@ -47,6 +47,16 @@ public static class GameStats
         PlayerPrefs.Save();
     }
 
+    // Rewarded "save your streak": the loss still counts (it happened), but
+    // the streak survives intact. Best-streak bookkeeping is preserved.
+    public static void RestoreStreak(int streak)
+    {
+        PlayerPrefs.SetInt(StreakKey, streak);
+        if (streak > BestStreak)
+            PlayerPrefs.SetInt(BestStreakKey, streak);
+        PlayerPrefs.Save();
+    }
+
     // Rolling window of the last 10 results for the adaptive AI difficulty.
     static void PushRecent(bool won)
     {

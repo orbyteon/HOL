@@ -66,7 +66,8 @@ PvP:
 
 - [ ] LevelPlay: app registered with key `6076495`, bundle `com.Orbyteon.HOL`,
       `Interstitial_Android` unit active (unityads-adapter 5.6.0 is
-      catalog-compatible with SDK 9.5.0 — no change needed)
+      catalog-compatible with SDK 9.5.0 — no change needed) — plus a
+      `Rewarded_Android` unit for the save-your-streak placement
 - [ ] Play Console: create app (bundle id is permanent), upload AAB signed
       with the HOL keystore, content rating, data-safety form (declare:
       device ID via PlayFab + ads, optional display name in PvP), privacy
