@@ -95,6 +95,8 @@ public class ConsentManager : MonoBehaviour
         cardRect.anchorMax = new Vector2(0.5f, 0.5f);
         cardRect.sizeDelta = new Vector2(600f, 420f);
         var cardImage = card.AddComponent<Image>();
+        cardImage.sprite = RuntimeUI.RoundedRectSprite;
+        cardImage.type = Image.Type.Sliced;
         cardImage.color = new Color(0.10f, 0.09f, 0.18f, 1f);
 
         // Message.
@@ -159,6 +161,8 @@ public class ConsentManager : MonoBehaviour
         rect.anchoredPosition = position;
 
         var image = go.AddComponent<Image>();
+        image.sprite = RuntimeUI.RoundedRectSprite;
+        image.type = Image.Type.Sliced;
         image.color = color;
 
         var button = go.AddComponent<Button>();
