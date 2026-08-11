@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using TMPro;
 
 public class GameManager : MonoBehaviour
@@ -26,6 +26,11 @@ public class GameManager : MonoBehaviour
     int min = 1;
     int max = 100;
     int aiGuess;
+
+    // Bounds on what the player still knows about the AI's secret number.
+    // Narrowed by each Higher/Lower hint; used to reject out-of-range guesses.
+    int playerMin = 1;
+    int playerMax = 100;
 
     bool playerTurn = false;
     bool gameFinished = false;
@@ -70,6 +75,8 @@ public class GameManager : MonoBehaviour
 
         min = 1;
         max = 100;
+        playerMin = 1;
+        playerMax = 100;
 
         gameFinished = false;
         playerTurn = false;
@@ -83,7 +90,7 @@ public class GameManager : MonoBehaviour
         stopGameButton.SetActive(false);
         HideButtons();
 
-        // 🔥 RANDOM START (ΜΟΝΗ ΑΛΛΑΓΗ)
+        // Randomly decide who starts.
         bool aiStarts = Random.value < 0.5f;
 
         if (aiStarts)
@@ -139,6 +146,13 @@ public class GameManager : MonoBehaviour
 
     public void Higher()
     {
+        // Cheat detection: this answer contradicts an earlier hint.
+        if (aiGuess + 1 > max)
+        {
+            HandleInconsistentAnswer();
+            return;
+        }
+
         min = aiGuess + 1;
 
         HideButtons();
@@ -148,11 +162,27 @@ public class GameManager : MonoBehaviour
 
     public void Lower()
     {
+        // Cheat detection: this answer contradicts an earlier hint.
+        if (aiGuess - 1 < min)
+        {
+            HandleInconsistentAnswer();
+            return;
+        }
+
         max = aiGuess - 1;
 
         HideButtons();
         turnText.text = "Your guess";
         playerTurn = true;
+    }
+
+    void HandleInconsistentAnswer()
+    {
+        // The player gave an answer impossible for their secret number
+        // (e.g. "Higher" when the remaining range is already at 100).
+        // End the round instead of letting the AI guess from an empty range.
+        aiAnswerText.text = "That doesn't add up! " + currentOpponent + " caught you cheating.";
+        EndGame(false);
     }
 
     public void Correct()
@@ -165,6 +195,13 @@ public class GameManager : MonoBehaviour
     {
         if (!playerTurn || gameFinished) return;
 
+        // Reject guesses outside the range the player has already narrowed to.
+        if (guess < playerMin || guess > playerMax)
+        {
+            aiAnswerText.text = "You already know it's between " + playerMin + " and " + playerMax + "!";
+            return;
+        }
+
         aiAnswerText.text = "Player: " + guess;
 
         if (guess == aiSecretNumber)
@@ -175,9 +212,15 @@ public class GameManager : MonoBehaviour
         }
 
         if (guess < aiSecretNumber)
+        {
             aiAnswerText.text = "Player: " + guess + "\n" + currentOpponent + ": Higher";
+            if (guess + 1 > playerMin) playerMin = guess + 1;
+        }
         else
+        {
             aiAnswerText.text = "Player: " + guess + "\n" + currentOpponent + ": Lower";
+            if (guess - 1 < playerMax) playerMax = guess - 1;
+        }
 
         playerTurn = false;
 
