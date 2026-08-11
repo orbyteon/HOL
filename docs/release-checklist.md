@@ -101,6 +101,9 @@ Regression checks for the QA fixes (rounds 1–3):
       descriptions, release notes) is paste-ready in
       `docs/store-listing.md`. Mandatory listing assets are ready in
       `docs/store/` (feature graphic 1024×500, hi-res icon 512×512).
+      Screenshots (min 2 required): capture during the smoke test on
+      device/emulator at 1080×1920 — main menu, mid-duel with the range
+      label visible, PvP room with invite code, and a win with confetti.
       Promo video: upload `promo/hol_teaser.mp4` to YouTube (unlisted is
       fine) and paste its URL into the listing's promo-video field
 
