@@ -8,32 +8,39 @@ public class FakeMatchmaking : MonoBehaviour
     public GameObject panelGame;
     public TMP_Text searchingText;
 
+    bool isSearching; // review #8: prevent overlapping searches
+
     public void StartSearch()
     {
+        if (isSearching)
+            return;
+
         StartCoroutine(SearchRoutine());
     }
 
     IEnumerator SearchRoutine()
     {
+        isSearching = true;
+
         searchingPanel.SetActive(true);
 
         searchingText.text = "Searching opponent...";
 
-        // τυχαίος χρόνος
+        // Review #5: shortened waits (were 5/8/10s)
         float waitTime;
 
         int randomTime = Random.Range(0, 3);
 
         if (randomTime == 0)
-            waitTime = 5f;
+            waitTime = 2f;
         else if (randomTime == 1)
-            waitTime = 8f;
+            waitTime = 3.5f;
         else
-            waitTime = 10f;
+            waitTime = 5f;
 
         yield return new WaitForSeconds(waitTime);
 
-        // 1 στις 6 φορές δεν βρίσκει αντίπαλο
+        // 1 in 6 searches finds no opponent
         int failChance = Random.Range(0, 6);
 
         if (failChance == 0)
@@ -41,6 +48,7 @@ public class FakeMatchmaking : MonoBehaviour
             searchingText.text = "Opponent not found. Try again.";
             yield return new WaitForSeconds(2f);
             searchingPanel.SetActive(false);
+            isSearching = false;
             yield break;
         }
 
@@ -49,5 +57,7 @@ public class FakeMatchmaking : MonoBehaviour
 
         searchingPanel.SetActive(false);
         panelGame.SetActive(true);
+
+        isSearching = false;
     }
 }

@@ -7,7 +7,12 @@ public class SavePlayerName : MonoBehaviour
 
     public void SaveName()
     {
-        PlayerPrefs.SetString("PlayerName", nameInput.text);
+        // Review #7: an empty saved name used to render as ": ?" in-game.
+        string name = nameInput.text.Trim();
+        if (string.IsNullOrEmpty(name))
+            name = "Player";
+
+        PlayerPrefs.SetString("PlayerName", name);
         PlayerPrefs.Save();
     }
 }
