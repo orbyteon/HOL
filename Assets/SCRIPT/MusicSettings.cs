@@ -10,17 +10,26 @@ public class MusicSettings : MonoBehaviour
     {
         bool musicOn = PlayerPrefs.GetInt("MusicOn", 1) == 1;
 
-        musicToggle.isOn = musicOn;
-        musicSource.mute = !musicOn;
+        ApplyMusicState(musicOn);
 
-        musicToggle.onValueChanged.AddListener(OnToggleChanged);
+        if (musicToggle != null)
+            musicToggle.onValueChanged.AddListener(OnToggleChanged);
     }
 
     void OnToggleChanged(bool isOn)
     {
-        musicSource.mute = !isOn;
+        ApplyMusicState(isOn);
 
         PlayerPrefs.SetInt("MusicOn", isOn ? 1 : 0);
         PlayerPrefs.Save();
+    }
+
+    void ApplyMusicState(bool isOn)
+    {
+        if (musicToggle != null)
+            musicToggle.isOn = isOn;
+
+        if (musicSource != null)
+            musicSource.mute = !isOn;
     }
 }
