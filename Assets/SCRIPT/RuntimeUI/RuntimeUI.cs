@@ -7,6 +7,54 @@ using TMPro;
 // construction in one place.
 public static class RuntimeUI
 {
+    // Shared rounded-rect sprite (white, transparent corners) so every
+    // runtime-built button/card/input has soft corners instead of hard
+    // squares. Generated once, cached; sliced so corners stay round at
+    // any size.
+    static Sprite roundedSprite;
+
+    public static Sprite RoundedRectSprite
+    {
+        get
+        {
+            if (roundedSprite == null)
+                roundedSprite = GenerateRoundedRect(64, 14);
+            return roundedSprite;
+        }
+    }
+
+    static Sprite GenerateRoundedRect(int size, int radius)
+    {
+        var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        tex.wrapMode = TextureWrapMode.Clamp;
+        tex.filterMode = FilterMode.Bilinear;
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                // Distance outside the rounded corner circle, if any.
+                float cx = Mathf.Min(x, size - 1 - x);
+                float cy = Mathf.Min(y, size - 1 - y);
+                float alpha = 1f;
+                if (cx < radius && cy < radius)
+                {
+                    float dx = radius - cx - 0.5f;
+                    float dy = radius - cy - 0.5f;
+                    float dist = Mathf.Sqrt(dx * dx + dy * dy);
+                    alpha = Mathf.Clamp01(radius + 0.5f - dist); // 1px anti-alias
+                }
+                tex.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
+            }
+        }
+        tex.Apply();
+
+        int border = radius + 1;
+        return Sprite.Create(tex, new Rect(0, 0, size, size),
+            new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect,
+            new Vector4(border, border, border, border));
+    }
+
     public static GameObject CreateObject(string name, Transform parent)
     {
         var go = new GameObject(name, typeof(RectTransform));
@@ -67,6 +115,8 @@ public static class RuntimeUI
         rect.anchoredPosition = position;
 
         var image = go.AddComponent<Image>();
+        image.sprite = RoundedRectSprite;
+        image.type = Image.Type.Sliced;
         image.color = color;
 
         var button = go.AddComponent<Button>();
@@ -90,6 +140,8 @@ public static class RuntimeUI
         rect.anchoredPosition = position;
 
         var image = go.AddComponent<Image>();
+        image.sprite = RoundedRectSprite;
+        image.type = Image.Type.Sliced;
         image.color = new Color(1f, 1f, 1f, 0.9f);
 
         var input = go.AddComponent<TMP_InputField>();

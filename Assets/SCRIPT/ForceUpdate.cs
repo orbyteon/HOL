@@ -142,6 +142,8 @@ public class ForceUpdate : MonoBehaviour
         var card = RuntimeUI.CreateObject("Card", panel.transform);
         ConvergingLight.Center(card, Vector2.zero, new Vector2(640f, 460f));
         var cardImage = card.AddComponent<Image>();
+        cardImage.sprite = RuntimeUI.RoundedRectSprite;
+        cardImage.type = Image.Type.Sliced;
         cardImage.color = ConvergingLight.PanelIndigo;
 
         RuntimeUI.CreateText(card.transform, "Message", L10n.Get("update_required"),
