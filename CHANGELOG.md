@@ -52,6 +52,13 @@ Play Console versionName in `ProjectSettings.asset`.
 - GameCI workflow (`.github/workflows/ci.yml`): Android compile-check
   build on every PR and push to main; skips with a warning until the
   Unity license secrets are configured (release-checklist step 0)
+- EditMode test assembly (`Assets/Tests/EditMode`, reflection-based so it
+  never touches the player build): localization-table integrity (every
+  key has non-empty EN+EL, matching format placeholders, no malformed
+  format strings), scene-label key mapping resolves, and the difficulty
+  PlayerPrefs key stays in sync between `GameManager` and the Settings
+  UI; CI runs them in a new "EditMode tests" job
+  (`com.unity.test-framework` re-added to the package manifest)
 - Release builds override a stray Firebase backend selection to PlayFab
   when a Title ID is configured — the Firebase fallback is dev-only
   (plaintext secrets in the room document, non-atomic joins)

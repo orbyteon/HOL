@@ -1,5 +1,7 @@
 # HOL
 
+[![CI](https://github.com/orbyteon/HOL/actions/workflows/ci.yml/badge.svg)](https://github.com/orbyteon/HOL/actions/workflows/ci.yml)
+
 A mobile **"Higher or Lower" number-guessing duel** built in Unity for Android.
 
 You and an opponent each pick a secret number between **1 and 100**, then take turns guessing each other's number. After every guess you're told whether to go *higher* or *lower*. The first to correctly guess the other's number wins.

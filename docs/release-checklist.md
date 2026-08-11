@@ -12,8 +12,8 @@ build, but skips (with a warning) until the Unity license secrets exist:
       license file for Unity 2022.3.x (Personal license works)
 - [ ] Repo → Settings → Secrets → Actions: add `UNITY_LICENSE` (file
       contents), `UNITY_EMAIL`, `UNITY_PASSWORD`
-- [ ] Re-run the workflow on an open PR and confirm the
-      "Build Android (compile check)" job goes green
+- [ ] Re-run the workflow on an open PR and confirm both jobs go green:
+      "Build Android (compile check)" and "EditMode tests"
 
 Until this is done, **no merge without an editor smoke test** — nothing
 else verifies that the project compiles.
