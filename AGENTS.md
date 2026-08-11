@@ -35,6 +35,11 @@ smoke test (there is no CLI build/verify loop on this machine).
 - **All user-facing strings go through `L10n.Get(key)`** with both EN and
   EL entries in `Assets/SCRIPT/Localization/L10n.cs`. Never add hardcoded
   English UI text. Formatted entries take args: `L10n.Get("key", arg)`.
+- **UI colors follow Converging Light** (`design/philosophy.md`): indigo
+  depth backgrounds, cyan `(0.25, 0.85, 1)` for secondary actions, muted
+  gold `(1, 0.78, 0.34)` reserved for the primary CTA, text near-white
+  `(0.91, 0.93, 1)` — never pure white or pure black. Gold/cyan buttons
+  use dark indigo labels for contrast.
 - **Null-guard optional scene references** (`if (x != null)`) — several
   Inspector fields are intentionally unwired and filled at runtime.
 - Git: feature branches merged with `--no-ff` into `main`, pushed
