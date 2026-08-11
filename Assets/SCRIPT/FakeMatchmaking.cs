@@ -61,14 +61,14 @@ public class FakeMatchmaking : MonoBehaviour
 
         if (failChance == 0)
         {
-            searchingText.text = "Opponent not found. Try again.";
+            searchingText.text = L10n.Get("opponent_not_found");
             yield return new WaitForSeconds(2f);
             searchingPanel.SetActive(false);
             isSearching = false;
             yield break;
         }
 
-        searchingText.text = "Opponent found!";
+        searchingText.text = L10n.Get("opponent_found");
         yield return new WaitForSeconds(1.5f);
 
         searchingPanel.SetActive(false);
@@ -79,12 +79,11 @@ public class FakeMatchmaking : MonoBehaviour
 
     IEnumerator AnimateSearchingText()
     {
-        const string baseText = "Searching opponent";
         int dots = 0;
 
         while (true)
         {
-            searchingText.text = baseText + new string('.', dots);
+            searchingText.text = L10n.Get("searching") + new string('.', dots);
             dots = (dots + 1) % 4;
             yield return new WaitForSeconds(0.4f);
         }

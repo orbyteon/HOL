@@ -34,14 +34,14 @@ public class NumberManager : MonoBehaviour
         if (!int.TryParse(numberInput.text, out number))
         {
             messageText.gameObject.SetActive(true);
-            messageText.text = "Enter a valid number";
+            messageText.text = L10n.Get("invalid_number");
             return;
         }
 
         if (number < 1 || number > 100)
         {
             messageText.gameObject.SetActive(true);
-            messageText.text = "Number must be between 1 and 100";
+            messageText.text = L10n.Get("number_out_of_range");
             return;
         }
 
@@ -73,7 +73,7 @@ public class NumberManager : MonoBehaviour
             if (gameManager != null && !gameManager.IsPlayerTurn)
             {
                 messageText.gameObject.SetActive(true);
-                messageText.text = "Wait for your turn...";
+                messageText.text = L10n.Get("wait_your_turn");
                 return;
             }
 

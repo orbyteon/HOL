@@ -81,10 +81,10 @@ public class GameManager : MonoBehaviour
         int randomIndex = Random.Range(0, fakeNames.Length);
         currentOpponent = fakeNames[randomIndex];
 
-        opponentNameText.text = "Opponent: " + currentOpponent;
+        opponentNameText.text = L10n.Get("opponent_label", currentOpponent);
 
         if (turnText != null)
-            turnText.text = "Enter your number";
+            turnText.text = L10n.Get("enter_your_number");
     }
 
     public void SetPlayerNumber(int number)
@@ -122,12 +122,12 @@ public class GameManager : MonoBehaviour
 
         if (aiStarts)
         {
-            turnText.text = currentOpponent + " thinking...";
+            turnText.text = L10n.Get("opponent_thinking", currentOpponent);
             Invoke(nameof(AIGuess), Random.Range(0.8f, 1.5f));
         }
         else
         {
-            turnText.text = "Your guess";
+            turnText.text = L10n.Get("your_guess");
             playerTurn = true;
         }
     }
@@ -166,7 +166,7 @@ public class GameManager : MonoBehaviour
         AppendHistory(aiHistory, aiHistoryText, aiGuess);
 
         playerTurn = false;
-        turnText.text = "Answer " + currentOpponent;
+        turnText.text = L10n.Get("answer_opponent", currentOpponent);
 
         HideButtons();
 
@@ -190,7 +190,7 @@ public class GameManager : MonoBehaviour
         min = aiGuess + 1;
 
         HideButtons();
-        turnText.text = "Your guess";
+        turnText.text = L10n.Get("your_guess");
         playerTurn = true;
     }
 
@@ -206,7 +206,7 @@ public class GameManager : MonoBehaviour
         max = aiGuess - 1;
 
         HideButtons();
-        turnText.text = "Your guess";
+        turnText.text = L10n.Get("your_guess");
         playerTurn = true;
     }
 
@@ -228,13 +228,13 @@ public class GameManager : MonoBehaviour
         // The player gave an answer impossible for their secret number
         // (e.g. "Higher" when the remaining range is already at 100).
         // End the round instead of letting the AI guess from an empty range.
-        aiAnswerText.text = "That doesn't add up! " + currentOpponent + " caught you cheating.";
+        aiAnswerText.text = L10n.Get("caught_cheating", currentOpponent);
         EndGame(false);
     }
 
     public void Correct()
     {
-        aiAnswerText.text = currentOpponent + " found your number!";
+        aiAnswerText.text = L10n.Get("opponent_found_number", currentOpponent);
         EndGame(false);
     }
 
@@ -245,7 +245,7 @@ public class GameManager : MonoBehaviour
         // Reject guesses outside the range the player has already narrowed to.
         if (guess < playerMin || guess > playerMax)
         {
-            aiAnswerText.text = "You already know it's between " + playerMin + " and " + playerMax + "!";
+            aiAnswerText.text = L10n.Get("already_know_range", playerMin, playerMax);
             return;
         }
 
@@ -257,19 +257,19 @@ public class GameManager : MonoBehaviour
 
         if (guess == aiSecretNumber)
         {
-            aiAnswerText.text = "Player: " + guess + "\nPlayer wins!";
+            aiAnswerText.text = "Player: " + guess + "\n" + L10n.Get("you_win");
             EndGame(true);
             return;
         }
 
         if (guess < aiSecretNumber)
         {
-            aiAnswerText.text = "Player: " + guess + "\n" + currentOpponent + ": Higher";
+            aiAnswerText.text = "Player: " + guess + "\n" + currentOpponent + ": " + L10n.Get("higher");
             if (guess + 1 > playerMin) playerMin = guess + 1;
         }
         else
         {
-            aiAnswerText.text = "Player: " + guess + "\n" + currentOpponent + ": Lower";
+            aiAnswerText.text = "Player: " + guess + "\n" + currentOpponent + ": " + L10n.Get("lower");
             if (guess - 1 < playerMax) playerMax = guess - 1;
         }
 
@@ -277,7 +277,7 @@ public class GameManager : MonoBehaviour
 
         playerTurn = false;
 
-        turnText.text = currentOpponent + " thinking...";
+        turnText.text = L10n.Get("opponent_thinking", currentOpponent);
         Invoke(nameof(AIGuess), Random.Range(1.5f, 3.5f)); // review #5: tighter pacing (was 2.8–6.5)
     }
 
@@ -294,7 +294,7 @@ public class GameManager : MonoBehaviour
             Haptics.Success();
             GameEvents.MatchEnded(true, playerGuessCount);
 
-            turnText.text = "YOU WIN!\nIn " + playerGuessCount + " guesses";
+            turnText.text = L10n.Get("you_win") + "\n" + L10n.Get("won_in_guesses", playerGuessCount);
             if (audioSource != null && winSound != null) // review #14: don't throw on unwired scenes
                 audioSource.PlayOneShot(winSound);
             if (winConfetti != null)
@@ -306,7 +306,7 @@ public class GameManager : MonoBehaviour
             Haptics.Error();
             GameEvents.MatchEnded(false, 0);
 
-            turnText.text = "YOU LOSE!";
+            turnText.text = L10n.Get("you_lose");
             if (audioSource != null && loseSound != null)
                 audioSource.PlayOneShot(loseSound);
         }
@@ -329,11 +329,11 @@ public class GameManager : MonoBehaviour
 
         int randomIndex = Random.Range(0, fakeNames.Length);
         currentOpponent = fakeNames[randomIndex];
-        opponentNameText.text = "Opponent: " + currentOpponent;
+        opponentNameText.text = L10n.Get("opponent_label", currentOpponent);
 
         aiNumberText.text = "?";
         aiAnswerText.text = "";
-        turnText.text = "Enter your number";
+        turnText.text = L10n.Get("enter_your_number");
 
         ResetHistory();
 
@@ -368,6 +368,6 @@ public class GameManager : MonoBehaviour
     void UpdateRangeText()
     {
         if (rangeText != null)
-            rangeText.text = "Between " + playerMin + " and " + playerMax;
+            rangeText.text = L10n.Get("between_range", playerMin, playerMax);
     }
 }
