@@ -12,27 +12,35 @@
 </head>
 <body>
 <h1>HOL — Privacy Policy</h1>
-<p><em>Effective date: August 11, 2026</em></p>
+<p><em>Effective date: August 12, 2026</em></p>
 
 <p>HOL ("the game") is a mobile game developed and published by Orbyteon ("we", "us"). This policy explains what data is processed when you play the game and why.</p>
 
-<h2>Data we collect directly</h2>
-<p>The game requires no account. Your music preference and match statistics are stored only on your device and never leave it. The display name you can optionally enter stays on your device, except when you use online multiplayer (below), where it is shown to your opponent.</p>
+<h2>Data stored on your device</h2>
+<p>Your music preference, language choice, ad-permission choice, player name, and gameplay statistics are stored locally on your device using Unity PlayerPrefs. The player name leaves your device only when you choose the optional online multiplayer mode described below.</p>
 
-<h2>Online multiplayer (PvP Duel)</h2>
-<p>If you use the optional PvP Duel mode, the game signs in anonymously using your device's unique identifier and processes your display name and match data (room code, guesses, match result) through Microsoft PlayFab (Azure PlayFab), our multiplayer backend provider. The same anonymous sign-in is used at startup to check whether a newer version of the game is required; no other information is sent for that check. This data is used solely to run the match and the version check, and is processed under the <a href="https://privacy.microsoft.com/privacystatement">Microsoft Privacy Statement</a>. Rooms are temporary; no match history is kept beyond the match itself. The game's solo "Find challenger" mode uses simulated on-device opponents and sends nothing over the network.</p>
+<h2>Online multiplayer (PvP Duel) and version checks</h2>
+<p>HOL does not require you to create a named account. When PlayFab-backed features are used, the game uses a device-derived identifier as an anonymous PlayFab Custom ID so the same installation can be recognized by Microsoft PlayFab. PlayFab processes that identifier under Microsoft's privacy terms.</p>
 
-<h2>Data processed by our advertising partner</h2>
-<p>The game shows advertisements served through Unity LevelPlay (ironSource), an ad-mediation service by Unity Technologies. To serve and measure ads, this service may process your device's advertising identifier, IP address, approximate (coarse) location derived from IP, device information (model, operating system, language), and ad-interaction data (which ads were shown and tapped). We do not receive this data ourselves in identifiable form; it is processed by Unity and its mediated ad networks under their own policies. For details, see <a href="https://unity.com/legal/privacy-policy">Unity's Privacy Policy</a> and the <a href="https://developers.is.com/ironsource-mobile/air/ironsource-mobile-privacy-policy/">ironSource Mobile Privacy Policy</a>.</p>
+<p>During a PvP Duel, PlayFab processes the room code, both players' display names, both secret numbers, guesses, higher/lower/correct results, turn state, guess counts, and match result. Secret numbers are kept in private server-controlled room state while the match is live; the client receives only the hint and other information needed to render the duel. The opponent's secret is revealed after the match ends.</p>
 
-<h2>Your choices and consent</h2>
-<p>On first launch the game asks whether you allow personalized ads. If you decline, we instruct the ad service to serve non-personalized ads only. You can change your choice at any time in the game's Settings → Ads privacy, which re-opens the consent dialog. You can also reset or delete your device's advertising identifier at any time in your device's privacy settings (Android: Settings → Privacy → Ads).</p>
+<p>Room data is deleted when either participant leaves cleanly, when the surviving client times out an abandoned match, or after both participants acknowledge the completed result. If both devices disappear without sending cleanup requests, an orphaned room may remain in PlayFab until backend cleanup is performed. We do not use PvP room data to build a server-side match-history profile.</p>
+
+<p>The same anonymous PlayFab session may be used to read the title's minimum-supported-version setting so the game can show a required-update screen. The solo "Find challenger" mode uses an on-device simulated opponent and does not send its match data to PlayFab.</p>
+
+<h2>Advertising</h2>
+<p>HOL can show advertisements through Unity LevelPlay (ironSource), an ad-mediation service by Unity Technologies. On first launch, the game asks for permission before initializing LevelPlay. If you choose No, LevelPlay is not initialized on later launches and the game does not show ads. If you withdraw permission after the SDK has already initialized in the current session, HOL stops loading or showing further ads and does not initialize the SDK on the next launch.</p>
+
+<p>If you allow ads, Unity LevelPlay and its mediated ad networks may process data such as your advertising identifier, IP address, approximate location derived from IP, device and operating-system information, language, and ad-interaction data. We do not receive this information in directly identifiable form. For details, see <a href="https://unity.com/legal/privacy-policy">Unity's Privacy Policy</a> and the <a href="https://developers.is.com/ironsource-mobile/air/ironsource-mobile-privacy-policy/">ironSource Mobile Privacy Policy</a>.</p>
+
+<h2>Your choices</h2>
+<p>You can change the game's ad permission at any time in Settings → Ads privacy. You can also reset or delete your device's advertising identifier using your Android privacy settings. Deleting the app removes HOL's local PlayerPrefs data from the device, subject to normal operating-system backup behavior.</p>
 
 <h2>Children</h2>
-<p>The game is not directed at children under 13 (or the applicable age of digital consent in your region), and we do not knowingly collect personal data from children. The game contains no chat and no messaging; PvP matches transmit only gameplay data.</p>
+<p>The game is not directed at children under 13 (or the applicable age of digital consent in your region), and we do not knowingly collect personal data from children. The game contains no free-form chat or messaging.</p>
 
 <h2>Data retention and security</h2>
-<p>We store no player data on any server of our own. Multiplayer match data is processed transiently by Microsoft PlayFab and anonymous sign-in records are retained according to Microsoft's published policies; data processed by the advertising partner is retained according to Unity's published policies linked above. Uninstalling the game deletes all on-device data.</p>
+<p>We do not operate a database of player profiles or match history. Online multiplayer and anonymous identity data are processed by Microsoft PlayFab, and advertising data is processed by Unity and its mediated networks when ads are enabled. Those providers retain their service data according to their own policies. We limit live PvP clients to sanitized room views and keep secret numbers in server-controlled private state.</p>
 
 <h2>Changes to this policy</h2>
 <p>If the game's data practices change, we will update this page and the effective date above.</p>

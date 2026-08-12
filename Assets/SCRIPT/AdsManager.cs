@@ -3,38 +3,36 @@ using Unity.Services.LevelPlay;
 
 public class AdsManager : MonoBehaviour
 {
-    // Review #10: platform-safe, single-place ad configuration
 #if UNITY_IOS
-    const string GameId = "SET_IOS_APP_KEY"; // iOS needs its own LevelPlay app + key in the dashboard
+    const string GameId = "SET_IOS_APP_KEY";
 #else
     const string GameId = "6076495";
 #endif
 #if UNITY_IOS
-    const string InterstitialUnit = "Interstitial_iOS"; // create this unit in the LevelPlay dashboard before an iOS release
-    const string RewardedUnit = "Rewarded_iOS";         // same — dashboard unit needed
+    const string InterstitialUnit = "Interstitial_iOS";
+    const string RewardedUnit = "Rewarded_iOS";
 #else
     const string InterstitialUnit = "Interstitial_Android";
-    const string RewardedUnit = "Rewarded_Android"; // create this unit in the LevelPlay dashboard
+    const string RewardedUnit = "Rewarded_Android";
 #endif
 
     const string ConsentPrefKey = "AdsConsent";
-    // Pending-reward persistence: if the app is killed after the reward is
-    // earned but before the ad-close callback, the next launch still grants
-    // it (GameManager reconciles). Public so GameManager uses the same keys.
-    public const string PendingStreakRestoreKey = "PendingStreakRestore"; // streak value, written by GameManager when the ad shows
-    public const string PendingRewardEarnedKey = "PendingRewardEarned";   // 1 once OnRewardedEarned fires
-    const float ShowAdSafetyTimeout = 120f; // review #1: only a genuinely lost callback should trip this — normal interstitials run 15-30s
-    const float MinSecondsBetweenAds = 60f; // interstitial frequency cap (Play policy)
+    public const string PendingStreakRestoreKey = "PendingStreakRestore";
+    public const string PendingRewardEarnedKey = "PendingRewardEarned";
+    const float ShowAdSafetyTimeout = 120f;
+    const float MinSecondsBetweenAds = 60f;
     const int MaxInitRetries = 3;
 
-    private LevelPlayInterstitialAd interstitialAd;
-    private LevelPlayRewardedAd rewardedAd;
+    LevelPlayInterstitialAd interstitialAd;
+    LevelPlayRewardedAd rewardedAd;
 
     public System.Action onAdFinished;
 
     bool adInProgress;
     float lastAdShowTime = -999f;
     int initRetries;
+    bool initialized;
+    bool adsAllowedThisSession;
 
     System.Action onRewardEarned;
     System.Action onRewardUnavailable;
@@ -45,9 +43,10 @@ public class AdsManager : MonoBehaviour
         LevelPlay.OnInitSuccess += OnInitSuccess;
         LevelPlay.OnInitFailed += OnInitFailed;
 
-        // Review #9: only initialize ads once the player has made a consent choice.
-        // On first launch ConsentManager shows the dialog and calls OnConsentChosen.
-        if (PlayerPrefs.HasKey(ConsentPrefKey))
+        // Consent is an opt-in to initialize the third-party ads SDK at all.
+        // A stored decline keeps LevelPlay completely uninitialized on launch.
+        adsAllowedThisSession = PlayerPrefs.GetInt(ConsentPrefKey, 0) == 1;
+        if (adsAllowedThisSession)
             InitAds();
     }
 
@@ -66,29 +65,39 @@ public class AdsManager : MonoBehaviour
         OnDestroyRewardedCleanup();
     }
 
-    // Called by ConsentManager after the player answers the consent dialog.
+    // Called by ConsentManager. Accepting allows SDK initialization. Declining
+    // (or withdrawing later) blocks all future ad loads/shows in this session;
+    // the next launch will not initialize LevelPlay at all.
     public void OnConsentChosen(bool consent)
     {
         PlayerPrefs.SetInt(ConsentPrefKey, consent ? 1 : 0);
         PlayerPrefs.Save();
-        InitAds();
+
+        adsAllowedThisSession = consent;
+        LevelPlayPrivacySettings.SetGDPRConsent(consent);
+
+        if (consent)
+        {
+            InitAds();
+            return;
+        }
+
+        // An initialized SDK cannot be uninitialized safely mid-session, so
+        // withdrawal is enforced by never loading/showing another ad. The SDK
+        // is left idle and will not initialize on the next launch.
+        CancelInvoke(nameof(RetryInit));
+        CancelInvoke(nameof(RetryLoad));
+        CancelInvoke(nameof(RetryRewardedLoad));
     }
 
     void InitAds()
     {
-        bool consent = PlayerPrefs.GetInt(ConsentPrefKey, 0) == 1;
+        if (!adsAllowedThisSession || initialized)
+            return;
 
-        // Requires com.unity.services.levelplay 9.5.0+ (set in Packages/manifest.json).
-        // Privacy flags must be set BEFORE LevelPlay.Init, and can be updated
-        // any time after — so a consent change from Settings applies live.
-        LevelPlayPrivacySettings.SetGDPRConsent(consent);
-
-        // Init exactly once: re-choosing consent must not re-initialize the SDK.
-        if (!initialized)
-            LevelPlay.Init(GameId);
+        LevelPlayPrivacySettings.SetGDPRConsent(true);
+        LevelPlay.Init(GameId);
     }
-
-    bool initialized;
 
     void OnInitSuccess(LevelPlayConfiguration config)
     {
@@ -97,72 +106,62 @@ public class AdsManager : MonoBehaviour
         initialized = true;
         initRetries = 0;
 
+        // Consent could have been withdrawn while initialization was in flight.
+        if (!adsAllowedThisSession)
+            return;
+
         interstitialAd = new LevelPlayInterstitialAd(InterstitialUnit);
-
         interstitialAd.OnAdClosed += OnAdClosed;
-        interstitialAd.OnAdDisplayFailed += OnAdDisplayFailed; // review #1: a failed display must never soft-lock Play
+        interstitialAd.OnAdDisplayFailed += OnAdDisplayFailed;
         interstitialAd.OnAdLoadFailed += OnAdLoadFailed;
-
         interstitialAd.LoadAd();
 
         rewardedAd = new LevelPlayRewardedAd(RewardedUnit);
-
         rewardedAd.OnAdClosed += OnRewardedClosed;
         rewardedAd.OnAdDisplayFailed += OnRewardedDisplayFailed;
         rewardedAd.OnAdLoadFailed += OnRewardedLoadFailed;
         rewardedAd.OnAdRewarded += OnRewardedEarned;
-
         rewardedAd.LoadAd();
     }
 
     void OnAdClosed(LevelPlayAdInfo adInfo)
     {
         Debug.Log("Ad Closed");
-
-        // Frequency cap stamps here — only an ad that was actually shown and
-        // dismissed counts, not a skipped/failed attempt.
         lastAdShowTime = Time.realtimeSinceStartup;
-
         FinishAndContinue();
 
-        interstitialAd.LoadAd(); // preload the next ad
+        if (adsAllowedThisSession && interstitialAd != null)
+            interstitialAd.LoadAd();
     }
 
     void OnAdDisplayFailed(LevelPlayAdInfo adInfo, LevelPlayAdError error)
     {
         Debug.Log("Ad display failed: " + error);
+        FinishAndContinue();
 
-        FinishAndContinue(); // let the player through anyway
-
-        interstitialAd.LoadAd();
+        if (adsAllowedThisSession && interstitialAd != null)
+            interstitialAd.LoadAd();
     }
 
     void OnAdLoadFailed(LevelPlayAdError error)
     {
         Debug.Log("Ad load failed: " + error);
-
-        Invoke(nameof(RetryLoad), 30f); // gentle retry, no tight loop
+        if (adsAllowedThisSession)
+            Invoke(nameof(RetryLoad), 30f);
     }
 
     // ---------------------------------------------------------- rewarded
 
-    // Used to decide whether to offer a rewarded placement (e.g. the
-    // save-your-streak button) at all.
     public bool IsRewardedReady()
     {
-        return rewardedAd != null && rewardedAd.IsAdReady();
+        return adsAllowedThisSession && rewardedAd != null && rewardedAd.IsAdReady();
     }
 
-    // Shows a rewarded ad. onReward fires only if the player earns the
-    // reward (watched through); closes just end the flow quietly.
-    // onUnavailable fires when no ad can be shown right now (not loaded or
-    // the display failed) so the caller can keep its UI alive and tell the
-    // player. Returns false in that case, true once an ad is on its way.
     public bool ShowRewardedAd(System.Action onReward, System.Action onUnavailable = null)
     {
         if (!IsRewardedReady())
         {
-            Debug.Log("Rewarded ad not ready");
+            Debug.Log("Rewarded ad not ready or ads consent not granted");
             onUnavailable?.Invoke();
             return false;
         }
@@ -177,8 +176,6 @@ public class AdsManager : MonoBehaviour
     void OnRewardedEarned(LevelPlayAdInfo adInfo, LevelPlayReward reward)
     {
         rewardGranted = true;
-        // Persist immediately: the streak restore normally happens in the
-        // close callback, but an app kill before it must not lose the reward.
         PlayerPrefs.SetInt(PendingRewardEarnedKey, 1);
         PlayerPrefs.Save();
     }
@@ -186,7 +183,8 @@ public class AdsManager : MonoBehaviour
     void OnRewardedClosed(LevelPlayAdInfo adInfo)
     {
         FinishRewarded();
-        rewardedAd.LoadAd(); // preload the next one
+        if (adsAllowedThisSession && rewardedAd != null)
+            rewardedAd.LoadAd();
     }
 
     void OnRewardedDisplayFailed(LevelPlayAdInfo adInfo, LevelPlayAdError error)
@@ -194,19 +192,21 @@ public class AdsManager : MonoBehaviour
         Debug.Log("Rewarded display failed: " + error);
         var unavailable = onRewardUnavailable;
         FinishRewarded();
-        unavailable?.Invoke(); // caller keeps its UI alive and tells the player
-        rewardedAd.LoadAd();
+        unavailable?.Invoke();
+        if (adsAllowedThisSession && rewardedAd != null)
+            rewardedAd.LoadAd();
     }
 
     void OnRewardedLoadFailed(LevelPlayAdError error)
     {
         Debug.Log("Rewarded load failed: " + error);
-        Invoke(nameof(RetryRewardedLoad), 30f);
+        if (adsAllowedThisSession)
+            Invoke(nameof(RetryRewardedLoad), 30f);
     }
 
     void RetryRewardedLoad()
     {
-        if (rewardedAd != null)
+        if (adsAllowedThisSession && rewardedAd != null)
             rewardedAd.LoadAd();
     }
 
@@ -218,9 +218,6 @@ public class AdsManager : MonoBehaviour
 
         if (!rewardGranted)
         {
-            // Closed/failed without earning: drop any pending-restore keys so
-            // the next launch can't resurrect a streak that wasn't saved.
-            // (The earned case is cleared by the reward callback instead.)
             PlayerPrefs.DeleteKey(PendingStreakRestoreKey);
             PlayerPrefs.DeleteKey(PendingRewardEarnedKey);
             PlayerPrefs.Save();
@@ -243,17 +240,19 @@ public class AdsManager : MonoBehaviour
 
     void RetryLoad()
     {
-        if (interstitialAd != null)
+        if (adsAllowedThisSession && interstitialAd != null)
             interstitialAd.LoadAd();
     }
 
     public void ShowAd(System.Action callback)
     {
-        // Re-entrancy: an interstitial is already on screen. The new caller
-        // just continues — the live ad's state must not be touched (routing
-        // through FinishAndContinue here used to overwrite the pending
-        // callback, cancel the live ad's safety timer, and clear
-        // adInProgress mid-ad).
+        if (!adsAllowedThisSession)
+        {
+            Debug.Log("Ads disabled by privacy choice → continue");
+            callback?.Invoke();
+            return;
+        }
+
         if (adInProgress)
         {
             Debug.Log("Ad already in progress → continue");
@@ -261,8 +260,6 @@ public class AdsManager : MonoBehaviour
             return;
         }
 
-        // Frequency cap: never show interstitials back-to-back (Play
-        // interstitial policy). Player continues.
         if (Time.realtimeSinceStartup - lastAdShowTime < MinSecondsBetweenAds)
         {
             Debug.Log("Ad skipped (frequency cap) → continue");
@@ -275,8 +272,6 @@ public class AdsManager : MonoBehaviour
         if (interstitialAd != null && interstitialAd.IsAdReady())
         {
             adInProgress = true;
-
-            // Review #1: if no close/fail event arrives, force the game to continue.
             Invoke(nameof(ForceContinue), ShowAdSafetyTimeout);
             interstitialAd.ShowAd();
         }
@@ -293,12 +288,9 @@ public class AdsManager : MonoBehaviour
         FinishAndContinue();
     }
 
-    // Single exit point: cancels the safety timer and guarantees the
-    // callback fires exactly once per ShowAd call.
     void FinishAndContinue()
     {
         CancelInvoke(nameof(ForceContinue));
-
         adInProgress = false;
 
         var cb = onAdFinished;
@@ -309,18 +301,14 @@ public class AdsManager : MonoBehaviour
     void OnInitFailed(LevelPlayInitError error)
     {
         Debug.Log("Ads Init Failed: " + error);
-
-        // Transient failures (e.g. no network at launch) shouldn't kill ads
-        // for the whole session — retry a few times, spaced out.
-        if (initRetries < MaxInitRetries)
+        if (adsAllowedThisSession && initRetries < MaxInitRetries)
             Invoke(nameof(RetryInit), 60f);
     }
 
     void RetryInit()
     {
         initRetries++;
-
-        if (PlayerPrefs.HasKey(ConsentPrefKey))
+        if (adsAllowedThisSession)
             InitAds();
     }
 }

@@ -1,20 +1,6 @@
-# CI: compile-verify the Unity project on every PR and push to main.
-#
-# Uses GameCI (game.ci) to run an Android build — the truthful check for
-# this project, since a successful build requires every script to compile
-# for the shipping platform.
-#
-# ONE-TIME SETUP (repo admin) — without it the build job SKIPS (not fails):
-#   1. Get a Unity license activation file (.ulf) for 2022.3.x:
-#      https://game.ci/docs/github/activation
-#      (Personal license: run the manual-activation flow once, locally.)
-#   2. Repo → Settings → Secrets and variables → Actions → add:
-#        UNITY_LICENSE  — full contents of the .ulf file
-#        UNITY_EMAIL    — Unity account email
-#        UNITY_PASSWORD — Unity account password
-#
-# The check-license job exists because GitHub Actions cannot reference
-# `secrets` in a job-level `if` directly.
+# CI: static integrity + Unity EditMode tests + Android compile build.
+# Unity credentials are mandatory: missing secrets make CI fail loudly instead
+# of producing a misleading green run with the real jobs skipped.
 
 name: CI
 
@@ -28,31 +14,72 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check-license:
-    name: Check Unity license secret
+  static-checks:
+    name: Static integrity
     runs-on: ubuntu-latest
-    outputs:
-      has-license: ${{ steps.check.outputs.has }}
     steps:
-      - id: check
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate PlayFab CloudScript syntax
+        run: node --check playfab/cloudscript.js
+
+      - name: Enforce server-authoritative PlayFab client
+        shell: bash
+        run: |
+          set -euo pipefail
+          file=Assets/SCRIPT/PvP/PlayFabPvpClient.cs
+          if grep -Eq 'Api\("(CreateSharedGroup|GetSharedGroupData|UpdateSharedGroupData|AddSharedGroupMembers|RemoveSharedGroupMembers)' "$file"; then
+            echo "::error::PlayFabPvpClient must not call Shared Group client APIs directly"
+            exit 1
+          fi
+          grep -q 'ExecuteCloudScript' "$file"
+          grep -q 'Permission: "Private"' playfab/cloudscript.js
+          if grep -q 'args.side' playfab/cloudscript.js; then
+            echo "::error::CloudScript must derive the player side from currentPlayerId"
+            exit 1
+          fi
+          if grep -q 'AddSharedGroupMembers' playfab/cloudscript.js; then
+            echo "::error::PvP Shared Groups must have no client members; CloudScript tracks host/guest IDs itself"
+            exit 1
+          fi
+
+      - name: Verify Unity meta files for scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=0
+          while IFS= read -r -d '' file; do
+            if [ ! -f "$file.meta" ]; then
+              echo "::error file=$file::Missing Unity .meta file"
+              missing=1
+            fi
+          done < <(find Assets -type f -name '*.cs' -print0)
+          exit "$missing"
+
+  check-license:
+    name: Require Unity credentials
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check required secrets
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         run: |
-          if [ -n "$UNITY_LICENSE" ]; then
-            echo "has=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "has=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::UNITY_LICENSE secret not set — Unity build check skipped. See .github/workflows/ci.yml header for setup."
-          fi
+          missing=0
+          for name in UNITY_LICENSE UNITY_EMAIL UNITY_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name is not configured. See docs/release-checklist.md step 0."
+              missing=1
+            fi
+          done
+          exit "$missing"
 
   test:
     name: EditMode tests
-    needs: check-license
-    if: needs.check-license.outputs.has-license == 'true'
+    needs: [static-checks, check-license]
     runs-on: ubuntu-latest
-    # unity-test-runner reports results via the Checks API; the default
-    # workflow token is read-only, so grant it explicitly or the job goes
-    # red on the reporting step even when every test passed.
     permissions:
       checks: write
       contents: read
@@ -89,12 +116,23 @@ jobs:
 
   build:
     name: Build Android (compile check)
-    needs: check-license
-    if: needs.check-license.outputs.has-license == 'true'
+    needs: [static-checks, check-license]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Free runner disk for Unity Android image
+        shell: bash
+        run: |
+          set -euxo pipefail
+          echo "Disk before cleanup:"
+          df -h /
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/lib/android
+          docker system prune -af || true
+          sudo apt-get clean
+          echo "Disk after cleanup:"
+          df -h /
 
       - name: Cache Library
         uses: actions/cache@v4
@@ -113,9 +151,6 @@ jobs:
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
           targetPlatform: Android
-          # Debug-keystore APK is fine — this job verifies compilation and
-          # asset import, not release packaging (that stays manual, with the
-          # HOL release keystore, per docs/release-checklist.md).
           androidExportType: androidPackage
 
       - name: Upload build artifact

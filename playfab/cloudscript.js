@@ -1,148 +1,300 @@
 // HOL — PlayFab CloudScript (Legacy)
-// Paste this into Game Manager → Automation → CloudScript (Legacy) → Revisions,
-// then Save and Deploy.
-//
-// joinRoom: atomically admits the calling player to a room (shared group) by
-// its invite code AND claims the guest slot (name + secret + phase "play")
-// in the same server execution. Needed because:
-//   - the Client API only lets existing members add members (server authority
-//     required), and
-//   - a client-side "check empty, then write" join leaves a seconds-wide race
-//     window in which two guests could both join. Doing it here shrinks that
-//     window to the CloudScript execution itself.
-//
-// args: { roomId: string, guestName: string, guestSecret: number (1-100) }
-// returns: { ok: true } | { ok: false, error: "room not found" | "room full" | ... }
-//
-// submitGuess: server-authoritative guess submission. The old client-side
-// read-modify-write of the whole state was last-write-wins: a leaver's
-// closed-write could erase a winning guess that landed first, and a stale
-// in-flight guess write could resurrect a closed room. Applying the guess
-// here (with the turn + phase checks) shrinks that race to this execution.
-//
-// args: { roomId: string, side: "host" | "guest", guess: number (1-100) }
-// returns: { ok: true, state: "<new state JSON>" } |
-//          { ok: false, error: "room not found" | "room corrupt" |
-//                "bad side" | "bad guess" | "not in play" | "not your turn" }
+// Server-authoritative PvP room functions. Clients call only ExecuteCloudScript.
+// Room groups deliberately have NO client members: private Shared Group state is
+// therefore unreadable and unwritable through Client Shared Group APIs even if
+// an API Access Policy is accidentally left permissive.
 
-handlers.joinRoom = function (args, context) {
-    if (!args || !args.roomId) {
-        return { ok: false, error: "missing roomId" };
+var CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // no 0/O/1/I/L
+var ROOM_CREATE_ATTEMPTS = 12;
+
+function cleanName(value, fallback) {
+    var s = String(value || fallback || "Player").trim();
+    if (!s) s = fallback || "Player";
+    return s.substring(0, 16);
+}
+
+function validSecret(value) {
+    var n = value | 0;
+    return n >= 1 && n <= 100 ? n : 0;
+}
+
+function randomCode() {
+    var s = "";
+    for (var i = 0; i < 5; i++)
+        s += CODE_ALPHABET.charAt(Math.floor(Math.random() * CODE_ALPHABET.length));
+    return s;
+}
+
+function claimGroupId(roomId) {
+    return roomId + "-GUEST";
+}
+
+function turnGroupId(roomId, turnIndex) {
+    return roomId + "-TURN-" + turnIndex;
+}
+
+function ackGroupId(roomId, side) {
+    return roomId + "-ACK-" + side.toUpperCase();
+}
+
+function groupExists(groupId) {
+    try {
+        server.GetSharedGroupData({ SharedGroupId: groupId, Keys: [] });
+        return true;
+    } catch (e) {
+        return false;
     }
+}
 
-    var roomId = String(args.roomId).toUpperCase().trim();
-    var guestName = String(args.guestName || "Guest").substring(0, 24);
-    var guestSecret = args.guestSecret | 0;
-    if (guestSecret < 1 || guestSecret > 100) {
-        return { ok: false, error: "bad secret" };
-    }
-
-    // Verify the room exists and the guest slot is still free.
+function readState(roomId) {
     var data;
     try {
         data = server.GetSharedGroupData({ SharedGroupId: roomId, Keys: ["state"] });
     } catch (e) {
-        return { ok: false, error: "room not found" };
+        return null;
     }
+    if (!data || !data.Data || !data.Data.state || !data.Data.state.Value)
+        return null;
 
-    if (!data || !data.Data || !data.Data.state) {
-        return { ok: false, error: "room not found" };
-    }
+    try { return JSON.parse(data.Data.state.Value); }
+    catch (e2) { return null; }
+}
 
-    var state;
-    try { state = JSON.parse(data.Data.state.Value); } catch (e) { state = null; }
-    if (!state) {
-        return { ok: false, error: "room corrupt" };
-    }
-    if (state.guestName && state.guestName.length > 0) {
-        return { ok: false, error: "room full" };
-    }
-    if (state.phase === "closed") {
-        return { ok: false, error: "room not found" };
-    }
-
-    server.AddSharedGroupMembers({
-        SharedGroupId: roomId,
-        PlayFabIds: [currentPlayerId],
-    });
-
-    // Claim the slot server-side: guest joins, match begins.
-    state.guestName = guestName;
-    state.guestSecret = guestSecret;
-    state.phase = "play";
-
+function writeState(roomId, state) {
     server.UpdateSharedGroupData({
         SharedGroupId: roomId,
         Data: { state: JSON.stringify(state) },
-        Permission: "Public",
+        Permission: "Private",
     });
+}
 
-    return { ok: true };
+function deleteGroupQuietly(groupId) {
+    try { server.DeleteSharedGroup({ SharedGroupId: groupId }); }
+    catch (e) { }
+}
+
+function deleteRoomArtifacts(roomId, state) {
+    deleteGroupQuietly(roomId);
+    deleteGroupQuietly(claimGroupId(roomId));
+    deleteGroupQuietly(ackGroupId(roomId, "host"));
+    deleteGroupQuietly(ackGroupId(roomId, "guest"));
+
+    var maxTurn = state && typeof state.turnIndex === "number" ? state.turnIndex : 0;
+    maxTurn = Math.max(0, Math.min(maxTurn, 200));
+    for (var i = 0; i <= maxTurn; i++)
+        deleteGroupQuietly(turnGroupId(roomId, i));
+}
+
+function sideForPlayer(state, playerId) {
+    if (state.hostId === playerId) return "host";
+    if (state.guestId === playerId) return "guest";
+    return "";
+}
+
+function viewFor(state, playerId) {
+    var side = sideForPlayer(state, playerId);
+    var revealed = 0;
+    if (state.phase === "done")
+        revealed = side === "host" ? (state.guestSecret | 0) : (state.hostSecret | 0);
+
+    return {
+        hostName: String(state.hostName || ""),
+        guestName: String(state.guestName || ""),
+        turn: String(state.turn || ""),
+        phase: String(state.phase || ""),
+        lastGuess: state.lastGuess | 0,
+        lastBy: String(state.lastBy || ""),
+        winner: String(state.winner || ""),
+        lastHint: String(state.lastHint || ""),
+        revealedSecret: revealed,
+        hostGuessCount: state.hostGuessCount | 0,
+        guestGuessCount: state.guestGuessCount | 0,
+    };
+}
+
+handlers.createRoom = function (args, context) {
+    var hostSecret = validSecret(args && args.hostSecret);
+    if (!hostSecret) return { ok: false, error: "bad secret" };
+
+    var hostName = cleanName(args && args.hostName, "Player");
+    var roomId = "";
+
+    for (var i = 0; i < ROOM_CREATE_ATTEMPTS; i++) {
+        var candidate = randomCode();
+        try {
+            server.CreateSharedGroup({ SharedGroupId: candidate });
+            roomId = candidate;
+            break;
+        } catch (e) { }
+    }
+
+    if (!roomId) return { ok: false, error: "create failed" };
+
+    try {
+        var state = {
+            hostId: currentPlayerId,
+            guestId: "",
+            hostName: hostName,
+            guestName: "",
+            hostSecret: hostSecret,
+            guestSecret: 0,
+            turn: "guest",
+            phase: "waiting",
+            lastGuess: 0,
+            lastBy: "",
+            winner: "",
+            lastHint: "",
+            hostGuessCount: 0,
+            guestGuessCount: 0,
+            turnIndex: 0,
+        };
+        writeState(roomId, state);
+        return { ok: true, roomId: roomId, state: JSON.stringify(viewFor(state, currentPlayerId)) };
+    } catch (e2) {
+        deleteRoomArtifacts(roomId, null);
+        return { ok: false, error: "create failed" };
+    }
 };
 
-// See the header above for why guesses are applied server-side. Mirrors the
-// client's old SubmitGuess mutation field-for-field (turn/phase/lastGuess/
-// lastBy/winner semantics exactly as the client writes them).
-handlers.submitGuess = function (args, context) {
-    if (!args || !args.roomId) {
-        return { ok: false, error: "missing roomId" };
-    }
+handlers.joinRoom = function (args, context) {
+    if (!args || !args.roomId) return { ok: false, error: "missing roomId" };
 
     var roomId = String(args.roomId).toUpperCase().trim();
-    var side = String(args.side || "");
-    if (side !== "host" && side !== "guest") {
-        return { ok: false, error: "bad side" };
-    }
-    var guess = args.guess | 0;
-    if (guess < 1 || guess > 100) {
-        return { ok: false, error: "bad guess" };
-    }
+    var guestSecret = validSecret(args.guestSecret);
+    if (!guestSecret) return { ok: false, error: "bad secret" };
 
-    var data;
+    var state = readState(roomId);
+    if (!state || state.phase === "closed") return { ok: false, error: "room not found" };
+    if (state.phase !== "waiting" || state.guestId) return { ok: false, error: "room full" };
+    if (state.hostId === currentPlayerId) return { ok: false, error: "room full" };
+
+    // Atomic guest-slot claim: CreateSharedGroup is unique by ID. Exactly one
+    // concurrent joiner can create the claim group; all others get a conflict.
     try {
-        data = server.GetSharedGroupData({ SharedGroupId: roomId, Keys: ["state"] });
+        server.CreateSharedGroup({ SharedGroupId: claimGroupId(roomId) });
+    } catch (claimError) {
+        return { ok: false, error: "room full" };
+    }
+
+    try {
+        // Re-read after claiming in case the host closed the room immediately
+        // before this invocation won the claim.
+        state = readState(roomId);
+        if (!state || state.phase !== "waiting" || state.guestId) {
+            deleteGroupQuietly(claimGroupId(roomId));
+            return { ok: false, error: state ? "room full" : "room not found" };
+        }
+
+        state.guestId = currentPlayerId;
+        state.guestName = cleanName(args.guestName, "Player");
+        state.guestSecret = guestSecret;
+        state.phase = "play";
+        writeState(roomId, state);
+
+        return { ok: true, state: JSON.stringify(viewFor(state, currentPlayerId)) };
     } catch (e) {
-        return { ok: false, error: "room not found" };
+        deleteGroupQuietly(claimGroupId(roomId));
+        return { ok: false, error: "join failed" };
+    }
+};
+
+handlers.getRoom = function (args, context) {
+    if (!args || !args.roomId) return { ok: false, error: "missing roomId" };
+
+    var roomId = String(args.roomId).toUpperCase().trim();
+    var state = readState(roomId);
+    if (!state) return { ok: false, error: "room not found" };
+    if (!sideForPlayer(state, currentPlayerId)) return { ok: false, error: "not a member" };
+
+    return { ok: true, state: JSON.stringify(viewFor(state, currentPlayerId)) };
+};
+
+handlers.submitGuess = function (args, context) {
+    if (!args || !args.roomId) return { ok: false, error: "missing roomId" };
+
+    var roomId = String(args.roomId).toUpperCase().trim();
+    var guess = validSecret(args.guess);
+    if (!guess) return { ok: false, error: "bad guess" };
+
+    var state = readState(roomId);
+    if (!state) return { ok: false, error: "room not found" };
+
+    var side = sideForPlayer(state, currentPlayerId);
+    if (!side) return { ok: false, error: "not a member" };
+    if (state.phase !== "play") return { ok: false, error: "not in play" };
+    if (state.turn !== side) return { ok: false, error: "not your turn" };
+
+    // One immutable claim group per turn makes duplicate/concurrent submissions
+    // for the same turn fail closed without relying on client-side tap guards.
+    var turnIndex = state.turnIndex | 0;
+    var turnClaim = turnGroupId(roomId, turnIndex);
+    try {
+        server.CreateSharedGroup({ SharedGroupId: turnClaim });
+    } catch (turnClaimError) {
+        return { ok: false, error: "turn already submitted" };
     }
 
-    if (!data || !data.Data || !data.Data.state) {
-        return { ok: false, error: "room not found" };
-    }
-
-    var state;
-    try { state = JSON.parse(data.Data.state.Value); } catch (e) { state = null; }
-    if (!state) {
-        return { ok: false, error: "room corrupt" };
-    }
-
-    // Server authority on the race-prone checks: a closed/finished room can
-    // never be resurrected by a stale in-flight guess, and a guess lands
-    // only on the caller's own turn.
-    if (state.phase !== "play") {
-        return { ok: false, error: "not in play" };
-    }
-    if (state.turn !== side) {
-        return { ok: false, error: "not your turn" };
-    }
-
-    // Apply the guess exactly as the client's old read-modify-write did.
-    var opponentSecret = side === "host" ? state.guestSecret : state.hostSecret;
+    var opponentSecret = side === "host" ? (state.guestSecret | 0) : (state.hostSecret | 0);
     state.lastGuess = guess;
     state.lastBy = side;
+    state.lastHint = guess === opponentSecret ? "correct" : (guess < opponentSecret ? "higher" : "lower");
+
+    if (side === "host") state.hostGuessCount = (state.hostGuessCount | 0) + 1;
+    else state.guestGuessCount = (state.guestGuessCount | 0) + 1;
+
     if (guess === opponentSecret) {
         state.phase = "done";
         state.winner = side;
     } else {
         state.turn = side === "host" ? "guest" : "host";
+        state.turnIndex = turnIndex + 1;
     }
 
-    server.UpdateSharedGroupData({
-        SharedGroupId: roomId,
-        Data: { state: JSON.stringify(state) },
-        Permission: "Public",
-    });
+    try {
+        writeState(roomId, state);
+    } catch (writeError) {
+        // A failed state write must not consume the turn forever. Roll the
+        // immutable claim back so the same player can retry after recovery.
+        deleteGroupQuietly(turnClaim);
+        return { ok: false, error: "write failed" };
+    }
 
-    // Return the new state so the client can apply it immediately instead of
-    // waiting for the next poll (keeps its cached snapshot from regressing).
-    return { ok: true, state: JSON.stringify(state) };
+    return { ok: true, state: JSON.stringify(viewFor(state, currentPlayerId)) };
+};
+
+handlers.ackResult = function (args, context) {
+    if (!args || !args.roomId) return { ok: false, error: "missing roomId" };
+
+    var roomId = String(args.roomId).toUpperCase().trim();
+    var state = readState(roomId);
+    if (!state) return { ok: true, deleted: true };
+    if (state.phase !== "done") return { ok: false, error: "not done" };
+
+    var side = sideForPlayer(state, currentPlayerId);
+    if (!side) return { ok: false, error: "not a member" };
+
+    // Each side claims an immutable acknowledgement group. This avoids the
+    // lost-update race that would occur if both clients toggled booleans in
+    // the same Shared Group state at nearly the same time.
+    try { server.CreateSharedGroup({ SharedGroupId: ackGroupId(roomId, side) }); }
+    catch (alreadyAcknowledged) { }
+
+    if (groupExists(ackGroupId(roomId, "host")) && groupExists(ackGroupId(roomId, "guest"))) {
+        deleteRoomArtifacts(roomId, state);
+        return { ok: true, deleted: true };
+    }
+
+    return { ok: true, deleted: false };
+};
+
+handlers.leaveRoom = function (args, context) {
+    if (!args || !args.roomId) return { ok: false, error: "missing roomId" };
+
+    var roomId = String(args.roomId).toUpperCase().trim();
+    var state = readState(roomId);
+    if (!state) return { ok: true };
+    if (!sideForPlayer(state, currentPlayerId)) return { ok: false, error: "not a member" };
+
+    deleteRoomArtifacts(roomId, state);
+    return { ok: true };
 };

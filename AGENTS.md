@@ -1,8 +1,10 @@
 # AGENTS.md — HOL (Higher or Lower)
 
 Unity 2022.3 Android game. Repo: `orbyteon/HOL` (private). Bundle id
-`com.Orbyteon.HOL`. No test suite; verification is by code review + in-editor
-smoke test (there is no CLI build/verify loop on this machine).
+`com.Orbyteon.HOL`. EditMode integrity tests live under `Assets/Tests/EditMode/`;
+GameCI runs those tests plus an Android compile build once the required Unity
+license credentials are configured. CI intentionally fails when they are
+missing so a skipped compile cannot look green.
 
 ## Layout
 
@@ -19,6 +21,7 @@ smoke test (there is no CLI build/verify loop on this machine).
   `Design/` (Converging Light layer: `ConvergingLight` palette/textures,
   `SplashDesign`, `DesignRuntimeWiring`, `NumberDrift`).
 - `playfab/cloudscript.js` — deploy to PlayFab → Automation → CloudScript.
+  This is the authority for PlayFab room create/read/join/guess/leave/cleanup.
 - `docs/privacy.html` — privacy policy; keep it truthful when data
   practices change.
 
@@ -49,6 +52,11 @@ smoke test (there is no CLI build/verify loop on this machine).
   use dark indigo labels for contrast.
 - **Null-guard optional scene references** (`if (x != null)`) — several
   Inspector fields are intentionally unwired and filled at runtime.
+- **PlayFab clients never read or write Shared Group Data directly.** All
+  gameplay-impacting room operations go through `ExecuteCloudScript`, and
+  `playfab/cloudscript.js` derives the player side from `currentPlayerId`.
+  Keep Shared Group state `Private`; disable the Client Shared Group API
+  methods in PlayFab's API Access Policy before release.
 - Git: feature branches merged with `--no-ff` into `main`, pushed
   immediately. Never commit tokens, keystores (`*.keystore` is ignored),
   or `hol.bundle` / `_to_delete/`. Watch for `.git/index.lock` — another
@@ -57,22 +65,21 @@ smoke test (there is no CLI build/verify loop on this machine).
 ## Backend setup state
 
 - PvP backend is **PlayFab** (`usePlayFab: 1` in scene); Firebase client
-  (`PvpClient`) is the fallback and needs its RTDB URL in the Inspector.
-- PlayFab requires the **Title ID** in `PvpRuntimeUI.playFabTitleId`
-  (Inspector on the `PvpRuntimeUI` object; copied onto the backend created
-  at Start) and `playfab/cloudscript.js` deployed, or PvP fails gracefully
-  at login.
+  (`PvpClient`) is a development fallback only and needs its RTDB URL in the
+  Inspector.
+- PlayFab requires the **Title ID** in `PvpRuntimeUI.playFabTitleId` and the
+  current `playfab/cloudscript.js` revision deployed. Production release
+  builds use `CreateAccount=false`; first-time anonymous players therefore
+  require trusted server-side provisioning via PlayFab Server/LoginWithCustomID.
+  Debug builds can opt into client account creation for local testing only.
 - Ads: LevelPlay app key `6076495` (Android) in `AdsManager`; iOS keys
-  are placeholders. Consent gates init; Settings → Ads privacy re-opens it.
-  Interstitial unit `Interstitial_Android` plus rewarded unit
-  `Rewarded_Android` (save-your-streak offer on losses with streak ≥ 2 —
-  create it in the dashboard or the offer never appears).
-  The pinned unityads-adapter 5.6.0 is catalog-verified compatible with
-  LevelPlay 9.5.0 (`Assets/LevelPlay/Editor/LevelPlayVersions.json` →
-  adapters → UnityAds → ironSourceSdkVersion [9.0.0, 10.0[).
+  are placeholders. Ads are opt-in: declining keeps LevelPlay uninitialized
+  on later launches and blocks ad loads/shows. Settings → Ads privacy re-opens
+  the choice. Interstitial unit `Interstitial_Android` plus rewarded unit
+  `Rewarded_Android` powers the save-your-streak offer.
 - Force update: optional PlayFab TitleData key `minVersion` (e.g. "0.2")
-  blocks older builds with a store-link dialog. Missing key / no Title ID
-  / offline → players just play (fail-open).
+  blocks older builds with a store-link dialog. It reuses the PvP PlayFab
+  session. Missing key / no Title ID / offline → players just play (fail-open).
 - Signing: debug only. No release keystore exists yet — generate one on a
   machine with Unity/JDK, keep it out of git, back it up offline. Never
   sign with another title's key (the project once pointed at RideCore's).

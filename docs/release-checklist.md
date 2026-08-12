@@ -1,145 +1,155 @@
 # HOL — Release checklist
 
-Everything code-side is done on `main`. These are the remaining manual
-steps, in order. Each links to where the details live.
+Release blockers and manual go-live steps, in order.
 
-## 0. CI activation (one-time, ~15 min)
+## 0. CI activation
 
-`.github/workflows/ci.yml` compile-verifies every PR with a GameCI Android
-build, but skips (with a warning) until the Unity license secrets exist:
+`.github/workflows/ci.yml` always runs static integrity checks. Unity EditMode
+and Android compile verification require the repository's Unity credentials;
+missing credentials now **fail CI** instead of producing a misleading green
+run with the real jobs skipped.
 
 - [ ] Follow https://game.ci/docs/github/activation to produce a `.ulf`
-      license file for Unity 2022.3.x (Personal license works)
-- [ ] Repo → Settings → Secrets → Actions: add `UNITY_LICENSE` (file
-      contents), `UNITY_EMAIL`, `UNITY_PASSWORD`
-- [ ] Re-run the workflow on an open PR and confirm both jobs go green:
-      "Build Android (compile check)" and "EditMode tests"
+      license file for Unity 2022.3.x
+- [ ] Repo → Settings → Secrets and variables → Actions: add
+      `UNITY_LICENSE`, `UNITY_EMAIL`, and `UNITY_PASSWORD`
+- [ ] Re-run CI and confirm all three checks are green:
+      `Static integrity`, `EditMode tests`, and `Build Android (compile check)`
+- [ ] Do not merge a release candidate while the Unity credential gate is red
 
-Until this is done, **no merge without an editor smoke test** — nothing
-else verifies that the project compiles.
+## 1. Smoke test in Unity
 
-## 1. Smoke test in Unity (on the machine with Unity installed)
-
-Pull `main`, open the project, let package resolution finish (the manifest
-diet removed four packages — let Unity prune them), then press Play and
-verify:
+Pull the release branch, open the project in Unity 2022.3.62f3, let package
+resolution finish, then verify:
 
 Splash:
 
-- [ ] Indigo gradient background (not flat black), faint drifting digits
-- [ ] Logo blooms in, then breathes; cyan→magenta seam + tagline below it
-- [ ] Gold loading hairline fills at the bottom; tap skips the splash
+- [ ] Indigo gradient background, faint drifting digits
+- [ ] Logo blooms/breathes; cyan→magenta seam + tagline
+- [ ] Gold loading hairline fills; tap skips splash
 
 Main menu / solo:
 
-- [ ] Menu backdrop is indigo-toned (photo dulled, drifting digits behind
-      panels); panels are indigo, never white or red
-- [ ] Consent dialog appears on first launch; ads initialize after a choice
+- [ ] Consent dialog appears on first launch
+- [ ] Choose **No** → LevelPlay remains disabled and the game still plays normally
+- [ ] Choose **Yes** → ads initialize; Settings → Ads privacy can withdraw permission
+- [ ] Reopen Ads privacy after switching EN/EL → dialog follows the current language
 - [ ] First launch on a Greek-language device starts in Greek
-- [ ] Settings gear opens settings (menu panel hides underneath)
-- [ ] EN/EL buttons switch all labels, including scene labels ("SAVE" → "ΑΠΟΘΗΚΕΥΣΗ")
+- [ ] Blank player name uses the localized default instead of storing English `Player`
 - [ ] Difficulty buttons highlight the active choice in gold
-- [ ] Stats label shows on the main menu (wins/losses/streak/best)
-- [ ] Play → searching → Cancel button stops the search; Android back too
-- [ ] Opponent-found stinger plays when found, NOT when tapping Search
-- [ ] Every button clicks (menu, settings, game) and squashes on press;
-      panels fade+rise when shown
-- [ ] Match end → Rematch button restarts via number entry; win bursts
-      confetti, plays the win stinger
-- [ ] Android back during a solo match exits to the menu
-- [ ] "Opponents are simulated" disclosure visible on find/searching panels
+- [ ] Stats label shows wins/losses/streak/best/fastest win
+- [ ] Play → searching → Cancel and Android back both stop the search
+- [ ] Opponent-found stinger plays only when an opponent is found
+- [ ] Buttons click/squash and panels fade+rise
+- [ ] Match end → Rematch returns to number entry; win confetti/stinger work
+- [ ] Solo Android back mid-match: first press shows the localized warning;
+      second press within two seconds exits cleanly
+- [ ] Simulated-opponent disclosure is visible on solo matchmaking screens
 
 PvP:
 
-- [ ] PvP Duel → create room shows a 5-letter code; join from a second
-      device/instance; leaving a match notifies the opponent
-- [ ] Duel win/lose plays the stinger, updates the menu stats label, and
-      shows "In X guesses" on a win
+- [ ] Create room produces a 5-character code and second device can join
+- [ ] A third simultaneous join attempt is rejected as room full
+- [ ] Inspect PlayFab responses: live `getRoom` state contains no host/guest secret
+- [ ] Modify a client request to submit an invented `side` field → server ignores it;
+      identity comes from `currentPlayerId`
+- [ ] Double-submit the same turn → only one server turn claim succeeds
+- [ ] Higher/lower/correct hint is returned by the server and displays correctly
+- [ ] Win count is correct even if result polling arrives before the submit callback
+- [ ] A loss reveals only the opponent secret after `phase == done`
+- [ ] Normal Leave removes the PlayFab room and notifies the other client
+- [ ] Completed match is removed after both clients acknowledge the result
+- [ ] Back out during create/join, then try the old code → no late UI hijack
+- [ ] PvP Android back navigates create/join/menu; mid-match uses explicit Leave
 
-Regression checks for the QA fixes (rounds 1–3):
+Other regressions:
 
-- [ ] Solo: a guess outside the narrowed range is rejected but keeps the
-      typed number in the input (no retyping)
-- [ ] Solo: STOP GAME and the number-input placeholder ("1-100") follow the
-      selected language
-- [ ] Solo: Android back mid-match lands on a clean menu in ONE press —
-      no menu/game overlap, no second press needed
-- [ ] The gold PvP Duel button is covered by panels (not tappable) during
-      a solo match and while settings are open
-- [ ] Switch language with the PvP menu open: every PvP label, button, and
-      placeholder relabels live (no restart)
-- [ ] PvP: back out of create/join, then have a friend join the code →
-      they get "room not found"; no match panel hijacks your screen
-- [ ] PvP: Android back navigates PvP panels (create/join → menu, menu →
-      closed); mid-match back does nothing (Leave button is the way out)
-- [ ] PvP: double-tap Guess quickly → only one guess counted and sent
-- [ ] Lose with a streak ≥ 2 → save-streak offer; if no rewarded ad is
-      available (e.g. unit missing), a "no ad available" message shows and
-      the button STAYS for retry
-- [ ] Force-update dialog (set TitleData minVersion higher than the build)
-      shows Update AND Quit buttons
-- [ ] Player Settings → Icon shows the HOL icon (indigo, chevrons, gold
-      dot), not the Unity default
+- [ ] Solo out-of-range guess is rejected without clearing typed input
+- [ ] STOP GAME and number placeholder follow selected language
+- [ ] Save-streak reward restores the streak without emitting a second MatchEnded event
+- [ ] Reload MainMenu twice on the same day → DailyStreak event fires only once
+- [ ] Force-update `minVersion` higher than build → Update + Quit dialog
+- [ ] Player Settings icon is HOL artwork, not Unity default
 
-## 2. PlayFab (PvP backend)
+## 2. PlayFab — mandatory production hardening
 
-- [ ] developer.playfab.com → create Studio + Title, copy the Title ID
-- [ ] Automation → CloudScript (Legacy) → paste `playfab/cloudscript.js`
-      → Save → **Deploy** (the client requires the revision with the atomic
-      `joinRoom` + server-authoritative `submitGuess` — an old deployed
-      revision breaks joining and makes every guess fail)
-- [ ] Paste the Title ID into `PvpRuntimeUI.playFabTitleId` (Inspector on the
-      `PvpRuntimeUI` object in `MainMenu`; copied onto the backend at startup)
-- [ ] Optional force-update gate: Title Data → add key `minVersion`
-      (e.g. `0.1`). Builds older than it get a blocking update dialog;
-      while the key is absent every version plays (fail-open)
+### Title + CloudScript
+
+- [ ] Create the PlayFab Studio/Title and copy the Title ID
+- [ ] Paste the Title ID into `PvpRuntimeUI.playFabTitleId` in `MainMenu`
+- [ ] Automation → CloudScript (Legacy) → deploy the exact current
+      `playfab/cloudscript.js`
+- [ ] Confirm the deployed revision exposes:
+      `createRoom`, `joinRoom`, `getRoom`, `submitGuess`, `ackResult`, `leaveRoom`
+
+### Disable client Shared Group authority
+
+The Unity PlayFab client no longer needs Shared Group APIs. Before release,
+disable the **Client** Shared Group methods in the PlayFab API Access Policy
+(Create/Get/Update Shared Group data and member-management methods). Room data
+is private and is accessed only by CloudScript/server APIs.
+
+- [ ] Verify a modified client cannot call `GetSharedGroupData` successfully
+- [ ] Verify a modified client cannot call `UpdateSharedGroupData` successfully
+- [ ] Verify normal PvP still works because it uses `ExecuteCloudScript`
+
+### Provision first-time anonymous players from a trusted server
+
+Release builds deliberately send `CreateAccount:false` to
+`Client/LoginWithCustomID`. Do **not** solve first-time login by enabling
+client-side anonymous account creation for production.
+
+- [ ] Deploy a trusted provisioning service that calls PlayFab
+      `Server/LoginWithCustomID` with the Title Secret Key and `CreateAccount:true`
+- [ ] Never embed the Title Secret Key in Unity, CloudScript parameters, repo,
+      or downloadable app assets
+- [ ] Protect/rate-limit the provisioning service; a public unauthenticated
+      endpoint is not a meaningful trust boundary
+- [ ] Provision a fresh install, then confirm the app's normal
+      `Client/LoginWithCustomID(CreateAccount:false)` succeeds
+- [ ] Keep `allowClientAccountCreationInDebugBuilds` for development only
+
+See `docs/playfab-auth-provisioning.md` for the required boundary.
+
+### Version gate
+
+- [ ] Optional: Title Data → `minVersion` (for example `0.2`)
+- [ ] ForceUpdate reuses the same PlayFab session as PvP and remains fail-open
+      when PlayFab/title data is unavailable
 
 ## 3. Release keystore
 
-- [ ] Player Settings → Keystore Manager → Create New →
-      `hol-release.keystore`, alias `hol` (never reuse another title's key —
-      this project once pointed at RideCore's)
-- [ ] Back up the keystore + passwords offline **immediately**; losing it
-      means never updating `com.Orbyteon.HOL` again
-- [ ] Keystore stays out of git (`*.keystore` is gitignored)
+- [ ] Player Settings → Keystore Manager → create `hol-release.keystore`, alias `hol`
+- [ ] Back up keystore + passwords offline immediately
+- [ ] Keep keystore out of git (`*.keystore` is ignored)
+- [ ] Never reuse another title's signing key
 
-## 4. Dashboards
+## 4. Advertising + Play Console
 
-- [ ] LevelPlay: app registered with key `6076495`, bundle `com.Orbyteon.HOL`,
-      `Interstitial_Android` unit active (unityads-adapter 5.6.0 is
-      catalog-compatible with SDK 9.5.0 — no change needed) — plus a
-      `Rewarded_Android` unit for the save-your-streak placement
-- [ ] Play Console: create app (bundle id is permanent), upload AAB signed
-      with the HOL keystore, content rating, data-safety form (declare:
-      device ID via PlayFab + ads, optional display name in PvP), privacy
-      policy URL from step 5. Listing copy (EN + EL, short/full
-      descriptions, release notes) is paste-ready in
-      `docs/store-listing.md`. Mandatory listing assets are ready in
-      `docs/store/` (feature graphic 1024×500, hi-res icon 512×512).
-      Screenshots (min 2 required): capture during the smoke test on
-      device/emulator at 1080×1920 — main menu, mid-duel with the range
-      label visible, PvP room with invite code, and a win with confetti.
-      Promo video: upload `promo/hol_teaser.mp4` to YouTube (unlisted is
-      fine) and paste its URL into the listing's promo-video field
+- [ ] LevelPlay app registered with the production Android app key and bundle
+      `com.Orbyteon.HOL`
+- [ ] `Interstitial_Android` and `Rewarded_Android` units active
+- [ ] Verify consent **No** produces no ads and no LevelPlay initialization on a fresh launch
+- [ ] Verify consent **Yes** loads interstitial/rewarded units normally
+- [ ] Review the final Play Console Data safety answers against `docs/privacy.html`
+      and the exact mediated networks enabled in the LevelPlay dashboard
+- [ ] Upload the signed AAB, content rating, EN/EL listing copy, screenshots,
+      feature graphic, icon, and optional promo video
 
 ## 5. Privacy policy hosting
 
-GitHub Pages on a **private** repo requires a paid plan (API-verified:
-"Your current plan does not support GitHub Pages for this repository").
-Pick one:
+Host `docs/privacy.html` at a stable public HTTPS URL before publishing.
 
-- [ ] **Make the repo public** (if acceptable), then repo → Settings →
-      Pages → Source: `main` branch, `/docs` folder → policy live at
-      `https://orbyteon.github.io/HOL/privacy.html`
-- [ ] Or upgrade the GitHub plan, then same Pages steps
-- [ ] Or host `docs/privacy.html` anywhere public (Netlify Drop, itch.io
-      project page, Google Sites) — any static URL works
-- [ ] Link the final URL in the Play Console listing
+- [ ] Host the policy (GitHub Pages when available, or another static host)
+- [ ] Open the URL without authentication/incognito and verify it loads
+- [ ] Link that exact URL in Play Console
+- [ ] Re-read the policy after final PlayFab and LevelPlay dashboard configuration;
+      update it if actual data handling differs
 
 ## 6. Security hygiene
 
-- [ ] Rotate the GitHub personal access token used during development
-      (it was exposed in chat): github.com → Settings → Developer settings
-      → revoke, then re-add the new one locally when pushing
-- [ ] Keep `promo/hol_teaser.mp4` and other secrets considerations in mind
-      before making the repo public
+- [ ] Rotate any development credentials/tokens that were exposed outside their
+      intended secret store
+- [ ] Confirm no Title Secret Key, keystore, passwords, service credentials, or
+      private provisioning tokens are committed
+- [ ] Run a repository secret scan before making the repository public

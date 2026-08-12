@@ -5,12 +5,8 @@ using System.Reflection;
 using System.Text.RegularExpressions;
 using NUnit.Framework;
 
-// Static-integrity tests for the localization table and cross-script
-// contracts. The game scripts live in the predefined Assembly-CSharp,
-// which a test asmdef cannot reference at compile time — so these tests
-// reach the game types via reflection. That keeps this assembly fully
-// decoupled: it is editor-only (UNITY_INCLUDE_TESTS) and can never ship
-// with, or break, the player build.
+// Static-integrity tests for localization and cross-script release contracts.
+// Reflection keeps the editor-only test assembly decoupled from Assembly-CSharp.
 public class L10nIntegrityTests
 {
     static Type FindGameType(string name)
@@ -55,8 +51,6 @@ public class L10nIntegrityTests
     [Test]
     public void FormatPlaceholdersMatchAcrossLanguages()
     {
-        // A {0} present in English but missing in Greek (or vice versa)
-        // silently drops information for one language's players.
         foreach (DictionaryEntry entry in L10nTable())
         {
             var values = (string[])entry.Value;
@@ -78,10 +72,6 @@ public class L10nIntegrityTests
     [Test]
     public void FormattedEntriesSurviveStringFormat()
     {
-        // string.Format throws on malformed braces ("{0", "{}"). L10n.Get
-        // formats every entry that receives args — a typo must fail here,
-        // not in front of a player mid-match. Ten dummy args so a valid
-        // future {3}+ placeholder isn't misreported as malformed.
         foreach (DictionaryEntry entry in L10nTable())
         {
             var values = (string[])entry.Value;
@@ -95,9 +85,6 @@ public class L10nIntegrityTests
     [Test]
     public void SceneTextKeysAllResolveToTableEntries()
     {
-        // ExtrasRuntimeWiring maps scene-authored label content onto L10n
-        // keys; a key that fell out of the table would leave a scene label
-        // showing the raw key name after a language switch.
         var wiring = FindGameType("ExtrasRuntimeWiring");
         var field = wiring.GetField("SceneTextKeys", BindingFlags.NonPublic | BindingFlags.Static);
         Assert.IsNotNull(field, "ExtrasRuntimeWiring.SceneTextKeys not found — renamed?");
@@ -112,14 +99,45 @@ public class L10nIntegrityTests
     [Test]
     public void DifficultyPrefKeyMatchesBetweenGameManagerAndSettingsUI()
     {
-        // GameManager reads the difficulty per AI guess; the Settings row in
-        // ExtrasRuntimeWiring writes it. Each declares the PlayerPrefs key as
-        // its own private const — if they drift apart, the difficulty
-        // selector silently stops affecting the AI.
         string gm = PrivateConst("GameManager", "DifficultyPrefKey");
         string ui = PrivateConst("ExtrasRuntimeWiring", "DifficultyPrefKey");
         Assert.AreEqual(gm, ui,
             "GameManager and ExtrasRuntimeWiring disagree on the difficulty PlayerPrefs key");
+    }
+
+    [Test]
+    public void PvpRoomStateExposesOnlySanitizedPlayFabViewFields()
+    {
+        var backend = FindGameType("PvpBackend");
+        var room = backend.GetNestedType("RoomState", BindingFlags.Public);
+        Assert.IsNotNull(room, "PvpBackend.RoomState missing");
+
+        foreach (var name in new[] { "lastHint", "revealedSecret", "hostGuessCount", "guestGuessCount" })
+            Assert.IsNotNull(room.GetField(name, BindingFlags.Public | BindingFlags.Instance),
+                "RoomState is missing server-view field '" + name + "'");
+    }
+
+    [TestCase("0.1", "0.2", true)]
+    [TestCase("0.2", "0.2", false)]
+    [TestCase("0.10", "0.2", false)]
+    [TestCase("1.0", "0.99", false)]
+    [TestCase("0.2b", "0.3", true)]
+    [TestCase("0.3", "0.2b", false)]
+    public void ForceUpdateVersionComparisonIsNumeric(string current, string minimum, bool expected)
+    {
+        var forceUpdate = FindGameType("ForceUpdate");
+        var method = forceUpdate.GetMethod("IsOutdated", BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.IsNotNull(method, "ForceUpdate.IsOutdated not found — renamed?");
+        Assert.AreEqual(expected, (bool)method.Invoke(null, new object[] { current, minimum }));
+    }
+
+    [Test]
+    public void GameEventsSeparatesMatchAndStatsSignals()
+    {
+        var events = FindGameType("GameEvents");
+        Assert.IsNotNull(events.GetField("OnMatchEnded", BindingFlags.Public | BindingFlags.Static));
+        Assert.IsNotNull(events.GetField("OnStatsChanged", BindingFlags.Public | BindingFlags.Static));
+        Assert.IsNotNull(events.GetField("OnDailyStreak", BindingFlags.Public | BindingFlags.Static));
     }
 
     static string PrivateConst(string typeName, string fieldName)

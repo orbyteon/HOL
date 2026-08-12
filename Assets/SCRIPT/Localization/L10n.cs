@@ -3,13 +3,6 @@ using UnityEngine;
 
 // Lightweight localization (English + native Greek). Static so any script
 // or UI component can use it without scene wiring.
-//
-// Usage:
-//   string s = L10n.Get("play");                     // current language
-//   string s = L10n.Get("opponent_thinking", name);  // formatted entry
-//   L10n.SetLanguage(L10n.Language.Greek);           // persisted via PlayerPrefs
-//
-// UI wiring: put a LocalizedText on any TMP_Text and set its key.
 public static class L10n
 {
     public enum Language { English = 0, Greek = 1 }
@@ -22,8 +15,6 @@ public static class L10n
     {
         get
         {
-            // First launch (no explicit choice yet): follow the device
-            // language, so Greek phones start in Greek.
             if (!PlayerPrefs.HasKey(PrefKey))
                 return Application.systemLanguage == SystemLanguage.Greek
                     ? Language.Greek
@@ -49,10 +40,8 @@ public static class L10n
         }
 
         string s = pair[(int)Current];
-
         if (args != null && args.Length > 0)
             s = string.Format(s, args);
-
         return s;
     }
 
@@ -67,6 +56,7 @@ public static class L10n
         { "language",                new[] { "Language", "Γλώσσα" } },
         { "music",                   new[] { "Music", "Μουσική" } },
         { "player_name",             new[] { "Your name", "Το όνομά σου" } },
+        { "player_default",          new[] { "Player", "Παίκτης" } },
 
         // matchmaking
         { "find_challenger",         new[] { "Find challenger", "Βρες αντίπαλο" } },
@@ -138,7 +128,7 @@ public static class L10n
 
         // disclosure / consent
         { "simulated_opponents",     new[] { "Opponents are simulated by an on-device AI.", "Οι αντίπαλοι προσομοιώνονται από τεχνητή νοημοσύνη στη συσκευή." } },
-        { "consent_message",         new[] { "This game shows ads. Allow personalized ads?", "Το παιχνίδι εμφανίζει διαφημίσεις. Να επιτρέπονται εξατομικευμένες;" } },
+        { "consent_message",         new[] { "Allow ads and related device access? If you choose No, ads stay disabled.", "Να επιτρέπονται διαφημίσεις και η σχετική πρόσβαση στη συσκευή; Αν επιλέξεις Όχι, οι διαφημίσεις θα παραμείνουν απενεργοποιημένες." } },
         { "yes",                     new[] { "Yes", "Ναι" } },
         { "no",                      new[] { "No", "Όχι" } },
         { "ads_privacy",             new[] { "Ads privacy", "Απόρρητο διαφημίσεων" } },
