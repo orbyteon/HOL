@@ -25,6 +25,7 @@ jobs:
         run: |
           node --check playfab/cloudscript.js
           node --check tools/playfab/deploy-cloudscript.mjs
+          node --check tools/release/write-release-config.mjs
           node --check services/provisioner/src/index.js
           node --check services/provisioner/src/security.js
 
@@ -57,10 +58,28 @@ jobs:
           grep -q 'Server/LoginWithCustomID' services/provisioner/src/index.js
           grep -q 'MEETS_DEVICE_INTEGRITY' services/provisioner/src/security.js
           grep -q 'PLAY_RECOGNIZED' services/provisioner/src/security.js
+          grep -q 'ReleaseConfig.IsConfigured' Assets/SCRIPT/ReleaseBootstrap.cs
           if grep -R -E 'PLAYFAB_DEV_SECRET_KEY|X-SecretKey' Assets --include='*.cs' --include='*.json' --include='*.txt'; then
             echo "::error::Server PlayFab credentials/references must never be compiled into Unity Assets"
             exit 1
           fi
+
+      - name: Enforce release configuration contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('fs');
+          const p = JSON.parse(fs.readFileSync('Assets/Resources/HOLReleaseConfig.json', 'utf8'));
+          if ((p.playFabTitleId || '').trim() || (p.provisioningUrl || '').trim() || Number(p.googleCloudProjectNumber) !== 0) {
+            console.error('::error::Committed HOLReleaseConfig.json must stay empty; production values are injected by build-release.yml');
+            process.exit(1);
+          }
+          NODE
+          grep -q 'customParameters: -holReleaseBuild' .github/workflows/build-release.yml
+          grep -q 'allowDirtyBuild: true' .github/workflows/build-release.yml
+          grep -q 'refs/heads/main' .github/workflows/build-release.yml
+          grep -q 'PlayerSettings.Android.useCustomKeystore = true' Assets/Editor/ReleaseBuildGuard.cs
 
       - name: Enforce one dependency resolver source
         shell: bash
