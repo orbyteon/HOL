@@ -4,51 +4,86 @@ HOL's Unity client identifies an installation with `SystemInfo.deviceUniqueIdent
 and uses that value as a PlayFab Custom ID. Production builds intentionally call
 `Client/LoginWithCustomID` with `CreateAccount:false`.
 
-That means a **fresh production installation must be provisioned by a trusted
-service before the Unity client can log in**. Do not put the PlayFab Title Secret
-Key in Unity and do not enable client-side anonymous account creation as a
-production shortcut.
+A fresh production installation is therefore provisioned by the trusted service
+in `services/provisioner/` before the Unity client retries its normal login. The
+PlayFab Title Secret Key never ships in Unity.
 
-## Required service behavior
+## Implemented production flow
 
-The trusted service should:
+1. Unity first calls `Client/LoginWithCustomID(CreateAccount:false)`.
+2. If PlayFab reports that the anonymous account does not exist, Unity prepares
+   a **standard Google Play Integrity** token provider and requests a token whose
+   `requestHash` binds the package name, Custom ID, and app version.
+3. Unity sends only the Custom ID, app version, and encrypted integrity token to
+   `POST /api/provision` on the Azure Functions service.
+4. The service asks Google to decode the token and rejects the request unless the
+   package, request hash, freshness, Play recognition, device integrity, license
+   status, and optional Play signing certificate match production policy.
+5. Only after those checks does the service call PlayFab
+   `Server/LoginWithCustomID(CreateAccount:true)` using the server-held Title
+   Secret Key.
+6. Unity retries `Client/LoginWithCustomID(CreateAccount:false)` once. PvP and
+   ForceUpdate then share that authenticated client session.
 
-1. Receive a request to provision the installation's Custom ID through an
-   authenticated/attested and rate-limited path appropriate for the deployment.
-2. Call PlayFab `Server/LoginWithCustomID` over HTTPS with:
-   - header `X-SecretKey: <PlayFab Title Secret Key>`
-   - the HOL Title ID
-   - the same Custom ID the Unity client will use
-   - `CreateAccount: true`
-3. Return only a success/failure result needed by the client bootstrap flow.
-   Do not return the Title Secret Key or otherwise expose server credentials.
-4. After successful provisioning, the Unity app uses its normal
-   `Client/LoginWithCustomID(CreateAccount:false)` flow. PvP and ForceUpdate
-   then share that client session.
+The service returns only success/failure plus the non-sensitive `newlyCreated`
+flag. It does not return PlayFab server credentials or the Play Integrity token.
 
-Official API reference:
-`https://learn.microsoft.com/en-us/rest/api/playfab/server/authentication/login-with-custom-id`
+## Request binding
 
-PlayFab's anonymous-login guidance:
-`https://learn.microsoft.com/en-us/xbox/playfab/identity/player-identity/platform-specific-authentication/anonymous-login`
+Both client and service calculate the SHA-256 hex digest of this exact UTF-8
+serialization:
 
-## What is intentionally not implemented in this repository
+```text
+<packageName>\n<customId>\n<appVersion>
+```
 
-This Unity repository cannot create a trustworthy public provisioning endpoint by
-itself. A bare internet endpoint that accepts any caller-supplied Custom ID and
-uses the Title Secret Key to create accounts simply moves client-side account
-creation behind an unauthenticated proxy; it does not create a meaningful trust
-boundary.
+EditMode and Node tests carry the same regression vector so a serialization
+change on one side cannot silently weaken the binding.
 
-Choose the deployment/attestation mechanism first (for example an existing
-backend with authenticated sessions or a platform-attested bootstrap service),
-then implement the server endpoint there. Store the PlayFab Title Secret Key only
-in that service's secret manager/environment.
+## Deployment
+
+`.github/workflows/deploy-provisioner.yml` is the production deployment path. It
+is manual, uses the `production` GitHub Environment, refuses refs other than
+`main`, and requires the operator to type `DEPLOY`.
+
+Required production settings are documented in `services/provisioner/README.md`.
+The PlayFab and Google credentials are secrets. The function-app name, resource
+group, package name, signing-certificate digest, PlayFab title ID used by the app,
+provisioning URL, and Google Cloud project number are non-secret configuration.
+
+After the function is deployed, the signed Android release workflow
+`.github/workflows/build-release.yml` injects these public app values into
+`Assets/Resources/HOLReleaseConfig.json` **only in the Actions workspace**:
+
+- `PLAYFAB_TITLE_ID`
+- `PROVISIONING_URL`
+- `GOOGLE_CLOUD_PROJECT_NUMBER`
+
+The committed JSON must remain empty. `ReleaseBuildGuard` rejects a production
+build if any required value is missing or malformed.
+
+## Abuse controls
+
+Google Play Integrity is the primary attestation boundary. The request hash binds
+an integrity token to the exact installation ID and app version being provisioned,
+and the service accepts only fresh tokens.
+
+The function also has a small in-process IP limiter, but that limiter is not a
+distributed quota across serverless instances. Configure platform-level rate
+limiting/WAF controls (Azure API Management, Front Door/WAF, or equivalent)
+before public release.
 
 ## Release verification
 
-- Provision a brand-new test installation through the trusted service.
-- Verify `Client/LoginWithCustomID(CreateAccount:false)` succeeds afterward.
-- Verify an unprovisioned Custom ID cannot create an account from the Unity app.
+- Deploy the provisioner from `main` using the manual workflow.
+- Use a Google Play-distributed test build on a certified physical Android device.
+- Verify a brand-new install provisions successfully and the subsequent
+  `Client/LoginWithCustomID(CreateAccount:false)` succeeds.
+- Verify an unprovisioned Custom ID cannot create an account directly from Unity.
+- Verify a tampered package/request hash, stale token, unlicensed app, or failed
+  device-integrity verdict is rejected.
 - Verify PlayFab API Access Policy blocks Client Shared Group operations while
   `ExecuteCloudScript` PvP continues to work.
+
+See `services/provisioner/README.md` for Azure/Google setup details and
+`docs/release-checklist.md` for the full release gate.
