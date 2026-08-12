@@ -48,13 +48,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: services/provisioner/package-lock.json
 
       - name: Install and test provisioner
         working-directory: ${{ env.FUNCTION_PATH }}
         run: |
-          npm ci
+          npm install --no-audit --no-fund
           npm test
           npm run check
 
