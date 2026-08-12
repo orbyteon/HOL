@@ -32,6 +32,19 @@ function turnGroupId(roomId, turnIndex) {
     return roomId + "-TURN-" + turnIndex;
 }
 
+function ackGroupId(roomId, side) {
+    return roomId + "-ACK-" + side.toUpperCase();
+}
+
+function groupExists(groupId) {
+    try {
+        server.GetSharedGroupData({ SharedGroupId: groupId, Keys: [] });
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
 function readState(roomId) {
     var data;
     try {
@@ -62,6 +75,8 @@ function deleteGroupQuietly(groupId) {
 function deleteRoomArtifacts(roomId, state) {
     deleteGroupQuietly(roomId);
     deleteGroupQuietly(claimGroupId(roomId));
+    deleteGroupQuietly(ackGroupId(roomId, "host"));
+    deleteGroupQuietly(ackGroupId(roomId, "guest"));
 
     var maxTurn = state && typeof state.turnIndex === "number" ? state.turnIndex : 0;
     maxTurn = Math.max(0, Math.min(maxTurn, 200));
@@ -136,8 +151,6 @@ handlers.createRoom = function (args, context) {
             hostGuessCount: 0,
             guestGuessCount: 0,
             turnIndex: 0,
-            hostResultAck: false,
-            guestResultAck: false,
         };
         writeState(roomId, state);
         return { ok: true, roomId: roomId, state: JSON.stringify(viewFor(state, currentPlayerId)) };
@@ -265,15 +278,17 @@ handlers.ackResult = function (args, context) {
     var side = sideForPlayer(state, currentPlayerId);
     if (!side) return { ok: false, error: "not a member" };
 
-    if (side === "host") state.hostResultAck = true;
-    else state.guestResultAck = true;
+    // Each side claims an immutable acknowledgement group. This avoids the
+    // lost-update race that would occur if both clients toggled booleans in
+    // the same Shared Group state at nearly the same time.
+    try { server.CreateSharedGroup({ SharedGroupId: ackGroupId(roomId, side) }); }
+    catch (alreadyAcknowledged) { }
 
-    if (state.hostResultAck && state.guestResultAck) {
+    if (groupExists(ackGroupId(roomId, "host")) && groupExists(ackGroupId(roomId, "guest"))) {
         deleteRoomArtifacts(roomId, state);
         return { ok: true, deleted: true };
     }
 
-    writeState(roomId, state);
     return { ok: true, deleted: false };
 };
 
