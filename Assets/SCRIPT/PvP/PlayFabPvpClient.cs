@@ -18,10 +18,19 @@ public class PlayFabPvpClient : PvpBackend
     [Tooltip("Debug builds may create anonymous players client-side for local testing. Release builds always use CreateAccount=false and require server-side provisioning.")]
     public bool allowClientAccountCreationInDebugBuilds = true;
 
+    [Header("Production first-install provisioning")]
+    [Tooltip("Trusted HTTPS endpoint that validates Play Integrity before creating a PlayFab account.")]
+    public string provisioningUrl = "";
+
+    [Tooltip("Google Cloud project number used by the standard Play Integrity provider. A Play-linked app may use 0 when supported by its Play Integrity configuration.")]
+    public long googleCloudProjectNumber;
+
     string sessionTicket = "";
     Coroutine pollRoutine;
+    PlayIntegrityProvisioner provisioner;
 
     string Api(string method) => "https://" + titleId.Trim() + ".playfabapi.com/Client/" + method;
+    string CustomId => SystemInfo.deviceUniqueIdentifier;
 
     // ------------------------------------------------ login (anonymous, device-bound)
 
@@ -31,32 +40,81 @@ public class PlayFabPvpClient : PvpBackend
         StartCoroutine(Login(done));
     }
 
-    // Release builds never create accounts from the client. New players must
-    // be provisioned through a trusted server using PlayFab Server/LoginWithCustomID.
-    // Debug builds can opt into client creation for local testing only.
-    IEnumerator Login(Action<bool> done)
+    // Release builds never create accounts from the client. If a fresh release
+    // install has no linked Custom ID, an attested server bootstrap creates it
+    // and this method retries the same CreateAccount=false login once.
+    IEnumerator Login(Action<bool> done, bool allowProvisioning = true)
     {
+        bool requestOk = false;
+        string response = "";
         yield return StartCoroutine(Post(Api("LoginWithCustomID"), LoginBody(), false, (ok, resp) =>
         {
-            if (ok)
-            {
-                sessionTicket = ExtractString(resp, "SessionTicket");
-                ok = !string.IsNullOrEmpty(sessionTicket);
-            }
-            else if (resp.Contains("PlayerCreationDisabled"))
-            {
-                Debug.LogError("PlayFab account creation is disabled for this title. Provision the player server-side before Client/LoginWithCustomID.");
-            }
-            done(ok);
+            requestOk = ok;
+            response = resp ?? "";
         }));
+
+        if (requestOk)
+        {
+            sessionTicket = ExtractString(response, "SessionTicket");
+            done(!string.IsNullOrEmpty(sessionTicket));
+            yield break;
+        }
+
+        bool clientCreates = ClientAccountCreationEnabled();
+        bool missingAccount = response.Contains("AccountNotFound") || response.Contains("PlayerCreationDisabled");
+        if (!clientCreates && allowProvisioning && missingAccount)
+        {
+            bool provisionFinished = false;
+            bool provisioned = false;
+            var bootstrap = GetProvisioner();
+            bootstrap.Provision(CustomId, ok =>
+            {
+                provisioned = ok;
+                provisionFinished = true;
+            });
+            while (!provisionFinished) yield return null;
+
+            if (provisioned)
+            {
+                yield return StartCoroutine(Login(done, false));
+                yield break;
+            }
+
+            Debug.LogError("PlayFab first-install provisioning failed; login remains closed.");
+            done(false);
+            yield break;
+        }
+
+        if (response.Contains("PlayerCreationDisabled"))
+            Debug.LogError("PlayFab client-side account creation is disabled. Use the production provisioning flow.");
+        else if (response.Contains("AccountNotFound"))
+            Debug.LogError("No PlayFab account is linked to this Custom ID.");
+
+        done(false);
+    }
+
+    bool ClientAccountCreationEnabled()
+    {
+        return Debug.isDebugBuild && allowClientAccountCreationInDebugBuilds;
     }
 
     string LoginBody()
     {
-        bool createAccount = Debug.isDebugBuild && allowClientAccountCreationInDebugBuilds;
         return "{\"TitleId\":\"" + titleId.Trim() + "\",\"CustomId\":\"" +
-               EscapeJson(SystemInfo.deviceUniqueIdentifier) + "\",\"CreateAccount\":" +
-               (createAccount ? "true" : "false") + "}";
+               EscapeJson(CustomId) + "\",\"CreateAccount\":" +
+               (ClientAccountCreationEnabled() ? "true" : "false") + "}";
+    }
+
+    PlayIntegrityProvisioner GetProvisioner()
+    {
+        if (provisioner == null)
+            provisioner = GetComponent<PlayIntegrityProvisioner>();
+        if (provisioner == null)
+            provisioner = gameObject.AddComponent<PlayIntegrityProvisioner>();
+
+        provisioner.endpointUrl = provisioningUrl;
+        provisioner.cloudProjectNumber = googleCloudProjectNumber;
+        return provisioner;
     }
 
     // ForceUpdate reuses the same session instead of creating a second account
