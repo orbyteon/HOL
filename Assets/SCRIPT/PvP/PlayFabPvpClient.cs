@@ -19,10 +19,10 @@ public class PlayFabPvpClient : PvpBackend
     public bool allowClientAccountCreationInDebugBuilds = true;
 
     [Header("Production first-install provisioning")]
-    [Tooltip("Trusted HTTPS endpoint that validates Play Integrity before creating a PlayFab account.")]
+    [Tooltip("Optional debug/local override. Empty uses ReleaseConfig.ProvisioningUrl in a configured production build.")]
     public string provisioningUrl = "";
 
-    [Tooltip("Google Cloud project number used by the standard Play Integrity provider. A Play-linked app may use 0 when supported by its Play Integrity configuration.")]
+    [Tooltip("Optional debug/local override. Zero uses the required positive ReleaseConfig.GoogleCloudProjectNumber in production.")]
     public long googleCloudProjectNumber;
 
     string sessionTicket = "";
@@ -469,6 +469,7 @@ public class PlayFabPvpClient : PvpBackend
 
     static string EscapeJson(string s)
     {
-        return (s ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"");
+        if (string.IsNullOrEmpty(s)) return "";
+        return s.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\n").Replace("\r", "\\r");
     }
 }
