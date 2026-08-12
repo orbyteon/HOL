@@ -236,8 +236,9 @@ handlers.submitGuess = function (args, context) {
     // One immutable claim group per turn makes duplicate/concurrent submissions
     // for the same turn fail closed without relying on client-side tap guards.
     var turnIndex = state.turnIndex | 0;
+    var turnClaim = turnGroupId(roomId, turnIndex);
     try {
-        server.CreateSharedGroup({ SharedGroupId: turnGroupId(roomId, turnIndex) });
+        server.CreateSharedGroup({ SharedGroupId: turnClaim });
     } catch (turnClaimError) {
         return { ok: false, error: "turn already submitted" };
     }
@@ -261,6 +262,9 @@ handlers.submitGuess = function (args, context) {
     try {
         writeState(roomId, state);
     } catch (writeError) {
+        // A failed state write must not consume the turn forever. Roll the
+        // immutable claim back so the same player can retry after recovery.
+        deleteGroupQuietly(turnClaim);
         return { ok: false, error: "write failed" };
     }
 
