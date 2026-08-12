@@ -1,0 +1,161 @@
+name: Build Android Release Candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Public version (for example 0.2.0)"
+        required: true
+        default: "0.2.0"
+        type: string
+      version_code:
+        description: "Google Play versionCode (positive integer, must increase)"
+        required: true
+        type: string
+      confirm:
+        description: "Type BUILD to create a signed production AAB from main"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hol-android-release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Signed production AAB
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 30
+    env:
+      PLAYFAB_TITLE_ID: ${{ vars.PLAYFAB_TITLE_ID }}
+      PROVISIONING_URL: ${{ vars.PROVISIONING_URL }}
+      GOOGLE_CLOUD_PROJECT_NUMBER: ${{ vars.GOOGLE_CLOUD_PROJECT_NUMBER }}
+    steps:
+      - name: Enforce release source and inputs
+        shell: bash
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+          VERSION: ${{ inputs.version }}
+          VERSION_CODE: ${{ inputs.version_code }}
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASS }}
+          ANDROID_KEYALIAS_NAME: ${{ secrets.ANDROID_KEYALIAS_NAME }}
+          ANDROID_KEYALIAS_PASS: ${{ secrets.ANDROID_KEYALIAS_PASS }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/main" || {
+            echo "::error::Release builds must be dispatched from main (got $GITHUB_REF)"
+            exit 1
+          }
+          test "$CONFIRM" = "BUILD" || {
+            echo "::error::Confirmation must be exactly BUILD"
+            exit 1
+          }
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]] || {
+            echo "::error::version must be a semantic version such as 0.2.0"
+            exit 1
+          }
+          [[ "$VERSION_CODE" =~ ^[1-9][0-9]*$ ]] || {
+            echo "::error::version_code must be a positive integer"
+            exit 1
+          }
+          for name in PLAYFAB_TITLE_ID PROVISIONING_URL GOOGLE_CLOUD_PROJECT_NUMBER \
+                      UNITY_LICENSE UNITY_EMAIL UNITY_PASSWORD \
+                      ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASS \
+                      ANDROID_KEYALIAS_NAME ANDROID_KEYALIAS_PASS; do
+            test -n "${!name:-}" || { echo "::error::$name is missing"; exit 1; }
+          done
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Inject and validate public release config
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check tools/release/write-release-config.mjs
+          node tools/release/write-release-config.mjs
+          git diff --check -- Assets/Resources/HOLReleaseConfig.json
+
+      - name: Free runner disk for Unity Android image
+        shell: bash
+        run: |
+          set -euxo pipefail
+          df -h /
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/lib/android
+          docker system prune -af || true
+          sudo apt-get clean
+          df -h /
+
+      - name: Cache Library
+        uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-Release-Android-${{ hashFiles('Packages/manifest.json', 'Packages/packages-lock.json') }}
+          restore-keys: |
+            Library-Release-Android-
+            Library-Android-
+            Library-
+
+      - name: Build signed Android App Bundle
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          targetPlatform: Android
+          androidExportType: androidAppBundle
+          versioning: Custom
+          version: ${{ inputs.version }}
+          androidVersionCode: ${{ inputs.version_code }}
+          androidKeystoreName: hol-release.keystore
+          androidKeystoreBase64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          androidKeystorePass: ${{ secrets.ANDROID_KEYSTORE_PASS }}
+          androidKeyaliasName: ${{ secrets.ANDROID_KEYALIAS_NAME }}
+          androidKeyaliasPass: ${{ secrets.ANDROID_KEYALIAS_PASS }}
+          customParameters: -holReleaseBuild
+          allowDirtyBuild: true
+
+      - name: Verify bundle and write checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t bundles < <(find build/Android -type f -name '*.aab' -print)
+          test "${#bundles[@]}" -eq 1 || {
+            echo "::error::Expected exactly one AAB, found ${#bundles[@]}"
+            exit 1
+          }
+          sha256sum "${bundles[0]}" | tee build/Android/SHA256SUMS
+
+      - name: Upload signed release candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: hol-android-release-${{ inputs.version }}-${{ inputs.version_code }}
+          path: build/Android
+          retention-days: 14
+
+      - name: Build summary
+        if: success()
+        shell: bash
+        run: |
+          {
+            echo "## HOL Android release candidate"
+            echo "- Commit: \`${GITHUB_SHA}\`"
+            echo "- Version: \`${{ inputs.version }}\`"
+            echo "- versionCode: \`${{ inputs.version_code }}\`"
+            echo "- Signed AAB produced and SHA-256 recorded in the artifact"
+            echo "- Production deployment is still a separate manual action"
+          } >> "$GITHUB_STEP_SUMMARY"
