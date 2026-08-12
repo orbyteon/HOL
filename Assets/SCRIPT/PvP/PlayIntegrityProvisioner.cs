@@ -13,10 +13,10 @@ using Google.Play.Integrity;
 // provisioning service, which validates it before creating the PlayFab account.
 public class PlayIntegrityProvisioner : MonoBehaviour
 {
-    [Tooltip("HTTPS Azure Function endpoint, e.g. https://<app>.azurewebsites.net/api/provision")]
+    [Tooltip("Optional override. Empty uses ReleaseConfig.ProvisioningUrl.")]
     public string endpointUrl = "";
 
-    [Tooltip("Google Cloud project number. Use 0 for a Play-distributed app linked to its Cloud project when supported by the Play Integrity setup.")]
+    [Tooltip("Optional override. Zero uses ReleaseConfig.GoogleCloudProjectNumber.")]
     public long cloudProjectNumber;
 
 #if UNITY_ANDROID && !UNITY_EDITOR
@@ -39,9 +39,17 @@ public class PlayIntegrityProvisioner : MonoBehaviour
         public string error;
     }
 
+    string ResolvedEndpoint => string.IsNullOrWhiteSpace(endpointUrl)
+        ? ReleaseConfig.ProvisioningUrl
+        : endpointUrl.Trim();
+
+    long ResolvedCloudProjectNumber => cloudProjectNumber != 0
+        ? cloudProjectNumber
+        : ReleaseConfig.GoogleCloudProjectNumber;
+
     public void Provision(string customId, Action<bool> done)
     {
-        if (string.IsNullOrWhiteSpace(endpointUrl) || string.IsNullOrWhiteSpace(customId))
+        if (string.IsNullOrWhiteSpace(ResolvedEndpoint) || string.IsNullOrWhiteSpace(customId))
         {
             Debug.LogError("Play Integrity provisioning is not configured.");
             done?.Invoke(false);
@@ -94,7 +102,7 @@ public class PlayIntegrityProvisioner : MonoBehaviour
             integrityToken = token,
         };
 
-        var req = new UnityWebRequest(endpointUrl.Trim(), "POST");
+        var req = new UnityWebRequest(ResolvedEndpoint, "POST");
         req.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(JsonUtility.ToJson(payload)));
         req.downloadHandler = new DownloadHandlerBuffer();
         req.SetRequestHeader("Content-Type", "application/json");
@@ -133,7 +141,7 @@ public class PlayIntegrityProvisioner : MonoBehaviour
             integrityManager = new StandardIntegrityManager();
 
         var prepare = integrityManager.PrepareIntegrityToken(
-            new PrepareIntegrityTokenRequest(cloudProjectNumber));
+            new PrepareIntegrityTokenRequest(ResolvedCloudProjectNumber));
         yield return prepare;
 
         if (prepare.Error != StandardIntegrityErrorCode.NoError)
