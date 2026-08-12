@@ -1,24 +1,13 @@
 using UnityEngine;
 using UnityEngine.UI;
 
-// Review #9: first-launch ads-consent dialog.
-//
-// Two ways to use:
-//   A) No wiring at all (default): on first launch the component builds a
-//      simple consent dialog from code (BuildRuntimeDialog) and shows it.
-//      This is the zero-setup path so the consent flow — and therefore ads
-//      initialization, which is gated on it — works out of the box.
-//   B) Custom UI: create a ConsentPanel in the scene, drag it + AdsManager
-//      into the fields below, and wire Yes/No buttons to AcceptPersonalized /
-//      DeclinePersonalized. The runtime dialog is then never built.
-//
-// The choice is stored in PlayerPrefs ("AdsConsent"); AdsManager initializes
-// the SDK only after a choice exists.
+// First-launch ads permission dialog. A decline means LevelPlay is not
+// initialized at all on the next launch and no ads are shown this session.
 [RequireComponent(typeof(Canvas), typeof(UnityEngine.UI.GraphicRaycaster))]
 public class ConsentManager : MonoBehaviour
 {
-    public GameObject consentPanel; // optional — built from code if null
-    public AdsManager adsManager;   // optional — found in scene if null
+    public GameObject consentPanel;
+    public AdsManager adsManager;
 
     const string ConsentPrefKey = "AdsConsent";
 
@@ -36,20 +25,11 @@ public class ConsentManager : MonoBehaviour
             adsManager = FindFirstObjectByType<AdsManager>();
     }
 
-    public void AcceptPersonalized()
-    {
-        Choose(true);
-    }
+    // Method names are kept for scene compatibility; the choice now controls
+    // whether the ads SDK may initialize, not merely ad personalization.
+    public void AcceptPersonalized() { Choose(true); }
+    public void DeclinePersonalized() { Choose(false); }
 
-    public void DeclinePersonalized()
-    {
-        Choose(false);
-    }
-
-    // Re-open the consent dialog from Settings so the player can change
-    // their ads-privacy choice in-app (GDPR: withdrawing consent must be
-    // as easy as giving it). Choosing again overwrites the stored pref and
-    // updates the SDK's privacy flags; AdsManager guards against re-init.
     public void ReopenConsent()
     {
         if (consentPanel == null)
@@ -63,8 +43,6 @@ public class ConsentManager : MonoBehaviour
         if (consentPanel != null)
             consentPanel.SetActive(false);
 
-        // Persist here as the single source of truth — the choice must be
-        // saved even if the AdsManager reference is missing in the scene.
         PlayerPrefs.SetInt(ConsentPrefKey, consent ? 1 : 0);
         PlayerPrefs.Save();
 
@@ -74,21 +52,17 @@ public class ConsentManager : MonoBehaviour
         if (adsManager != null)
             adsManager.OnConsentChosen(consent);
         else
-            Debug.LogError("ConsentManager: no AdsManager in scene — consent saved, but ads will not initialize this session.");
+            Debug.LogError("ConsentManager: no AdsManager in scene — privacy choice saved, but ad state cannot update this session.");
     }
-
-    // ------------------------------------------------ zero-setup runtime UI
 
     GameObject BuildRuntimeDialog()
     {
-        // Dimmed fullscreen backdrop (Converging Light: indigo night, not black).
         var panel = CreateUIObject("ConsentPanel", transform);
         Stretch(panel);
         var bg = panel.AddComponent<Image>();
         bg.color = new Color(0.05f, 0.05f, 0.12f, 0.92f);
-        bg.raycastTarget = true; // block taps through the dialog
+        bg.raycastTarget = true;
 
-        // Centered card.
         var card = CreateUIObject("Card", panel.transform);
         var cardRect = (RectTransform)card.transform;
         cardRect.anchorMin = new Vector2(0.5f, 0.5f);
@@ -99,20 +73,30 @@ public class ConsentManager : MonoBehaviour
         cardImage.type = Image.Type.Sliced;
         cardImage.color = new Color(0.10f, 0.09f, 0.18f, 1f);
 
-        // Message.
         var message = CreateText(card.transform, "Message",
             L10n.Get("consent_message"), 34, new Vector2(0f, 60f));
+        Localize(message, "consent_message");
 
-        // Buttons.
         var yes = CreateButton(card.transform, "YesButton", L10n.Get("yes"),
             new Vector2(0f, -80f), new Color(0.25f, 0.85f, 1f), new Color(0.10f, 0.09f, 0.18f));
         yes.onClick.AddListener(AcceptPersonalized);
+        Localize(yes.GetComponentInChildren<Text>(true), "yes");
 
         var no = CreateButton(card.transform, "NoButton", L10n.Get("no"),
             new Vector2(0f, -170f), new Color(0.16f, 0.15f, 0.26f));
         no.onClick.AddListener(DeclinePersonalized);
+        Localize(no.GetComponentInChildren<Text>(true), "no");
 
         return panel;
+    }
+
+    static void Localize(Text text, string key)
+    {
+        if (text == null) return;
+        var localized = text.GetComponent<LocalizedLegacyText>();
+        if (localized == null)
+            localized = text.gameObject.AddComponent<LocalizedLegacyText>();
+        localized.key = key;
     }
 
     static GameObject CreateUIObject(string name, Transform parent)
@@ -144,7 +128,7 @@ public class ConsentManager : MonoBehaviour
         var text = go.AddComponent<Text>();
         text.text = content;
         text.fontSize = fontSize;
-        text.color = color ?? new Color(0.91f, 0.93f, 1f); // near-white, never pure white
+        text.color = color ?? new Color(0.91f, 0.93f, 1f);
         text.alignment = TextAnchor.MiddleCenter;
         text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         return text;
@@ -172,10 +156,7 @@ public class ConsentManager : MonoBehaviour
             .GetComponent<RectTransform>()
             .FillParent();
 
-        // A dialog reopened from Settings is built long after the startup
-        // juice pass — attach press feedback + click sound here.
         RuntimeUI.AttachJuice(button);
-
         return button;
     }
 }
