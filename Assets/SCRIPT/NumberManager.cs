@@ -18,9 +18,19 @@ public class NumberManager : MonoBehaviour
 
     bool gameStarted = false;
 
+    void OnEnable()
+    {
+        L10n.OnLanguageChanged += RefreshPlayerLabel;
+    }
+
+    void OnDisable()
+    {
+        L10n.OnLanguageChanged -= RefreshPlayerLabel;
+    }
+
     void Start()
     {
-        playerNumberText.text = DisplayPlayerName() + ": ?";
+        RefreshPlayerLabel();
     }
 
     public void SubmitNumber()
@@ -49,7 +59,8 @@ public class NumberManager : MonoBehaviour
         if (!gameStarted)
         {
             playerNumber = number;
-            playerNumberText.text = DisplayPlayerName() + ": " + playerNumber;
+            gameStarted = true;
+            RefreshPlayerLabel();
 
             stopButton.SetActive(true);
             playerGuessesPanel.SetActive(true);
@@ -57,8 +68,6 @@ public class NumberManager : MonoBehaviour
 
             gameManager.SetPlayerNumber(playerNumber);
             gameManager.StartGame();
-
-            gameStarted = true;
         }
         else
         {
@@ -88,7 +97,7 @@ public class NumberManager : MonoBehaviour
     public void ResetForNewMatch()
     {
         gameStarted = false;
-        playerNumberText.text = DisplayPlayerName() + ": ?";
+        RefreshPlayerLabel();
 
         messageText.gameObject.SetActive(false);
         stopButton.SetActive(false);
@@ -96,6 +105,12 @@ public class NumberManager : MonoBehaviour
         aiGuessesPanel.SetActive(false);
 
         numberInput.text = "";
+    }
+
+    void RefreshPlayerLabel()
+    {
+        if (playerNumberText == null) return;
+        playerNumberText.text = DisplayPlayerName() + ": " + (gameStarted ? playerNumber.ToString() : "?");
     }
 
     static string DisplayPlayerName()
