@@ -1,7 +1,8 @@
 // HOL — PlayFab CloudScript (Legacy)
-// Server-authoritative PvP room functions. Clients call only ExecuteCloudScript;
-// Shared Group client read/write APIs can and should be disabled in PlayFab's
-// API Access Policy before release.
+// Server-authoritative PvP room functions. Clients call only ExecuteCloudScript.
+// Room groups deliberately have NO client members: private Shared Group state is
+// therefore unreadable and unwritable through Client Shared Group APIs even if
+// an API Access Policy is accidentally left permissive.
 
 var CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // no 0/O/1/I/L
 var ROOM_CREATE_ATTEMPTS = 12;
@@ -130,11 +131,6 @@ handlers.createRoom = function (args, context) {
     if (!roomId) return { ok: false, error: "create failed" };
 
     try {
-        server.AddSharedGroupMembers({
-            SharedGroupId: roomId,
-            PlayFabIds: [currentPlayerId],
-        });
-
         var state = {
             hostId: currentPlayerId,
             guestId: "",
@@ -188,11 +184,6 @@ handlers.joinRoom = function (args, context) {
             deleteGroupQuietly(claimGroupId(roomId));
             return { ok: false, error: state ? "room full" : "room not found" };
         }
-
-        server.AddSharedGroupMembers({
-            SharedGroupId: roomId,
-            PlayFabIds: [currentPlayerId],
-        });
 
         state.guestId = currentPlayerId;
         state.guestName = cleanName(args.guestName, "Player");
