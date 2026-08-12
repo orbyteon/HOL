@@ -1,5 +1,18 @@
 {
+  "scopedRegistries": [
+    {
+      "name": "package.openupm.com",
+      "url": "https://package.openupm.com",
+      "scopes": [
+        "com.google.external-dependency-manager",
+        "com.google.play.common",
+        "com.google.play.core",
+        "com.google.play.integrity"
+      ]
+    }
+  ],
   "dependencies": {
+    "com.google.play.integrity": "2.0.0",
     "com.unity.services.levelplay": "9.5.0",
     "com.unity.test-framework": "1.1.33",
     "com.unity.textmeshpro": "3.0.7",
