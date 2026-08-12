@@ -28,6 +28,7 @@ jobs:
       AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
       GOOGLE_PLAY_PACKAGE_NAME: ${{ vars.GOOGLE_PLAY_PACKAGE_NAME }}
       GOOGLE_PLAY_CERT_SHA256: ${{ vars.GOOGLE_PLAY_CERT_SHA256 }}
+      PLAYFAB_TITLE_ID: ${{ vars.PLAYFAB_TITLE_ID }}
     steps:
       - name: Enforce production source
         shell: bash
@@ -50,7 +51,6 @@ jobs:
       - name: Validate deployment configuration
         shell: bash
         env:
-          PLAYFAB_TITLE_ID: ${{ secrets.PLAYFAB_TITLE_ID }}
           PLAYFAB_DEV_SECRET_KEY: ${{ secrets.PLAYFAB_DEV_SECRET_KEY }}
           GOOGLE_SERVICE_ACCOUNT_JSON_B64: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON_B64 }}
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
@@ -86,7 +86,6 @@ jobs:
       - name: Configure production app settings
         shell: bash
         env:
-          PLAYFAB_TITLE_ID: ${{ secrets.PLAYFAB_TITLE_ID }}
           PLAYFAB_DEV_SECRET_KEY: ${{ secrets.PLAYFAB_DEV_SECRET_KEY }}
           GOOGLE_SERVICE_ACCOUNT_JSON_B64: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON_B64 }}
         run: |
