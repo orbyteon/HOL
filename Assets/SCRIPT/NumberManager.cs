@@ -20,18 +20,11 @@ public class NumberManager : MonoBehaviour
 
     void Start()
     {
-        // Load the player name saved in Settings.
-        string playerName = PlayerPrefs.GetString("PlayerName", "Player");
-
-        // Show the name before the game starts.
-        playerNumberText.text = playerName + ": ?";
+        playerNumberText.text = DisplayPlayerName() + ": ?";
     }
 
     public void SubmitNumber()
     {
-        // Round already decided: any submit — Confirm tap or keyboard Done,
-        // valid or empty — should do nothing. Checked BEFORE validation so a
-        // stray empty submit can't flash "Invalid number" over the result.
         if (gameManager != null && gameManager.IsMatchOver)
             return;
 
@@ -56,12 +49,7 @@ public class NumberManager : MonoBehaviour
         if (!gameStarted)
         {
             playerNumber = number;
-
-            // Use the saved player name.
-            string playerName = PlayerPrefs.GetString("PlayerName", "Player");
-
-            // Show name + secret number.
-            playerNumberText.text = playerName + ": " + playerNumber;
+            playerNumberText.text = DisplayPlayerName() + ": " + playerNumber;
 
             stopButton.SetActive(true);
             playerGuessesPanel.SetActive(true);
@@ -74,8 +62,6 @@ public class NumberManager : MonoBehaviour
         }
         else
         {
-            // Review #6: don't silently swallow (and erase) a guess typed
-            // during the opponent's turn — tell the player and keep the input.
             if (gameManager != null && !gameManager.IsPlayerTurn)
             {
                 messageText.gameObject.SetActive(true);
@@ -83,41 +69,26 @@ public class NumberManager : MonoBehaviour
                 return;
             }
 
-            if (gameManager != null)
-            {
-                // A rejected guess (e.g. outside the known range) keeps the
-                // input so the player can adjust it instead of retyping.
-                if (!gameManager.PlayerGuess(number))
-                    return;
-            }
+            if (gameManager != null && !gameManager.PlayerGuess(number))
+                return;
         }
 
         numberInput.text = "";
         numberInput.DeactivateInputField();
-        // Don't pop the soft keyboard back up over the result screen — the
-        // winning guess ends the match; refocus only while play continues.
         if (gameManager == null || !gameManager.IsMatchOver)
             numberInput.ActivateInputField();
     }
 
-    // Called by GameManager.EndGame: the match can end on the OPPONENT's
-    // turn (AI finds your number), when the soft keyboard was already
-    // refocused after our last guess — close it so it doesn't cover the
-    // result screen.
     public void CloseInput()
     {
         if (numberInput != null)
             numberInput.DeactivateInputField();
     }
 
-    // Review #3: called by GameManager.RestartMatch so a rematch starts from
-    // the number-entry state instead of reusing the old secret.
     public void ResetForNewMatch()
     {
         gameStarted = false;
-
-        string playerName = PlayerPrefs.GetString("PlayerName", "Player");
-        playerNumberText.text = playerName + ": ?";
+        playerNumberText.text = DisplayPlayerName() + ": ?";
 
         messageText.gameObject.SetActive(false);
         stopButton.SetActive(false);
@@ -127,8 +98,12 @@ public class NumberManager : MonoBehaviour
         numberInput.text = "";
     }
 
-    // Review #4: renamed from StopGame (which collided with GameManager's
-    // opposite-behavior StopGame). Re-wire the exit button's OnClick to this.
+    static string DisplayPlayerName()
+    {
+        string playerName = PlayerPrefs.GetString("PlayerName", "");
+        return string.IsNullOrWhiteSpace(playerName) ? L10n.Get("player_default") : playerName;
+    }
+
     public void ExitToMenu()
     {
         SceneManager.LoadScene("MainMenu");
