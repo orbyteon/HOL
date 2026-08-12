@@ -20,8 +20,11 @@ public class PlayIntegrityProvisioner : MonoBehaviour
     public long cloudProjectNumber;
 
 #if UNITY_ANDROID && !UNITY_EDITOR
-    StandardIntegrityManagerV2 integrityManager;
-    StandardIntegrityManagerV2.StandardIntegrityTokenProvider tokenProvider;
+    // Google Play Integrity Unity 2.0.0 currently has an upstream compile bug
+    // in its V2 managers (wrong failure-callback signature). HOL uses the
+    // stable 1.4.1 Standard API, which still supports requestHash binding.
+    StandardIntegrityManager integrityManager;
+    StandardIntegrityTokenProvider tokenProvider;
 #endif
 
     [Serializable]
@@ -80,12 +83,9 @@ public class PlayIntegrityProvisioner : MonoBehaviour
         var tokenOperation = tokenProvider.Request(new StandardIntegrityTokenRequest(requestHash));
         yield return tokenOperation;
 
-        if (tokenOperation.Error != null &&
-            tokenOperation.Error.ErrorCode != StandardIntegrityErrorCode.NoError)
+        if (!tokenOperation.IsSuccessful)
         {
-            var code = tokenOperation.Error.ErrorCode;
-            tokenOperation.Error.Dispose();
-            Debug.LogError("Play Integrity token request failed: " + code);
+            Debug.LogError("Play Integrity token request failed: " + tokenOperation.Error);
             done?.Invoke(false);
             yield break;
         }
@@ -142,18 +142,15 @@ public class PlayIntegrityProvisioner : MonoBehaviour
         }
 
         if (integrityManager == null)
-            integrityManager = new StandardIntegrityManagerV2();
+            integrityManager = new StandardIntegrityManager();
 
         var prepare = integrityManager.PrepareIntegrityToken(
             new PrepareIntegrityTokenRequest(ResolvedCloudProjectNumber));
         yield return prepare;
 
-        if (prepare.Error != null &&
-            prepare.Error.ErrorCode != StandardIntegrityErrorCode.NoError)
+        if (!prepare.IsSuccessful)
         {
-            var code = prepare.Error.ErrorCode;
-            prepare.Error.Dispose();
-            Debug.LogError("Play Integrity provider preparation failed: " + code);
+            Debug.LogError("Play Integrity provider preparation failed: " + prepare.Error);
             done?.Invoke(false);
             yield break;
         }
