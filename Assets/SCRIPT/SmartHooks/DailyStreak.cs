@@ -1,9 +1,8 @@
 using System;
 using UnityEngine;
 
-// Daily-play streak hook. Put this component on any always-alive object
-// (e.g. next to MenuManager); it counts one streak day per calendar day
-// the game is opened and fires GameEvents.OnDailyStreak.
+// Daily-play streak hook. Counts one streak day per local calendar day and
+// emits GameEvents.OnDailyStreak only when that day is newly registered.
 public class DailyStreak : MonoBehaviour
 {
     const string LastPlayDateKey = "DailyLastPlayDate"; // yyyy-MM-dd
@@ -21,11 +20,9 @@ public class DailyStreak : MonoBehaviour
         string today = DateTime.Now.ToString("yyyy-MM-dd");
         string last = PlayerPrefs.GetString(LastPlayDateKey, "");
 
+        // Scene reloads on the same day are not new engagement events.
         if (last == today)
-        {
-            GameEvents.DailyStreak(CurrentStreakDays); // already counted
             return;
-        }
 
         bool consecutive = false;
         if (!string.IsNullOrEmpty(last))
