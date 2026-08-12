@@ -39,6 +39,10 @@ jobs:
             echo "::error::CloudScript must derive the player side from currentPlayerId"
             exit 1
           fi
+          if grep -q 'AddSharedGroupMembers' playfab/cloudscript.js; then
+            echo "::error::PvP Shared Groups must have no client members; CloudScript tracks host/guest IDs itself"
+            exit 1
+          fi
 
       - name: Verify Unity meta files for scripts
         shell: bash
