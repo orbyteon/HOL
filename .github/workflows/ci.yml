@@ -1,4 +1,4 @@
-# CI: static integrity + Unity EditMode tests + Android compile build.
+# CI: static integrity + server bootstrap tests + Unity EditMode tests + Android compile build.
 # Unity credentials are mandatory: missing secrets make CI fail loudly instead
 # of producing a misleading green run with the real jobs skipped.
 
@@ -21,8 +21,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Validate PlayFab CloudScript syntax
-        run: node --check playfab/cloudscript.js
+      - name: Validate JavaScript syntax
+        run: |
+          node --check playfab/cloudscript.js
+          node --check tools/playfab/deploy-cloudscript.mjs
+          node --check services/provisioner/src/index.js
+          node --check services/provisioner/src/security.js
 
       - name: Enforce server-authoritative PlayFab client
         shell: bash
@@ -44,6 +48,30 @@ jobs:
             exit 1
           fi
 
+      - name: Enforce production provisioning boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'CreateAccount\\":' Assets/SCRIPT/PvP/PlayFabPvpClient.cs
+          grep -q 'PlayIntegrityProvisioner' Assets/SCRIPT/PvP/PlayFabPvpClient.cs
+          grep -q 'Server/LoginWithCustomID' services/provisioner/src/index.js
+          grep -q 'MEETS_DEVICE_INTEGRITY' services/provisioner/src/security.js
+          grep -q 'PLAY_RECOGNIZED' services/provisioner/src/security.js
+          if grep -R -E 'PLAYFAB_DEV_SECRET_KEY|X-SecretKey' Assets --include='*.cs' --include='*.json' --include='*.txt'; then
+            echo "::error::Server PlayFab credentials/references must never be compiled into Unity Assets"
+            exit 1
+          fi
+
+      - name: Enforce one dependency resolver source
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q '"com.google.play.integrity": "2.0.0"' Packages/manifest.json
+          if [ -e Assets/MobileDependencyResolver ]; then
+            echo "::error::EDM4U is supplied through UPM for Play Integrity; do not also embed Assets/MobileDependencyResolver"
+            exit 1
+          fi
+
       - name: Verify Unity meta files for scripts
         shell: bash
         run: |
@@ -56,6 +84,26 @@ jobs:
             fi
           done < <(find Assets -type f -name '*.cs' -print0)
           exit "$missing"
+
+  provisioner-test:
+    name: Provisioner tests
+    needs: static-checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install, test, and syntax-check
+        working-directory: services/provisioner
+        run: |
+          npm install --no-audit --no-fund
+          npm test
+          npm run check
 
   check-license:
     name: Require Unity credentials
@@ -78,7 +126,7 @@ jobs:
 
   test:
     name: EditMode tests
-    needs: [static-checks, check-license]
+    needs: [static-checks, provisioner-test, check-license]
     runs-on: ubuntu-latest
     permissions:
       checks: write
@@ -116,7 +164,7 @@ jobs:
 
   build:
     name: Build Android (compile check)
-    needs: [static-checks, check-license]
+    needs: [static-checks, provisioner-test, check-license]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
