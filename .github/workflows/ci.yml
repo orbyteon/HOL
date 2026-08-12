@@ -122,6 +122,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Free runner disk for Unity Android image
+        shell: bash
+        run: |
+          set -euxo pipefail
+          echo "Disk before cleanup:"
+          df -h /
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/lib/android
+          docker system prune -af || true
+          sudo apt-get clean
+          echo "Disk after cleanup:"
+          df -h /
+
       - name: Cache Library
         uses: actions/cache@v4
         with:
