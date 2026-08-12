@@ -13,10 +13,10 @@ using Google.Play.Integrity;
 // provisioning service, which validates it before creating the PlayFab account.
 public class PlayIntegrityProvisioner : MonoBehaviour
 {
-    [Tooltip("Optional override. Empty uses ReleaseConfig.ProvisioningUrl.")]
+    [Tooltip("Optional debug/local override. Empty uses ReleaseConfig.ProvisioningUrl.")]
     public string endpointUrl = "";
 
-    [Tooltip("Optional override. Zero uses ReleaseConfig.GoogleCloudProjectNumber.")]
+    [Tooltip("Optional debug/local override. Zero uses the required positive ReleaseConfig.GoogleCloudProjectNumber.")]
     public long cloudProjectNumber;
 
 #if UNITY_ANDROID && !UNITY_EDITOR
@@ -52,16 +52,21 @@ public class PlayIntegrityProvisioner : MonoBehaviour
 
     public void Provision(string customId, Action<bool> done)
     {
-        if (string.IsNullOrWhiteSpace(ResolvedEndpoint) || string.IsNullOrWhiteSpace(customId) ||
-            ResolvedCloudProjectNumber <= 0)
+        string endpoint = ResolvedEndpoint;
+        long projectNumber = ResolvedCloudProjectNumber;
+        Uri endpointUri;
+        if (string.IsNullOrWhiteSpace(customId) || projectNumber <= 0 ||
+            !Uri.TryCreate(endpoint, UriKind.Absolute, out endpointUri) ||
+            endpointUri.Scheme != Uri.UriSchemeHttps || string.IsNullOrWhiteSpace(endpointUri.Host) ||
+            !string.IsNullOrEmpty(endpointUri.UserInfo))
         {
-            Debug.LogError("Play Integrity provisioning is not configured.");
+            Debug.LogError("Play Integrity provisioning is not configured with a valid HTTPS endpoint and positive Google Cloud project number.");
             done?.Invoke(false);
             return;
         }
 
 #if UNITY_ANDROID && !UNITY_EDITOR
-        StartCoroutine(ProvisionAndroid(customId, done));
+        StartCoroutine(ProvisionAndroid(customId, endpoint, projectNumber, done));
 #else
         Debug.LogWarning("Play Integrity provisioning is available only on an Android device build.");
         done?.Invoke(false);
@@ -69,10 +74,10 @@ public class PlayIntegrityProvisioner : MonoBehaviour
     }
 
 #if UNITY_ANDROID && !UNITY_EDITOR
-    IEnumerator ProvisionAndroid(string customId, Action<bool> done)
+    IEnumerator ProvisionAndroid(string customId, string endpoint, long projectNumber, Action<bool> done)
     {
         bool providerReady = false;
-        yield return EnsureProvider(ok => providerReady = ok);
+        yield return EnsureProvider(projectNumber, ok => providerReady = ok);
         if (!providerReady)
         {
             done?.Invoke(false);
@@ -106,7 +111,7 @@ public class PlayIntegrityProvisioner : MonoBehaviour
             integrityToken = token,
         };
 
-        var req = new UnityWebRequest(ResolvedEndpoint, "POST");
+        var req = new UnityWebRequest(endpoint, "POST");
         req.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(JsonUtility.ToJson(payload)));
         req.downloadHandler = new DownloadHandlerBuffer();
         req.SetRequestHeader("Content-Type", "application/json");
@@ -133,7 +138,7 @@ public class PlayIntegrityProvisioner : MonoBehaviour
         done?.Invoke(ok);
     }
 
-    IEnumerator EnsureProvider(Action<bool> done)
+    IEnumerator EnsureProvider(long projectNumber, Action<bool> done)
     {
         if (tokenProvider != null)
         {
@@ -145,7 +150,7 @@ public class PlayIntegrityProvisioner : MonoBehaviour
             integrityManager = new StandardIntegrityManager();
 
         var prepare = integrityManager.PrepareIntegrityToken(
-            new PrepareIntegrityTokenRequest(ResolvedCloudProjectNumber));
+            new PrepareIntegrityTokenRequest(projectNumber));
         yield return prepare;
 
         if (!prepare.IsSuccessful)
