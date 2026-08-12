@@ -3,6 +3,10 @@ name: Deploy PlayFab Production
 on:
   workflow_dispatch:
     inputs:
+      confirm:
+        description: "Type DEPLOY to publish the main branch to production"
+        required: true
+        type: string
       harden_shared_group_policy:
         description: "Also deny direct Client Shared Group APIs"
         required: true
@@ -23,6 +27,21 @@ jobs:
     environment: production
     timeout-minutes: 10
     steps:
+      - name: Enforce production source
+        shell: bash
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/main" || {
+            echo "::error::Production deployment must be dispatched from the main branch (got $GITHUB_REF)"
+            exit 1
+          }
+          test "$CONFIRM" = "DEPLOY" || {
+            echo "::error::Confirmation must be exactly DEPLOY"
+            exit 1
+          }
+
       - name: Checkout
         uses: actions/checkout@v4
 
