@@ -20,8 +20,8 @@ public class PlayIntegrityProvisioner : MonoBehaviour
     public long cloudProjectNumber;
 
 #if UNITY_ANDROID && !UNITY_EDITOR
-    StandardIntegrityManager integrityManager;
-    StandardIntegrityTokenProvider tokenProvider;
+    StandardIntegrityManagerV2 integrityManager;
+    StandardIntegrityManagerV2.StandardIntegrityTokenProvider tokenProvider;
 #endif
 
     [Serializable]
@@ -79,9 +79,12 @@ public class PlayIntegrityProvisioner : MonoBehaviour
         var tokenOperation = tokenProvider.Request(new StandardIntegrityTokenRequest(requestHash));
         yield return tokenOperation;
 
-        if (tokenOperation.Error != StandardIntegrityErrorCode.NoError)
+        if (tokenOperation.Error != null &&
+            tokenOperation.Error.ErrorCode != StandardIntegrityErrorCode.NoError)
         {
-            Debug.LogError("Play Integrity token request failed: " + tokenOperation.Error);
+            var code = tokenOperation.Error.ErrorCode;
+            tokenOperation.Error.Dispose();
+            Debug.LogError("Play Integrity token request failed: " + code);
             done?.Invoke(false);
             yield break;
         }
@@ -138,15 +141,18 @@ public class PlayIntegrityProvisioner : MonoBehaviour
         }
 
         if (integrityManager == null)
-            integrityManager = new StandardIntegrityManager();
+            integrityManager = new StandardIntegrityManagerV2();
 
         var prepare = integrityManager.PrepareIntegrityToken(
             new PrepareIntegrityTokenRequest(ResolvedCloudProjectNumber));
         yield return prepare;
 
-        if (prepare.Error != StandardIntegrityErrorCode.NoError)
+        if (prepare.Error != null &&
+            prepare.Error.ErrorCode != StandardIntegrityErrorCode.NoError)
         {
-            Debug.LogError("Play Integrity provider preparation failed: " + prepare.Error);
+            var code = prepare.Error.ErrorCode;
+            prepare.Error.Dispose();
+            Debug.LogError("Play Integrity provider preparation failed: " + code);
             done?.Invoke(false);
             yield break;
         }
