@@ -1,0 +1,56 @@
+name: Deploy PlayFab Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      harden_shared_group_policy:
+        description: "Also deny direct Client Shared Group APIs"
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: playfab-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Publish CloudScript
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate deployment inputs
+        shell: bash
+        env:
+          PLAYFAB_TITLE_ID: ${{ secrets.PLAYFAB_TITLE_ID }}
+          PLAYFAB_DEV_SECRET_KEY: ${{ secrets.PLAYFAB_DEV_SECRET_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$PLAYFAB_TITLE_ID" || { echo "::error::PLAYFAB_TITLE_ID secret is missing"; exit 1; }
+          test -n "$PLAYFAB_DEV_SECRET_KEY" || { echo "::error::PLAYFAB_DEV_SECRET_KEY secret is missing"; exit 1; }
+          node --check playfab/cloudscript.js
+          node --check tools/playfab/deploy-cloudscript.mjs
+
+      - name: Publish Legacy CloudScript and harden API policy
+        env:
+          PLAYFAB_TITLE_ID: ${{ secrets.PLAYFAB_TITLE_ID }}
+          PLAYFAB_DEV_SECRET_KEY: ${{ secrets.PLAYFAB_DEV_SECRET_KEY }}
+          HARDEN_SHARED_GROUP_POLICY: ${{ inputs.harden_shared_group_policy }}
+        run: node tools/playfab/deploy-cloudscript.mjs
+
+      - name: Deployment summary
+        if: success()
+        run: |
+          {
+            echo "## PlayFab production deployment"
+            echo "- CloudScript source: \`playfab/cloudscript.js\`"
+            echo "- Commit: \`${GITHUB_SHA}\`"
+            echo "- Direct Client Shared Group policy hardening: \`${{ inputs.harden_shared_group_policy }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
