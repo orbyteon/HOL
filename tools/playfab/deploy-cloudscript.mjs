@@ -34,6 +34,30 @@ async function playFab(path, body) {
   return json.data ?? json;
 }
 
+async function verifyPublishedCloudScript(source, deployment) {
+  if (!Number.isInteger(deployment?.Revision) || !Number.isInteger(deployment?.Version))
+    throw new Error("UpdateCloudScript did not return a version/revision to verify");
+
+  const revision = await playFab("/Admin/GetCloudScriptRevision", {
+    Revision: deployment.Revision,
+    Version: deployment.Version,
+  });
+
+  if (revision.IsPublished !== true)
+    throw new Error(`CloudScript revision ${deployment.Revision} is not published`);
+  if (revision.Revision !== deployment.Revision || revision.Version !== deployment.Version)
+    throw new Error("Published CloudScript version/revision does not match deployment response");
+
+  const files = Array.isArray(revision.Files) ? revision.Files : [];
+  const cloudScript = files.find(file => file?.Filename === "cloudscript.js");
+  if (!cloudScript)
+    throw new Error("Published CloudScript revision does not contain cloudscript.js");
+  if (cloudScript.FileContents !== source)
+    throw new Error("Published CloudScript source differs from the repository source");
+
+  console.log(`Verified published Legacy CloudScript version ${revision.Version}, revision ${revision.Revision}.`);
+}
+
 async function deployCloudScript() {
   const source = await fs.readFile("playfab/cloudscript.js", "utf8");
   const result = await playFab("/Admin/UpdateCloudScript", {
@@ -47,6 +71,7 @@ async function deployCloudScript() {
   });
 
   console.log(`Published Legacy CloudScript version ${result.Version}, revision ${result.Revision}.`);
+  await verifyPublishedCloudScript(source, result);
   return result;
 }
 
