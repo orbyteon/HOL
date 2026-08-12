@@ -117,6 +117,21 @@ public class L10nIntegrityTests
                 "RoomState is missing server-view field '" + name + "'");
     }
 
+    [Test]
+    public void PlayIntegrityRequestHashMatchesServerContract()
+    {
+        var provisioner = FindGameType("PlayIntegrityProvisioner");
+        var method = provisioner.GetMethod("CanonicalRequestHash", BindingFlags.Public | BindingFlags.Static);
+        Assert.IsNotNull(method, "PlayIntegrityProvisioner.CanonicalRequestHash missing");
+
+        var actual = (string)method.Invoke(null,
+            new object[] { "com.Orbyteon.HOL", "device-123", "0.2.0" });
+        Assert.AreEqual(
+            "abd56a777ec513b24d8bc3180d808efb6965271533f8ac97ef0fb6385799758e",
+            actual,
+            "Unity's attested request serialization/hash no longer matches the server test vector");
+    }
+
     [TestCase("0.1", "0.2", true)]
     [TestCase("0.2", "0.2", false)]
     [TestCase("0.10", "0.2", false)]
