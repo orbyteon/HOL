@@ -34,24 +34,17 @@ public class GameManager : MonoBehaviour
     public AudioClip winSound;
     public AudioClip loseSound;
 
-    public NumberManager numberManager; // review #3: wire in Inspector
-    public ConfettiBurst winConfetti;   // optional: drag a ConfettiBurst for win celebration
-    public AdsManager adsManager;       // optional: match-end interstitial (see EndGame)
+    public NumberManager numberManager;
+    public ConfettiBurst winConfetti;
+    public AdsManager adsManager;
 
-    // Review #6: lets NumberManager give feedback instead of silently
-    // swallowing guesses typed during the opponent's turn.
     public bool IsPlayerTurn => playerTurn && !gameFinished;
-
-    // Lets the UI distinguish "not your turn" from "the round is decided"
-    // (post-match submits and back-press handling behave differently).
     public bool IsMatchOver => gameFinished;
 
     int min = 1;
     int max = 100;
     int aiGuess;
 
-    // Bounds on what the player still knows about the AI's secret number.
-    // Narrowed by each Higher/Lower hint; used to reject out-of-range guesses.
     int playerMin = 1;
     int playerMax = 100;
 
@@ -123,7 +116,6 @@ public class GameManager : MonoBehaviour
         stopGameButton.SetActive(false);
         HideButtons();
 
-        // Randomly decide who starts.
         bool aiStarts = Random.value < 0.5f;
 
         if (aiStarts)
@@ -168,12 +160,10 @@ public class GameManager : MonoBehaviour
         }
 
         aiNumberText.text = currentOpponent + ": " + aiGuess;
-
         AppendHistory(aiHistory, aiHistoryText, aiGuess);
 
         playerTurn = false;
         turnText.text = L10n.Get("answer_opponent", currentOpponent);
-
         HideButtons();
 
         if (playerSecretNumber > aiGuess)
@@ -186,10 +176,7 @@ public class GameManager : MonoBehaviour
 
     public void Higher()
     {
-        // Only the truthful answer button is ever shown (see AIGuess), so
-        // this answer is consistent with every earlier hint by construction.
         min = aiGuess + 1;
-
         HideButtons();
         turnText.text = L10n.Get("your_guess");
         playerTurn = true;
@@ -198,23 +185,19 @@ public class GameManager : MonoBehaviour
     public void Lower()
     {
         max = aiGuess - 1;
-
         HideButtons();
         turnText.text = L10n.Get("your_guess");
         playerTurn = true;
     }
 
-    // Adaptive difficulty: aims the AI so a regular player wins about half
-    // their matches. Winning a lot → tougher AI (less randomness); losing a
-    // lot → friendlier AI. Falls back to Normal with little/no history.
     static float AdaptiveRandomChance()
     {
         float winRate = GameStats.RecentWinRate();
-        if (winRate < 0f) return DifficultyRandomChance[1]; // no data → Normal
+        if (winRate < 0f) return DifficultyRandomChance[1];
 
-        if (winRate > 0.6f) return 0.1f;  // streaking player → tougher
-        if (winRate < 0.4f) return 0.5f;  // struggling player → friendlier
-        return 0.25f;                     // balanced → near Normal
+        if (winRate > 0.6f) return 0.1f;
+        if (winRate < 0.4f) return 0.5f;
+        return 0.25f;
     }
 
     public void Correct()
@@ -223,13 +206,10 @@ public class GameManager : MonoBehaviour
         EndGame(false);
     }
 
-    // Returns true when the guess was accepted, so the caller knows whether
-    // to clear the input. Rejected guesses (wrong turn, out of range) keep it.
     public bool PlayerGuess(int guess)
     {
         if (!playerTurn || gameFinished) return false;
 
-        // Reject guesses outside the range the player has already narrowed to.
         if (guess < playerMin || guess > playerMax)
         {
             aiAnswerText.text = L10n.Get("already_know_range", playerMin, playerMax);
@@ -238,13 +218,11 @@ public class GameManager : MonoBehaviour
 
         playerGuessCount++;
 
-        // Show the player's own name (fall back to "You"), like NumberManager.
         string playerLabel = PlayerPrefs.GetString("PlayerName", "");
         if (string.IsNullOrEmpty(playerLabel))
             playerLabel = L10n.Get("you");
 
         aiAnswerText.text = playerLabel + ": " + guess;
-
         AppendHistory(playerHistory, playerHistoryText, guess);
 
         if (guess == aiSecretNumber)
@@ -266,11 +244,10 @@ public class GameManager : MonoBehaviour
         }
 
         UpdateRangeText();
-
         playerTurn = false;
 
         turnText.text = L10n.Get("opponent_thinking", currentOpponent);
-        Invoke(nameof(AIGuess), Random.Range(1.5f, 3.5f)); // review #5: tighter pacing (was 2.8–6.5)
+        Invoke(nameof(AIGuess), Random.Range(1.5f, 3.5f));
         return true;
     }
 
@@ -281,9 +258,6 @@ public class GameManager : MonoBehaviour
         HideButtons();
         stopGameButton.SetActive(true);
 
-        // The soft keyboard may still be up from the player's last guess
-        // (the match can end on the opponent's turn) — close it so it
-        // doesn't cover the result.
         if (numberManager != null)
             numberManager.CloseInput();
 
@@ -294,24 +268,20 @@ public class GameManager : MonoBehaviour
             GameEvents.MatchEnded(true, playerGuessCount);
 
             turnText.text = L10n.Get("you_win") + "\n" + L10n.Get("won_in_guesses", playerGuessCount);
-            // Optimal binary search solves 1-100 in at most 7 guesses —
-            // celebrate a perfect run.
             if (playerGuessCount <= 7)
                 turnText.text += "\n" + L10n.Get("perfect_game");
-            if (audioSource != null && winSound != null) // review #14: don't throw on unwired scenes
+            if (audioSource != null && winSound != null)
                 audioSource.PlayOneShot(winSound);
             if (winConfetti != null)
                 winConfetti.Burst();
         }
         else
         {
-            int streakBeforeLoss = GameStats.CurrentStreak; // captured before reset
+            int streakBeforeLoss = GameStats.CurrentStreak;
             GameStats.RecordLoss();
             Haptics.Error();
             GameEvents.MatchEnded(false, 0);
 
-            // Reveal the AI's secret — losing without ever learning the
-            // answer leaves the round feeling unresolved.
             turnText.text = L10n.Get("you_lose") + "\n" + L10n.Get("number_was", aiSecretNumber);
             if (audioSource != null && loseSound != null)
                 audioSource.PlayOneShot(loseSound);
@@ -319,29 +289,23 @@ public class GameManager : MonoBehaviour
             OfferStreakSave(streakBeforeLoss);
         }
 
-        // Interstitial at a natural break (match end), every 2nd match —
-        // instead of gating every Play press. ShowAd's own caps still apply.
         if (adsManager != null && GameStats.Matches % 2 == 0)
             adsManager.ShowAd(null);
     }
 
-    // Rewarded "save your streak": offered on a loss when the streak was
-    // worth saving and a rewarded ad is loaded. The loss still counts —
-    // only the streak survives.
     const int MinStreakToSave = 2;
     GameObject streakSaveButton;
 
-    // A rewarded ad that earned its reward but whose close callback was lost
-    // (app killed mid-ad) restores its streak here on the next launch. An ad
-    // that was shown but never earned leaves no PendingRewardEarned flag, so
-    // there is nothing to restore — the stale key is just swept.
     void ReconcilePendingStreakRestore()
     {
         int pending = PlayerPrefs.GetInt(AdsManager.PendingStreakRestoreKey, 0);
         if (pending <= 0) return;
 
         if (PlayerPrefs.GetInt(AdsManager.PendingRewardEarnedKey, 0) == 1)
+        {
             GameStats.RestoreStreak(pending);
+            GameEvents.StatsChanged();
+        }
 
         PlayerPrefs.DeleteKey(AdsManager.PendingStreakRestoreKey);
         PlayerPrefs.DeleteKey(AdsManager.PendingRewardEarnedKey);
@@ -358,7 +322,6 @@ public class GameManager : MonoBehaviour
             L10n.Get("save_streak_ad", streak), Vector2.zero, new Vector2(560f, 90f),
             ConvergingLight.Gold, ConvergingLight.WithAlpha(ConvergingLight.PanelIndigo, 1f));
 
-        // Sit just above the rematch button.
         var stopRect = (RectTransform)stopGameButton.transform;
         var rect = (RectTransform)btn.transform;
         rect.anchorMin = stopRect.anchorMin;
@@ -371,14 +334,11 @@ public class GameManager : MonoBehaviour
         {
             bool shown = adsManager.ShowRewardedAd(() =>
             {
-                // Reward earned: streak restored, button consumed. (The
-                // destroy lives here, not at show time — a display failure
-                // after Show() must leave the player a button to retry.)
                 GameStats.RestoreStreak(streak);
                 PlayerPrefs.DeleteKey(AdsManager.PendingStreakRestoreKey);
                 PlayerPrefs.DeleteKey(AdsManager.PendingRewardEarnedKey);
                 PlayerPrefs.Save();
-                GameEvents.MatchEnded(false, 0); // refresh the menu stats label
+                GameEvents.StatsChanged();
                 if (streakSaveButton != null)
                 {
                     Destroy(streakSaveButton);
@@ -387,8 +347,6 @@ public class GameManager : MonoBehaviour
             },
             () =>
             {
-                // Ad unavailable or display failed: clear the pending-restore
-                // marker (no reward was earned) and keep the button alive.
                 PlayerPrefs.DeleteKey(AdsManager.PendingStreakRestoreKey);
                 PlayerPrefs.Save();
                 if (aiAnswerText != null)
@@ -397,17 +355,12 @@ public class GameManager : MonoBehaviour
 
             if (shown)
             {
-                // Persist in case the app is killed after the reward is
-                // earned but before the ad-close callback (see Start).
                 PlayerPrefs.SetInt(AdsManager.PendingStreakRestoreKey, streak);
                 PlayerPrefs.Save();
             }
         });
     }
 
-    // Review #3 + #4: replaces the old StopGame(), which silently replayed
-    // with the player's stale secret number and the same opponent.
-    // IMPORTANT: re-wire the stop-game button's OnClick to this method.
     public void RestartMatch()
     {
         CancelInvoke();
