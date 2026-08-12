@@ -66,7 +66,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          grep -q '"com.google.play.integrity": "2.0.0"' Packages/manifest.json
+          # Google Play Integrity Unity 2.0.0 currently has an upstream V2 compile bug
+          # (google/play-integrity-unity#2). Keep HOL on the stable Standard API until fixed.
+          grep -q '"com.google.play.integrity": "1.4.1"' Packages/manifest.json
           if [ -e Assets/MobileDependencyResolver ]; then
             echo "::error::EDM4U is supplied through UPM for Play Integrity; do not also embed Assets/MobileDependencyResolver"
             exit 1
