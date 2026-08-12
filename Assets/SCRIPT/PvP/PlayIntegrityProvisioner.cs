@@ -43,13 +43,14 @@ public class PlayIntegrityProvisioner : MonoBehaviour
         ? ReleaseConfig.ProvisioningUrl
         : endpointUrl.Trim();
 
-    long ResolvedCloudProjectNumber => cloudProjectNumber != 0
+    long ResolvedCloudProjectNumber => cloudProjectNumber > 0
         ? cloudProjectNumber
         : ReleaseConfig.GoogleCloudProjectNumber;
 
     public void Provision(string customId, Action<bool> done)
     {
-        if (string.IsNullOrWhiteSpace(ResolvedEndpoint) || string.IsNullOrWhiteSpace(customId))
+        if (string.IsNullOrWhiteSpace(ResolvedEndpoint) || string.IsNullOrWhiteSpace(customId) ||
+            ResolvedCloudProjectNumber <= 0)
         {
             Debug.LogError("Play Integrity provisioning is not configured.");
             done?.Invoke(false);
