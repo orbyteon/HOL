@@ -2,10 +2,8 @@ using System;
 using UnityEngine;
 
 // Abstract transport for HOL's PvP rooms. Two implementations ship:
-//   - PvpClient          (Firebase Realtime Database, REST)
-//   - PlayFabPvpClient   (Microsoft Azure PlayFab, REST + CloudScript)
-// PvpGameController talks only to this base class — pick the backend by
-// dropping the matching component into its Inspector field.
+//   - PvpClient          (Firebase Realtime Database, REST; dev fallback)
+//   - PlayFabPvpClient   (PlayFab REST + server-authoritative CloudScript)
 public abstract class PvpBackend : MonoBehaviour
 {
     [Serializable]
@@ -13,25 +11,30 @@ public abstract class PvpBackend : MonoBehaviour
     {
         public string hostName = "";
         public string guestName = "";
-        public int hostSecret;     // 0 = not set yet
-        public int guestSecret;    // 0 = not set yet
+
+        // Firebase fallback still carries secrets in its room document.
+        // PlayFab's sanitized room view leaves these at 0 and instead returns
+        // lastHint/revealedSecret from server authority.
+        public int hostSecret;
+        public int guestSecret;
+
         public string turn = "";    // "host" | "guest"
         public string phase = "";   // "waiting" | "play" | "done" | "closed"
         public int lastGuess;
         public string lastBy = "";
-        public string winner = "";  // "host" | "guest" when phase == "done"
+        public string winner = "";
+
+        // Server-computed public view. PlayFab never sends live secrets.
+        public string lastHint = ""; // "higher" | "lower" | "correct"
+        public int revealedSecret;    // opponent secret, only after phase == "done"
+        public int hostGuessCount;
+        public int guestGuessCount;
     }
 
     public string RoomCode { get; protected set; } = "";
     public bool IsHost { get; protected set; }
 
-    // Fired by the poller when the room disappears or is marked "closed"
-    // (the opponent left). Also surfaced as phase == "closed" via onState
-    // on backends that can't delete rooms (PlayFab).
     public Action OnRoomClosed;
-
-    // Fired by the poller after too many consecutive failed polls
-    // (network down, backend unreachable). Polling stops at that point.
     public Action OnConnectionLost;
 
     public abstract void CreateRoom(string hostName, int hostSecret, Action<bool, string> done);
@@ -41,7 +44,11 @@ public abstract class PvpBackend : MonoBehaviour
     public abstract void StopPolling();
     public abstract void DeleteRoom();
 
-    protected const string CodeAlphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // no 0/O/1/I/L
+    // PlayFab uses this to delete completed room data after both clients have
+    // observed the result. Firebase has no separate acknowledgement flow.
+    public virtual void AcknowledgeResult() { }
+
+    protected const string CodeAlphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 
     protected string GenerateCode()
     {
