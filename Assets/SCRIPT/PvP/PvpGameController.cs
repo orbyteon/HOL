@@ -46,7 +46,7 @@ public class PvpGameController : MonoBehaviour
     string shownGuessKey = "";
     bool matchOver;
     bool guessInFlight;
-    int localAcceptedGuessCount; // Firebase fallback; PlayFab uses authoritative server counts.
+    int localAcceptedGuessCount;
 
     int flowGeneration;
     bool joinCreateInFlight;
@@ -54,9 +54,14 @@ public class PvpGameController : MonoBehaviour
     int silentPolls;
     const int MaxSilentPolls = 200;
 
-    string MyName => PlayerPrefs.GetString("PlayerName", "Player");
-
-    // ---------------------------------------------------------- UI entry points
+    string MyName
+    {
+        get
+        {
+            string name = PlayerPrefs.GetString("PlayerName", "");
+            return string.IsNullOrWhiteSpace(name) ? L10n.Get("player_default") : name;
+        }
+    }
 
     public void OpenPvpMenu()
     {
@@ -254,8 +259,6 @@ public class PvpGameController : MonoBehaviour
         }
     }
 
-    // ---------------------------------------------------------- state handling
-
     void BeginMatchPolling()
     {
         matchOver = false;
@@ -407,8 +410,6 @@ public class PvpGameController : MonoBehaviour
             if (iWon && winConfetti != null)
                 winConfetti.Burst();
 
-            // PlayFab removes the authoritative room once both players have
-            // observed the result. Firebase uses the default no-op.
             client.AcknowledgeResult();
             return;
         }
@@ -427,8 +428,6 @@ public class PvpGameController : MonoBehaviour
         if (hint == "lower") return L10n.Get("lower");
         return "";
     }
-
-    // ---------------------------------------------------------- helpers
 
     static bool TryReadSecret(TMP_InputField field, out int value)
     {
