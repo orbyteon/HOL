@@ -6,8 +6,7 @@ public static class ReleaseConfig
     // an empty value before a public Play Store build is promoted.
     public const string ProvisioningUrl = "";
 
-    // For Play-distributed apps linked to a Cloud project, Play Integrity can
-    // use 0 when supported by the title setup. Set the numeric project number
-    // here if the Play Integrity configuration requires it.
+    // Numeric Google Cloud project number linked to HOL's Play Integrity setup.
+    // Keep this public value separate from service-account credentials/secrets.
     public const long GoogleCloudProjectNumber = 0;
 }
