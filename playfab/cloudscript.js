@@ -6,6 +6,7 @@
 
 var CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // no 0/O/1/I/L
 var ROOM_CREATE_ATTEMPTS = 12;
+var WAITING_ROOM_TTL_MS = 30 * 60 * 1000;
 
 function cleanName(value, fallback) {
     var s = String(value || fallback || "Player").trim();
@@ -74,7 +75,9 @@ function deleteGroupQuietly(groupId) {
 }
 
 function deleteRoomArtifacts(roomId, state) {
-    deleteGroupQuietly(roomId);
+    // Derived groups first, room group LAST: if execution stops partway, the
+    // code stays burned instead of freeing while claim/ack/turn groups linger
+    // to poison a future room under the same code.
     deleteGroupQuietly(claimGroupId(roomId));
     deleteGroupQuietly(ackGroupId(roomId, "host"));
     deleteGroupQuietly(ackGroupId(roomId, "guest"));
@@ -83,6 +86,17 @@ function deleteRoomArtifacts(roomId, state) {
     maxTurn = Math.max(0, Math.min(maxTurn, 200));
     for (var i = 0; i <= maxTurn; i++)
         deleteGroupQuietly(turnGroupId(roomId, i));
+
+    deleteGroupQuietly(roomId);
+}
+
+// Abandoned "waiting" rooms would otherwise burn their codes forever; callers
+// treat a stale one as already gone and clean it up in passing (O(1) — only
+// the room being touched, never a sweep).
+function staleWaiting(state) {
+    return state.phase === "waiting" &&
+        typeof state.createdAt === "number" &&
+        Date.now() - state.createdAt > WAITING_ROOM_TTL_MS;
 }
 
 function sideForPlayer(state, playerId) {
@@ -138,8 +152,9 @@ handlers.createRoom = function (args, context) {
             guestName: "",
             hostSecret: hostSecret,
             guestSecret: 0,
-            turn: "guest",
+            turn: Math.random() < 0.5 ? "host" : "guest",
             phase: "waiting",
+            createdAt: Date.now(),
             lastGuess: 0,
             lastBy: "",
             winner: "",
@@ -165,15 +180,21 @@ handlers.joinRoom = function (args, context) {
 
     var state = readState(roomId);
     if (!state || state.phase === "closed") return { ok: false, error: "room not found" };
-    if (state.phase !== "waiting" || state.guestId) return { ok: false, error: "room full" };
-    if (state.hostId === currentPlayerId) return { ok: false, error: "room full" };
+    if (staleWaiting(state)) {
+        deleteRoomArtifacts(roomId, state);
+        return { ok: false, error: "room not found" };
+    }
+    // A taken (or own) room reports the same error as a dead code — distinct
+    // "room full" answers formed a code-enumeration oracle.
+    if (state.phase !== "waiting" || state.guestId) return { ok: false, error: "room not found" };
+    if (state.hostId === currentPlayerId) return { ok: false, error: "room not found" };
 
     // Atomic guest-slot claim: CreateSharedGroup is unique by ID. Exactly one
     // concurrent joiner can create the claim group; all others get a conflict.
     try {
         server.CreateSharedGroup({ SharedGroupId: claimGroupId(roomId) });
     } catch (claimError) {
-        return { ok: false, error: "room full" };
+        return { ok: false, error: "room not found" };
     }
 
     try {
@@ -182,7 +203,7 @@ handlers.joinRoom = function (args, context) {
         state = readState(roomId);
         if (!state || state.phase !== "waiting" || state.guestId) {
             deleteGroupQuietly(claimGroupId(roomId));
-            return { ok: false, error: state ? "room full" : "room not found" };
+            return { ok: false, error: "room not found" };
         }
 
         state.guestId = currentPlayerId;
@@ -204,6 +225,10 @@ handlers.getRoom = function (args, context) {
     var roomId = String(args.roomId).toUpperCase().trim();
     var state = readState(roomId);
     if (!state) return { ok: false, error: "room not found" };
+    if (staleWaiting(state)) {
+        deleteRoomArtifacts(roomId, state);
+        return { ok: false, error: "room not found" };
+    }
     if (!sideForPlayer(state, currentPlayerId)) return { ok: false, error: "not a member" };
 
     return { ok: true, state: JSON.stringify(viewFor(state, currentPlayerId)) };
@@ -303,10 +328,26 @@ handlers.submitDaily = function (args, context) {
     if (day < 1) return { ok: false, error: "bad day" };
     if (guesses < 0 || guesses > 20) return { ok: false, error: "bad guesses" };
 
-    // Clients number days from local-calendar 2026-01-01; allow one day of
-    // timezone skew around the server's UTC day.
+    // Clients number days from UTC 2026-01-01; keep one day of tolerance
+    // for a submission racing the midnight rollover.
     var serverDay = Math.floor((Date.now() - Date.UTC(2026, 0, 1)) / 86400000) + 1;
     if (Math.abs(day - serverDay) > 1) return { ok: false, error: "bad day" };
+
+    // One counted submission per player per day: without this marker a
+    // rerolled device clock or a scripted client could rewrite the whole
+    // day's distribution. The read/write pair is not atomic, so a racing
+    // duplicate can still slip through — display-grade is fine with that.
+    var seenKey = "dailySeen";
+    try {
+        var seen = server.GetUserInternalData({ PlayFabId: currentPlayerId, Keys: [seenKey] });
+        if (seen && seen.Data && seen.Data[seenKey] && (seen.Data[seenKey].Value | 0) >= day)
+            return { ok: false, error: "already submitted", already: true };
+    } catch (seenReadError) { }
+    try {
+        var seenUpdate = {};
+        seenUpdate[seenKey] = String(day);
+        server.UpdateUserInternalData({ PlayFabId: currentPlayerId, Data: seenUpdate });
+    } catch (seenWriteError) { }
 
     var groupId = dailyStatsGroupId(day);
     try { server.CreateSharedGroup({ SharedGroupId: groupId }); } catch (exists) { }
@@ -326,12 +367,15 @@ handlers.submitDaily = function (args, context) {
         Permission: "Private",
     });
 
-    // Opportunistic cleanup keeps storage bounded: yesterday's bucket is
-    // still being read, day-2 is done.
-    deleteGroupQuietly(dailyStatsGroupId(day - 2));
+    // Opportunistic cleanup keeps storage bounded. Swept relative to the
+    // server's own day, safely outside the ±1 skew window — sweeping from
+    // the client-supplied day let one timezone delete a bucket another
+    // timezone was still writing.
+    deleteGroupQuietly(dailyStatsGroupId(serverDay - 3));
 
     // "better" = submissions this result beats: every fail, and every find
-    // that needed more guesses.
+    // that needed more guesses. "ties" = other players with the same
+    // result, so the client can midrank instead of treating a tie as loss.
     var total = 0, better = 0;
     for (var k in stats) {
         var n = stats[k] | 0;
@@ -339,7 +383,9 @@ handlers.submitDaily = function (args, context) {
         if (guesses !== 0 && (k === "fail" || parseInt(k, 10) > guesses))
             better += n;
     }
-    return { ok: true, total: total, better: better };
+    var ties = (stats[key] | 0) - 1;
+    if (ties < 0) ties = 0;
+    return { ok: true, total: total, better: better, ties: ties };
 };
 
 handlers.leaveRoom = function (args, context) {

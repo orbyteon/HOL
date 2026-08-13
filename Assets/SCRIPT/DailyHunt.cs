@@ -29,9 +29,11 @@ public class DailyHunt : MonoBehaviour
     const string SubmittedKey = "DailyHuntSubmitted"; // day already reported
     const string PercentileKey = "DailyHuntPct";      // -1 = none received
 
-    // Day numbering epoch; #1 is 2026-01-01 in the device's local calendar
-    // (matching DailyStreak's local-day semantics).
-    static readonly DateTime Epoch = new DateTime(2026, 1, 1);
+    // Day numbering epoch; #1 is 2026-01-01 UTC. The UTC anchor matches the
+    // server's day validation in cloudscript.js and keeps the day number
+    // stable across timezone travel — a local-day anchor replayed or skipped
+    // whole days (and their streaks) on a long flight.
+    static readonly DateTime Epoch = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
     AdsManager ads;
 
@@ -42,6 +44,7 @@ public class DailyHunt : MonoBehaviour
     TMP_InputField input;
     Button guessButton;
     Button reviveButton;
+    Text reviveLabel;
     Button shareButton;
     RangeBar rangeBar;
 
@@ -71,8 +74,13 @@ public class DailyHunt : MonoBehaviour
         var entry = RuntimeUI.CreateButton(menuParent, "DailyHuntButton",
             L10n.Get("daily_hunt"), new Vector2(0f, -740f), new Vector2(460f, 90f),
             ConvergingLight.Cyan, ConvergingLightFX.DarkLabel);
+        RuntimeUI.PlaceMenuEntry(entry.transform);
         RuntimeUI.Localize(entry, "daily_hunt");
         entry.onClick.AddListener(hunt.Open);
+
+        // Back button closes the hunt like its own Close (settling a
+        // declined revive as the loss it is).
+        MenuManager.RegisterModal(panel, hunt.Close);
 
         return hunt;
     }
@@ -113,6 +121,7 @@ public class DailyHunt : MonoBehaviour
         reviveButton = RuntimeUI.CreateButton(card.transform, "ReviveButton",
             L10n.Get("second_chance", ReviveGuesses), new Vector2(0f, -280f),
             new Vector2(620f, 96f), ConvergingLight.Gold, ConvergingLightFX.DarkLabel);
+        reviveLabel = reviveButton.GetComponentInChildren<Text>();
         reviveButton.onClick.AddListener(OnRevivePressed);
 
         shareButton = RuntimeUI.CreateButton(card.transform, "ShareButton",
@@ -129,7 +138,7 @@ public class DailyHunt : MonoBehaviour
             L10n.Get("back"), new Vector2(0f, -540f), new Vector2(300f, 84f),
             ConvergingLightFX.GhostSurface);
         RuntimeUI.Localize(close, "back");
-        close.onClick.AddListener(() => gameObject.SetActive(false));
+        close.onClick.AddListener(Close);
     }
 
     public void Open()
@@ -137,28 +146,68 @@ public class DailyHunt : MonoBehaviour
         EnsureToday();
         gameObject.SetActive(true);
         Refresh();
+
+        // A finish made offline (or before PlayFab login) retries its report
+        // here; the flag is only set once the server acknowledges.
+        if (done && PlayerPrefs.GetInt(SubmittedKey, 0) == 0)
+            SubmitResult();
+    }
+
+    public void Close()
+    {
+        // Backing out of the revive offer settles the day as a loss —
+        // leaving it unfinalized dropped the fail from streaks, analytics
+        // and the day's stats bucket entirely.
+        if (!done && used >= budget)
+            FinalizeFail();
+        gameObject.SetActive(false);
     }
 
     // ------------------------------------------------------------ state
 
     static int TodayNumber()
     {
-        return (DateTime.Now.Date - Epoch).Days + 1;
+        return (DateTime.UtcNow.Date - Epoch).Days + 1;
     }
 
     static int SecretFor(int dayNumber)
     {
-        var rng = new System.Random(dayNumber * 1000003);
-        rng.Next(); // decorrelate small consecutive seeds
-        return rng.Next(1, 101);
+        // Keyed hash instead of System.Random(day): the seeded-PRNG secret
+        // was computable for every future day from the visible day number,
+        // and its multiplied seed overflowed int in 2031.
+        using (var sha = System.Security.Cryptography.SHA256.Create())
+        {
+            byte[] hash = sha.ComputeHash(
+                System.Text.Encoding.UTF8.GetBytes("HOL-DAILY-2:" + dayNumber));
+            uint v = (uint)(hash[0] | (hash[1] << 8) | (hash[2] << 16) | (hash[3] << 24));
+            return (int)(v % 100u) + 1;
+        }
+    }
+
+    // True when the current day's hunt has been settled (found or failed);
+    // DailyReminder uses this to pick today's or tomorrow's slot.
+    public static bool CompletedToday()
+    {
+        return PlayerPrefs.GetInt(DayKey, 0) >= TodayNumber()
+            && PlayerPrefs.GetInt(DoneKey, 0) == 1;
     }
 
     void EnsureToday()
     {
         day = TodayNumber();
+
+        int storedDay = PlayerPrefs.GetInt(DayKey, 0);
+        if (day < storedDay)
+        {
+            // The device clock rolled backwards past a day already started.
+            // Keep serving that furthest day — a reset here let a revealed
+            // answer be replayed for a fresh 1-guess "win" and a re-count in
+            // the day's stats bucket.
+            day = storedDay;
+        }
         secret = SecretFor(day);
 
-        if (PlayerPrefs.GetInt(DayKey, 0) != day)
+        if (storedDay < day)
         {
             PlayerPrefs.SetInt(DayKey, day);
             PlayerPrefs.SetInt(UsedKey, 0);
@@ -181,6 +230,16 @@ public class DailyHunt : MonoBehaviour
         min = PlayerPrefs.GetInt(MinKey, 1);
         max = PlayerPrefs.GetInt(MaxKey, 100);
         budget = GuessBudget + (revived ? ReviveGuesses : 0);
+
+        // A missed day ends the streak now, not on the next find — the panel
+        // used to advertise a streak the player no longer had, then appear to
+        // steal it at the moment they won.
+        if (PlayerPrefs.GetInt(LastFoundKey, -1) < day - 1
+            && PlayerPrefs.GetInt(StreakPrefKey, 0) != 0)
+        {
+            PlayerPrefs.SetInt(StreakPrefKey, 0);
+            PlayerPrefs.Save();
+        }
     }
 
     void Persist()
@@ -260,29 +319,50 @@ public class DailyHunt : MonoBehaviour
     // ranks among today's hunters; the reminder for tomorrow's hunt is
     // scheduled at the same moment (the one contextual point where a
     // notification permission prompt makes sense).
+    bool submitInFlight;
+
     void OnHuntCompleted()
     {
         DailyReminder.OnHuntCompleted(this);
+        SubmitResult();
+    }
 
-        if (PlayerPrefs.GetInt(SubmittedKey, 0) == 1) return;
-        PlayerPrefs.SetInt(SubmittedKey, 1);
-        PlayerPrefs.Save();
+    void SubmitResult()
+    {
+        if (submitInFlight || PlayerPrefs.GetInt(SubmittedKey, 0) == 1) return;
 
         var client = FindObjectOfType<PlayFabPvpClient>();
         if (client == null || string.IsNullOrEmpty(client.titleId)) return;
 
+        submitInFlight = true;
         int score = found ? used : 0;
         string args = "{\"day\":" + day + ",\"guesses\":" + score + "}";
         int submittedDay = day;
         client.CallCloudScript("submitDaily", args, (ok, resp) =>
         {
-            if (!ok || string.IsNullOrEmpty(resp) || !resp.Contains("\"ok\":true")) return;
+            submitInFlight = false;
+            if (!ok || string.IsNullOrEmpty(resp)) return; // offline — Open() retries
+
+            bool counted = resp.Contains("\"ok\":true");
+            bool already = resp.Contains("\"already\":true"); // server-side dedupe hit
+            if (!counted && !already) return;
+
+            // Marked submitted only on acknowledgement — flagging before the
+            // call permanently lost every finish made without a connection.
+            PlayerPrefs.SetInt(SubmittedKey, 1);
+            PlayerPrefs.Save();
+            if (!counted) return;
 
             int total = ExtractInt(resp, "total");
             int better = ExtractInt(resp, "better");
+            int ties = Mathf.Max(0, ExtractInt(resp, "ties"));
             if (total < 2 || !found) return; // percentile needs company and a find
 
-            int pct = Mathf.Clamp(Mathf.RoundToInt(better * 100f / total), 0, 99);
+            // Midrank against the other hunters: ties split the difference.
+            // Counting ties as losses read "you beat 0%" for the modal
+            // result — the most common outcome looked like the worst.
+            int pct = Mathf.Clamp(Mathf.RoundToInt(
+                (better + ties * 0.5f) * 100f / Mathf.Max(1, total - 1)), 0, 100);
             PlayerPrefs.SetInt(PercentileKey, pct);
             PlayerPrefs.Save();
 
@@ -290,6 +370,16 @@ public class DailyHunt : MonoBehaviour
             if (this != null && gameObject.activeInHierarchy && day == submittedDay)
                 Refresh();
         });
+    }
+
+    // The stored trail keeps real emoji for the clipboard share, but the
+    // bundled TMP font has no emoji glyphs — in-app they rendered as boxes.
+    // Display swaps them for triangles/dot the font actually carries.
+    static string DisplayTrail(string t)
+    {
+        return t.Replace("\U0001F53A", "▲")
+                .Replace("\U0001F53B", "▼")
+                .Replace("\U0001F3AF", "●");
     }
 
     static int ExtractInt(string json, string name)
@@ -345,8 +435,12 @@ public class DailyHunt : MonoBehaviour
     void Refresh()
     {
         title.text = L10n.Get("daily_hunt_number", day);
+        // Formatted label, so RuntimeUI.Localize can't cover it — re-resolve
+        // here to follow live language switches like its sibling buttons.
+        if (reviveLabel != null)
+            reviveLabel.text = L10n.Get("second_chance", ReviveGuesses);
         streakText.text = L10n.Get("daily_streak", PlayerPrefs.GetInt(StreakPrefKey, 0));
-        trailText.text = trail;
+        trailText.text = DisplayTrail(trail);
         rangeBar.SetRange(min, max, true);
 
         bool awaitingRevive = !done && used >= budget;

@@ -75,6 +75,10 @@ public static class GameStats
         PlayerPrefs.SetInt(RecentCountKey, count);
     }
 
+    // How many results the rolling window actually holds (0..10) — the
+    // adaptive AI needs this to avoid tuning itself on two matches.
+    public static int RecentSamples => PlayerPrefs.GetInt(RecentCountKey, 0);
+
     // Win rate over the last up-to-10 matches (0..1). Returns -1 with no data.
     public static float RecentWinRate()
     {

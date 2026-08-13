@@ -82,7 +82,10 @@ public static class Themes
         },
         new Theme
         {
-            id = "mono", nameKey = "theme_mono", unlock = Unlock.PerfectWin,
+            // 5 guesses, not 7: ⌈log2(100)⌉ = 7 is merely competent binary
+            // search, which unlocked the "rarest" theme on the first decent
+            // win — before Ember's 5 wins or Frost's 3-day streak.
+            id = "mono", nameKey = "theme_mono", unlock = Unlock.PerfectWin, threshold = 5,
             palette = new Palette
             {
                 depthTop = new Color(0.050f, 0.050f, 0.060f),
@@ -130,7 +133,7 @@ public static class Themes
             (theme.unlock == Unlock.DailyStreak &&
                 PlayerPrefs.GetInt(DailyHunt.StreakPrefKey, 0) >= theme.threshold) ||
             (theme.unlock == Unlock.PerfectWin &&
-                GameStats.BestWinningGuesses > 0 && GameStats.BestWinningGuesses <= 7);
+                GameStats.BestWinningGuesses > 0 && GameStats.BestWinningGuesses <= theme.threshold);
 
         if (met)
         {
@@ -146,7 +149,7 @@ public static class Themes
         {
             case Unlock.Wins: return L10n.Get("theme_locked_wins", theme.threshold);
             case Unlock.DailyStreak: return L10n.Get("theme_locked_daily", theme.threshold);
-            case Unlock.PerfectWin: return L10n.Get("theme_locked_perfect");
+            case Unlock.PerfectWin: return L10n.Get("theme_locked_perfect", theme.threshold);
             default: return "";
         }
     }

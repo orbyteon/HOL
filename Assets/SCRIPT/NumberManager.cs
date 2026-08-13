@@ -127,6 +127,10 @@ public class NumberManager : MonoBehaviour
 
     public void ExitToMenu()
     {
+        // Any path out of a live match settles it as a loss first.
+        var gm = FindObjectOfType<GameManager>();
+        if (gm != null)
+            gm.ForfeitIfLive();
         SceneManager.LoadScene("MainMenu");
     }
 }

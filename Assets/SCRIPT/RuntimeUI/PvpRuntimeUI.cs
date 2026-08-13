@@ -202,7 +202,8 @@ public class PvpRuntimeUI : MonoBehaviour
         joinGo.onClick.AddListener(controller.OnJoinRoomPressed);
         joinBack.onClick.AddListener(controller.CancelRoomAndLeave);
         guessBtn.onClick.AddListener(controller.OnSubmitGuessPressed);
-        leaveBtn.onClick.AddListener(controller.OnLeaveMatchPressed);
+        // Leave routes through the armed two-step confirm, like hardware back.
+        leaveBtn.onClick.AddListener(controller.OnLeaveButtonPressed);
 
         // Soft-keyboard Done (Enter in the editor) submits the field's flow;
         // the handlers validate and give feedback, so a premature submit is

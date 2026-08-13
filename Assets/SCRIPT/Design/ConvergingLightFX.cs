@@ -301,6 +301,14 @@ public static class ConvergingLightFX
         if (img == null) return;
         img.color = new Color(0.85f, 0.87f, 1f, img.color.a);
         AddShadow(img);
+
+        // These art rects carry huge transparent padding (Quit is 850×700
+        // for a small visible icon), which silently swallowed taps meant
+        // for anything placed nearby. Shrink the hit area to the icon.
+        var rect = ((RectTransform)button.transform).sizeDelta;
+        float padX = Mathf.Max(0f, (rect.x - 220f) * 0.5f);
+        float padY = Mathf.Max(0f, (rect.y - 220f) * 0.5f);
+        img.raycastPadding = new Vector4(padX, padY, padX, padY);
     }
 
     // Engraved-caption treatment for TMP headers: letterspaced, near-white.

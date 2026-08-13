@@ -41,38 +41,18 @@ public class FakeMatchmaking : MonoBehaviour
         // doesn't look frozen.
         dotsAnimation = StartCoroutine(AnimateSearchingText());
 
-        // Review #5: shortened waits (were 5/8/10s)
-        float waitTime;
-
-        int randomTime = Random.Range(0, 3);
-
-        if (randomTime == 0)
-            waitTime = 2f;
-        else if (randomTime == 1)
-            waitTime = 3.5f;
-        else
-            waitTime = 5f;
-
-        yield return new WaitForSeconds(waitTime);
+        // Just enough theatre to land the "found" stinger. The opponent is
+        // a disclosed on-device AI, so long waits — and the old fabricated
+        // 1-in-6 "no opponent found" — only taxed every single match with
+        // dead time for a search that cannot actually fail.
+        yield return new WaitForSeconds(Random.Range(0.9f, 1.8f));
 
         StopDotsAnimation();
-
-        // 1 in 6 searches finds no opponent
-        int failChance = Random.Range(0, 6);
-
-        if (failChance == 0)
-        {
-            searchingText.text = L10n.Get("opponent_not_found");
-            yield return new WaitForSeconds(2f);
-            searchingPanel.SetActive(false);
-            isSearching = false;
-            yield break;
-        }
 
         searchingText.text = L10n.Get("opponent_found");
         if (foundSound != null)
             foundSound.Play();
-        yield return new WaitForSeconds(1.5f);
+        yield return new WaitForSeconds(1f);
 
         searchingPanel.SetActive(false);
         panelGame.SetActive(true);

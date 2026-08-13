@@ -39,7 +39,9 @@ public class PvpClient : PvpBackend
         {
             hostName = hostName,
             hostSecret = hostSecret,
-            turn = "guest",         // guest guesses first (host created, fair trade)
+            // Random first mover, mirroring CloudScript's createRoom — a fixed
+            // starting side is a systematic advantage in a symmetric race.
+            turn = UnityEngine.Random.value < 0.5f ? "host" : "guest",
             phase = "waiting",
         };
         StartCoroutine(PutRoom(code, state, ok =>
@@ -139,6 +141,7 @@ public class PvpClient : PvpBackend
     {
         const int maxConsecutiveFailures = 10;
         int failures = 0;
+        float waitingSince = -1f;
 
         while (true)
         {
@@ -180,7 +183,17 @@ public class PvpClient : PvpBackend
 
             failures = 0;
             onState?.Invoke(state);
-            yield return new WaitForSeconds(pollIntervalSeconds);
+
+            float wait = pollIntervalSeconds;
+            if (state.phase == "waiting")
+            {
+                // An empty room does not need match-speed polling for long.
+                if (waitingSince < 0f) waitingSince = Time.unscaledTime;
+                if (Time.unscaledTime - waitingSince >= 30f)
+                    wait = Mathf.Max(wait, 4f);
+            }
+            else waitingSince = -1f;
+            yield return new WaitForSeconds(wait);
         }
     }
 

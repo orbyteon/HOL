@@ -25,6 +25,17 @@ public class PlayFabPvpClient : PvpBackend
     [Tooltip("Optional debug/local override. Zero uses the required positive ReleaseConfig.GoogleCloudProjectNumber in production.")]
     public long googleCloudProjectNumber;
 
+    // Non-terminal connection status from the poll loop. Not part of
+    // PvpBackend's contract — the controller wires these when this backend
+    // is the active one.
+    public Action OnReconnecting;
+    public Action OnReconnected;
+
+    // Server rejection reason from the last SubmitGuess ("" for transport
+    // failures and successes). PvpBackend's callback is a bare bool, so the
+    // controller reads the reason out-of-band.
+    public string LastGuessError { get; private set; } = "";
+
     string sessionTicket = "";
     Coroutine pollRoutine;
     PlayIntegrityProvisioner provisioner;
@@ -173,12 +184,11 @@ public class PlayFabPvpClient : PvpBackend
                     done?.Invoke(false, L10n.Get("pvp_network_error"));
                     return;
                 }
-                if (HasCloudError(resp, "room full"))
-                {
-                    done?.Invoke(false, L10n.Get("pvp_room_full"));
-                    return;
-                }
-                if (HasCloudError(resp, "room not found") || HasCloudError(resp, "bad secret"))
+                // "room full" no longer leaves the server (it reported the
+                // same as not-found to close an enumeration oracle); keep the
+                // mapping for older CloudScript revisions during rollout.
+                if (HasCloudError(resp, "room not found") || HasCloudError(resp, "room full") ||
+                    HasCloudError(resp, "bad secret"))
                 {
                     done?.Invoke(false, L10n.Get("pvp_room_not_found"));
                     return;
@@ -206,12 +216,20 @@ public class PlayFabPvpClient : PvpBackend
                       "\",\"guess\":" + guess + "}";
         ExecuteCloudScript("submitGuess", args, (ok, resp) =>
         {
-            if (!ok || !CloudOk(resp))
+            if (!ok)
             {
+                LastGuessError = "";
+                done?.Invoke(false);
+                return;
+            }
+            if (!CloudOk(resp))
+            {
+                LastGuessError = ExtractString(resp, "error");
                 done?.Invoke(false);
                 return;
             }
 
+            LastGuessError = "";
             ApplyReturnedState(current, resp);
             done?.Invoke(true);
         });
@@ -256,7 +274,12 @@ public class PlayFabPvpClient : PvpBackend
     IEnumerator Poll(Action<RoomState> onState)
     {
         const int maxConsecutiveFailures = 10;
+        const float reconnectRetrySeconds = 5f;
+        const float reconnectWindowSeconds = 120f;
         int failures = 0;
+        bool reconnecting = false;
+        float reconnectingSince = 0f;
+        float waitingSince = -1f;
 
         while (true)
         {
@@ -285,9 +308,24 @@ public class PlayFabPvpClient : PvpBackend
             {
                 if (++failures >= maxConsecutiveFailures)
                 {
-                    pollRoutine = null;
-                    OnConnectionLost?.Invoke();
-                    yield break;
+                    // The room is still valid server-side; a dead poller would
+                    // strand the opponent for the whole watchdog window. Keep
+                    // RoomCode and retry in slow waves, going terminal only
+                    // after the reconnect window closes.
+                    if (!reconnecting)
+                    {
+                        reconnecting = true;
+                        reconnectingSince = Time.unscaledTime;
+                        OnReconnecting?.Invoke();
+                    }
+                    else if (Time.unscaledTime - reconnectingSince >= reconnectWindowSeconds)
+                    {
+                        pollRoutine = null;
+                        OnConnectionLost?.Invoke();
+                        yield break;
+                    }
+                    yield return new WaitForSeconds(reconnectRetrySeconds);
+                    continue;
                 }
                 yield return new WaitForSeconds(
                     Mathf.Min(pollIntervalSeconds * (1f + failures * 0.5f), 10f));
@@ -295,8 +333,23 @@ public class PlayFabPvpClient : PvpBackend
             }
 
             failures = 0;
+            if (reconnecting)
+            {
+                reconnecting = false;
+                OnReconnected?.Invoke();
+            }
             onState?.Invoke(state);
-            yield return new WaitForSeconds(pollIntervalSeconds);
+
+            float wait = pollIntervalSeconds;
+            if (state.phase == "waiting")
+            {
+                // An empty room does not need match-speed polling for long.
+                if (waitingSince < 0f) waitingSince = Time.unscaledTime;
+                if (Time.unscaledTime - waitingSince >= 30f)
+                    wait = Mathf.Max(wait, 4f);
+            }
+            else waitingSince = -1f;
+            yield return new WaitForSeconds(wait);
         }
     }
 

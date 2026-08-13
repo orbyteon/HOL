@@ -14,8 +14,9 @@ using Unity.Notifications.Android;
 public static class DailyReminder
 {
     const string AskedKey = "DailyReminderAsked";
+    const string NotifIdKey = "DailyReminderNotifId";
     const string ChannelId = "daily_hunt";
-    const int ReminderHour = 18; // local evening, when tomorrow's hunt is live
+    const int ReminderHour = 18; // local evening
 
 #if UNITY_ANDROID
     static bool channelReady;
@@ -36,14 +37,30 @@ public static class DailyReminder
     static void Schedule()
     {
         EnsureChannel();
-        AndroidNotificationCenter.CancelAllScheduledNotifications();
 
-        AndroidNotificationCenter.SendNotification(new AndroidNotification
+        // Cancel only our own pending reminder; CancelAll would also wipe
+        // any future feature's notifications.
+        int pending = PlayerPrefs.GetInt(NotifIdKey, 0);
+        if (pending != 0)
+            AndroidNotificationCenter.CancelScheduledNotification(pending);
+
+        // The next 18:00 that can still matter: today's slot if it is ahead
+        // and today's hunt is unplayed, otherwise tomorrow's. The old fixed
+        // "tomorrow 18:00" was cancelled and re-armed a day forward on every
+        // launch, so a daily player's reminder never actually fired.
+        var now = DateTime.Now;
+        var fire = now.Date.AddHours(ReminderHour);
+        if (now >= fire || DailyHunt.CompletedToday())
+            fire = fire.AddDays(1);
+
+        int id = AndroidNotificationCenter.SendNotification(new AndroidNotification
         {
             Title = L10n.Get("notif_daily_title"),
             Text = L10n.Get("notif_daily_body"),
-            FireTime = DateTime.Now.Date.AddDays(1).AddHours(ReminderHour),
+            FireTime = fire,
         }, ChannelId);
+        PlayerPrefs.SetInt(NotifIdKey, id);
+        PlayerPrefs.Save();
     }
 
     static IEnumerator RequestThenSchedule()

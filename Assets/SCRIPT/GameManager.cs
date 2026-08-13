@@ -74,10 +74,12 @@ public class GameManager : MonoBehaviour
     bool playerTurn = false;
     bool gameFinished = false;
     bool firstAIGuess = true;
+    bool matchStarted = false;
 
     int playerSecretNumber;
     int aiSecretNumber;
     int playerGuessCount;
+    int aiGuessCount;
 
     Persona persona;
     int mode;
@@ -97,9 +99,20 @@ public class GameManager : MonoBehaviour
         "Sven", "Kostas", "Andreas", "Nikos", "Konstantinos"
     };
 
+    const string PendingForfeitKey = "PendingMatchForfeit";
+
     void Start()
     {
         ReconcilePendingStreakRestore();
+
+        // A match that was live when the app went to background and never
+        // came back was abandoned — settle it as the loss it is.
+        if (PlayerPrefs.GetInt(PendingForfeitKey, 0) == 1)
+        {
+            PlayerPrefs.DeleteKey(PendingForfeitKey);
+            GameStats.RecordLoss();
+            PlayerPrefs.Save();
+        }
 
         stopGameButton.SetActive(false);
         HideButtons();
@@ -115,9 +128,59 @@ public class GameManager : MonoBehaviour
     void PickOpponent()
     {
         currentOpponent = fakeNames[Random.Range(0, fakeNames.Length)];
-        persona = (Persona)Random.Range(0, PersonaKeys.Length);
-        opponentNameText.text = L10n.Get("opponent_label",
-            currentOpponent + " · " + L10n.Get(PersonaKeys[(int)persona]));
+
+        // The roll respects the difficulty promise: Hard never serves the
+        // deliberately weak Cautious, Easy never serves the near-optimal
+        // Calculator — otherwise an invisible persona roll could swing the
+        // chosen difficulty by more than the setting itself.
+        int difficulty = Mathf.Clamp(PlayerPrefs.GetInt(DifficultyPrefKey, 1), 0, 3);
+        do
+        {
+            persona = (Persona)Random.Range(0, PersonaKeys.Length);
+        }
+        while ((difficulty == 2 && persona == Persona.Cautious)
+            || (difficulty == 0 && persona == Persona.Calculator));
+
+        RefreshOpponentLabel();
+    }
+
+    // Composed at runtime, so RuntimeUI.Localize can't own it — refreshed on
+    // language change or the header keeps the old language until a rematch.
+    void RefreshOpponentLabel()
+    {
+        if (opponentNameText != null && !string.IsNullOrEmpty(currentOpponent))
+            opponentNameText.text = L10n.Get("opponent_label",
+                currentOpponent + " · " + L10n.Get(PersonaKeys[(int)persona]));
+    }
+
+    void OnEnable()
+    {
+        L10n.OnLanguageChanged += RefreshOpponentLabel;
+    }
+
+    void OnDisable()
+    {
+        L10n.OnLanguageChanged -= RefreshOpponentLabel;
+    }
+
+    bool pausedThisSession;
+
+    void OnApplicationPause(bool paused)
+    {
+        // Ads and returns clear the marker; only a backgrounded live match
+        // that never resumes converts to a loss on the next boot. The
+        // pausedThisSession guard keeps Android's launch-time unpause call
+        // from wiping a marker Start() hasn't reconciled yet.
+        if (paused && matchStarted && !gameFinished)
+        {
+            pausedThisSession = true;
+            PlayerPrefs.SetInt(PendingForfeitKey, 1);
+            PlayerPrefs.Save();
+        }
+        else if (!paused && pausedThisSession)
+        {
+            PlayerPrefs.DeleteKey(PendingForfeitKey);
+        }
     }
 
     public void SetPlayerNumber(int number)
@@ -138,6 +201,7 @@ public class GameManager : MonoBehaviour
         playerTurn = false;
         firstAIGuess = true;
         playerGuessCount = 0;
+        aiGuessCount = 0;
 
         mode = Mathf.Clamp(PlayerPrefs.GetInt(ModePrefKey, 0), 0, 2);
         timeLeft = TimeAttackSeconds;
@@ -154,18 +218,13 @@ public class GameManager : MonoBehaviour
         stopGameButton.SetActive(false);
         HideButtons();
 
-        bool aiStarts = Random.value < 0.5f;
-
-        if (aiStarts)
-        {
-            turnText.text = L10n.Get("opponent_thinking", currentOpponent);
-            Invoke(nameof(AIGuess), Random.Range(0.8f, 1.5f));
-        }
-        else
-        {
-            turnText.text = L10n.Get("your_guess");
-            playerTurn = true;
-        }
+        // The player always moves first. The duel is a symmetric race, so
+        // whichever side moves first wins every evenly-played match — a
+        // coin flip here made half of all flawless games unwinnable for a
+        // reason invisible to the player. The house rival can afford it.
+        turnText.text = L10n.Get("your_guess");
+        playerTurn = true;
+        matchStarted = true;
     }
 
     void HideButtons()
@@ -201,6 +260,7 @@ public class GameManager : MonoBehaviour
         }
 
         aiGuess = Mathf.Clamp(aiGuess, min, max);
+        aiGuessCount++;
 
         aiNumberText.text = currentOpponent + ": " + aiGuess;
         AppendHistory(aiHistory, aiHistoryText, aiGuess);
@@ -220,16 +280,29 @@ public class GameManager : MonoBehaviour
     public void Higher()
     {
         min = aiGuess + 1;
-        HideButtons();
-        turnText.text = L10n.Get("your_guess");
-        playerTurn = true;
-        FocusGuessInput();
+        AfterWrongAIGuess();
     }
 
     public void Lower()
     {
         max = aiGuess - 1;
+        AfterWrongAIGuess();
+    }
+
+    void AfterWrongAIGuess()
+    {
         HideButtons();
+
+        // Sudden Death cuts both ways: the rival is on the same guess
+        // budget, so an imperfect rival run is winnable pressure, not a
+        // one-sided countdown on the player alone.
+        if (mode == 1 && aiGuessCount >= SuddenDeathGuessLimit)
+        {
+            aiAnswerText.text = L10n.Get("opponent_out_of_guesses", currentOpponent);
+            EndGame(true);
+            return;
+        }
+
         turnText.text = L10n.Get("your_guess");
         playerTurn = true;
         FocusGuessInput();
@@ -259,14 +332,16 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    // Wild guess: the persona's version of a lapse.
+    // Wild guess: the persona's version of a lapse. Every lapse must cost
+    // real information — a ±2 slip on a wide interval is still near-perfect
+    // play, which made "Easy" Calculators as lethal as Hard ones.
     int PersonaWildGuess()
     {
         int mid = (min + max) / 2;
         int range = max - min;
         switch (persona)
         {
-            case Persona.Calculator: return mid + Random.Range(-2, 3);
+            case Persona.Calculator: return mid + Random.Range(-range / 4, range / 4 + 1);
             case Persona.Cautious:   return Random.value < 0.5f ? min : min + Mathf.Max(1, range / 3);
             case Persona.Intuitive:  return mid + Random.Range(-range / 4, range / 4 + 1);
             default:                 return Random.Range(min, max + 1); // Chaotic
@@ -275,12 +350,16 @@ public class GameManager : MonoBehaviour
 
     static float AdaptiveRandomChance()
     {
+        // A real sample is required before the tuner reacts — two lucky
+        // opening wins used to summon a near-perfect opponent by match 3.
+        if (GameStats.RecentSamples < 5) return DifficultyRandomChance[1];
+
         float winRate = GameStats.RecentWinRate();
         if (winRate < 0f) return DifficultyRandomChance[1];
 
-        if (winRate > 0.6f) return 0.1f;
-        if (winRate < 0.4f) return 0.5f;
-        return 0.25f;
+        // Continuous ramp between the forgiving and strong ends; the old
+        // three-step table made the difficulty snap visibly between matches.
+        return Mathf.Lerp(0.5f, 0.1f, Mathf.InverseLerp(0.3f, 0.7f, winRate));
     }
 
     public void Correct()
@@ -345,8 +424,10 @@ public class GameManager : MonoBehaviour
 
     void Update()
     {
-        // Time Attack: the clock burns only while the decision is yours.
-        if (mode != 2 || gameFinished || !playerTurn) return;
+        // Time Attack: one shared clock for the whole duel. Ticking only on
+        // the player's turn meant a prompt typist could never lose to it —
+        // the race premise needs the clock alive while the rival thinks too.
+        if (mode != 2 || gameFinished || !matchStarted) return;
 
         timeLeft -= Time.deltaTime;
         if (timeLeft <= 0f)
@@ -389,7 +470,9 @@ public class GameManager : MonoBehaviour
             GameEvents.MatchEnded(true, playerGuessCount);
 
             turnText.text = L10n.Get("you_win") + "\n" + L10n.Get("won_in_guesses", playerGuessCount);
-            if (playerGuessCount <= 7)
+            // ≤7 is just competent binary search (and every Sudden Death win),
+            // which made the game's only mastery callout carry no information.
+            if (mode != 1 && playerGuessCount <= 5)
                 turnText.text += "\n" + L10n.Get("perfect_game");
             if (audioSource != null && winSound != null)
                 audioSource.PlayOneShot(winSound);
@@ -410,8 +493,28 @@ public class GameManager : MonoBehaviour
             OfferStreakSave(streakBeforeLoss);
         }
 
-        if (adsManager != null && GameStats.Matches % 2 == 0)
-            adsManager.ShowAd(null);
+        // Deferred to the rematch tap: firing here buried the result reveal,
+        // the win celebration, and the streak-save offer under a full-screen
+        // ad in the same frame.
+        interstitialPending = adsManager != null && GameStats.Matches % 2 == 0
+            && streakSaveButton == null;
+    }
+
+    bool interstitialPending;
+
+    // Abandoning a live match counts as the loss it is. Without this,
+    // backing out at the moment of certain defeat kept streaks and win rate
+    // clean, skipped the interstitial cadence, and fed the adaptive AI a
+    // fabricated win rate — which also made the rewarded streak-save
+    // pointless. Quiet by design: no result screen, no ad, just the record.
+    public void ForfeitIfLive()
+    {
+        if (!matchStarted || gameFinished) return;
+
+        gameFinished = true;
+        PlayerPrefs.DeleteKey(PendingForfeitKey); // settled here, not on boot
+        GameStats.RecordLoss();
+        GameEvents.MatchEnded(false, 0);
     }
 
     const int MinStreakToSave = 2;
@@ -486,6 +589,13 @@ public class GameManager : MonoBehaviour
     {
         CancelInvoke();
 
+        if (interstitialPending)
+        {
+            interstitialPending = false;
+            if (adsManager != null)
+                adsManager.ShowAd(null);
+        }
+
         if (streakSaveButton != null)
         {
             Destroy(streakSaveButton);
@@ -494,6 +604,16 @@ public class GameManager : MonoBehaviour
 
         gameFinished = false;
         playerTurn = false;
+        matchStarted = false;
+
+        // The number-entry screen must not carry last match's state: the
+        // range bar froze on the old interval and Time Attack's label kept
+        // the expired clock.
+        playerMin = 1;
+        playerMax = 100;
+        UpdateRangeText();
+        timeLeft = TimeAttackSeconds;
+        UpdateModeStatus();
 
         PickOpponent();
 

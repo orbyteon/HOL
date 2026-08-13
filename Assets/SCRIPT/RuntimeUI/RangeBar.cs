@@ -25,14 +25,21 @@ public class RangeBar : MonoBehaviour
     int targetMin = 1;
     int targetMax = 100;
 
+    bool subscribed;
+
     public static RangeBar Attach(Transform parent, GameManager gm, Vector2 position)
     {
         var root = RuntimeUI.CreateObject("RangeBar", parent);
         ConvergingLight.Center(root, position, new Vector2(TrackWidth, 60f));
 
+        // AddComponent can fire OnEnable before the manager is assigned
+        // (whenever the parent panel happens to be active), so subscription
+        // is idempotent and retried both here and in OnEnable — otherwise
+        // the bar silently froze at 1–100 for the whole match.
         var bar = root.AddComponent<RangeBar>();
         bar.gameManager = gm;
         bar.Build();
+        bar.Subscribe();
         return bar;
     }
 
@@ -65,20 +72,26 @@ public class RangeBar : MonoBehaviour
 
     void OnEnable()
     {
-        if (gameManager != null)
-        {
-            gameManager.OnPlayerRangeChanged += OnRangeChanged;
-            // Panels can activate after StartGame already fired the event.
-            targetMin = gameManager.PlayerRangeMin;
-            targetMax = gameManager.PlayerRangeMax;
-            Apply(true);
-        }
+        Subscribe();
+    }
+
+    void Subscribe()
+    {
+        if (subscribed || gameManager == null || !isActiveAndEnabled) return;
+
+        gameManager.OnPlayerRangeChanged += OnRangeChanged;
+        subscribed = true;
+        // Panels can activate after StartGame already fired the event.
+        targetMin = gameManager.PlayerRangeMin;
+        targetMax = gameManager.PlayerRangeMax;
+        Apply(true);
     }
 
     void OnDisable()
     {
-        if (gameManager != null)
+        if (subscribed && gameManager != null)
             gameManager.OnPlayerRangeChanged -= OnRangeChanged;
+        subscribed = false;
     }
 
     void OnRangeChanged(int min, int max)
@@ -125,10 +138,27 @@ public class RangeBar : MonoBehaviour
         window.sizeDelta = new Vector2(width, TrackHeight);
         window.anchoredPosition = new Vector2((left + right) * 0.5f, 0f);
 
-        minLabel.text = Mathf.RoundToInt(shownMin).ToString();
-        maxLabel.text = Mathf.RoundToInt(shownMax).ToString();
-        minLabel.rectTransform.anchoredPosition = new Vector2(left, 34f);
-        maxLabel.rectTransform.anchoredPosition = new Vector2(right, 34f);
+        int minShown = Mathf.RoundToInt(shownMin);
+        int maxShown = Mathf.RoundToInt(shownMax);
+
+        // Near convergence the two 120px labels overlap into a smear at
+        // exactly the dramatic beat the bar exists to sell — collapse them
+        // into one centered "49–50" (or "50") once they'd collide.
+        if (right - left < 130f)
+        {
+            minLabel.text = minShown == maxShown
+                ? minShown.ToString()
+                : minShown + "-" + maxShown;
+            maxLabel.text = "";
+            minLabel.rectTransform.anchoredPosition = new Vector2((left + right) * 0.5f, 34f);
+        }
+        else
+        {
+            minLabel.text = minShown.ToString();
+            maxLabel.text = maxShown.ToString();
+            minLabel.rectTransform.anchoredPosition = new Vector2(left, 34f);
+            maxLabel.rectTransform.anchoredPosition = new Vector2(right, 34f);
+        }
     }
 
     // Maps a 1..100 value onto the track's local x (centered).

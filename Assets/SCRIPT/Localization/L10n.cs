@@ -76,7 +76,11 @@ public static class L10n
         { "opponent_label",          new[] { "Opponent: {0}", "Αντίπαλος: {0}" } },
         { "your_guess",              new[] { "Your guess", "Η μαντεψιά σου" } },
         { "opponent_thinking",       new[] { "{0} thinking...", "{0} σκέφτεται..." } },
-        { "answer_opponent",         new[] { "Answer {0}", "Απάντησε στον/στην {0}" } },
+        // Colon phrasing sidesteps Greek case agreement: the composed value
+        // ("Nikos · ο Υπολογιστής") is nominative, so a preposition here
+        // ("στον/στην …") was grammatically wrong for every persona.
+        { "answer_opponent",         new[] { "Answer {0}", "Απάντησε: {0}" } },
+        { "opponent_out_of_guesses", new[] { "{0} ran out of guesses!", "Ο αντίπαλος {0} έμεινε από προσπάθειες!" } },
         { "wait_your_turn",          new[] { "Wait for your turn...", "Περίμενε τη σειρά σου..." } },
         { "higher",                  new[] { "Higher", "Ψηλότερα" } },
         { "lower",                   new[] { "Lower", "Χαμηλότερα" } },
@@ -108,7 +112,12 @@ public static class L10n
         { "pvp_join_room",           new[] { "Join room", "Μπες σε δωμάτιο" } },
         { "pvp_waiting",             new[] { "Waiting for your challenger...", "Αναμονή για τον αντίπαλό σου..." } },
         { "pvp_invite_copied",       new[] { "Invite copied! Send it to a friend.", "Η πρόσκληση αντιγράφηκε! Στείλ'τη σε φίλο σου." } },
-        { "pvp_room_not_found",      new[] { "Room not found. Check the code.", "Το δωμάτιο δεν βρέθηκε. Έλεγξε τον κωδικό." } },
+        // Also covers full rooms: the server reports both identically so the
+        // join endpoint can't be used to enumerate live codes.
+        { "pvp_room_not_found",      new[] { "Room not found — check the code, or it may already be full.", "Το δωμάτιο δεν βρέθηκε — έλεγξε τον κωδικό ή ίσως είναι ήδη γεμάτο." } },
+        { "pvp_reconnecting",        new[] { "Connection trouble — reconnecting", "Πρόβλημα σύνδεσης — επανασύνδεση" } },
+        { "pvp_room_expired",        new[] { "No one joined — the code expired. Create a new room.", "Κανείς δεν μπήκε — ο κωδικός έληξε. Φτιάξε νέο δωμάτιο." } },
+        { "tap_again_to_leave",      new[] { "Tap again to leave the match", "Πάτησε ξανά για έξοδο από τον αγώνα" } },
         { "pvp_room_full",           new[] { "Room is already full.", "Το δωμάτιο είναι γεμάτο." } },
         { "pvp_network_error",       new[] { "Network hiccup — try again", "Πρόβλημα δικτύου — δοκίμασε ξανά" } },
         { "pvp_duel",                new[] { "PvP Duel", "Μονομαχία PvP" } },
@@ -188,7 +197,7 @@ public static class L10n
         { "theme_mono",              new[] { "Mono", "Μονόχρωμο" } },
         { "theme_locked_wins",       new[] { "Unlocks at {0} wins", "Ξεκλειδώνει στις {0} νίκες" } },
         { "theme_locked_daily",      new[] { "Unlocks at a {0}-day Daily Hunt streak", "Ξεκλειδώνει με σερί {0} ημερών στο Καθημερινό Κυνήγι" } },
-        { "theme_locked_perfect",    new[] { "Unlocks with a perfect win (7 guesses or fewer)", "Ξεκλειδώνει με τέλεια νίκη (έως 7 προσπάθειες)" } },
+        { "theme_locked_perfect",    new[] { "Unlocks with a perfect win ({0} guesses or fewer)", "Ξεκλειδώνει με τέλεια νίκη (έως {0} προσπάθειες)" } },
 
         // solo modes
         { "mode",                    new[] { "Mode", "Λειτουργία" } },

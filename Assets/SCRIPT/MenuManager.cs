@@ -27,10 +27,50 @@ public class MenuManager : MonoBehaviour
         gameManager = FindObjectOfType<GameManager>();
     }
 
+    // Runtime-built fullscreen modals (rules card, Daily Hunt) register here
+    // so the back button can close the topmost one — they live at canvas
+    // level, invisible to the panel chain below.
+    struct RuntimeModal
+    {
+        public GameObject panel;
+        public System.Action close;
+    }
+
+    static readonly System.Collections.Generic.List<RuntimeModal> runtimeModals =
+        new System.Collections.Generic.List<RuntimeModal>();
+
+    public static void RegisterModal(GameObject panel, System.Action close = null)
+    {
+        runtimeModals.Add(new RuntimeModal { panel = panel, close = close });
+    }
+
+    bool CloseTopRuntimeModal()
+    {
+        for (int i = runtimeModals.Count - 1; i >= 0; i--)
+        {
+            var modal = runtimeModals[i];
+            if (modal.panel == null) // died with its scene — registry is static
+            {
+                runtimeModals.RemoveAt(i);
+                continue;
+            }
+            if (!modal.panel.activeSelf)
+                continue;
+
+            if (modal.close != null) modal.close();
+            else modal.panel.SetActive(false);
+            return true;
+        }
+        return false;
+    }
+
     void Update()
     {
         // Android back button / gesture. Escape is Unity's mapping for it.
         if (!Input.GetKeyDown(KeyCode.Escape))
+            return;
+
+        if (CloseTopRuntimeModal())
             return;
 
         if (settingsPanel != null && settingsPanel.activeSelf)
@@ -60,6 +100,10 @@ public class MenuManager : MonoBehaviour
 
         if (!matchLive || Time.unscaledTime - lastMatchBackTime <= BackConfirmSeconds)
         {
+            // A confirmed walk-out on a live match is a forfeit — leaving
+            // silently used to erase the loss from every stat.
+            if (gameManager != null)
+                gameManager.ForfeitIfLive();
             SceneManager.LoadScene("MainMenu");
             return;
         }

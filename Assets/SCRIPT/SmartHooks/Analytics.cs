@@ -33,7 +33,15 @@ public static class Analytics
         pump = go.AddComponent<Pump>();
 
         GameEvents.OnMatchEnded += MatchEnded;
+        GameEvents.OnDailyStreak += LaunchStreak;
         Track("hol_session_start", "{}");
+    }
+
+    // App-open streak from DailyStreak — distinct from the Daily Hunt
+    // completion streak the player sees in the hunt panel.
+    static void LaunchStreak(int days)
+    {
+        Track("hol_launch_streak", "{\"days\":" + days + "}");
     }
 
     // PvP tags itself before its result fires; solo is the default. The tag

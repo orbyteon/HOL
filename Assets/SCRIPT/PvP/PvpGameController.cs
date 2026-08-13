@@ -51,6 +51,8 @@ public class PvpGameController : MonoBehaviour
 
     PvpBackend.RoomState lastState;
     string shownGuessKey = "";
+    string myHistory = "";
+    string theirHistory = "";
     bool matchOver;
     bool guessInFlight;
     int localAcceptedGuessCount;
@@ -60,6 +62,10 @@ public class PvpGameController : MonoBehaviour
     string lastStateSignature = "";
     int silentPolls;
     const int MaxSilentPolls = 200;
+
+    // A host code nobody redeems expires instead of holding the panel forever.
+    const float WaitingTimeoutSeconds = 240f;
+    float waitingStartTime;
 
     string MyName
     {
@@ -219,25 +225,58 @@ public class PvpGameController : MonoBehaviour
         int gen = flowGeneration;
         client.SubmitGuess(guess, lastState, ok =>
         {
-            SetInteractable(guessButton, true);
+            SetInteractable(guessButton, !matchOver);
             if (gen != flowGeneration) return;
 
             guessInFlight = false;
             if (ok)
             {
                 localAcceptedGuessCount++;
-                // A winning guess ends the match in the submit response itself;
-                // don't leave the winner staring at "sending" until the next poll
-                // (which the loser's leave may beat to the room).
-                if (lastState != null && lastState.phase == "done" && !matchOver)
+                // Render the returned authoritative state right away: the
+                // hint (and a winning result) must not wait on the next poll,
+                // which the opponent's reply or the loser's leave may beat.
+                if (lastState != null && !matchOver)
                     OnState(lastState);
             }
-            else
+            else if (!matchOver)
             {
-                guessInput.text = typed;
-                turnText.text = L10n.Get("pvp_network_error");
+                var playFab = client as PlayFabPvpClient;
+                string serverError = playFab != null ? playFab.LastGuessError : "";
+                if (serverError == "not your turn" || serverError == "turn already submitted" ||
+                    serverError == "not in play")
+                {
+                    // The state moved on without us (an earlier submit landed
+                    // or the poll lagged) — resync now, nothing to report.
+                    turnText.text = L10n.Get("pvp_wait_turn");
+                    client.StartPolling(OnState);
+                }
+                else if (serverError == "room not found")
+                {
+                    client.StopPolling();
+                    HandleRoomClosed();
+                }
+                else
+                {
+                    guessInput.text = typed;
+                    turnText.text = L10n.Get("pvp_network_error");
+                }
             }
         });
+    }
+
+    // On-screen Leave uses the same two-step contract as hardware back: a
+    // decided match has nothing to forfeit, a live one asks to confirm.
+    public void OnLeaveButtonPressed()
+    {
+        if (matchOver || !matchPanel.activeSelf ||
+            Time.unscaledTime - lastMatchBackTime <= BackConfirmSeconds)
+        {
+            OnLeaveMatchPressed();
+            return;
+        }
+
+        lastMatchBackTime = Time.unscaledTime;
+        ShowConfirmHint("tap_again_to_leave");
     }
 
     public void OnLeaveMatchPressed()
@@ -249,6 +288,8 @@ public class PvpGameController : MonoBehaviour
         guessInFlight = false;
         lastState = null;
         shownGuessKey = "";
+        myHistory = "";
+        theirHistory = "";
         OpenPvpMenu();
     }
 
@@ -301,6 +342,11 @@ public class PvpGameController : MonoBehaviour
 
     void ShowBackHint()
     {
+        ShowConfirmHint("back_again_to_leave");
+    }
+
+    void ShowConfirmHint(string l10nKey)
+    {
         if (backHintLabel == null)
         {
             backHintLabel = RuntimeUI.CreateTmpText(matchPanel.transform, "BackExitHint",
@@ -308,7 +354,7 @@ public class PvpGameController : MonoBehaviour
                 new Color(0.91f, 0.93f, 1f, 0.85f));
         }
 
-        backHintLabel.text = L10n.Get("back_again_to_leave");
+        backHintLabel.text = L10n.Get(l10nKey);
         backHintLabel.gameObject.SetActive(true);
 
         CancelInvoke(nameof(HideBackHint));
@@ -333,14 +379,23 @@ public class PvpGameController : MonoBehaviour
         guessInFlight = false;
         localAcceptedGuessCount = 0;
         shownGuessKey = "";
+        myHistory = "";
+        theirHistory = "";
         silentPolls = 0;
         lastStateSignature = "";
+        waitingStartTime = Time.unscaledTime;
         // A leave mid-request must not strand next match's buttons disabled.
         SetInteractable(createGoButton, true);
         SetInteractable(joinGoButton, true);
-        SetInteractable(guessButton, true);
+        SetGuessControls(true);
         client.OnRoomClosed = HandleRoomClosed;
         client.OnConnectionLost = HandleConnectionLost;
+        var playFab = client as PlayFabPvpClient;
+        if (playFab != null)
+        {
+            playFab.OnReconnecting = HandleReconnecting;
+            playFab.OnReconnected = HandleReconnected;
+        }
         client.StartPolling(OnState);
     }
 
@@ -354,6 +409,29 @@ public class PvpGameController : MonoBehaviour
         ShowTerminalStatus(L10n.Get("pvp_connection_lost"));
     }
 
+    void HandleReconnecting()
+    {
+        if (matchOver) return;
+
+        string message = L10n.Get("pvp_reconnecting");
+        if (matchPanel.activeSelf)
+            turnText.text = message;
+        else if (createPanel.activeSelf)
+            SetCreateStatus(message, true);
+        else if (joinPanel.activeSelf)
+            joinStatusText.text = message;
+    }
+
+    void HandleReconnected()
+    {
+        if (matchOver) return;
+
+        // The match panel repaints from the next poll's OnState; the create
+        // panel's waiting status has no poll-driven repaint, restore it here.
+        if (createPanel.activeSelf && (lastState == null || lastState.phase == "waiting"))
+            SetCreateStatus(L10n.Get("pvp_waiting"), true);
+    }
+
     void ShowTerminalStatus(string message)
     {
         if (matchPanel.activeSelf)
@@ -361,6 +439,7 @@ public class PvpGameController : MonoBehaviour
             matchOver = true;
             resultText.text = message;
             turnText.text = "";
+            SetGuessControls(false);
         }
         else if (createPanel.activeSelf)
         {
@@ -370,6 +449,13 @@ public class PvpGameController : MonoBehaviour
         {
             joinStatusText.text = message;
         }
+    }
+
+    void SetGuessControls(bool on)
+    {
+        SetInteractable(guessButton, on);
+        if (guessInput != null)
+            guessInput.interactable = on;
     }
 
     void OnState(PvpBackend.RoomState s)
@@ -406,7 +492,19 @@ public class PvpGameController : MonoBehaviour
         else silentPolls = 0;
 
         if (s.phase == "waiting")
+        {
+            if (Time.unscaledTime - waitingStartTime >= WaitingTimeoutSeconds)
+            {
+                client.StopPolling();
+                client.DeleteRoom();
+                lastState = null;
+                roomCodeText.text = "-----";
+                // Back at the create entry state: RoomCode is cleared, so the
+                // player can mint a fresh room from this same panel.
+                SetCreateStatus(L10n.Get("pvp_room_expired"), false);
+            }
             return;
+        }
 
         if (!matchPanel.activeSelf)
         {
@@ -433,22 +531,40 @@ public class PvpGameController : MonoBehaviour
         {
             shownGuessKey = key;
             bool guessWasMine = (s.lastBy == me);
-            string who = guessWasMine ? L10n.Get("you") : opponentName;
-            string hint = LocalizedHint(s.lastHint);
-            if (string.IsNullOrEmpty(hint))
+            string rawHint = s.lastHint;
+            if (string.IsNullOrEmpty(rawHint))
             {
                 int targetSecret = s.lastBy == "host" ? s.guestSecret : s.hostSecret;
                 if (targetSecret > 0)
-                    hint = s.lastGuess == targetSecret ? L10n.Get("correct") + "!"
-                        : (s.lastGuess < targetSecret ? L10n.Get("higher") : L10n.Get("lower"));
+                    rawHint = s.lastGuess == targetSecret ? "correct"
+                        : (s.lastGuess < targetSecret ? "higher" : "lower");
             }
-            historyText.text = who + ": " + s.lastGuess + "  →  " + hint;
+
+            // One appended chain per player: "50>" = secret is higher than
+            // 50, "50<" = lower, "50=" = found. ASCII on purpose — the
+            // shipped fonts are not verified for arrow glyphs.
+            string mark = rawHint == "higher" ? ">"
+                : rawHint == "lower" ? "<"
+                : rawHint == "correct" ? "=" : "";
+            string entry = s.lastGuess + mark;
+            if (guessWasMine)
+                myHistory += (myHistory.Length > 0 ? "  " : "") + entry;
+            else
+                theirHistory += (theirHistory.Length > 0 ? "  " : "") + entry;
+
+            string lines = "";
+            if (myHistory.Length > 0)
+                lines = L10n.Get("you") + ": " + myHistory;
+            if (theirHistory.Length > 0)
+                lines += (lines.Length > 0 ? "\n" : "") + opponentName + ": " + theirHistory;
+            historyText.text = lines;
         }
 
         if (s.phase == "done" && !matchOver)
         {
             matchOver = true;
             client.StopPolling();
+            SetGuessControls(false);
 
             bool iWon = s.winner == me;
             int authoritativeGuessCount = client.IsHost ? s.hostGuessCount : s.guestGuessCount;
@@ -499,14 +615,6 @@ public class PvpGameController : MonoBehaviour
             bool myTurn = s.turn == me;
             turnText.text = myTurn ? L10n.Get("your_guess") : L10n.Get("opponent_thinking", opponentName);
         }
-    }
-
-    static string LocalizedHint(string hint)
-    {
-        if (hint == "correct") return L10n.Get("correct") + "!";
-        if (hint == "higher") return L10n.Get("higher");
-        if (hint == "lower") return L10n.Get("lower");
-        return "";
     }
 
     static bool TryReadSecret(TMP_InputField field, out int value)

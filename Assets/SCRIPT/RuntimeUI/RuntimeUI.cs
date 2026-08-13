@@ -178,6 +178,12 @@ public static class RuntimeUI
         var text = CreateText(go.transform, "Label", label, 30, Vector2.zero, size, labelColor);
         Stretch(text.gameObject);
 
+        // Greek labels routinely run ~40% longer than English on the same
+        // fixed-width chip ("Προσαρμοστικό" in 180px) — shrink before wrap.
+        text.resizeTextForBestFit = true;
+        text.resizeTextMaxSize = 30;
+        text.resizeTextMinSize = 16;
+
         // Juice at creation time: buttons built after JuiceRuntimeWiring's
         // one-shot startup pass would otherwise stay flat and silent.
         AttachJuice(button);
@@ -240,6 +246,26 @@ public static class RuntimeUI
         input.placeholder = ph;
 
         return input;
+    }
+
+    // Menu-canvas insertion for runtime entry points: right above the icon
+    // buttons (whose padded art rects raycast over half the screen), below
+    // any panel the scene opens later — the same slot the PvP entry uses.
+    public static void PlaceMenuEntry(Transform entry)
+    {
+        var parent = entry.parent;
+        if (parent == null) return;
+
+        int index = -1;
+        string[] anchors = { "Buttonsettings", "ButtonQuit" };
+        foreach (var name in anchors)
+        {
+            var t = parent.Find(name);
+            if (t != null && t.GetSiblingIndex() > index)
+                index = t.GetSiblingIndex();
+        }
+        if (index >= 0)
+            entry.SetSiblingIndex(index + 1);
     }
 
     // ---------------------------------------------------------- live localization

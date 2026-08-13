@@ -81,16 +81,20 @@ public class ExtrasRuntimeWiring : MonoBehaviour
             bool unlocked = Themes.IsUnlocked(theme);
             bool current = theme.id == Themes.CurrentId;
 
+            // Non-current chips sit on the shared ghost surface, not the
+            // theme's own panel color — Mono's near-black chip was invisible
+            // against the card. The theme's identity shows in the label tint.
             var chip = RuntimeUI.CreateButton(menu.settingsPanel.transform,
                 "Theme_" + theme.id, L10n.Get(theme.nameKey),
                 new Vector2(-300f + i * 200f, 240f), new Vector2(184f, 84f),
-                current ? theme.palette.gold : ConvergingLight.WithAlpha(theme.palette.panelIndigo, 1f),
-                current ? DarkLabel : ConvergingLight.WithAlpha(theme.palette.nearWhite, unlocked ? 1f : 0.45f));
+                current ? theme.palette.gold : ConvergingLightFX.GhostSurface,
+                current ? DarkLabel : ConvergingLight.WithAlpha(theme.palette.gold, unlocked ? 1f : 0.45f));
             RuntimeUI.Localize(chip, theme.nameKey);
 
             var captured = theme;
             chip.onClick.AddListener(() =>
             {
+                hint.text = ""; // stale lock hints outlive their tap otherwise
                 if (!Themes.IsUnlocked(captured))
                 {
                     hint.text = Themes.LockHint(captured);
@@ -214,7 +218,11 @@ public class ExtrasRuntimeWiring : MonoBehaviour
         if (canvas == null)
             return;
 
-        DailyHunt.Attach(canvas.transform, menu.mainMenuPanel.transform,
+        // Entry lives at canvas level like the PvP button. mainMenuPanel is
+        // the BACKROUND object at sibling 0, and the design pass inserts its
+        // five backdrop layers right above it — anything parented there is
+        // painted under a 92%-opaque field and can never be tapped.
+        DailyHunt.Attach(canvas.transform, canvas.transform,
             FindFirstObjectByType<AdsManager>());
     }
 
@@ -239,14 +247,26 @@ public class ExtrasRuntimeWiring : MonoBehaviour
 
         BuildHowToPanel(canvas.transform);
 
-        var help = RuntimeUI.CreateButton(menu.mainMenuPanel.transform, "HowToButton",
-            "?", new Vector2(-460f, 850f), new Vector2(84f, 84f),
+        // Canvas level (see WireDailyHunt), and x -400 — at -460 the button
+        // hung past the left edge on 20:9 screens.
+        var help = RuntimeUI.CreateButton(canvas.transform, "HowToButton",
+            "?", new Vector2(-400f, 850f), new Vector2(84f, 84f),
             ConvergingLightFX.GhostSurface);
+        RuntimeUI.PlaceMenuEntry(help.transform);
         help.onClick.AddListener(() => howToPanel.SetActive(true));
 
         // First run: show the rules once, but never stack over the consent
-        // dialog — if consent is still unanswered, wait for the next launch.
-        if (PlayerPrefs.GetInt(HowToSeenKey, 0) == 0 && PlayerPrefs.HasKey("AdsConsent"))
+        // dialog. Gating on the stored consent key alone deferred the rules
+        // to the SECOND launch — wait for the choice within this session.
+        if (PlayerPrefs.GetInt(HowToSeenKey, 0) == 0)
+            StartCoroutine(ShowRulesAfterConsent());
+    }
+
+    IEnumerator ShowRulesAfterConsent()
+    {
+        while (!PlayerPrefs.HasKey("AdsConsent"))
+            yield return null;
+        if (PlayerPrefs.GetInt(HowToSeenKey, 0) == 0 && howToPanel != null)
             howToPanel.SetActive(true);
     }
 
@@ -286,6 +306,9 @@ public class ExtrasRuntimeWiring : MonoBehaviour
 
         howToPanel.AddComponent<PanelAnimator>();
         howToPanel.SetActive(false);
+
+        // The Android back button closes this card like any other screen.
+        MenuManager.RegisterModal(howToPanel);
     }
 
     // --- 8. Scene-authored static labels ------------------------------------
@@ -327,10 +350,21 @@ public class ExtrasRuntimeWiring : MonoBehaviour
         return (s ?? "").Replace(" ", "").Replace("\u200B", "").ToUpperInvariant();
     }
 
+    // GameManager rewrites these at runtime (AI guess readout, player answer
+    // line); their authored "Guesses :" placeholder must not receive a
+    // LocalizedText, which would overwrite live gameplay text on every
+    // enable and language change.
+    static bool IsDynamicGameLabel(GameObject go)
+    {
+        return go.name == "AIguesses" || go.name == "PlayerGuessText";
+    }
+
     void LocalizeSceneTexts()
     {
         foreach (var tmp in FindObjectsOfType<TMP_Text>(true))
         {
+            if (IsDynamicGameLabel(tmp.gameObject))
+                continue;
             string key;
             if (!SceneTextKeys.TryGetValue(NormalizeSceneText(tmp.text), out key))
                 continue;
@@ -345,6 +379,8 @@ public class ExtrasRuntimeWiring : MonoBehaviour
 
         foreach (var legacy in FindObjectsOfType<Text>(true))
         {
+            if (IsDynamicGameLabel(legacy.gameObject))
+                continue;
             string key;
             if (SceneTextKeys.TryGetValue(NormalizeSceneText(legacy.text), out key))
             {
@@ -382,7 +418,7 @@ public class ExtrasRuntimeWiring : MonoBehaviour
 
         var button = RuntimeUI.CreateButton(menu.settingsPanel.transform,
             "AdsPrivacyButton", L10n.Get("ads_privacy"),
-            new Vector2(0f, -680f), new Vector2(360f, 80f), Neutral);
+            new Vector2(0f, -510f), new Vector2(360f, 80f), Neutral);
         button.onClick.AddListener(consent.ReopenConsent);
         RuntimeUI.Localize(button, "ads_privacy");
     }
@@ -408,7 +444,7 @@ public class ExtrasRuntimeWiring : MonoBehaviour
 
         var difficultyLabel = RuntimeUI.CreateText(menu.settingsPanel.transform, "DifficultyLabel",
             L10n.Get("difficulty"), 32,
-            new Vector2(0f, -780f), new Vector2(400f, 50f));
+            new Vector2(0f, -610f), new Vector2(400f, 50f));
         RuntimeUI.Localize(difficultyLabel, "difficulty");
 
         string[] keys = { "easy", "normal", "hard", "adaptive" };
@@ -417,7 +453,7 @@ public class ExtrasRuntimeWiring : MonoBehaviour
             int difficulty = i; // captured for the lambda
             var button = RuntimeUI.CreateButton(menu.settingsPanel.transform,
                 "Difficulty" + i, L10n.Get(keys[i]),
-                new Vector2(-300f + i * 200f, -860f), new Vector2(180f, 70f), Neutral);
+                new Vector2(-300f + i * 200f, -685f), new Vector2(180f, 70f), Neutral);
             button.onClick.AddListener(() => SetDifficulty(difficulty));
             RuntimeUI.Localize(button, keys[i]);
             difficultyButtons[i] = button;
@@ -452,6 +488,11 @@ public class ExtrasRuntimeWiring : MonoBehaviour
         if (button == null)
             return;
 
+        // RemoveAllListeners strips only script-added listeners — the scene
+        // serializes a persistent NumberManager.ExitToMenu call on this
+        // button, which would reload the scene on top of the rematch.
+        for (int i = 0; i < button.onClick.GetPersistentEventCount(); i++)
+            button.onClick.SetPersistentListenerState(i, UnityEngine.Events.UnityEventCallState.Off);
         button.onClick.RemoveAllListeners();
         button.onClick.AddListener(gm.RestartMatch);
 
@@ -524,19 +565,22 @@ public class ExtrasRuntimeWiring : MonoBehaviour
         if (selector == null)
             selector = menu.settingsPanel.AddComponent<LanguageSelector>();
 
+        // Rows sit above y -720: the old -480..-860 column ran the
+        // difficulty row clean off-screen on 4:3 tablets and under the
+        // gesture bar on 16:9.
         var languageLabel = RuntimeUI.CreateText(menu.settingsPanel.transform, "LanguageLabel",
             L10n.Get("language"), 32,
-            new Vector2(0f, -480f), new Vector2(400f, 50f));
+            new Vector2(0f, -320f), new Vector2(400f, 50f));
         RuntimeUI.Localize(languageLabel, "language");
 
         englishButton = RuntimeUI.CreateButton(menu.settingsPanel.transform,
             "EnglishButton", "English",
-            new Vector2(-130f, -560f), new Vector2(220f, 80f), Neutral);
+            new Vector2(-130f, -395f), new Vector2(220f, 80f), Neutral);
         englishButton.onClick.AddListener(selector.SetEnglish);
 
         greekButton = RuntimeUI.CreateButton(menu.settingsPanel.transform,
             "GreekButton", "Ελληνικά",
-            new Vector2(130f, -560f), new Vector2(220f, 80f), Neutral);
+            new Vector2(130f, -395f), new Vector2(220f, 80f), Neutral);
         greekButton.onClick.AddListener(selector.SetGreek);
 
         RefreshLanguageButtons();
@@ -565,7 +609,10 @@ public class ExtrasRuntimeWiring : MonoBehaviour
         if (image != null)
             image.color = selected ? Gold : Neutral;
 
-        var label = button.GetComponentInChildren<Text>();
+        // includeInactive — every Refresh* call runs during the wiring frame
+        // while its panel is still inactive; without it the selected chip
+        // kept a near-white label on gold until the first tap.
+        var label = button.GetComponentInChildren<Text>(true);
         if (label != null)
             label.color = selected ? DarkLabel : new Color(0.91f, 0.93f, 1f);
     }
@@ -578,10 +625,18 @@ public class ExtrasRuntimeWiring : MonoBehaviour
         if (menu == null || menu.mainMenuPanel == null)
             return;
 
-        statsLabel = RuntimeUI.CreateText(menu.mainMenuPanel.transform,
+        var canvas = menu.mainMenuPanel.GetComponentInParent<Canvas>(true);
+        if (canvas == null)
+            return;
+
+        // Canvas level (see WireDailyHunt): under BACKROUND this label sat
+        // beneath the backdrop layers and was never visible.
+        statsLabel = RuntimeUI.CreateText(canvas.transform,
             "StatsLabel", "", 28,
             new Vector2(0f, 820f), new Vector2(700f, 90f),
             new Color(0.91f, 0.93f, 1f, 0.8f));
+        statsLabel.raycastTarget = false;
+        RuntimeUI.PlaceMenuEntry(statsLabel.transform);
 
         RefreshStats();
         L10n.OnLanguageChanged += RefreshStats;
