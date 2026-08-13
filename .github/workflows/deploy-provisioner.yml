@@ -59,10 +59,19 @@ jobs:
         run: |
           set -euo pipefail
           for name in AZURE_FUNCTIONAPP_NAME AZURE_RESOURCE_GROUP GOOGLE_PLAY_PACKAGE_NAME \
-                      PLAYFAB_TITLE_ID PLAYFAB_DEV_SECRET_KEY GOOGLE_SERVICE_ACCOUNT_JSON_B64 \
-                      AZURE_CLIENT_ID AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID; do
+                      GOOGLE_PLAY_CERT_SHA256 PLAYFAB_TITLE_ID PLAYFAB_DEV_SECRET_KEY \
+                      GOOGLE_SERVICE_ACCOUNT_JSON_B64 AZURE_CLIENT_ID AZURE_TENANT_ID \
+                      AZURE_SUBSCRIPTION_ID; do
             test -n "${!name:-}" || { echo "::error::$name is missing"; exit 1; }
           done
+          test "$GOOGLE_PLAY_PACKAGE_NAME" = "com.Orbyteon.HOL" || {
+            echo "::error::GOOGLE_PLAY_PACKAGE_NAME must be com.Orbyteon.HOL"
+            exit 1
+          }
+          [[ "$PLAYFAB_TITLE_ID" =~ ^[A-Za-z0-9]{3,32}$ ]] || {
+            echo "::error::PLAYFAB_TITLE_ID must be 3-32 letters/digits"
+            exit 1
+          }
 
       - name: Setup Node 22
         uses: actions/setup-node@v4
@@ -110,6 +119,27 @@ jobs:
           app-name: ${{ env.AZURE_FUNCTIONAPP_NAME }}
           package: ${{ env.FUNCTION_PATH }}
 
+      - name: Verify deployed endpoint is reachable
+        shell: bash
+        run: |
+          set -euo pipefail
+          endpoint="https://${AZURE_FUNCTIONAPP_NAME}.azurewebsites.net/api/provision"
+          status=""
+          for attempt in $(seq 1 12); do
+            status=$(curl --silent --show-error --output /tmp/hol-provision-response \
+              --write-out '%{http_code}' \
+              --header 'Content-Type: application/json' \
+              --data '{}' \
+              "$endpoint" || true)
+            if [ "$status" = "400" ]; then
+              echo "Provisioning endpoint is live and rejecting an invalid request as expected."
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::Provisioning endpoint did not become healthy (last HTTP status: ${status:-none})"
+          exit 1
+
       - name: Deployment summary
         if: success()
         shell: bash
@@ -120,4 +150,6 @@ jobs:
             echo "- Function App: \`${AZURE_FUNCTIONAPP_NAME}\`"
             echo "- Endpoint: \`https://${AZURE_FUNCTIONAPP_NAME}.azurewebsites.net/api/provision\`"
             echo "- Play Integrity licensing required: \`true\`"
+            echo "- Play signing certificate pin required: \`true\`"
+            echo "- Invalid-request health probe: \`HTTP 400\`"
           } >> "$GITHUB_STEP_SUMMARY"
