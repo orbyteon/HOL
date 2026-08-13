@@ -89,6 +89,13 @@ jobs:
           node tools/release/write-release-config.mjs
           git diff --check -- Assets/Resources/HOLReleaseConfig.json
 
+          mapfile -t dirty < <(git status --porcelain --untracked-files=all)
+          if [ "${#dirty[@]}" -ne 1 ] || [ "${dirty[0]}" != " M Assets/Resources/HOLReleaseConfig.json" ]; then
+            echo "::error::Release workspace must differ from main only by injected HOLReleaseConfig.json"
+            printf '%s\n' "${dirty[@]}"
+            exit 1
+          fi
+
       - name: Free runner disk for Unity Android image
         shell: bash
         run: |
@@ -129,13 +136,23 @@ jobs:
           customParameters: -holReleaseBuild
           allowDirtyBuild: true
 
-      - name: Verify bundle and write checksum
+      - name: Verify bundle signature and write checksum
         shell: bash
         run: |
           set -euo pipefail
           mapfile -t bundles < <(find build/Android -type f -name '*.aab' -print)
           test "${#bundles[@]}" -eq 1 || {
             echo "::error::Expected exactly one AAB, found ${#bundles[@]}"
+            exit 1
+          }
+          command -v jarsigner >/dev/null || {
+            echo "::error::jarsigner is unavailable on the release runner"
+            exit 1
+          }
+          jarsigner -verify -verbose -certs "${bundles[0]}" > build/Android/JARSIGNER_VERIFY.txt
+          grep -q '^jar verified\.$' build/Android/JARSIGNER_VERIFY.txt || {
+            echo "::error::AAB signature verification did not report 'jar verified.'"
+            cat build/Android/JARSIGNER_VERIFY.txt
             exit 1
           }
           sha256sum "${bundles[0]}" | tee build/Android/SHA256SUMS
@@ -156,6 +173,6 @@ jobs:
             echo "- Commit: \`${GITHUB_SHA}\`"
             echo "- Version: \`${{ inputs.version }}\`"
             echo "- versionCode: \`${{ inputs.version_code }}\`"
-            echo "- Signed AAB produced and SHA-256 recorded in the artifact"
+            echo "- Signed AAB produced, JAR signature verified, and SHA-256 recorded in the artifact"
             echo "- Production deployment is still a separate manual action"
           } >> "$GITHUB_STEP_SUMMARY"
