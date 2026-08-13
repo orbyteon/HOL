@@ -207,11 +207,60 @@ public class PvpRuntimeUI : MonoBehaviour
         joinSecret.onSubmit.AddListener(_ => controller.OnJoinRoomPressed());
         guessInput.onSubmit.AddListener(_ => controller.OnSubmitGuessPressed());
 
+        // Publisher pass: each fullscreen fill becomes a dimming scrim with a
+        // floating card behind the controls, the room code becomes the gold
+        // hero mark, headers read as engraved captions, and the gold CTAs
+        // carry the shine sweep.
+        StyleAsCard(menuPanel, new Vector2(0f, 110f), new Vector2(880f, 960f), true);
+        StyleAsCard(createPanel, new Vector2(0f, -60f), new Vector2(1000f, 1360f), true);
+        StyleAsCard(joinPanel, new Vector2(0f, 20f), new Vector2(1000f, 1160f), true);
+        StyleAsCard(matchPanel, new Vector2(0f, -70f), new Vector2(1000f, 1360f), false);
+
+        controller.roomCodeText.color = Accent;
+        controller.roomCodeText.characterSpacing = 14f;
+        ConvergingLightFX.AddSeamRule(createPanel.transform, new Vector2(0f, -172f), 460f);
+
+        ConvergingLightFX.StyleHeading(controller.opponentNameText, 3f);
+        ConvergingLightFX.StyleHeading(controller.resultText, 2f);
+
+        ConvergingLightFX.AddShine(createGo);
+        ConvergingLightFX.AddShine(guessBtn);
+
+        // Victory light pulse for duels, scoped to the match screen.
+        var flash = WinFlash.Attach(transform);
+        flash.gate = matchPanel;
+
         // All panels start hidden; OpenPvpMenu shows the menu panel.
         menuPanel.SetActive(false);
         createPanel.SetActive(false);
         joinPanel.SetActive(false);
         matchPanel.SetActive(false);
+    }
+
+    // Scrim + card treatment for a fullscreen PvP panel. The panel's own
+    // image dims the scene behind it; a rounded, shadowed, seam-lit card
+    // floats behind the controls (children paint in order, so glow at index
+    // 0 and card at index 1 sit under everything built before this call).
+    static void StyleAsCard(GameObject panel, Vector2 cardPos, Vector2 cardSize, bool cascade)
+    {
+        var scrim = panel.GetComponent<Image>();
+        if (scrim != null)
+            scrim.color = ConvergingLight.WithAlpha(ConvergingLight.ScrimIndigo, 0.88f);
+
+        var card = RuntimeUI.CreateObject("Card", panel.transform);
+        ConvergingLight.Center(card, cardPos, cardSize);
+        var surface = card.AddComponent<Image>();
+        surface.raycastTarget = false;
+        ConvergingLightFX.StyleCard(surface, 0.97f);
+        card.transform.SetSiblingIndex(0);
+
+        ConvergingLightFX.AddCardGlow(panel.transform, cardPos, cardSize,
+            ConvergingLight.Cyan, 0.09f);
+
+        if (panel.GetComponent<PanelAnimator>() == null)
+            panel.AddComponent<PanelAnimator>();
+        if (cascade && panel.GetComponent<CascadeReveal>() == null)
+            panel.AddComponent<CascadeReveal>();
     }
 
     void InjectEntryButton(PvpGameController controller)
@@ -228,6 +277,7 @@ public class PvpRuntimeUI : MonoBehaviour
             L10n.Get("pvp_duel"), new Vector2(0f, -620f), new Vector2(460f, 100f), Accent, DarkLabel);
         entry.onClick.AddListener(controller.OpenPvpMenu);
         RuntimeUI.Localize(entry, "pvp_duel");
+        ConvergingLightFX.AddShine(entry); // gold CTA earns the glint
 
         // Sit right after the settings button instead of as the last child,
         // so scene panels opened later render/raycast above this button.

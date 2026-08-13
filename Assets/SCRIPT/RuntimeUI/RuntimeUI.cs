@@ -146,6 +146,10 @@ public static class RuntimeUI
         image.type = Image.Type.Sliced;
         image.color = color;
 
+        // Shared elevation: every runtime button sits off the surface like
+        // the restyled scene controls (ConvergingLightFX canon).
+        ConvergingLightFX.AddShadow(image);
+
         var button = go.AddComponent<Button>();
         button.targetGraphic = image;
 
@@ -176,7 +180,8 @@ public static class RuntimeUI
         var image = go.AddComponent<Image>();
         image.sprite = RoundedRectSprite;
         image.type = Image.Type.Sliced;
-        image.color = new Color(1f, 1f, 1f, 0.9f);
+        image.color = new Color(1f, 1f, 1f, 0.95f);
+        ConvergingLightFX.AddShadow(image);
 
         var input = go.AddComponent<TMP_InputField>();
         input.contentType = contentType;

@@ -67,8 +67,10 @@ public static class ConvergingLight
     // "Numbers are treated as texture and talisman rather than data — a faint
     // field of them can fill a sky." Spawns low-alpha drifting digits under
     // `parent`; each digit carries a NumberDrift. Positions are in the
-    // 1080x1920 reference space the canvases share.
-    public static void NumberField(Transform parent, int count, float maxAlpha)
+    // 1080x1920 reference space the canvases share. Font range is exposed so
+    // callers can layer fields into near/far parallax planes.
+    public static void NumberField(Transform parent, int count, float maxAlpha,
+        int minFont = 18, int maxFont = 44)
     {
         var rng = new System.Random();
         for (int i = 0; i < count; i++)
@@ -84,7 +86,7 @@ public static class ConvergingLight
 
             var text = go.AddComponent<Text>();
             text.text = rng.Next(0, 10).ToString();
-            text.fontSize = rng.Next(18, 44);
+            text.fontSize = rng.Next(minFont, maxFont);
             text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             text.alignment = TextAnchor.MiddleCenter;
             text.color = WithAlpha(NearWhite,

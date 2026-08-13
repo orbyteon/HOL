@@ -5,6 +5,31 @@ Play Console versionName in `ProjectSettings.asset`.
 
 ## [Unreleased]
 
+### Improved (Converging Light visual redesign)
+
+- The menu and splash now wear a fully owned look: a deep multi-stop
+  indigo field with a slowly breathing cyan/magenta/gold aurora, two
+  parallax planes of drifting digits, and a corner vignette — the old
+  photo background survives only as faint texture
+- Every screen panel is now a floating card: rounded surface, soft
+  elevation shadow, and a hairline cyan-to-magenta seam along its top edge
+- All buttons joined one role system: muted-gold primary CTA, cyan
+  secondary actions, ghost-indigo tertiary (with seam hairline), softened
+  icon art for settings/quit — replacing the mixed scene button art
+- Primary CTAs (Play, Find challenger, PvP entry, room create, guess)
+  carry a slow masked shine sweep; sweeps are phase-randomized so they
+  never sync
+- Menu and PvP screens assemble with a staggered content cascade instead
+  of popping; PvP screens became dimming scrim + centered card layouts
+  with the room code as a gold letterspaced hero mark over a seam rule
+- Victory now lands with a warm full-screen light pulse synced to the
+  confetti (solo and PvP, each scoped to its own screen)
+- The splash gained the same aurora/vignette stack plus a gold halo bloom
+  behind the logo
+- Scene input fields became rounded near-white wells with elevation,
+  matching the runtime-built ones; in-match headers read as letterspaced
+  engraved captions
+
 ### Improved (frontend experience pass)
 
 - Losses now reveal the secret number you were hunting (solo and PvP) —

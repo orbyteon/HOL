@@ -24,7 +24,24 @@ public class JuiceRuntimeWiring : MonoBehaviour
         AddButtonJuice();
         AddPanelAnimators();
         AddConfetti();
+        AddWinFlash();
         WireClickSounds();
+    }
+
+    // Solo victory light pulse, topmost on the main canvas, gated to the
+    // game panel so PvP results (own canvas, own flash) never trigger it.
+    void AddWinFlash()
+    {
+        var mm = FindObjectOfType<FakeMatchmaking>();
+        if (mm == null || mm.panelGame == null)
+            return;
+
+        var canvas = mm.panelGame.GetComponentInParent<Canvas>(true);
+        if (canvas == null || canvas.transform.Find("WinFlash") != null)
+            return;
+
+        var flash = WinFlash.Attach(canvas.transform);
+        flash.gate = mm.panelGame;
     }
 
     // The scene has a dedicated click AudioSource, but only a few buttons

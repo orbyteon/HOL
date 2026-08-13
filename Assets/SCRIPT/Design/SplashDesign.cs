@@ -45,14 +45,28 @@ public class SplashDesign : MonoBehaviour
             bg.type = Image.Type.Simple;
         }
 
-        // 2. Number field: above the background, below the logo.
+        // 2. Aurora + number field + vignette: above the background, below
+        // the logo. The same nocturnal stack the menu wears.
+        var aurora = AuroraBackdrop.Attach(canvas.transform);
+        aurora.transform.SetSiblingIndex(1);
+
         var field = RuntimeUI.CreateObject("NumberField", canvas.transform);
         RuntimeUI.Stretch(field);
-        field.transform.SetSiblingIndex(1);
+        field.transform.SetSiblingIndex(2);
         ConvergingLight.NumberField(field.transform, 36, 0.08f);
 
-        // 3. Logo entrance bloom.
+        var edge = RuntimeUI.CreateObject("Vignette", canvas.transform);
+        RuntimeUI.Stretch(edge);
+        var vig = edge.AddComponent<Image>();
+        vig.sprite = ConvergingLightFX.Vignette;
+        vig.color = ConvergingLight.WithAlpha(new Color(0.015f, 0.015f, 0.05f), 0.6f);
+        vig.raycastTarget = false;
+        edge.transform.SetSiblingIndex(3);
+
+        // 3. Logo entrance bloom, over its own gold halo — "the way a
+        // cartographer gilds only the destination".
         logoRect = (RectTransform)logoT;
+        BuildLogoHalo(canvas.transform, logoRect, logoT);
         logoGroup = logoT.GetComponent<CanvasGroup>();
         if (logoGroup == null) logoGroup = logoT.gameObject.AddComponent<CanvasGroup>();
         logoGroup.alpha = 0f;
@@ -72,6 +86,27 @@ public class SplashDesign : MonoBehaviour
         BuildProgress(canvas.transform);
 
         ready = true;
+    }
+
+    static void BuildLogoHalo(Transform canvas, RectTransform logoRect, Transform logoT)
+    {
+        var halo = RuntimeUI.CreateObject("LogoHalo", canvas);
+        var haloRect = (RectTransform)halo.transform;
+        if (logoRect.anchorMin == logoRect.anchorMax)
+        {
+            haloRect.anchorMin = logoRect.anchorMin;
+            haloRect.anchorMax = logoRect.anchorMax;
+            haloRect.anchoredPosition = logoRect.anchoredPosition;
+        }
+        haloRect.sizeDelta = new Vector2(700f, 700f);
+
+        var img = halo.AddComponent<Image>();
+        img.sprite = ConvergingLightFX.RadialGlow;
+        img.color = ConvergingLight.WithAlpha(ConvergingLight.Gold, 0.10f);
+        img.raycastTarget = false;
+
+        // Just beneath the logo in paint order.
+        halo.SetSiblingIndex(logoT.GetSiblingIndex());
     }
 
     void BuildSeam(Transform canvas)

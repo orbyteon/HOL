@@ -3,23 +3,25 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
-// Converging Light backdrop for the main menu, built one frame after Start
+// Converging Light look for the main menu, built one frame after Start
 // (same pattern as Extras/JuiceRuntimeWiring):
-//   1. A semi-transparent indigo gradient over the scene's photo BACKROUND
-//      pulls the whole menu into the nocturnal palette, plus a faint
-//      drifting number field above it. Both sit directly over BACKROUND in
-//      the canvas hierarchy — behind every button and panel — and never
-//      intercept raycasts.
-//   2. A palette pass retints the scene-authored panels and labels, which
-//      were a mixed bag (pure white panels, a bright red settings panel,
-//      pure black/white/red/orange text). Button art sprites and input
-//      fields are left untouched, so dark labels on light button art stay
-//      readable; everything directly on a panel is mapped onto the canon
-//      palette (near-white text, cyan accents, gold primary).
+//   1. Backdrop stack over the scene's photo BACKROUND: deep indigo field,
+//      breathing aurora light pools, two parallax planes of drifting digits,
+//      and a corner vignette. All behind every button and panel, never
+//      intercepting raycasts; the photo survives only as faint texture.
+//   2. A palette pass maps the scene-authored label colors (mixed white/
+//      black/red/orange) onto the canon: near-white text, cyan accents,
+//      gold primary. Texts on buttons and inside input fields are handled
+//      by the component pass instead.
+//   3. A component pass pulls every scene-authored control into the design
+//      system: panels become floating cards (rounded, shadowed, seam-lit),
+//      buttons take their role color (gold CTA / cyan action / ghost),
+//      icon art is softened into the palette, input fields become rounded
+//      near-white wells, and menu panels gain a staggered content reveal.
 public class DesignRuntimeWiring : MonoBehaviour
 {
-    const float OverlayAlpha = 0.62f;
-    static readonly Color BackdropTint = new Color(0.62f, 0.60f, 0.85f);
+    const float OverlayAlpha = 0.92f;
+    static readonly Color BackdropTint = new Color(0.34f, 0.34f, 0.52f);
 
     void Start()
     {
@@ -40,36 +42,140 @@ public class DesignRuntimeWiring : MonoBehaviour
             int insert = bg.GetSiblingIndex() + 1;
 
             var bgImg = bg.GetComponent<Image>();
-            if (bgImg != null) bgImg.color = BackdropTint; // soften the magenta cast
+            if (bgImg != null) bgImg.color = BackdropTint; // photo survives as faint texture
 
+            // The owned look, back to front: deep indigo field, breathing
+            // aurora, two parallax digit planes, vignette. All raycast-off,
+            // all behind every panel and button.
             var overlay = RuntimeUI.CreateObject("BackdropDepth", canvas.transform);
             RuntimeUI.Stretch(overlay);
             var img = overlay.AddComponent<Image>();
-            img.sprite = ConvergingLight.VerticalGradient(
-                ConvergingLight.WithAlpha(ConvergingLight.DepthTop, OverlayAlpha),
-                ConvergingLight.WithAlpha(ConvergingLight.DepthBottom, OverlayAlpha));
-            img.color = Color.white;
+            img.sprite = ConvergingLightFX.DeepField;
+            img.color = ConvergingLight.WithAlpha(Color.white, OverlayAlpha);
             img.raycastTarget = false;
             overlay.transform.SetSiblingIndex(insert);
 
-            var field = RuntimeUI.CreateObject("BackdropNumbers", canvas.transform);
-            RuntimeUI.Stretch(field);
-            ConvergingLight.NumberField(field.transform, 28, 0.05f);
-            field.transform.SetSiblingIndex(insert + 1);
+            var aurora = AuroraBackdrop.Attach(canvas.transform);
+            aurora.transform.SetSiblingIndex(insert + 1);
+
+            var far = RuntimeUI.CreateObject("BackdropNumbersFar", canvas.transform);
+            RuntimeUI.Stretch(far);
+            ConvergingLight.NumberField(far.transform, 24, 0.045f, 16, 30);
+            far.transform.SetSiblingIndex(insert + 2);
+
+            var near = RuntimeUI.CreateObject("BackdropNumbersNear", canvas.transform);
+            RuntimeUI.Stretch(near);
+            ConvergingLight.NumberField(near.transform, 10, 0.08f, 34, 52);
+            near.transform.SetSiblingIndex(insert + 3);
+
+            var edge = RuntimeUI.CreateObject("BackdropVignette", canvas.transform);
+            RuntimeUI.Stretch(edge);
+            var vig = edge.AddComponent<Image>();
+            vig.sprite = ConvergingLightFX.Vignette;
+            vig.color = ConvergingLight.WithAlpha(new Color(0.015f, 0.015f, 0.05f), 0.6f);
+            vig.raycastTarget = false;
+            edge.transform.SetSiblingIndex(insert + 4);
 
             RestylePalette(canvas.transform);
+            RestyleControls(canvas.transform);
             break;
         }
+    }
+
+    // --- component pass -----------------------------------------------------
+    //
+    // Scene-authored controls join the same language runtime-built UI already
+    // speaks: card panels with elevation and a seam hairline, role-colored
+    // rounded buttons (gold CTA / cyan action / ghost indigo), softened icon
+    // art. Names are the scene's own; every lookup is null-guarded so a
+    // missing object simply keeps its authored look.
+
+    static readonly string[] PrimaryButtons =
+        { "ButtonPlay", "ButtonChallenger", "ButtonConfirm", "Buttonsave", "ButtonSTOPGAME" };
+    static readonly string[] SecondaryButtons =
+        { "ButtonHIGHER", "ButtonLOWER", "ButtonCORRECT" };
+    static readonly string[] GhostButtons =
+        { "ButtonBack", "Buttonback" };
+    static readonly string[] IconButtons =
+        { "Buttonsettings", "ButtonQuit" };
+
+    void RestyleControls(Transform canvasRoot)
+    {
+        foreach (var name in PrimaryButtons)
+            ConvergingLightFX.StyleButton(FindButton(canvasRoot, name),
+                ConvergingLightFX.ButtonRole.Primary);
+        foreach (var name in SecondaryButtons)
+            ConvergingLightFX.StyleButton(FindButton(canvasRoot, name),
+                ConvergingLightFX.ButtonRole.Secondary);
+        foreach (var name in GhostButtons)
+            ConvergingLightFX.StyleButton(FindButton(canvasRoot, name),
+                ConvergingLightFX.ButtonRole.Ghost);
+        foreach (var name in IconButtons)
+            ConvergingLightFX.StyleIconButton(FindButton(canvasRoot, name));
+
+        // Panels become floating cards; the searching scrim stays a scrim.
+        StyleCardPanel(canvasRoot, "PanelPlay");
+        StyleCardPanel(canvasRoot, "PanelSettings");
+        StyleCardPanel(canvasRoot, "PanelGAME");
+
+        // Scene input fields: rounded near-white wells, matching the
+        // runtime-built ones.
+        foreach (var input in canvasRoot.GetComponentsInChildren<TMP_InputField>(true))
+        {
+            var img = input.GetComponent<Image>();
+            if (img == null) continue;
+            img.sprite = RuntimeUI.RoundedRectSprite;
+            img.type = Image.Type.Sliced;
+            img.color = new Color(1f, 1f, 1f, 0.95f);
+            ConvergingLightFX.AddShadow(img);
+        }
+
+        // One gilded gesture per screen: the menu's Play and the challenger
+        // panel's CTA carry the shine sweep; every other gold stays still.
+        ConvergingLightFX.AddShine(FindButton(canvasRoot, "ButtonPlay"));
+        ConvergingLightFX.AddShine(FindButton(canvasRoot, "ButtonChallenger"));
+
+        // In-match headers read as engraved captions.
+        StyleHeader(canvasRoot, "Opponentanme");
+        StyleHeader(canvasRoot, "Yourtern");
+
+        // Menu screens assemble instead of popping.
+        AttachCascade(canvasRoot, "PanelPlay");
+        AttachCascade(canvasRoot, "PanelSettings");
+    }
+
+    static Button FindButton(Transform root, string name)
+    {
+        var t = DeepFind(root, name);
+        return t != null ? t.GetComponent<Button>() : null;
+    }
+
+    static void StyleCardPanel(Transform root, string name)
+    {
+        var t = DeepFind(root, name);
+        var img = t != null ? t.GetComponent<Image>() : null;
+        if (img != null) ConvergingLightFX.StyleCard(img);
+    }
+
+    static void StyleHeader(Transform root, string name)
+    {
+        var t = DeepFind(root, name);
+        if (t == null) return;
+        ConvergingLightFX.StyleHeading(t.GetComponent<TMP_Text>(), 3f);
+    }
+
+    static void AttachCascade(Transform root, string name)
+    {
+        var t = DeepFind(root, name);
+        if (t != null && t.GetComponent<CascadeReveal>() == null)
+            t.gameObject.AddComponent<CascadeReveal>();
     }
 
     // --- palette pass -------------------------------------------------------
 
     static void RestylePalette(Transform canvasRoot)
     {
-        // Panels: indigo depth, never pure white or pure black.
-        SetImageColor(canvasRoot, "PanelPlay", ConvergingLight.PanelIndigo);
-        SetImageColor(canvasRoot, "PanelGAME", ConvergingLight.PanelIndigo);
-        SetImageColor(canvasRoot, "PanelSettings", ConvergingLight.PanelIndigo);
+        // Panel surfaces are handled by the component pass (StyleCardPanel).
 
         // Matchmaking scrim keeps its alpha, gains the indigo cast.
         var searching = DeepFind(canvasRoot, "PanelSearching");
@@ -87,13 +193,6 @@ public class DesignRuntimeWiring : MonoBehaviour
             if (Skippable(txt.transform)) continue;
             txt.color = MapColor(txt.color);
         }
-    }
-
-    static void SetImageColor(Transform root, string name, Color color)
-    {
-        var t = DeepFind(root, name);
-        var img = t != null ? t.GetComponent<Image>() : null;
-        if (img != null) img.color = color;
     }
 
     // Transform.Find only sees direct children; the panels sit at varying
