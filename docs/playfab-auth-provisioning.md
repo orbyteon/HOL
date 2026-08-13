@@ -1,12 +1,15 @@
 # PlayFab production authentication boundary
 
-HOL's Unity client identifies an installation with `SystemInfo.deviceUniqueIdentifier`
-and uses that value as a PlayFab Custom ID. Production builds intentionally call
-`Client/LoginWithCustomID` with `CreateAccount:false`.
+HOL's Unity client uses `SystemInfo.deviceUniqueIdentifier` as its PlayFab Custom
+ID. On Android, Unity derives this value from `ANDROID_ID`; on Android 8.0 and
+later it is scoped to the combination of app-signing key, Android user, and
+device, and normally survives uninstall/reinstall when that scope is unchanged.
+Production builds intentionally call `Client/LoginWithCustomID` with
+`CreateAccount:false`.
 
-A fresh production installation is therefore provisioned by the trusted service
-in `services/provisioner/` before the Unity client retries its normal login. The
-PlayFab Title Secret Key never ships in Unity.
+When that anonymous PlayFab identity does not already exist, the trusted service
+in `services/provisioner/` provisions it before the Unity client retries its
+normal login. The PlayFab Title Secret Key never ships in Unity.
 
 ## Implemented production flow
 
@@ -84,9 +87,9 @@ the resulting AAB signature with `jarsigner`, and records its SHA-256 checksum.
 ## Abuse controls
 
 Google Play Integrity is the primary attestation boundary. The request hash binds
-an integrity token to the exact installation ID and app version being provisioned,
-and the service accepts only fresh tokens. Standard Play Integrity requests also
-receive Google's replay protection when their token is decoded.
+an integrity token to the exact Android-scoped Custom ID and app version being
+provisioned, and the service accepts only fresh tokens. Standard Play Integrity
+requests also receive Google's replay protection when their token is decoded.
 
 The function also has a small in-process IP limiter, but that limiter is not a
 distributed quota across serverless instances. Configure platform-level rate
@@ -97,8 +100,11 @@ before public release.
 
 - Deploy the provisioner from `main` using the manual workflow.
 - Use a Google Play-distributed test build on a certified physical Android device.
-- Verify a brand-new install provisions successfully and the subsequent
+- Verify a brand-new identity provisions successfully and the subsequent
   `Client/LoginWithCustomID(CreateAccount:false)` succeeds.
+- Verify reinstall behavior on the same Android user/device with the production
+  Play App Signing key: an existing anonymous identity should log in rather than
+  creating a second account.
 - Verify an unprovisioned Custom ID cannot create an account directly from Unity.
 - Verify a tampered package/request hash, stale token, unlicensed app, wrong
   signing certificate, malformed certificate configuration, or failed
