@@ -95,6 +95,11 @@ public class GameManager : MonoBehaviour
     UnityEngine.UI.Button lockButton;
     UnityEngine.UI.Text lockButtonLabel;
 
+    // The rangeText Inspector field was never wired in MainMenu, so the range
+    // line — and the Lock's one-line explanation, which shares the slot — had
+    // nowhere to render in solo. Built at runtime like the Lock button.
+    UnityEngine.UI.Text runtimeRangeLabel;
+
     string[] fakeNames =
     {
         "Pierre", "Lucas", "Mathieu", "Marco", "Giovanni",
@@ -110,6 +115,7 @@ public class GameManager : MonoBehaviour
 
         stopGameButton.SetActive(false);
         HideButtons();
+        EnsureRangeLabel();
         EnsureLockButton();
         RefreshLockButton();
 
@@ -445,6 +451,25 @@ public class GameManager : MonoBehaviour
         RefreshLockButton();
     }
 
+    void EnsureRangeLabel()
+    {
+        if (rangeText != null || runtimeRangeLabel != null || stopGameButton == null) return;
+
+        // Sits in the empty band above the Lock button (y 168-252) and below the
+        // guess histories (y 475-525); nothing else in PanelGAME occupies it.
+        runtimeRangeLabel = RuntimeUI.CreateText(stopGameButton.transform.parent,
+            "RangeLabel", "", 32, new Vector2(0f, 300f), new Vector2(760f, 60f),
+            ConvergingLight.Cyan);
+    }
+
+    // Writes to whichever range line exists: a wired Inspector field if one is
+    // ever added, otherwise the runtime-built label.
+    void SetRangeLine(string text)
+    {
+        if (rangeText != null) rangeText.text = text;
+        else if (runtimeRangeLabel != null) runtimeRangeLabel.text = text;
+    }
+
     void EnsureLockButton()
     {
         if (lockButton != null || stopGameButton == null) return;
@@ -486,11 +511,11 @@ public class GameManager : MonoBehaviour
         if (!lockRevealedThisMatch)
         {
             lockRevealedThisMatch = true;
-            if (LockIntro.ShouldExplain && rangeText != null)
+            if (LockIntro.ShouldExplain)
             {
                 // One line, in the secondary slot, replaced by the range again
                 // on the next guess.
-                rangeText.text = L10n.Get("lock_hint");
+                SetRangeLine(L10n.Get("lock_hint"));
                 LockIntro.MarkExplained();
             }
         }
@@ -635,7 +660,6 @@ public class GameManager : MonoBehaviour
 
     void UpdateRangeText()
     {
-        if (rangeText != null)
-            rangeText.text = L10n.Get("between_range", playerMin, playerMax);
+        SetRangeLine(L10n.Get("between_range", playerMin, playerMax));
     }
 }

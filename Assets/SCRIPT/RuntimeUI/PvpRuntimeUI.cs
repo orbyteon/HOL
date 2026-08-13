@@ -190,10 +190,15 @@ public class PvpRuntimeUI : MonoBehaviour
         RuntimeUI.LocalizePlaceholder(rematchSecret, "rematch_prompt");
         RuntimeUI.Localize(rematchBtn, "rematch");
 
-        var resultText = RuntimeUI.CreateText(matchPanel.transform, "Result", "", 64,
-            new Vector2(0f, -470f), new Vector2(1000f, 130f));
+        // Sized for the longest result, which is the draw: three lines in
+        // English and four in Greek, where the closing tip wraps. At 64pt those
+        // spilled up into the second Signals row, which shares the result
+        // screen. 48pt keeps every line unwrapped inside 1000px and leaves a
+        // clear gap above and below.
+        var resultText = RuntimeUI.CreateText(matchPanel.transform, "Result", "", 48,
+            new Vector2(0f, -530f), new Vector2(1000f, 200f));
         var leaveBtn = RuntimeUI.CreateButton(matchPanel.transform, "LeaveButton",
-            L10n.Get("pvp_leave"), new Vector2(0f, -600f), new Vector2(300f, 78f), Neutral);
+            L10n.Get("pvp_leave"), new Vector2(0f, -720f), new Vector2(300f, 78f), Neutral);
 
         RuntimeUI.LocalizePlaceholder(guessInput, "number_placeholder");
         RuntimeUI.Localize(guessBtn, "pvp_guess");
