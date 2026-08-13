@@ -32,10 +32,30 @@ public class PvpGameController : MonoBehaviour
 
     [Header("Match UI")]
     public TMP_InputField guessInput;
+    public GameObject guessButton;
     public TMP_Text opponentNameText;
     public TMP_Text turnText;
     public TMP_Text historyText;
     public TMP_Text resultText;
+
+    [Header("Duel rules UI")]
+    // How far the player has narrowed the opponent's number, plus the Lock.
+    // Both are optional: the Firebase development fallback does not adjudicate
+    // the Lock, so PvpRuntimeUI leaves the control hidden there.
+    public TMP_Text rangeText;
+    public GameObject lockButton;
+    public TMP_Text lockButtonLabel;
+
+    [Header("Signals")]
+    public GameObject signalsRoot;
+    public TMP_Text signalFeedText;
+
+    [Header("Rematch")]
+    // Offered on the result screen so friends can play again without swapping a
+    // new invite code. Needs the server-authoritative backend.
+    public GameObject rematchButton;
+    public TMP_InputField rematchSecretInput;
+    public TMP_Text rematchStatusText;
 
     public ConfettiBurst winConfetti;
     public AudioSource audioSource;
@@ -47,6 +67,28 @@ public class PvpGameController : MonoBehaviour
     bool matchOver;
     bool guessInFlight;
     int localAcceptedGuessCount;
+
+    // The player's own narrowing interval on the opponent's number. PvP used to
+    // show no range at all while solo play did; it is also what tells us how
+    // many candidates are left, and therefore whether the Lock is worth
+    // offering.
+    int myMin = 1;
+    int myMax = 100;
+    bool lockArmed;
+
+    int lastSignalSeq;
+    int signalsSent;
+
+    // The Lock is revealed once the player has played a round, and explains
+    // itself the first time it appears. See LockIntro.
+    bool lockRevealedThisMatch;
+
+    int lastMatchIndex;
+    bool rematchInFlight;
+    int donePolls;
+    // A finished room is held open for a rematch, but not forever: at a 1.5s
+    // poll this is about two minutes before the room is released.
+    const int MaxDonePolls = 80;
 
     int flowGeneration;
     bool joinCreateInFlight;
@@ -201,11 +243,12 @@ public class PvpGameController : MonoBehaviour
         }
 
         string typed = guessInput.text;
+        bool staked = lockArmed;
         guessInput.text = "";
         turnText.text = L10n.Get("pvp_sending");
         guessInFlight = true;
         int gen = flowGeneration;
-        client.SubmitGuess(guess, lastState, ok =>
+        client.SubmitGuess(guess, staked, lastState, ok =>
         {
             if (gen != flowGeneration) return;
 
@@ -213,17 +256,90 @@ public class PvpGameController : MonoBehaviour
             if (ok)
             {
                 localAcceptedGuessCount++;
-                // A winning guess ends the match in the submit response itself;
-                // don't leave the winner staring at "sending" until the next poll
-                // (which the loser's leave may beat to the room).
-                if (lastState != null && lastState.phase == "done" && !matchOver)
+                lockArmed = false;
+                if (staked) LockIntro.MarkUsed();
+                NarrowMyRange(guess, lastState != null ? lastState.lastHint : "");
+
+                // Render the server's answer straight away rather than leaving
+                // the player staring at "sending" for a poll interval. This
+                // also covers a winning guess, whose result the loser's leave
+                // could otherwise beat to the room.
+                if (lastState != null && !matchOver)
                     OnState(lastState);
             }
             else
             {
                 guessInput.text = typed;
                 turnText.text = L10n.Get("pvp_network_error");
+                RefreshLockButton();
             }
+        });
+    }
+
+    // Arms or disarms the Lock for the guess about to be sent. Nothing goes to
+    // the server until the guess itself does, so the opponent cannot see it
+    // coming.
+    public void OnLockTogglePressed()
+    {
+        if (matchOver || lastState == null || guessInFlight) return;
+        if (!client.IsServerAuthoritative) return;
+
+        string me = client.IsHost ? "host" : "guest";
+        if (lastState.LockUsedBy(me) || lastState.phase != "play") return;
+
+        lockArmed = !lockArmed;
+        Haptics.Light();
+        RefreshLockButton();
+    }
+
+    public void OnSignalPressed(int signalId)
+    {
+        if (lastState == null || !Signals.IsValid(signalId)) return;
+        if (!client.IsServerAuthoritative) return;
+        if (signalsSent >= Signals.CapPerSide)
+        {
+            if (signalFeedText != null)
+                signalFeedText.text = L10n.Get("signal_limit");
+            return;
+        }
+
+        signalsSent++;
+        RefreshSignalsAvailability();
+
+        // Show it locally straight away — the sender should never wait a poll
+        // interval to see their own message land.
+        ShowSignalLine(L10n.Get("you"), signalId);
+        client.SendSignal(signalId, ok =>
+        {
+            if (!ok && signalsSent > 0) signalsSent--;
+        });
+    }
+
+    // Commits a fresh secret for another match in this room. The server deals
+    // the next match only once both players have committed.
+    public void OnRematchPressed()
+    {
+        if (!matchOver || lastState == null || rematchInFlight) return;
+        if (!client.IsServerAuthoritative || lastState.opponentLeft) return;
+
+        int secret;
+        if (!TryReadSecret(rematchSecretInput, out secret))
+        {
+            SetRematchStatus(L10n.Get("pvp_secret"));
+            return;
+        }
+
+        rematchInFlight = true;
+        SetRematchStatus(L10n.Get("rematch_waiting"));
+
+        int gen = flowGeneration;
+        client.RequestRematch(secret, ok =>
+        {
+            if (gen != flowGeneration) return;
+
+            rematchInFlight = false;
+            if (ok) donePolls = 0;
+            else SetRematchStatus(L10n.Get("pvp_network_error"));
         });
     }
 
@@ -234,8 +350,10 @@ public class PvpGameController : MonoBehaviour
         client.DeleteRoom();
         matchOver = false;
         guessInFlight = false;
+        rematchInFlight = false;
         lastState = null;
         shownGuessKey = "";
+        ShowRematchOffer(false);
         OpenPvpMenu();
     }
 
@@ -278,6 +396,20 @@ public class PvpGameController : MonoBehaviour
         shownGuessKey = "";
         silentPolls = 0;
         lastStateSignature = "";
+        myMin = 1;
+        myMax = 100;
+        lockArmed = false;
+        lockRevealedThisMatch = false;
+        lastSignalSeq = 0;
+        signalsSent = 0;
+        lastMatchIndex = 0;
+        rematchInFlight = false;
+        donePolls = 0;
+        ShowRematchOffer(false);
+        UpdateRangeText();
+        RefreshLockButton();
+        RefreshSignalsAvailability();
+        if (signalFeedText != null) signalFeedText.text = "";
         client.OnRoomClosed = HandleRoomClosed;
         client.OnConnectionLost = HandleConnectionLost;
         client.StartPolling(OnState);
@@ -325,7 +457,8 @@ public class PvpGameController : MonoBehaviour
         string me = client.IsHost ? "host" : "guest";
         string signature = s.phase + "|" + s.turn + "|" + s.lastBy + "|" +
                            s.lastGuess + "|" + s.winner + "|" + s.hostGuessCount +
-                           "|" + s.guestGuessCount;
+                           "|" + s.guestGuessCount + "|" + s.matchIndex + "|" +
+                           s.iWantRematch + "|" + s.theyWantRematch;
         if (signature != lastStateSignature)
         {
             lastStateSignature = signature;
@@ -343,6 +476,14 @@ public class PvpGameController : MonoBehaviour
             }
         }
         else silentPolls = 0;
+
+        // Both sides committed a new secret, so the room dealt a fresh match in
+        // place. Everything local to the old one has to go.
+        if (matchOver && s.phase == "play" && s.matchIndex != lastMatchIndex)
+        {
+            lastMatchIndex = s.matchIndex;
+            BeginRematchedMatch();
+        }
 
         if (s.phase == "waiting")
             return;
@@ -381,15 +522,30 @@ public class PvpGameController : MonoBehaviour
                     hint = s.lastGuess == targetSecret ? L10n.Get("correct") + "!"
                         : (s.lastGuess < targetSecret ? L10n.Get("higher") : L10n.Get("lower"));
             }
+            if (s.lastLocked) who += " [" + L10n.Get("lock_armed") + "]";
             historyText.text = who + ": " + s.lastGuess + "  →  " + hint;
+
+            if (guessWasMine)
+                NarrowMyRange(s.lastGuess, s.lastHint);
+            if (s.lastLocked && s.lastHint != "correct")
+                historyText.text += "\n" + (guessWasMine
+                    ? L10n.Get("lock_missed")
+                    : L10n.Get("opponent_forfeits", opponentName));
         }
+
+        ShowIncomingSignal(s, opponentName);
 
         if (s.phase == "done" && !matchOver)
         {
             matchOver = true;
-            client.StopPolling();
 
-            bool iWon = s.winner == me;
+            // Keep polling so the room can hear a rematch offer. Backends that
+            // cannot deal one release the room immediately, as before.
+            bool canRematch = client.IsServerAuthoritative;
+            if (!canRematch) client.StopPolling();
+
+            bool isDraw = s.winner == "draw";
+            bool iWon = !isDraw && s.winner == me;
             int authoritativeGuessCount = client.IsHost ? s.hostGuessCount : s.guestGuessCount;
             // The poll can deliver the finished state before the winning
             // submit's own response returns; that in-flight guess is mine and
@@ -402,12 +558,28 @@ public class PvpGameController : MonoBehaviour
                 ? s.revealedSecret
                 : (client.IsHost ? s.guestSecret : s.hostSecret);
 
-            resultText.text = iWon
-                ? L10n.Get("you_win") + "\n" + L10n.Get("won_in_guesses", myGuessCount)
-                : L10n.Get("you_lose") + "\n" + L10n.Get("number_was", huntedSecret);
+            if (isDraw)
+                resultText.text = L10n.Get("you_draw") + "\n" +
+                                  L10n.Get("draw_in_guesses", myGuessCount) + "\n" +
+                                  L10n.Get("draw_tip");
+            else
+                resultText.text = iWon
+                    ? L10n.Get("you_win") + "\n" + L10n.Get("won_in_guesses", myGuessCount)
+                    : L10n.Get("you_lose") + "\n" + L10n.Get("number_was", huntedSecret);
             turnText.text = "";
+            lockArmed = false;
+            RefreshLockButton();
 
-            if (iWon)
+            if (isDraw)
+            {
+                // Neither a win nor a loss: the streak survives, and the
+                // win/lose analytics event would misreport it, so it is left
+                // to the stats listeners alone.
+                GameStats.RecordDraw();
+                Haptics.Light();
+                GameEvents.StatsChanged();
+            }
+            else if (iWon)
             {
                 GameStats.RecordWin(myGuessCount, false);
                 Haptics.Success();
@@ -419,7 +591,7 @@ public class PvpGameController : MonoBehaviour
                 Haptics.Error();
                 GameEvents.MatchEnded(false, 0);
             }
-            if (audioSource != null)
+            if (audioSource != null && !isDraw)
             {
                 var clip = iWon ? winSound : loseSound;
                 if (clip != null) audioSource.PlayOneShot(clip);
@@ -427,15 +599,247 @@ public class PvpGameController : MonoBehaviour
             if (iWon && winConfetti != null)
                 winConfetti.Burst();
 
-            client.AcknowledgeResult();
+            if (canRematch)
+            {
+                donePolls = 0;
+                lastMatchIndex = s.matchIndex;
+                if (rematchSecretInput != null) rematchSecretInput.text = "";
+                SetRematchStatus("");
+                ShowRematchOffer(true);
+            }
+            else
+            {
+                client.AcknowledgeResult();
+            }
+            return;
+        }
+
+        // Later polls on a finished room carry the rematch handshake.
+        if (matchOver && s.phase == "done")
+        {
+            HandleRematchState(s, opponentName);
             return;
         }
 
         if (!matchOver)
         {
-            bool myTurn = s.turn == me;
-            turnText.text = myTurn ? L10n.Get("your_guess") : L10n.Get("opponent_thinking", opponentName);
+            UpdateTurnText(s, me, opponentName);
+            UpdateRangeText();
+            RefreshLockButton();
         }
+    }
+
+    // The turn line is where the new rules become legible: that a correct guess
+    // is only provisional, and that the answering guess is the last one.
+    void UpdateTurnText(PvpBackend.RoomState s, string me, string opponentName)
+    {
+        bool myTurn = s.turn == me;
+
+        if (s.IsMatchPointAgainst(me))
+        {
+            turnText.text = myTurn
+                ? L10n.Get("match_point")
+                : L10n.Get("opponent_thinking", opponentName);
+            return;
+        }
+
+        if (!string.IsNullOrEmpty(s.pendingWin) && s.pendingWin == me)
+        {
+            turnText.text = L10n.Get("match_point_yours", opponentName);
+            return;
+        }
+
+        if (!myTurn && s.ForfeitPendingFor(me))
+        {
+            turnText.text = L10n.Get("turn_forfeited");
+            return;
+        }
+
+        turnText.text = myTurn ? L10n.Get("your_guess") : L10n.Get("opponent_thinking", opponentName);
+    }
+
+    // ------------------------------------------------------------- rematch UI
+
+    void HandleRematchState(PvpBackend.RoomState s, string opponentName)
+    {
+        if (!client.IsServerAuthoritative) return;
+
+        if (s.opponentLeft)
+        {
+            ShowRematchOffer(false);
+            SetRematchStatus(L10n.Get("rematch_closed"));
+            ReleaseFinishedRoom();
+            return;
+        }
+
+        if (s.iWantRematch)
+            SetRematchStatus(L10n.Get("rematch_waiting"));
+        else if (s.theyWantRematch)
+            SetRematchStatus(L10n.Get("rematch_offered", opponentName));
+
+        // Nobody is coming back. Let the room go rather than holding server
+        // state open for a player who has put the phone down — with a longer
+        // grace period when we are the ones waiting on an answer.
+        int limit = s.iWantRematch ? MaxDonePolls * 2 : MaxDonePolls;
+        if (++donePolls >= limit)
+        {
+            ShowRematchOffer(false);
+            SetRematchStatus(L10n.Get("rematch_closed"));
+            ReleaseFinishedRoom();
+        }
+    }
+
+    void ReleaseFinishedRoom()
+    {
+        client.StopPolling();
+        client.AcknowledgeResult();
+    }
+
+    // The room dealt a new match in place: clear everything that described the
+    // old one, keeping the connection and the opponent.
+    void BeginRematchedMatch()
+    {
+        matchOver = false;
+        guessInFlight = false;
+        rematchInFlight = false;
+        localAcceptedGuessCount = 0;
+        shownGuessKey = "";
+        silentPolls = 0;
+        donePolls = 0;
+        myMin = 1;
+        myMax = 100;
+        lockArmed = false;
+        lockRevealedThisMatch = false;
+        signalsSent = 0; // the server grants a fresh allowance per match
+
+        ShowRematchOffer(false);
+        SetRematchStatus("");
+        if (resultText != null) resultText.text = "";
+        if (historyText != null) historyText.text = "";
+        if (signalFeedText != null) signalFeedText.text = "";
+        if (guessInput != null) guessInput.text = "";
+
+        UpdateRangeText();
+        RefreshLockButton();
+        RefreshSignalsAvailability();
+    }
+
+    void ShowRematchOffer(bool visible)
+    {
+        if (rematchButton != null) rematchButton.SetActive(visible);
+        if (rematchSecretInput != null) rematchSecretInput.gameObject.SetActive(visible);
+
+        // The guess controls are dead once the match is decided, so the rematch
+        // controls take their slot rather than sitting beside a field that can
+        // no longer be used. They come back only for a live match.
+        bool matchLive = !matchOver;
+        if (guessInput != null) guessInput.gameObject.SetActive(!visible && matchLive);
+        if (guessButton != null) guessButton.SetActive(!visible && matchLive);
+
+        if (!visible) SetRematchStatus("");
+    }
+
+    void SetRematchStatus(string message)
+    {
+        if (rematchStatusText != null)
+            rematchStatusText.text = message;
+    }
+
+    // ---------------------------------------------------------- duel rules UI
+
+    void NarrowMyRange(int guess, string hint)
+    {
+        if (hint == "higher" && guess + 1 > myMin) myMin = guess + 1;
+        else if (hint == "lower" && guess - 1 < myMax) myMax = guess - 1;
+        UpdateRangeText();
+    }
+
+    int CandidatesLeft()
+    {
+        return myMax >= myMin ? myMax - myMin + 1 : 0;
+    }
+
+    void UpdateRangeText()
+    {
+        if (rangeText == null) return;
+
+        if (matchOver || lastState == null || lastState.phase != "play")
+        {
+            rangeText.text = "";
+            return;
+        }
+
+        rangeText.text = L10n.Get("between_range", myMin, myMax);
+    }
+
+    // The Lock button doubles as the tutorial for the mechanic: once the range
+    // is down to a few candidates it stops saying "LOCK" and starts asking.
+    // Two players who never lock draw roughly a quarter of their duels, so the
+    // prompt is what keeps the draw rate down in practice.
+    void RefreshLockButton()
+    {
+        if (lockButton == null) return;
+
+        string me = client != null && client.IsHost ? "host" : "guest";
+
+        // Not offered until the player has taken a turn: a first duel should
+        // feel like plain higher-or-lower, and staking the Lock on an opening
+        // guess is a trap rather than a choice.
+        bool revealed = lastState != null && lastState.GuessCountFor(me) > 0;
+        bool available = client != null && client.IsServerAuthoritative &&
+                         !matchOver && lastState != null && revealed &&
+                         lastState.phase == "play" && !lastState.LockUsedBy(me);
+
+        lockButton.SetActive(available);
+        if (!available) return;
+
+        if (!lockRevealedThisMatch)
+        {
+            lockRevealedThisMatch = true;
+            if (LockIntro.ShouldExplain && rangeText != null)
+            {
+                // One line, in the secondary slot, replaced by the range again
+                // on the next guess.
+                rangeText.text = L10n.Get("lock_hint");
+                LockIntro.MarkExplained();
+            }
+        }
+
+        if (lockButtonLabel == null) return;
+
+        int left = CandidatesLeft();
+        if (lockArmed)
+            lockButtonLabel.text = L10n.Get("lock_armed");
+        else if (DuelRules.ShouldSuggestLock(left, true))
+            lockButtonLabel.text = L10n.Get("lock_suggest", left);
+        else
+            lockButtonLabel.text = L10n.Get("lock");
+    }
+
+    void RefreshSignalsAvailability()
+    {
+        if (signalsRoot == null) return;
+
+        signalsRoot.SetActive(client != null && client.IsServerAuthoritative &&
+                              signalsSent < Signals.CapPerSide);
+    }
+
+    void ShowSignalLine(string who, int signalId)
+    {
+        if (signalFeedText != null)
+            signalFeedText.text = L10n.Get("signal_from", who, Signals.Text(signalId));
+    }
+
+    void ShowIncomingSignal(PvpBackend.RoomState s, string opponentName)
+    {
+        if (s.signalSeq <= lastSignalSeq) return;
+        lastSignalSeq = s.signalSeq;
+
+        // The sender already saw their own line the moment they tapped.
+        if (s.signalBy == (client.IsHost ? "host" : "guest")) return;
+
+        ShowSignalLine(opponentName, s.signalId);
+        Haptics.Light();
     }
 
     static string LocalizedHint(string hint)

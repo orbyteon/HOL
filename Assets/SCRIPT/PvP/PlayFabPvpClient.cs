@@ -10,6 +10,10 @@ using UnityEngine.Networking;
 // PlayFab API Access Policy before release.
 public class PlayFabPvpClient : PvpBackend
 {
+    // CloudScript adjudicates every room operation, so the Lock and Signals
+    // can be trusted here.
+    public override bool IsServerAuthoritative { get { return true; } }
+
     [Tooltip("Your PlayFab Title ID from Game Manager (e.g. 1A2B3)")]
     public string titleId = "";
 
@@ -198,12 +202,13 @@ public class PlayFabPvpClient : PvpBackend
 
     // ------------------------------------------------ gameplay
 
-    public override void SubmitGuess(int guess, RoomState current, Action<bool> done)
+    public override void SubmitGuess(int guess, bool useLock, RoomState current, Action<bool> done)
     {
         if (string.IsNullOrEmpty(RoomCode)) { done?.Invoke(false); return; }
 
         string args = "{\"roomId\":\"" + EscapeJson(RoomCode) +
-                      "\",\"guess\":" + guess + "}";
+                      "\",\"guess\":" + guess +
+                      ",\"lock\":" + (useLock ? "true" : "false") + "}";
         ExecuteCloudScript("submitGuess", args, (ok, resp) =>
         {
             if (!ok || !CloudOk(resp))
@@ -215,6 +220,32 @@ public class PlayFabPvpClient : PvpBackend
             ApplyReturnedState(current, resp);
             done?.Invoke(true);
         });
+    }
+
+    public override void SendSignal(int signalId, Action<bool> done)
+    {
+        if (string.IsNullOrEmpty(RoomCode) || !Signals.IsValid(signalId))
+        {
+            done?.Invoke(false);
+            return;
+        }
+
+        string args = "{\"roomId\":\"" + EscapeJson(RoomCode) +
+                      "\",\"signalId\":" + signalId + "}";
+        ExecuteCloudScript("sendSignal", args, (ok, resp) => done?.Invoke(ok && CloudOk(resp)));
+    }
+
+    public override void RequestRematch(int secret, Action<bool> done)
+    {
+        if (string.IsNullOrEmpty(RoomCode) || secret < 1 || secret > 100)
+        {
+            done?.Invoke(false);
+            return;
+        }
+
+        string args = "{\"roomId\":\"" + EscapeJson(RoomCode) +
+                      "\",\"secret\":" + secret + "}";
+        ExecuteCloudScript("requestRematch", args, (ok, resp) => done?.Invoke(ok && CloudOk(resp)));
     }
 
     public override void StartPolling(Action<RoomState> onState)
@@ -344,6 +375,22 @@ public class PlayFabPvpClient : PvpBackend
             current.revealedSecret = applied.revealedSecret;
             current.hostGuessCount = applied.hostGuessCount;
             current.guestGuessCount = applied.guestGuessCount;
+
+            current.opener = applied.opener;
+            current.pendingWin = applied.pendingWin;
+            current.lastLocked = applied.lastLocked;
+            current.hostLockUsed = applied.hostLockUsed;
+            current.guestLockUsed = applied.guestLockUsed;
+            current.hostSkipNext = applied.hostSkipNext;
+            current.guestSkipNext = applied.guestSkipNext;
+            current.roundIndex = applied.roundIndex;
+            current.signalBy = applied.signalBy;
+            current.signalId = applied.signalId;
+            current.signalSeq = applied.signalSeq;
+            current.matchIndex = applied.matchIndex;
+            current.iWantRematch = applied.iWantRematch;
+            current.theyWantRematch = applied.theyWantRematch;
+            current.opponentLeft = applied.opponentLeft;
         }
         catch { }
     }

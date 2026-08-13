@@ -10,11 +10,12 @@ missing so a skipped compile cannot look green.
 
 - `Assets/Scenes/` — `SplashScene.unity` (loader) and `MainMenu.unity`
   (everything: menu, solo game, PvP UI hooks).
-- `Assets/SCRIPT/` — gameplay (`GameManager`, `NumberManager`,
+- `Assets/SCRIPT/` — gameplay (`GameManager`, `NumberManager`, `DuelRules`,
   `FakeMatchmaking`, `MenuManager`), ads (`AdsManager`, `ConsentManager`),
   ops (`ForceUpdate` — PlayFab TitleData `minVersion` gate, fail-open),
   `ReleaseConfig` + `ReleaseBootstrap` (public production runtime config),
-  `PvP/` (backend abstraction + Firebase/PlayFab clients + controller),
+  `PvP/` (backend abstraction + Firebase/PlayFab clients + controller +
+  `Signals` quick-chat table),
   `Localization/` (`L10n` table, `LocalizedText`, `LanguageSelector`),
   `SmartHooks/` (`GameEvents`, `DailyStreak`, `Haptics`),
   `UIJuice/` (`ButtonJuice`, `PanelAnimator`, `ConfettiBurst`, …),
@@ -26,9 +27,16 @@ missing so a skipped compile cannot look green.
 - `services/provisioner/` — Azure Functions first-install account provisioner;
   validates Google Play Integrity before using PlayFab Server credentials.
 - `playfab/cloudscript.js` — server authority for PlayFab room
-  create/read/join/guess/leave/cleanup.
+  create/read/join/guess/signal/rematch/leave/cleanup.
 - `tools/playfab/deploy-cloudscript.mjs` — publishes/verifies Legacy CloudScript
   and optionally adds Client Shared Group API deny policy statements.
+- `tools/test/` — Node tests, run with `node --test tools/test/*.test.mjs` (the
+  bare directory form does not resolve). `cloudscript.test.mjs` drives the real
+  CloudScript against an in-memory Shared Group store;
+  `room-state-contract.test.mjs` checks every key the server emits against
+  `PvpBackend.RoomState`, because JsonUtility binds by exact field name and a
+  mismatch fails silently; `lock-policy-sim.mjs` balances the Lock. No Unity
+  needed for any of them.
 - `tools/release/write-release-config.mjs` — validates/injects public production
   config into the temporary release-build workspace.
 - `docs/privacy.html` — privacy policy; keep it truthful when data practices change.
@@ -58,6 +66,27 @@ missing so a skipped compile cannot look green.
   gold `(1, 0.78, 0.34)` reserved for the primary CTA, text near-white
   `(0.91, 0.93, 1)` — never pure white or pure black. Gold/cyan buttons
   use dark indigo labels for contrast.
+- **The duel rules live in two places and must stay in step.**
+  `Assets/SCRIPT/DuelRules.cs` (solo + Firebase fallback) and
+  `playfab/cloudscript.js` (PlayFab, server-authoritative) implement the same
+  round/last-licks/Lock machine. Change one, change the other, and update both
+  test suites — `Assets/Tests/EditMode/DuelRulesTests.cs` and
+  `tools/test/cloudscript.test.mjs` cover the same cases on each side.
+  `DuelRules` deliberately has no UnityEngine reference so it stays testable.
+- **Signals carry an index, never text.** `Signals.Table` order is protocol and
+  the server validates against its length: append only, never reorder or remove.
+  Keeping the vocabulary closed is what keeps HOL free of user-generated
+  content — do not add a free-text path without revisiting `docs/privacy.html`
+  and the Play Data Safety declaration first.
+- **A room outlives its match.** Rematch keeps the room and deals a new match
+  in place, so anything per-match must be cleared in `resetForRematch` — and
+  `turnIndex` must NOT be, because a reused turn id collides with the claim
+  group the previous match already created. `turnIndexBase` marks the live
+  claim window so teardown never walks a whole rematch chain.
+- **Gameplay-affecting rules need an adjudicator.** The Lock and Signals are
+  gated on `PvpBackend.IsServerAuthoritative`; the Firebase fallback's room
+  document is client-writable, so it plays the plain round rules and hides both
+  controls rather than trusting a client to report its own Lock.
 - **Null-guard optional scene references** (`if (x != null)`) — several
   Inspector fields are intentionally unwired and filled at runtime.
 - **PlayFab clients never read or write Shared Group Data directly.** All

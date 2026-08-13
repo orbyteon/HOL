@@ -19,6 +19,7 @@ Before merging a release candidate:
 
 - [ ] `Static integrity` is green
 - [ ] `Provisioner tests` is green
+- [ ] `Duel rule tests` is green
 - [ ] `EditMode tests` is green
 - [ ] `Build Android (compile check)` is green
 - [ ] the debug Android artifact is produced
@@ -90,20 +91,54 @@ See `services/provisioner/README.md` and `docs/playfab-auth-provisioning.md`.
 use `ExecuteCloudScript`; they must never receive live secret numbers or choose
 their own host/guest identity.
 
+> **Order matters for the 0.3.0 duel-rules release — read this first.**
+>
+> CloudScript deploys to every live player the moment it publishes, and the
+> 0.3.0 rules are **not backward compatible with a 0.2.x client**. A 0.2.x
+> client has no concept of a drawn match: it decides the result with
+> `winner == me`, so a server-declared `draw` renders as **"YOU LOSE"** and is
+> recorded as a loss. It also cannot see a provisional win, so the equal-turns
+> rule looks like an extra opponent turn after the match should have ended.
+>
+> Deploying CloudScript before old clients are gone therefore shows players
+> **wrong results**, not merely missing features. Use the force-update gate that
+> already exists for exactly this, and deploy in this order:
+>
+> 1. Publish the signed 0.3.0 build (section 4) and let the Play rollout reach
+>    the share of installs you are willing to cut off.
+> 2. Set PlayFab Title Data `minVersion` to `0.3.0`. Every 0.2.x client now gets
+>    the update screen with a store link instead of a match.
+> 3. Only then run **Deploy PlayFab Production**.
+>
+> Between steps 2 and 3, a 0.3.0 client runs against the old CloudScript: the
+> Lock, Signals and rematch calls fail and surface as "Network hiccup — try
+> again", and matches play by the old first-correct-guess rule. Nothing is
+> reported wrongly, but keep the window short.
+>
+> Rolling back CloudScript alone re-opens the same skew in the other direction.
+> If 0.3.0 has to be pulled, restore the previous CloudScript revision **and**
+> clear `minVersion` in the same maintenance window.
+
 - [ ] Run **Deploy PlayFab Production** from `main` and type `DEPLOY`
 - [ ] The workflow successfully reads the published CloudScript revision back
       and verifies `cloudscript.js` matches repository source exactly
 - [ ] The workflow verifies explicit deny statements for all direct Client Shared
       Group APIs; this hardening is mandatory in the production workflow
 - [ ] Confirm the deployed revision exposes `createRoom`, `joinRoom`, `getRoom`,
-      `submitGuess`, `ackResult`, and `leaveRoom`
+      `submitGuess`, `sendSignal`, `requestRematch`, `ackResult`, and `leaveRoom`
+- [ ] Confirm `Duel rule tests` was green on the commit being deployed — it runs
+      the published rules against an in-memory room store and checks every field
+      the client binds by name
 - [ ] Verify a modified client cannot call Client `GetSharedGroupData`
 - [ ] Verify a modified client cannot call Client `UpdateSharedGroupData`
 - [ ] Verify normal PvP still works through `ExecuteCloudScript`
 
 ### Version gate
 
-- [ ] Optional: PlayFab Title Data → `minVersion` (for example `0.2.0`)
+- [ ] **Required for 0.3.0:** PlayFab Title Data → `minVersion` = `0.3.0`, set
+      *before* the CloudScript deploy (see the ordering note above). It is what
+      stops 0.2.x clients from being shown incorrect match results.
+- [ ] Confirm a 0.2.x build now shows the update screen with a working store link
 - [ ] ForceUpdate remains fail-open when PlayFab/title data is unavailable
 
 ## 4. Produce the signed Android release candidate

@@ -22,24 +22,88 @@ public abstract class PvpBackend : MonoBehaviour
         public string phase = "";   // "waiting" | "play" | "done" | "closed"
         public int lastGuess;
         public string lastBy = "";
-        public string winner = "";
+        public string winner = "";  // "host" | "guest" | "draw"
 
         // Server-computed public view. PlayFab never sends live secrets.
         public string lastHint = ""; // "higher" | "lower" | "correct"
         public int revealedSecret;    // opponent secret, only after phase == "done"
         public int hostGuessCount;
         public int guestGuessCount;
+
+        // Duel rules (see DuelRules.cs and playfab/cloudscript.js). All of it is
+        // symmetric information — both sides see identical values — so showing
+        // it costs no fairness and lets the UI put the stakes on screen.
+        public string opener = "";     // who moved first; fixed for the match
+        public string pendingWin = ""; // provisional winner awaiting the answering guess
+        public bool lastLocked;        // was the last guess staked on the Lock?
+        public bool hostLockUsed;
+        public bool guestLockUsed;
+        public bool hostSkipNext;      // owes a forfeited turn after a missed Lock
+        public bool guestSkipNext;
+        public int roundIndex;
+
+        public string signalBy = "";   // "host" | "guest"
+        public int signalId;           // index into Signals.Table
+        public int signalSeq;          // bumped per signal; how clients spot a new one
+
+        // Rematch handshake. A room outlives its match now, so friends can play
+        // again without re-sharing an invite code. matchIndex changing is how a
+        // client knows the next match actually started rather than being offered.
+        public int matchIndex;
+        public bool iWantRematch;
+        public bool theyWantRematch;
+        public bool opponentLeft;
+
+        public bool LockUsedBy(string side)
+        {
+            return side == "host" ? hostLockUsed : guestLockUsed;
+        }
+
+        public bool ForfeitPendingFor(string side)
+        {
+            return side == "host" ? hostSkipNext : guestSkipNext;
+        }
+
+        public int GuessCountFor(string side)
+        {
+            return side == "host" ? hostGuessCount : guestGuessCount;
+        }
+
+        // True while this side is one guess away from losing: the opponent has
+        // already found the number and this is the answering turn.
+        public bool IsMatchPointAgainst(string side)
+        {
+            return phase == "play" && !string.IsNullOrEmpty(pendingWin) && pendingWin != side;
+        }
     }
 
     public string RoomCode { get; protected set; } = "";
     public bool IsHost { get; protected set; }
+
+    // The Lock and Signals are only offered on a backend that adjudicates them.
+    // Firebase's room document is client-writable, so a client could forge a
+    // Lock it never staked or a result it never earned; the development
+    // fallback therefore plays the plain round rules and hides both controls.
+    public virtual bool IsServerAuthoritative { get { return false; } }
 
     public Action OnRoomClosed;
     public Action OnConnectionLost;
 
     public abstract void CreateRoom(string hostName, int hostSecret, Action<bool, string> done);
     public abstract void JoinRoom(string code, string guestName, int guestSecret, Action<bool, string> done);
-    public abstract void SubmitGuess(int guess, RoomState current, Action<bool> done);
+
+    // useLock stakes this side's single Lock on the guess: it wins a same-round
+    // tie, and a miss forfeits the next turn.
+    public abstract void SubmitGuess(int guess, bool useLock, RoomState current, Action<bool> done);
+
+    // Sends one entry from the fixed Signals table. Backends that cannot carry
+    // signals simply report failure; the UI then leaves the control alone.
+    public virtual void SendSignal(int signalId, Action<bool> done) { done?.Invoke(false); }
+
+    // Commits a fresh secret for another match in the same room. The next match
+    // is dealt only once both sides have committed.
+    public virtual void RequestRematch(int secret, Action<bool> done) { done?.Invoke(false); }
+
     public abstract void StartPolling(Action<RoomState> onState);
     public abstract void StopPolling();
     public abstract void DeleteRoom();

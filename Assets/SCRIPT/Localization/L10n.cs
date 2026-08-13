@@ -143,5 +143,39 @@ public static class L10n
         { "save_streak_ad",          new[] { "Watch an ad to keep your {0}-win streak!", "Δες διαφήμιση για να κρατήσεις το σερί σου ({0})!" } },
         { "ad_not_ready",            new[] { "No ad available right now", "Δεν υπάρχει διαθέσιμη διαφήμιση αυτή τη στιγμή" } },
         { "perfect_game",            new[] { "PERFECT RUN!", "ΤΕΛΕΙΟ!" } },
+
+        // duel rules — rounds, last licks, the Lock
+        { "lock",                    new[] { "LOCK", "ΚΛΕΙΔΩΜΑ" } },
+        { "lock_hint",               new[] { "Lock a guess to win a tie — but miss and you forfeit your next turn.", "Κλείδωσε μια μαντεψιά για να κερδίσεις την ισοπαλία — αν αστοχήσεις όμως, χάνεις την επόμενη σειρά σου." } },
+        { "lock_suggest",            new[] { "Only {0} left — lock it?", "Έμειναν μόνο {0} — κλείδωσέ το;" } },
+        { "lock_spent",              new[] { "Lock used", "Το κλείδωμα χρησιμοποιήθηκε" } },
+        { "lock_armed",              new[] { "LOCKED", "ΚΛΕΙΔΩΜΕΝΟ" } },
+        { "lock_missed",             new[] { "Locked and missed — you forfeit your next turn.", "Κλείδωσες και αστόχησες — χάνεις την επόμενη σειρά σου." } },
+        { "turn_forfeited",          new[] { "Turn forfeited", "Έχασες τη σειρά σου" } },
+        { "opponent_forfeits",       new[] { "{0} forfeits this turn", "Ο/Η {0} χάνει αυτή τη σειρά" } },
+        { "match_point",             new[] { "MATCH POINT — your last guess!", "ΜΑΤΣ ΠΟΪΝΤ — η τελευταία σου μαντεψιά!" } },
+        { "match_point_yours",       new[] { "You found it! {0} gets one answering guess.", "Το βρήκες! Ο/Η {0} έχει μία απαντητική μαντεψιά." } },
+        { "you_draw",                new[] { "DEAD HEAT!", "ΙΣΟΠΑΛΙΑ!" } },
+        { "draw_in_guesses",         new[] { "You both found it in {0} guesses", "Και οι δύο το βρήκατε σε {0} προσπάθειες" } },
+        { "draw_tip",                new[] { "Lock a guess next time to settle it.", "Την επόμενη φορά κλείδωσε μια μαντεψιά για να κριθεί." } },
+        { "candidates_left",         new[] { "{0} numbers left", "Απομένουν {0} αριθμοί" } },
+
+        // signals — a closed vocabulary, never free text
+        { "signals",                 new[] { "Signals", "Σήματα" } },
+        { "signal_luck",             new[] { "Good luck!", "Καλή τύχη!" } },
+        { "signal_close",            new[] { "So close!", "Πολύ κοντά!" } },
+        { "signal_ouch",             new[] { "Ouch!", "Άουτς!" } },
+        { "signal_nice",             new[] { "Nice one!", "Μπράβο!" } },
+        { "signal_your_turn",        new[] { "Your turn!", "Η σειρά σου!" } },
+        { "signal_gg",               new[] { "Good game!", "Καλό παιχνίδι!" } },
+        { "signal_limit",            new[] { "No signals left", "Δεν έχεις άλλα σήματα" } },
+        { "signal_from",             new[] { "{0}: {1}", "{0}: {1}" } },
+
+        // rematch — play again without re-sharing an invite code
+        // ("rematch" itself already lives in the result block above)
+        { "rematch_prompt",          new[] { "New secret number (1-100)", "Νέος μυστικός αριθμός (1-100)" } },
+        { "rematch_waiting",         new[] { "Waiting for your opponent to accept", "Αναμονή να δεχτεί ο αντίπαλος" } },
+        { "rematch_offered",         new[] { "{0} wants a rematch!", "Ο/Η {0} θέλει ρεβάνς!" } },
+        { "rematch_closed",          new[] { "Your opponent has left.", "Ο αντίπαλός σου έφυγε." } },
     };
 }

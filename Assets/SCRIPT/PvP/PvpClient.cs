@@ -39,7 +39,7 @@ public class PvpClient : PvpBackend
         {
             hostName = hostName,
             hostSecret = hostSecret,
-            turn = "guest",         // guest guesses first (host created, fair trade)
+            turn = "",              // the opener is drawn when the guest arrives
             phase = "waiting",
         };
         StartCoroutine(PutRoom(code, state, ok =>
@@ -69,7 +69,11 @@ public class PvpClient : PvpBackend
                 done?.Invoke(false, L10n.Get("pvp_room_full"));
                 return;
             }
-            var patch = "{\"guestName\":\"" + Escape(guestName) + "\",\"guestSecret\":" + guestSecret + ",\"phase\":\"play\"}";
+            // Coin-flip the opener. Handing it to the joiner every time was worth
+            // roughly a 64% win rate between equally skilled players.
+            string opener = UnityEngine.Random.value < 0.5f ? "host" : "guest";
+            var patch = "{\"guestName\":\"" + Escape(guestName) + "\",\"guestSecret\":" + guestSecret +
+                        ",\"phase\":\"play\",\"opener\":\"" + opener + "\",\"turn\":\"" + opener + "\"}";
             StartCoroutine(PatchRoom(code, patch, ok2 =>
             {
                 if (ok2) { RoomCode = code; IsHost = false; }
@@ -81,7 +85,12 @@ public class PvpClient : PvpBackend
     // ------------------------------------------------ gameplay
 
     // Submit my guess; flips the turn. If it hits the opponent's secret, marks the win.
-    public override void SubmitGuess(int guess, RoomState current, Action<bool> done)
+    //
+    // This fallback plays the plain race rules: no last licks, no Lock. Both
+    // need an adjudicator, and this room document is client-writable — a client
+    // could otherwise claim a Lock it never staked. IsServerAuthoritative stays
+    // false so the UI hides those controls here.
+    public override void SubmitGuess(int guess, bool useLock, RoomState current, Action<bool> done)
     {
         string me = IsHost ? "host" : "guest";
         string other = IsHost ? "guest" : "host";

@@ -3,7 +3,94 @@
 All notable changes to HOL. Dates are commit dates; versions follow the
 Play Console versionName in `ProjectSettings.asset`.
 
-## [Unreleased]
+## [0.3.0] — 2026-08-13
+
+> **Deploying this release is order-sensitive.** The duel rules are not
+> backward compatible with a 0.2.x client, which renders a drawn match as a
+> loss. Ship the client, set PlayFab `minVersion` to `0.3.0`, *then* deploy
+> CloudScript. See `docs/release-checklist.md` section 3.
+
+### Fixed
+
+- Solo was playable exactly once per launch. The end-of-match button is
+  relabelled "Rematch" and wired to `GameManager.RestartMatch`, but the
+  match-over flag that `NumberManager` gates every number submission on
+  was left set, so the next match could never be started. The flag now
+  tracks whether a match is *set up* rather than whether the rules object
+  has finished, and clears when the board is reset.
+- A decided match no longer waits on a pointless tap. When the opponent's
+  guess was the one that closed the round, the game still asked the player
+  to answer Higher/Lower for a match that was already over, putting a dead
+  interaction between them and the result.
+- Solo never actually showed the narrowed range. `GameManager.rangeText` is
+  an optional Inspector field wired nowhere — not in the scene, not at
+  runtime — so `UpdateRangeText` had always written into nothing, and the
+  "live range label" the README credits to solo play only ever existed in
+  PvP. It is built at runtime now, which is also what gives the Lock's
+  one-line explanation somewhere to appear.
+- The PvP result line no longer collides with the Signals row. A drawn
+  match is three lines in English and four in Greek, where the closing tip
+  wraps; at 64pt that spilled into the second row of Signal buttons, which
+  shares the result screen. The result is now 48pt in a taller box, with
+  the leave button moved down to match.
+
+### Changed (duel rules — gameplay balance)
+
+- **Whoever moves first no longer wins the duel.** Two players who both
+  binary-search a number in 1–100 need the same number of guesses 27% of
+  the time and otherwise reach each guess number in lockstep, so under
+  "first correct guess wins" the opening player took **63.7%** of matches
+  against an identical opponent. PvP was worse still: CloudScript
+  hardcoded `turn: "guest"`, so the joiner opened *every* match and
+  carried that win rate by default.
+- The opener is now a coin flip, taken when the second player joins and
+  fixed for the match (PlayFab and the Firebase fallback both).
+- **Equal turns.** A round is one guess per side, and a match can only end
+  once a round closes — so the responder always answers the opener's
+  winning guess. Simulated over the real rules at human accuracy, the two
+  sides now take 46.3% and 46.5% with 7.3% draws; the seeded simulation in
+  `tools/test/cloudscript.test.mjs` reproduces those figures exactly.
+- **The Lock**, one per match: stake it on a guess and a correct one wins
+  a same-round tie, while a wrong one forfeits your next turn. It is the
+  game's first genuine decision — staking it only on a certain guess
+  beats never locking 50.3% to 36.6%, and locking on every guess loses
+  18.2% to 63.8%. The button turns into a prompt once the range is down
+  to three candidates, which is what keeps draws rare in practice.
+- The Lock is **revealed only after the player has played a round**, and
+  explains itself in one line the first few times it appears. A first
+  match should read as plain higher-or-lower — the original concept — with
+  the one added decision arriving after the loop has been felt. Nothing is
+  lost strategically: with a hundred candidates still open there is nothing
+  sensible to stake it on. This is presentation only; the server still
+  accepts a Lock on any turn.
+- A tied round with both sides locked, or neither, is an honest draw. It
+  counts as a match, breaks no streak, and stays out of the window that
+  tunes the adaptive AI.
+- Solo plays by exactly these rules too, so the mechanic is learned
+  against the AI before it decides a real duel. Difficulty now shapes the
+  opponent's *judgement* as well as its aim: Easy over-commits the Lock,
+  Hard waits for certainty and opens on the midpoint instead of at random.
+
+### Added
+
+- **Rematch in the same room.** A finished duel no longer tears the room
+  down: both players commit a fresh secret and the next match is dealt in
+  place, so friends never re-share an invite code to play again. The
+  handshake needs both sides, a leaver is reported to the opponent instead
+  of leaving a dead button on screen, and an unanswered room is released
+  after about two minutes rather than being held open indefinitely.
+- **Signals** — a fixed six-entry vocabulary ("Good luck!", "So close!",
+  "Ouch!", "Nice one!", "Your turn!", "Good game!") players can send
+  during a PvP match and on the result screen. Only the index travels, so
+  each player reads it in their own language. Deliberately not free-form
+  chat: with no user-authored text there is nothing to moderate, no
+  reports or blocks to build, and nothing new to declare on the Play Data
+  Safety form. Server-validated and capped at 12 per side per match.
+- PvP now shows the narrowed guess range that solo play has always shown.
+- Rule tests: `tools/test/cloudscript.test.mjs` drives the real
+  CloudScript through an in-memory Shared Group store (`node --test`), and
+  `Assets/Tests/EditMode/DuelRulesTests.cs` covers the C# implementation.
+  `tools/test/lock-policy-sim.mjs` plays Lock policies head to head.
 
 ### Improved (frontend experience pass)
 

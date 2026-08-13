@@ -11,6 +11,12 @@ Under the hood the game is single-player against a lightweight AI, but it's pres
 ## Features
 
 - Turn-based Higher/Lower guessing against an AI opponent
+- **Duel rules that reward play, not turn order** — a coin-flip opener, equal
+  turns (the responder always answers the opener's winning guess), and a
+  once-per-match **Lock** that wins a tie if you are right and forfeits your
+  next turn if you are wrong
+- **Signals** — a fixed set of six quick messages in PvP, sent by index and
+  read in each player's own language (no free-form chat, so nothing to moderate)
 - **Real PvP duels** with room-code invites (Firebase RTDB or PlayFab backend, both REST, no SDK)
 - **Converging Light design** (`design/philosophy.md`) — indigo depth gradients, drifting number fields, a cyan→magenta seam, gold reserved for primary actions; animated splash with logo bloom and a loading hairline
 - **English + native Greek** localization with live language switching; first launch follows the device language
@@ -34,11 +40,21 @@ Under the hood the game is single-player against a lightweight AI, but it's pres
 2. Press **Play** — matchmaking begins (ads show at match end, not here).
 3. Once an "opponent" is found, enter your secret number (1–100).
 4. Take turns: when the opponent guesses, answer **Higher**, **Lower**, or **Correct** relative to your secret number. When it's your turn, guess theirs — a live range label and guess history help you play optimally.
-5. First to guess the other's number correctly wins.
+5. A round is one guess each. Finding the number first does not end the duel on
+   its own — your opponent still answers, so the win goes to whoever needed
+   fewer guesses, not to whoever moved first.
+6. Once per match you can **Lock** a guess. Right, and it takes a tied round;
+   wrong, and you forfeit your next turn. If a round ties with both sides
+   locked or neither, it's an honest draw.
 
-For a **live PvP duel**, create a room and share the 5-letter invite code, or join with a friend's code. Hints are computed automatically and honestly by the room state.
+Both players binary-searching 1–100 need the same number of guesses about 27% of
+the time, which is why the equal-turns rule matters: without it the player who
+moved first won 63.7% of duels regardless of skill. The Lock is what settles the
+ties — and what makes the endgame a decision rather than arithmetic.
 
-The AI narrows its range with a midpoint (binary-search) strategy, guessing randomly at a difficulty-dependent rate to feel less mechanical. Who goes first is decided by a coin flip each round.
+For a **live PvP duel**, create a room and share the 5-letter invite code, or join with a friend's code. When a duel ends, either player can offer a **rematch** — commit a new secret number and the next match is dealt in the same room, so the code only ever gets shared once. Hints, turn order, the Lock and the result are all adjudicated server-side by `playfab/cloudscript.js`. Mid-match you can send **Signals** — six fixed phrases, capped per match — so the duel has a voice without the game carrying user-generated text.
+
+The AI narrows its range with a midpoint (binary-search) strategy, guessing randomly at a difficulty-dependent rate to feel less mechanical. Who goes first is decided by a coin flip each round. Difficulty also sets how well the opponent uses its Lock: Easy over-commits it, Hard stakes it only on a certain guess.
 
 ## Tech stack
 
@@ -98,11 +114,13 @@ The game uses only two scenes. All gameplay (menu, settings, matchmaking, and th
 
 | Script | Responsibility |
 |---|---|
+| `DuelRules.cs` | The duel state machine — rounds, equal turns, the Lock, draws. Pure C#, no Unity dependency; mirrored server-side by `playfab/cloudscript.js` |
 | `GameManager.cs` | Core game loop: secret numbers, AI guessing (difficulty + adaptive), turns, stats, win/lose, match-end ads |
 | `NumberManager.cs` | Validates the player's number, starts the round, routes player guesses |
 | `AdsManager.cs` | LevelPlay init (consent-gated), interstitial lifecycle, frequency cap, init retry |
 | `ConsentManager.cs` | First-launch ads-consent dialog; builds its own UI from code if unwired |
 | `FakeMatchmaking.cs` | Simulated opponent search (cancellable, animated) |
+| `PvP/Signals.cs` | The closed six-entry quick-chat vocabulary; ids are protocol, so append only |
 | `MenuManager.cs` | Menu/settings/play panel switching; Android back-button handling |
 | `MusicSettings.cs` | Music on/off toggle, persisted via `PlayerPrefs` |
 | `SavePlayerName.cs` | Saves the player name to `PlayerPrefs` |
