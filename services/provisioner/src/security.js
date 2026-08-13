@@ -12,11 +12,37 @@ function safeEqual(a, b) {
   return left.length === right.length && timingSafeEqual(left, right);
 }
 
-function allowedCertificates(value) {
-  return String(value || "")
+// Play Integrity returns certificateSha256Digest as URL-safe Base64. Operators
+// commonly copy the Play App Signing SHA-256 fingerprint as colon-separated
+// hex, so accept both representations and compare one canonical value.
+export function normalizeCertificateDigest(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+
+  const hex = raw.replace(/[:\s]/g, "");
+  if (/^[0-9a-fA-F]{64}$/.test(hex))
+    return Buffer.from(hex, "hex").toString("base64url");
+
+  const base64url = raw
+    .replace(/\s/g, "")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+  return /^[A-Za-z0-9_-]{43}$/.test(base64url) ? base64url : "";
+}
+
+export function parseCertificateConfig(value) {
+  const entries = String(value || "")
     .split(",")
     .map(v => v.trim())
     .filter(Boolean);
+
+  const normalized = entries.map(normalizeCertificateDigest);
+  return {
+    configured: entries.length > 0,
+    valid: entries.length > 0 && normalized.every(Boolean),
+    certificates: normalized.filter(Boolean),
+  };
 }
 
 export function validateIntegrityPayload(payload, options) {
@@ -47,12 +73,15 @@ export function validateIntegrityPayload(payload, options) {
   if (app.packageName && app.packageName !== packageName)
     return { ok: false, reason: "app_package_mismatch" };
 
-  const allowCerts = allowedCertificates(certificateSha256);
-  if (allowCerts.length > 0) {
+  const certConfig = parseCertificateConfig(certificateSha256);
+  if (certConfig.configured) {
+    if (!certConfig.valid)
+      return { ok: false, reason: "certificate_config_invalid" };
+
     const verdictCerts = Array.isArray(app.certificateSha256Digest)
-      ? app.certificateSha256Digest
+      ? app.certificateSha256Digest.map(normalizeCertificateDigest).filter(Boolean)
       : [];
-    if (!verdictCerts.some(cert => allowCerts.includes(cert)))
+    if (!verdictCerts.some(cert => certConfig.certificates.includes(cert)))
       return { ok: false, reason: "certificate_mismatch" };
   }
 
