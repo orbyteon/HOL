@@ -7,11 +7,6 @@ on:
         description: "Type DEPLOY to publish the main branch to production"
         required: true
         type: string
-      harden_shared_group_policy:
-        description: "Also deny direct Client Shared Group APIs"
-        required: true
-        default: true
-        type: boolean
 
 permissions:
   contents: read
@@ -54,14 +49,18 @@ jobs:
         run: |
           set -euo pipefail
           test -n "$PLAYFAB_TITLE_ID" || { echo "::error::PLAYFAB_TITLE_ID production variable is missing"; exit 1; }
+          [[ "$PLAYFAB_TITLE_ID" =~ ^[A-Za-z0-9]{3,32}$ ]] || {
+            echo "::error::PLAYFAB_TITLE_ID must be 3-32 letters/digits"
+            exit 1
+          }
           test -n "$PLAYFAB_DEV_SECRET_KEY" || { echo "::error::PLAYFAB_DEV_SECRET_KEY secret is missing"; exit 1; }
           node --check playfab/cloudscript.js
           node --check tools/playfab/deploy-cloudscript.mjs
 
-      - name: Publish Legacy CloudScript and harden API policy
+      - name: Publish Legacy CloudScript and enforce API policy
         env:
           PLAYFAB_DEV_SECRET_KEY: ${{ secrets.PLAYFAB_DEV_SECRET_KEY }}
-          HARDEN_SHARED_GROUP_POLICY: ${{ inputs.harden_shared_group_policy }}
+          HARDEN_SHARED_GROUP_POLICY: "true"
         run: node tools/playfab/deploy-cloudscript.mjs
 
       - name: Deployment summary
@@ -71,5 +70,6 @@ jobs:
             echo "## PlayFab production deployment"
             echo "- CloudScript source: \`playfab/cloudscript.js\`"
             echo "- Commit: \`${GITHUB_SHA}\`"
-            echo "- Direct Client Shared Group policy hardening: \`${{ inputs.harden_shared_group_policy }}\`"
+            echo "- Published CloudScript source verified against repository source"
+            echo "- Direct Client Shared Group APIs: \`Denied\`"
           } >> "$GITHUB_STEP_SUMMARY"
