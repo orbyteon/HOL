@@ -18,7 +18,7 @@ PlayFab Title Secret Key never ships in Unity.
    `POST /api/provision` on the Azure Functions service.
 4. The service asks Google to decode the token and rejects the request unless the
    package, request hash, freshness, Play recognition, device integrity, license
-   status, and optional Play signing certificate match production policy.
+   status, and Play App Signing certificate all match production policy.
 5. Only after those checks does the service call PlayFab
    `Server/LoginWithCustomID(CreateAccount:true)` using the server-held Title
    Secret Key.
@@ -44,7 +44,10 @@ change on one side cannot silently weaken the binding.
 
 `.github/workflows/deploy-provisioner.yml` is the production deployment path. It
 is manual, uses the `production` GitHub Environment, refuses refs other than
-`main`, and requires the operator to type `DEPLOY`.
+`main`, and requires the operator to type `DEPLOY`. Production deployment also
+requires the `com.Orbyteon.HOL` package value and a non-empty Play App Signing
+certificate digest, then probes the deployed endpoint and requires an invalid
+empty request to return HTTP 400 before reporting success.
 
 Required production settings are documented in `services/provisioner/README.md`.
 The PlayFab and Google credentials are secrets. The function-app name, resource
@@ -60,7 +63,9 @@ After the function is deployed, the signed Android release workflow
 - `GOOGLE_CLOUD_PROJECT_NUMBER`
 
 The committed JSON must remain empty. `ReleaseBuildGuard` rejects a production
-build if any required value is missing or malformed.
+build if any required value is missing or malformed. The release workflow also
+fails if the workspace contains changes other than this injected JSON, verifies
+the resulting AAB signature with `jarsigner`, and records its SHA-256 checksum.
 
 ## Abuse controls
 
@@ -80,8 +85,8 @@ before public release.
 - Verify a brand-new install provisions successfully and the subsequent
   `Client/LoginWithCustomID(CreateAccount:false)` succeeds.
 - Verify an unprovisioned Custom ID cannot create an account directly from Unity.
-- Verify a tampered package/request hash, stale token, unlicensed app, or failed
-  device-integrity verdict is rejected.
+- Verify a tampered package/request hash, stale token, unlicensed app, wrong
+  signing certificate, or failed device-integrity verdict is rejected.
 - Verify PlayFab API Access Policy blocks Client Shared Group operations while
   `ExecuteCloudScript` PvP continues to work.
 
