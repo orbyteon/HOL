@@ -20,18 +20,18 @@
 <p>Your music preference, language choice, ad-permission choice, player name, and gameplay statistics are stored locally on your device using Unity PlayerPrefs. The player name leaves your device only when you choose the optional online multiplayer mode described below.</p>
 
 <h2>Anonymous account provisioning and app integrity</h2>
-<p>HOL does not require you to create a named account. For PlayFab-backed features, the game uses a device-derived identifier as an anonymous PlayFab Custom ID so the same installation can be recognized by Microsoft PlayFab.</p>
+<p>HOL does not require you to create a named account. For PlayFab-backed features, the Android game uses Unity's <code>SystemInfo.deviceUniqueIdentifier</code> as an anonymous PlayFab Custom ID. On Android, Unity derives this value from <code>ANDROID_ID</code>; on Android 8.0 and later, that identifier is scoped to the combination of app-signing key, Android user, and device. It is not an advertising identifier.</p>
 
-<p>On a new production installation, HOL may use Google Play Integrity before an anonymous PlayFab account is created. The app asks Google Play for an integrity token that is bound to HOL's package name, the installation's PlayFab Custom ID, and the installed app version. The app sends the Custom ID, app version, and encrypted integrity token over HTTPS to HOL's provisioning service hosted on Microsoft Azure. The provisioning service sends the token to Google's Play Integrity service for verification and checks the app/package identity, token freshness, Play recognition, device-integrity verdict, licensing verdict, and configured app-signing certificate before it can create the anonymous PlayFab account.</p>
+<p>On a device/version combination where the anonymous PlayFab account does not already exist, HOL may use Google Play Integrity before that account is created. The app asks Google Play for an integrity token that is bound to HOL's package name, the PlayFab Custom ID, and the installed app version. The app sends the Custom ID, app version, and encrypted integrity token over HTTPS to HOL's provisioning service hosted on Microsoft Azure. The provisioning service sends the token to Google's Play Integrity service for verification and checks the app/package identity, token freshness, Play recognition, device-integrity verdict, licensing verdict, and configured app-signing certificate before it can create the anonymous PlayFab account.</p>
 
 <p>The provisioning endpoint and its hosting/network infrastructure necessarily receive normal connection information such as an IP address. HOL uses the source IP transiently for an abuse-rate-limit check; it is not used to build an advertising or gameplay profile. The service is designed not to log or return PlayFab server credentials, Google service-account credentials, the raw integrity token, or the PlayFab Custom ID as application telemetry.</p>
 
-<p>Google, Microsoft Azure, and Microsoft PlayFab process data involved in this flow under their respective privacy terms. The Play Integrity verdict is used only to decide whether a fresh HOL installation may create its anonymous PlayFab account.</p>
+<p>Google, Microsoft Azure, and Microsoft PlayFab process data involved in this flow under their respective privacy terms. The Play Integrity verdict is used only to decide whether a HOL Android identity that is not yet present in PlayFab may create its anonymous PlayFab account.</p>
 
 <h2>Online multiplayer (PvP Duel) and version checks</h2>
 <p>During a PvP Duel, PlayFab processes the room code, both players' display names, both secret numbers, guesses, higher/lower/correct results, turn state, guess counts, and match result. Secret numbers are kept in private server-controlled room state while the match is live; the client receives only the hint and other information needed to render the duel. The opponent's secret is revealed after the match ends.</p>
 
-<p>Room data is deleted when either participant leaves cleanly, when the surviving client times out an abandoned match, or after both participants acknowledge the completed result. If both devices disappear without sending cleanup requests, an orphaned room may remain in PlayFab until backend cleanup is performed. We do not use PvP room data to build a server-side match-history profile.</p>
+<p>Room data is deleted when a participant leaves an unfinished match cleanly, when the surviving client times out an abandoned match, or after both participants acknowledge (or leave after) a completed result. If both devices disappear without sending cleanup requests, an orphaned room may remain in PlayFab until backend cleanup is performed. We do not use PvP room data to build a server-side match-history profile.</p>
 
 <p>The same anonymous PlayFab session may be used to read the title's minimum-supported-version setting so the game can show a required-update screen. The solo "Find challenger" mode uses an on-device simulated opponent and does not send its match data to PlayFab.</p>
 
@@ -43,7 +43,9 @@
 <p>We do not receive advertising-network data in directly identifiable form. For details, see <a href="https://unity.com/legal/privacy-policy">Unity's Privacy Policy</a> and the <a href="https://developers.is.com/ironsource-mobile/air/ironsource-mobile-privacy-policy/">ironSource Mobile Privacy Policy</a>. The Play Store Data safety disclosure should be read together with this policy because it reflects the exact advertising partners enabled for the current release.</p>
 
 <h2>Your choices</h2>
-<p>You can change the game's ad permission at any time in Settings → Ads privacy. You can also reset or delete your device's advertising identifier using your Android privacy settings. Deleting the app removes HOL's local PlayerPrefs data from the device, subject to normal operating-system backup behavior.</p>
+<p>You can change the game's ad permission at any time in Settings → Ads privacy. You can also reset or delete your device's advertising identifier using your Android privacy settings.</p>
+
+<p>Deleting HOL removes its local PlayerPrefs data from the device, subject to normal operating-system backup behavior. It does not by itself delete data already stored by PlayFab. On Android 8.0 and later, <code>ANDROID_ID</code> normally survives uninstall/reinstall when the same app-signing key, Android user, and device are used, so a reinstalled Google Play build may derive the same anonymous PlayFab Custom ID and reconnect to the same PlayFab identity.</p>
 
 <h2>Children</h2>
 <p>The game is not directed at children under 13 (or the applicable age of digital consent in your region), and we do not knowingly collect personal data from children. The game contains no free-form chat or messaging.</p>

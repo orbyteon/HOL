@@ -194,6 +194,42 @@ public class L10nIntegrityTests
         Assert.IsNotNull(events.GetField("OnDailyStreak", BindingFlags.Public | BindingFlags.Static));
     }
 
+    [Test]
+    public void AdsInitCompletionDoesNotRequireLiveSceneInstance()
+    {
+        var ads = FindGameType("AdsManager");
+        var initialized = ads.GetField("sdkInitialized", BindingFlags.NonPublic | BindingFlags.Static);
+        var inFlight = ads.GetField("sdkInitInFlight", BindingFlags.NonPublic | BindingFlags.Static);
+        var active = ads.GetField("activeInstance", BindingFlags.NonPublic | BindingFlags.Static);
+        var success = ads.GetMethod("OnGlobalInitSuccess", BindingFlags.NonPublic | BindingFlags.Static);
+
+        Assert.IsNotNull(initialized, "AdsManager.sdkInitialized must remain process-global");
+        Assert.IsNotNull(inFlight, "AdsManager.sdkInitInFlight must remain process-global");
+        Assert.IsNotNull(active, "AdsManager.activeInstance missing");
+        Assert.IsNotNull(success, "AdsManager.OnGlobalInitSuccess must remain a static SDK callback");
+
+        var oldInitialized = initialized.GetValue(null);
+        var oldInFlight = inFlight.GetValue(null);
+        var oldActive = active.GetValue(null);
+        try
+        {
+            initialized.SetValue(null, false);
+            inFlight.SetValue(null, true);
+            active.SetValue(null, null);
+
+            Assert.DoesNotThrow(() => success.Invoke(null, new object[] { null }),
+                "SDK init completion must settle global state after the scene AdsManager was destroyed");
+            Assert.AreEqual(true, initialized.GetValue(null));
+            Assert.AreEqual(false, inFlight.GetValue(null));
+        }
+        finally
+        {
+            initialized.SetValue(null, oldInitialized);
+            inFlight.SetValue(null, oldInFlight);
+            active.SetValue(null, oldActive);
+        }
+    }
+
     static string PrivateConst(string typeName, string fieldName)
     {
         var t = FindGameType(typeName);

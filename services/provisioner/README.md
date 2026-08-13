@@ -45,6 +45,8 @@ After those checks, the service calls PlayFab `Server/LoginWithCustomID(CreateAc
 | `REQUIRE_LICENSED` | Production workflow sets `true`; do not disable in production |
 | `INTEGRITY_MAX_AGE_MS` | Production workflow sets `120000` |
 
+`GOOGLE_PLAY_CERT_SHA256` accepts either the familiar 32-byte SHA-256 certificate fingerprint as 64 hex characters (with or without `:` separators) or the URL-safe Base64 digest returned by Play Integrity. Standard padded Base64 is accepted too and normalized to URL-safe Base64 before comparison. Every comma-separated entry must be a valid SHA-256 digest; malformed configuration fails closed.
+
 Do not log, commit, or return the service-account JSON, PlayFab secret, integrity token, or Custom ID.
 
 ## Google setup
@@ -53,7 +55,7 @@ Do not log, commit, or return the service-account JSON, PlayFab secret, integrit
 2. Enable the Play Integrity API in that Cloud project.
 3. Create a service account used only by this function and grant it the access required to decode HOL Play Integrity tokens.
 4. Add the service account in Play Console's Play Integrity API setup where required.
-5. Record the Play App Signing certificate SHA-256 digest in `GOOGLE_PLAY_CERT_SHA256`.
+5. Record the **Play App Signing** certificate SHA-256 fingerprint (not the upload-key certificate) in `GOOGLE_PLAY_CERT_SHA256`. A colon-separated hex fingerprint copied from Play Console/keytool is accepted directly; the service converts it to the URL-safe Base64 representation used by Play Integrity.
 
 The GitHub deployment workflow expects the service-account JSON as a **base64 GitHub secret**, which avoids multiline quoting problems. For example, generate it locally without sending it through chat:
 

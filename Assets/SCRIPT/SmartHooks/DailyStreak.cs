@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using UnityEngine;
 
 // Daily-play streak hook. Counts one streak day per local calendar day and
@@ -17,7 +18,10 @@ public class DailyStreak : MonoBehaviour
 
     public static void RegisterToday()
     {
-        string today = DateTime.Now.ToString("yyyy-MM-dd");
+        // Invariant culture on both sides: the device culture's default
+        // calendar (e.g. Buddhist) would otherwise store non-Gregorian years
+        // that break the comparison after a system-language change.
+        string today = DateTime.Now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         string last = PlayerPrefs.GetString(LastPlayDateKey, "");
 
         // Scene reloads on the same day are not new engagement events.
@@ -28,7 +32,8 @@ public class DailyStreak : MonoBehaviour
         if (!string.IsNullOrEmpty(last))
         {
             DateTime lastDate;
-            if (DateTime.TryParse(last, out lastDate))
+            if (DateTime.TryParseExact(last, "yyyy-MM-dd", CultureInfo.InvariantCulture,
+                    DateTimeStyles.None, out lastDate))
                 consecutive = (DateTime.Now.Date - lastDate.Date).Days == 1;
         }
 

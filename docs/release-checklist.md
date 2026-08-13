@@ -65,9 +65,9 @@ read the same `PLAYFAB_TITLE_ID` production variable.
 
 ## 2. Deploy the attested first-install provisioner
 
-Release builds use `Client/LoginWithCustomID(CreateAccount:false)`. A fresh
-install is created only by `services/provisioner/` after server-side Google Play
-Integrity verification.
+Release builds use `Client/LoginWithCustomID(CreateAccount:false)`. An anonymous
+PlayFab identity that does not already exist is created only by
+`services/provisioner/` after server-side Google Play Integrity verification.
 
 - [ ] Link HOL in Play Console to the Google Cloud project used for Play Integrity
 - [ ] Enable the Play Integrity API and authorize the service account used by Azure
@@ -162,9 +162,12 @@ candidate) on physical Android devices.
 
 ### PvP / provisioning
 
-- [ ] A brand-new Play-distributed install provisions successfully before its
-      normal `Client/LoginWithCustomID(CreateAccount:false)` retry
-- [ ] Existing installations log in without invoking provisioning
+- [ ] A brand-new Play-distributed Android identity provisions successfully before
+      its normal `Client/LoginWithCustomID(CreateAccount:false)` retry
+- [ ] Existing identities log in without invoking provisioning
+- [ ] Uninstall/reinstall the same Play-distributed build on the same Android
+      user/device → the existing anonymous PlayFab identity is reused rather than
+      creating a second account
 - [ ] Tampered/unlicensed/non-device-integrity builds cannot provision
 - [ ] A build signed with an unexpected certificate cannot provision
 - [ ] Create room produces a 5-character code and second device can join
