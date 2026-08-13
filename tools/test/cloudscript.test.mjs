@@ -1,4 +1,5 @@
-// Rule tests for playfab/cloudscript.js — run with: node --test tools/test/
+// Rule tests for playfab/cloudscript.js — run with:
+//   node --test tools/test/*.test.mjs
 //
 // The duel rules changed in a way that is hard to eyeball: the opener is now a
 // coin flip, a match ends only at the end of a round, and the Lock decides
@@ -12,6 +13,7 @@ import {
   startMatch,
   guess,
   midpointSolver,
+  seededRandom,
 } from "./cloudscript-harness.mjs";
 
 const other = (side) => (side === "host" ? "guest" : "host");
@@ -328,13 +330,15 @@ test("rematch rejects a bad secret, a stranger, and a live match", () => {
 // "first correct guess wins" rule two identical players did not split matches
 // 50/50, because the opener reached every guess number first.
 
-function playMatch(lockPolicy, slop = 0) {
-  const cs = loadCloudScript();
-  const hostSecret = 1 + Math.floor(Math.random() * 100);
-  const guestSecret = 1 + Math.floor(Math.random() * 100);
+function playMatch(lockPolicy, slop = 0, rng = Math.random) {
+  // The opener coin flip happens inside CloudScript, so the same generator has
+  // to drive the sandbox for the run to be reproducible.
+  const cs = loadCloudScript({ random: rng });
+  const hostSecret = 1 + Math.floor(rng() * 100);
+  const guestSecret = 1 + Math.floor(rng() * 100);
   const { roomId, state } = startMatch(cs, { hostSecret, guestSecret });
 
-  const solvers = { host: midpointSolver(slop), guest: midpointSolver(slop) };
+  const solvers = { host: midpointSolver(slop, rng), guest: midpointSolver(slop, rng) };
   let view = state;
 
   for (let step = 0; step < 80 && view.phase === "play"; step++) {
@@ -355,10 +359,11 @@ function playMatch(lockPolicy, slop = 0) {
   return { winner: view.winner, opener: view.opener };
 }
 
-function simulate(label, lockPolicy, runs, slop = 0) {
+function simulate(label, lockPolicy, runs, slop = 0, seed = 20260813) {
   const tally = { host: 0, guest: 0, draw: 0, openerWins: 0, responderWins: 0 };
+  const rng = seededRandom(seed);
   for (let i = 0; i < runs; i++) {
-    const { winner, opener } = playMatch(lockPolicy, slop);
+    const { winner, opener } = playMatch(lockPolicy, slop, rng);
     tally[winner]++;
     if (winner === opener) tally.openerWins++;
     else if (winner === other(opener)) tally.responderWins++;
@@ -379,11 +384,11 @@ test("equally skilled players are not decided by who moves first", () => {
   const runs = 3000;
   console.log("\n  3000 matches per row:");
 
-  const perfect = simulate("flawless, never lock", neverLock, runs);
-  const perfectLock = simulate("flawless, lock at 3", lockAtPromptThreshold, runs);
+  const perfect = simulate("flawless, never lock", neverLock, runs, 0, 1001);
+  const perfectLock = simulate("flawless, lock at 3", lockAtPromptThreshold, runs, 0, 2002);
   // Nobody plays a perfect binary search on a phone. A little slop is what a
   // real match looks like, and it is where the draw rate actually lands.
-  const human = simulate("human-ish, lock at 3", lockAtPromptThreshold, runs, 0.2);
+  const human = simulate("human-ish, lock at 3", lockAtPromptThreshold, runs, 0.2, 3003);
 
   for (const tally of [perfect, perfectLock, human]) {
     const gap = Math.abs(tally.openerWins - tally.responderWins) / runs;

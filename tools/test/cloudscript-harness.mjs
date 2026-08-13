@@ -111,6 +111,19 @@ export function startMatch(cs, { hostSecret = 42, guestSecret = 77 } = {}) {
 
 export const PLAYER = { host: "HOST", guest: "GUEST" };
 
+// Small deterministic PRNG. A fairness simulation that samples Math.random
+// fails on noise every few runs, which trains everyone to re-run the suite
+// instead of reading it; seeding makes the numbers reproducible.
+export function seededRandom(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 export function guess(cs, roomId, side, value, lock = false) {
   return cs.call("submitGuess", PLAYER[side], { roomId, guess: value, lock });
 }
@@ -118,13 +131,13 @@ export function guess(cs, roomId, side, value, lock = false) {
 // The strategy every rational player converges on: halve the interval. `slop`
 // is the chance of straying to a random number inside the known range instead,
 // which is what separates a real player from a flawless one.
-export function midpointSolver(slop = 0) {
+export function midpointSolver(slop = 0, random = Math.random) {
   let lo = 1;
   let hi = 100;
   return {
     next: () =>
-      slop > 0 && Math.random() < slop
-        ? lo + Math.floor(Math.random() * (hi - lo + 1))
+      slop > 0 && random() < slop
+        ? lo + Math.floor(random() * (hi - lo + 1))
         : Math.floor((lo + hi) / 2),
     remaining: () => hi - lo + 1,
     tell(value, hint) {

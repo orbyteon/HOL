@@ -30,9 +30,13 @@ missing so a skipped compile cannot look green.
   create/read/join/guess/signal/rematch/leave/cleanup.
 - `tools/playfab/deploy-cloudscript.mjs` — publishes/verifies Legacy CloudScript
   and optionally adds Client Shared Group API deny policy statements.
-- `tools/test/` — Node rule tests (`node --test tools/test/cloudscript.test.mjs`)
-  that drive the real CloudScript against an in-memory Shared Group store, plus
-  `lock-policy-sim.mjs` for balancing the Lock. No Unity needed.
+- `tools/test/` — Node tests, run with `node --test tools/test/*.test.mjs` (the
+  bare directory form does not resolve). `cloudscript.test.mjs` drives the real
+  CloudScript against an in-memory Shared Group store;
+  `room-state-contract.test.mjs` checks every key the server emits against
+  `PvpBackend.RoomState`, because JsonUtility binds by exact field name and a
+  mismatch fails silently; `lock-policy-sim.mjs` balances the Lock. No Unity
+  needed for any of them.
 - `tools/release/write-release-config.mjs` — validates/injects public production
   config into the temporary release-build workspace.
 - `docs/privacy.html` — privacy policy; keep it truthful when data practices change.

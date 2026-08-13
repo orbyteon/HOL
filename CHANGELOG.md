@@ -31,8 +31,9 @@ Play Console versionName in `ProjectSettings.asset`.
   fixed for the match (PlayFab and the Firebase fallback both).
 - **Equal turns.** A round is one guess per side, and a match can only end
   once a round closes — so the responder always answers the opener's
-  winning guess. Simulated over the real rules, the opener now takes
-  35.5% and the responder 36.8%.
+  winning guess. Simulated over the real rules at human accuracy, the two
+  sides now take 46.3% and 46.5% with 7.3% draws; the seeded simulation in
+  `tools/test/cloudscript.test.mjs` reproduces those figures exactly.
 - **The Lock**, one per match: stake it on a guess and a correct one wins
   a same-round tie, while a wrong one forfeits your next turn. It is the
   game's first genuine decision — staking it only on a certain guess
