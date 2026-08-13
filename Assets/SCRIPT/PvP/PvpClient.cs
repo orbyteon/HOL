@@ -96,7 +96,24 @@ public class PvpClient : PvpBackend
             sb.Append("\"turn\":\"").Append(other).Append("\"");
         sb.Append('}');
 
-        StartCoroutine(PatchRoom(RoomCode, sb.ToString(), done));
+        StartCoroutine(PatchRoom(RoomCode, sb.ToString(), ok =>
+        {
+            // Mirror the accepted patch into the caller's state so a winning
+            // guess ends the match from this response, like the PlayFab
+            // backend's returned view does — without waiting on the next poll.
+            if (ok && current != null)
+            {
+                current.lastGuess = guess;
+                current.lastBy = me;
+                if (guess == opponentSecret)
+                {
+                    current.phase = "done";
+                    current.winner = me;
+                }
+                else current.turn = other;
+            }
+            done?.Invoke(ok);
+        }));
     }
 
     public override void StartPolling(Action<RoomState> onState)

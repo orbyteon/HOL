@@ -293,7 +293,22 @@ handlers.leaveRoom = function (args, context) {
     var roomId = String(args.roomId).toUpperCase().trim();
     var state = readState(roomId);
     if (!state) return { ok: true };
-    if (!sideForPlayer(state, currentPlayerId)) return { ok: false, error: "not a member" };
+    var side = sideForPlayer(state, currentPlayerId);
+    if (!side) return { ok: false, error: "not a member" };
+
+    // A finished room must survive until the opponent has observed the
+    // result: leaving after "done" counts as this side's acknowledgement,
+    // and artifacts are destroyed only once both sides have acked (here or
+    // in ackResult). Leaving mid-match still deletes immediately so the
+    // opponent's poll reports the departure.
+    if (state.phase === "done") {
+        try { server.CreateSharedGroup({ SharedGroupId: ackGroupId(roomId, side) }); }
+        catch (alreadyAcknowledged) { }
+
+        var otherSide = side === "host" ? "guest" : "host";
+        if (!groupExists(ackGroupId(roomId, otherSide)))
+            return { ok: true };
+    }
 
     deleteRoomArtifacts(roomId, state);
     return { ok: true };

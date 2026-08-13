@@ -22,6 +22,7 @@ public class AdsManager : MonoBehaviour
     const float ShowAdSafetyTimeout = 120f;
     const float MinSecondsBetweenAds = 60f;
     const int MaxInitRetries = 3;
+    const float RewardGraceSeconds = 5f;
 
     LevelPlayInterstitialAd interstitialAd;
     LevelPlayRewardedAd rewardedAd;
@@ -31,7 +32,12 @@ public class AdsManager : MonoBehaviour
     bool adInProgress;
     float lastAdShowTime = -999f;
     int initRetries;
-    bool initialized;
+    // LevelPlay initialization is process-global while this component is
+    // scene-local and recreated on every MainMenu reload; instance flags here
+    // would re-run LevelPlay.Init on an already-initialized SDK, which never
+    // re-fires OnInitSuccess for the new instance.
+    static bool sdkInitialized;
+    static bool sdkInitInFlight;
     bool adsAllowedThisSession;
 
     System.Action onRewardEarned;
@@ -92,9 +98,22 @@ public class AdsManager : MonoBehaviour
 
     void InitAds()
     {
-        if (!adsAllowedThisSession || initialized)
+        if (!adsAllowedThisSession)
             return;
 
+        // Already-initialized SDK (consent re-granted mid-session, or a fresh
+        // instance after a scene reload): skip Init and go straight to the ad
+        // objects, or ads would stay dead for the rest of the session.
+        if (sdkInitialized)
+        {
+            EnsureAdObjects();
+            return;
+        }
+
+        if (sdkInitInFlight)
+            return;
+
+        sdkInitInFlight = true;
         LevelPlayPrivacySettings.SetGDPRConsent(true);
         LevelPlay.Init(GameId);
     }
@@ -103,25 +122,39 @@ public class AdsManager : MonoBehaviour
     {
         Debug.Log("Ads Initialized");
 
-        initialized = true;
+        sdkInitialized = true;
+        sdkInitInFlight = false;
         initRetries = 0;
 
         // Consent could have been withdrawn while initialization was in flight.
         if (!adsAllowedThisSession)
             return;
 
-        interstitialAd = new LevelPlayInterstitialAd(InterstitialUnit);
-        interstitialAd.OnAdClosed += OnAdClosed;
-        interstitialAd.OnAdDisplayFailed += OnAdDisplayFailed;
-        interstitialAd.OnAdLoadFailed += OnAdLoadFailed;
-        interstitialAd.LoadAd();
+        EnsureAdObjects();
+    }
 
-        rewardedAd = new LevelPlayRewardedAd(RewardedUnit);
-        rewardedAd.OnAdClosed += OnRewardedClosed;
-        rewardedAd.OnAdDisplayFailed += OnRewardedDisplayFailed;
-        rewardedAd.OnAdLoadFailed += OnRewardedLoadFailed;
-        rewardedAd.OnAdRewarded += OnRewardedEarned;
-        rewardedAd.LoadAd();
+    void EnsureAdObjects()
+    {
+        if (interstitialAd == null)
+        {
+            interstitialAd = new LevelPlayInterstitialAd(InterstitialUnit);
+            interstitialAd.OnAdClosed += OnAdClosed;
+            interstitialAd.OnAdDisplayFailed += OnAdDisplayFailed;
+            interstitialAd.OnAdLoadFailed += OnAdLoadFailed;
+        }
+        if (!interstitialAd.IsAdReady())
+            interstitialAd.LoadAd();
+
+        if (rewardedAd == null)
+        {
+            rewardedAd = new LevelPlayRewardedAd(RewardedUnit);
+            rewardedAd.OnAdClosed += OnRewardedClosed;
+            rewardedAd.OnAdDisplayFailed += OnRewardedDisplayFailed;
+            rewardedAd.OnAdLoadFailed += OnRewardedLoadFailed;
+            rewardedAd.OnAdRewarded += OnRewardedEarned;
+        }
+        if (!rewardedAd.IsAdReady())
+            rewardedAd.LoadAd();
     }
 
     void OnAdClosed(LevelPlayAdInfo adInfo)
@@ -166,6 +199,7 @@ public class AdsManager : MonoBehaviour
             return false;
         }
 
+        CancelInvoke(nameof(FinishRewardedAfterGrace));
         onRewardEarned = onReward;
         onRewardUnavailable = onUnavailable;
         rewardGranted = false;
@@ -178,13 +212,34 @@ public class AdsManager : MonoBehaviour
         rewardGranted = true;
         PlayerPrefs.SetInt(PendingRewardEarnedKey, 1);
         PlayerPrefs.Save();
+
+        // If the close event already ran, its grace timer is waiting on
+        // exactly this reward — deliver it now.
+        if (IsInvoking(nameof(FinishRewardedAfterGrace)))
+        {
+            CancelInvoke(nameof(FinishRewardedAfterGrace));
+            FinishRewarded();
+        }
     }
 
     void OnRewardedClosed(LevelPlayAdInfo adInfo)
     {
-        FinishRewarded();
+        // LevelPlay may deliver OnAdRewarded after OnAdClosed. Treating a
+        // close-without-reward as "not earned" immediately would wipe the
+        // pending-restore state the late reward needs, so give it a grace
+        // window before settling.
+        if (rewardGranted)
+            FinishRewarded();
+        else
+            Invoke(nameof(FinishRewardedAfterGrace), RewardGraceSeconds);
+
         if (adsAllowedThisSession && rewardedAd != null)
             rewardedAd.LoadAd();
+    }
+
+    void FinishRewardedAfterGrace()
+    {
+        FinishRewarded();
     }
 
     void OnRewardedDisplayFailed(LevelPlayAdInfo adInfo, LevelPlayAdError error)
@@ -301,6 +356,7 @@ public class AdsManager : MonoBehaviour
     void OnInitFailed(LevelPlayInitError error)
     {
         Debug.Log("Ads Init Failed: " + error);
+        sdkInitInFlight = false;
         if (adsAllowedThisSession && initRetries < MaxInitRetries)
             Invoke(nameof(RetryInit), 60f);
     }

@@ -104,6 +104,9 @@ public class FakeMatchmaking : MonoBehaviour
     void OnDisable()
     {
         // Don't leave the animation running if the object is deactivated.
+        // Deactivation also kills SearchRoutine before it can reset the
+        // guard, so clear it here or StartSearch is dead after re-enabling.
         StopDotsAnimation();
+        isSearching = false;
     }
 }

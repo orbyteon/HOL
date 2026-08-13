@@ -204,11 +204,21 @@ public class PvpGameController : MonoBehaviour
         guessInput.text = "";
         turnText.text = L10n.Get("pvp_sending");
         guessInFlight = true;
+        int gen = flowGeneration;
         client.SubmitGuess(guess, lastState, ok =>
         {
+            if (gen != flowGeneration) return;
+
             guessInFlight = false;
             if (ok)
+            {
                 localAcceptedGuessCount++;
+                // A winning guess ends the match in the submit response itself;
+                // don't leave the winner staring at "sending" until the next poll
+                // (which the loser's leave may beat to the room).
+                if (lastState != null && lastState.phase == "done" && !matchOver)
+                    OnState(lastState);
+            }
             else
             {
                 guessInput.text = typed;
@@ -223,6 +233,7 @@ public class PvpGameController : MonoBehaviour
         client.StopPolling();
         client.DeleteRoom();
         matchOver = false;
+        guessInFlight = false;
         lastState = null;
         shownGuessKey = "";
         OpenPvpMenu();
@@ -380,7 +391,13 @@ public class PvpGameController : MonoBehaviour
 
             bool iWon = s.winner == me;
             int authoritativeGuessCount = client.IsHost ? s.hostGuessCount : s.guestGuessCount;
-            int myGuessCount = authoritativeGuessCount > 0 ? authoritativeGuessCount : localAcceptedGuessCount;
+            // The poll can deliver the finished state before the winning
+            // submit's own response returns; that in-flight guess is mine and
+            // accepted (the state says so), so count it.
+            int localCount = localAcceptedGuessCount;
+            if (guessInFlight && s.lastBy == me)
+                localCount++;
+            int myGuessCount = authoritativeGuessCount > 0 ? authoritativeGuessCount : localCount;
             int huntedSecret = s.revealedSecret > 0
                 ? s.revealedSecret
                 : (client.IsHost ? s.guestSecret : s.hostSecret);
