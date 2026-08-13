@@ -315,6 +315,14 @@ network/platform consent requirement.
       prevents LevelPlay initialization on the next launch
 - [ ] Play Console Data safety answers match `docs/privacy.html` and the final
       mediation/configuration stack
+- [ ] **New in 0.4.0:** Data safety declares the end-of-match analytics event —
+      "App activity → Other actions", collected, tied to the anonymous PlayFab
+      identity, not shared with third parties beyond PlayFab as processor, not
+      used for advertising or tracking. Adding it changed two claims in
+      `docs/privacy.html` that were previously true: solo matches now report a
+      result, and PlayFab now retains per-player match summaries. Both are
+      described under "Gameplay analytics"; ship the updated policy in the same
+      release as the build, not after it.
 
 ## 7. Privacy policy hosting
 
