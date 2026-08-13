@@ -116,13 +116,21 @@ jobs:
           for workflow in \
             .github/workflows/build-release.yml \
             .github/workflows/deploy-playfab.yml \
-            .github/workflows/deploy-provisioner.yml; do
+            .github/workflows/deploy-provisioner.yml \
+            .github/workflows/set-min-version.yml; do
             grep -q 'environment: production' "$workflow"
             grep -q 'refs/heads/main' "$workflow"
           done
           grep -q 'Confirmation must be exactly BUILD' .github/workflows/build-release.yml
           grep -q 'Confirmation must be exactly DEPLOY' .github/workflows/deploy-playfab.yml
           grep -q 'Confirmation must be exactly DEPLOY' .github/workflows/deploy-provisioner.yml
+          grep -q 'Confirmation must be exactly SET' .github/workflows/set-min-version.yml
+          # The gate writes one fixed key; an operator-supplied key name would
+          # turn a release step into arbitrary production Title Data access.
+          if grep -qE '^\s*(key|title_data_key):' .github/workflows/set-min-version.yml; then
+            echo "::error::set-min-version must not accept an operator-chosen Title Data key"
+            exit 1
+          fi
           grep -q 'GOOGLE_PLAY_CERT_SHA256' .github/workflows/deploy-provisioner.yml
           grep -q 'Provisioning endpoint did not become healthy' .github/workflows/deploy-provisioner.yml
           grep -q 'HARDEN_SHARED_GROUP_POLICY: "true"' .github/workflows/deploy-playfab.yml

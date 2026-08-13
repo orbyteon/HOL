@@ -1,0 +1,90 @@
+name: Set PlayFab Force-Update Gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      min_version:
+        description: "Minimum supported client version, e.g. 0.3.0"
+        required: true
+        type: string
+      confirm:
+        description: "Type SET to write minVersion to production Title Data"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: playfab-production
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    name: Publish minVersion
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 10
+    env:
+      PLAYFAB_TITLE_ID: ${{ vars.PLAYFAB_TITLE_ID }}
+    steps:
+      - name: Enforce production source
+        shell: bash
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+          MIN_VERSION: ${{ inputs.min_version }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/main" || {
+            echo "::error::The force-update gate must be dispatched from the main branch (got $GITHUB_REF)"
+            exit 1
+          }
+          test "$CONFIRM" = "SET" || {
+            echo "::error::Confirmation must be exactly SET"
+            exit 1
+          }
+          [[ "$MIN_VERSION" =~ ^[0-9]+(\.[0-9]+)*$ ]] || {
+            echo "::error::min_version must be numeric segments such as 0.3.0"
+            exit 1
+          }
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validate deployment inputs
+        shell: bash
+        env:
+          PLAYFAB_DEV_SECRET_KEY: ${{ secrets.PLAYFAB_DEV_SECRET_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$PLAYFAB_TITLE_ID" || { echo "::error::PLAYFAB_TITLE_ID production variable is missing"; exit 1; }
+          [[ "$PLAYFAB_TITLE_ID" =~ ^[A-Za-z0-9]{3,32}$ ]] || {
+            echo "::error::PLAYFAB_TITLE_ID must be 3-32 letters/digits"
+            exit 1
+          }
+          test -n "$PLAYFAB_DEV_SECRET_KEY" || { echo "::error::PLAYFAB_DEV_SECRET_KEY secret is missing"; exit 1; }
+          node --check tools/playfab/set-min-version.mjs
+
+      - name: Write and verify the force-update gate
+        shell: bash
+        env:
+          PLAYFAB_DEV_SECRET_KEY: ${{ secrets.PLAYFAB_DEV_SECRET_KEY }}
+          MIN_VERSION: ${{ inputs.min_version }}
+        run: node tools/playfab/set-min-version.mjs
+
+      - name: Deployment summary
+        shell: bash
+        env:
+          MIN_VERSION: ${{ inputs.min_version }}
+        run: |
+          {
+            echo "## PlayFab force-update gate"
+            echo "- Title Data \`minVersion\`: \`${MIN_VERSION}\`"
+            echo "- Value written and read back from production Title Data"
+            echo "- Clients below this version now receive the update screen instead of a match"
+          } >> "$GITHUB_STEP_SUMMARY"
