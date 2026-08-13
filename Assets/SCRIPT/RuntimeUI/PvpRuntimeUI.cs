@@ -148,14 +148,44 @@ public class PvpRuntimeUI : MonoBehaviour
             new Vector2(0f, 300f), new Vector2(1000f, 90f));
         var historyText = RuntimeUI.CreateText(matchPanel.transform, "History", "", 40,
             new Vector2(0f, 120f), new Vector2(1000f, 120f));
+        // How far the player has narrowed the opponent's number. Solo play has
+        // always shown this; PvP never did.
+        var rangeText = RuntimeUI.CreateText(matchPanel.transform, "Range", "", 34,
+            new Vector2(0f, 205f), new Vector2(1000f, 70f), AccentBlue);
+        var signalFeed = RuntimeUI.CreateText(matchPanel.transform, "SignalFeed", "", 34,
+            new Vector2(0f, 20f), new Vector2(1000f, 70f), AccentBlue);
         var guessInput = RuntimeUI.CreateInputField(matchPanel.transform, "GuessInput",
             "1-100", new Vector2(0f, -80f), new Vector2(460f, 90f));
         var guessBtn = RuntimeUI.CreateButton(matchPanel.transform, "GuessButton",
-            L10n.Get("pvp_guess"), new Vector2(0f, -210f), new Vector2(460f, 90f), Accent, DarkLabel);
-        var resultText = RuntimeUI.CreateText(matchPanel.transform, "Result", "", 72,
-            new Vector2(0f, -400f), new Vector2(1000f, 120f));
+            L10n.Get("pvp_guess"), new Vector2(-135f, -200f), new Vector2(390f, 90f), Accent, DarkLabel);
+
+        // Gold stays reserved for the primary action (design/philosophy.md), so
+        // the Lock takes the cyan seam. Its label is state-driven — it becomes
+        // a prompt once the range is down to a few candidates — so the
+        // controller sets the text rather than a LocalizedText component.
+        var lockBtn = RuntimeUI.CreateButton(matchPanel.transform, "LockButton",
+            L10n.Get("lock"), new Vector2(200f, -200f), new Vector2(260f, 90f), AccentBlue, DarkLabel);
+        var lockLabel = AsTmp(lockBtn.GetComponentInChildren<Text>());
+        lockLabel.fontSize = 26;
+
+        var signalsRoot = RuntimeUI.CreateObject("Signals", matchPanel.transform);
+        var signalButtons = new Button[Signals.Count];
+        for (int i = 0; i < Signals.Count; i++)
+        {
+            float x = (i % 3 - 1) * 330f;
+            float y = i < 3 ? -300f : -374f;
+            var signalBtn = RuntimeUI.CreateButton(signalsRoot.transform, "Signal" + i,
+                Signals.Text(i), new Vector2(x, y), new Vector2(315f, 66f), Neutral);
+            var signalLabel = signalBtn.GetComponentInChildren<Text>();
+            if (signalLabel != null) signalLabel.fontSize = 24;
+            RuntimeUI.Localize(signalBtn, Signals.Key(i));
+            signalButtons[i] = signalBtn;
+        }
+
+        var resultText = RuntimeUI.CreateText(matchPanel.transform, "Result", "", 64,
+            new Vector2(0f, -470f), new Vector2(1000f, 130f));
         var leaveBtn = RuntimeUI.CreateButton(matchPanel.transform, "LeaveButton",
-            L10n.Get("pvp_leave"), new Vector2(0f, -560f), new Vector2(300f, 80f), Neutral);
+            L10n.Get("pvp_leave"), new Vector2(0f, -600f), new Vector2(300f, 78f), Neutral);
 
         RuntimeUI.LocalizePlaceholder(guessInput, "number_placeholder");
         RuntimeUI.Localize(guessBtn, "pvp_guess");
@@ -185,6 +215,11 @@ public class PvpRuntimeUI : MonoBehaviour
         controller.turnText = AsTmp(turnText);
         controller.historyText = AsTmp(historyText);
         controller.resultText = AsTmp(resultText);
+        controller.rangeText = AsTmp(rangeText);
+        controller.signalFeedText = AsTmp(signalFeed);
+        controller.lockButton = lockBtn.gameObject;
+        controller.lockButtonLabel = lockLabel;
+        controller.signalsRoot = signalsRoot;
 
         // Button hooks.
         createBtn.onClick.AddListener(() => ShowOnly(controller, createPanel));
@@ -196,7 +231,14 @@ public class PvpRuntimeUI : MonoBehaviour
         joinGo.onClick.AddListener(controller.OnJoinRoomPressed);
         joinBack.onClick.AddListener(controller.CancelRoomAndLeave);
         guessBtn.onClick.AddListener(controller.OnSubmitGuessPressed);
+        lockBtn.onClick.AddListener(controller.OnLockTogglePressed);
         leaveBtn.onClick.AddListener(controller.OnLeaveMatchPressed);
+
+        for (int i = 0; i < signalButtons.Length; i++)
+        {
+            int signalId = i; // capture per iteration, not the shared loop variable
+            signalButtons[i].onClick.AddListener(() => controller.OnSignalPressed(signalId));
+        }
 
         // Soft-keyboard Done (Enter in the editor) submits the field's flow;
         // the handlers validate and give feedback, so a premature submit is
@@ -208,6 +250,8 @@ public class PvpRuntimeUI : MonoBehaviour
         guessInput.onSubmit.AddListener(_ => controller.OnSubmitGuessPressed());
 
         // All panels start hidden; OpenPvpMenu shows the menu panel.
+        lockBtn.gameObject.SetActive(false);
+        signalsRoot.SetActive(false);
         menuPanel.SetActive(false);
         createPanel.SetActive(false);
         joinPanel.SetActive(false);

@@ -14,12 +14,14 @@ public static class GameStats
     const string StreakKey = "StatStreak";
     const string BestStreakKey = "StatBestStreak";
     const string BestGuessesKey = "StatBestGuesses"; // fewest guesses in a win, 0 = none yet
+    const string DrawsKey = "StatDraws";
     const string MatchesKey = "StatMatches";
     const string RecentKey = "StatRecentBits"; // last 10 results, bit0 = oldest
     const string RecentCountKey = "StatRecentCount";
 
     public static int Wins => PlayerPrefs.GetInt(WinsKey, 0);
     public static int Losses => PlayerPrefs.GetInt(LossesKey, 0);
+    public static int Draws => PlayerPrefs.GetInt(DrawsKey, 0);
     public static int CurrentStreak => PlayerPrefs.GetInt(StreakKey, 0);
     public static int BestStreak => PlayerPrefs.GetInt(BestStreakKey, 0);
     public static int BestWinningGuesses => PlayerPrefs.GetInt(BestGuessesKey, 0);
@@ -49,6 +51,17 @@ public static class GameStats
         PlayerPrefs.SetInt(StreakKey, 0);
 
         if (countRecent) PushRecent(false);
+        PlayerPrefs.Save();
+    }
+
+    // A dead heat: both duellists found the number in the same round and
+    // neither settled it with the Lock. It is not a win and not a loss, so the
+    // streak survives untouched and the result stays out of the rolling window
+    // that tunes the adaptive AI — a draw says nothing about relative skill.
+    public static void RecordDraw()
+    {
+        PlayerPrefs.SetInt(DrawsKey, Draws + 1);
+        PlayerPrefs.SetInt(MatchesKey, Matches + 1);
         PlayerPrefs.Save();
     }
 
@@ -92,7 +105,8 @@ public static class GameStats
     // One-line summary for menu/end-screen UI.
     public static string Summary()
     {
-        return "Wins: " + Wins + "  Losses: " + Losses +
-               "\nStreak: " + CurrentStreak + "  Best: " + BestStreak;
+        string record = "Wins: " + Wins + "  Losses: " + Losses;
+        if (Draws > 0) record += "  Draws: " + Draws;
+        return record + "\nStreak: " + CurrentStreak + "  Best: " + BestStreak;
     }
 }
