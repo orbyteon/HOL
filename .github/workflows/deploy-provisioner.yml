@@ -78,6 +78,20 @@ jobs:
         with:
           node-version: 22
 
+      - name: Validate Play signing certificate digest
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { parseCertificateConfig } from './services/provisioner/src/security.js';
+          const parsed = parseCertificateConfig(process.env.GOOGLE_PLAY_CERT_SHA256);
+          if (!parsed.valid) {
+            console.error('::error::GOOGLE_PLAY_CERT_SHA256 must contain SHA-256 certificate digest(s) as colon/plain hex or base64/base64url');
+            process.exit(1);
+          }
+          console.log(`Validated ${parsed.certificates.length} Play signing certificate digest(s).`);
+          NODE
+
       - name: Install and test provisioner
         working-directory: ${{ env.FUNCTION_PATH }}
         run: |
