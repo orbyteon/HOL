@@ -72,10 +72,12 @@ Integrity verification.
 - [ ] Link HOL in Play Console to the Google Cloud project used for Play Integrity
 - [ ] Enable the Play Integrity API and authorize the service account used by Azure
 - [ ] Configure the Play App Signing certificate digest in
-      `GOOGLE_PLAY_CERT_SHA256`
+      `GOOGLE_PLAY_CERT_SHA256` — production deployment refuses an empty value
 - [ ] Configure distributed/platform throttling (Azure API Management,
       Front Door/WAF, or equivalent); the in-process limiter is supplemental only
 - [ ] Run **Deploy Provisioning Service** from `main` and type `DEPLOY`
+- [ ] The deployment health probe reaches `/api/provision` and receives HTTP 400
+      for its intentionally invalid empty JSON request
 - [ ] Confirm Azure app settings contain the expected package/title configuration
       without printing or exposing the PlayFab/Google credentials
 - [ ] Confirm `PROVISIONING_URL` points at the deployed HTTPS endpoint
@@ -88,10 +90,11 @@ See `services/provisioner/README.md` and `docs/playfab-auth-provisioning.md`.
 use `ExecuteCloudScript`; they must never receive live secret numbers or choose
 their own host/guest identity.
 
-- [ ] Run **Deploy PlayFab Production** from `main`, type `DEPLOY`, and leave
-      `harden_shared_group_policy` enabled
+- [ ] Run **Deploy PlayFab Production** from `main` and type `DEPLOY`
 - [ ] The workflow successfully reads the published CloudScript revision back
       and verifies `cloudscript.js` matches repository source exactly
+- [ ] The workflow verifies explicit deny statements for all direct Client Shared
+      Group APIs; this hardening is mandatory in the production workflow
 - [ ] Confirm the deployed revision exposes `createRoom`, `joinRoom`, `getRoom`,
       `submitGuess`, `ackResult`, and `leaveRoom`
 - [ ] Verify a modified client cannot call Client `GetSharedGroupData`
@@ -116,12 +119,14 @@ Use **Build Android Release Candidate** from `main`:
 3. type `BUILD`.
 
 The workflow validates all production variables/secrets, injects public release
-configuration only into the temporary Actions workspace, runs Unity with the
-release build guard, signs an Android App Bundle using the secret keystore, and
-uploads the AAB plus `SHA256SUMS` as an artifact.
+configuration only into the temporary Actions workspace, refuses to build if any
+other workspace file changed, runs Unity with the release build guard, signs an
+Android App Bundle using the secret keystore, verifies the AAB JAR signature,
+and uploads the artifact with `JARSIGNER_VERIFY.txt` plus `SHA256SUMS`.
 
 - [ ] workflow completes successfully
 - [ ] exactly one `.aab` exists in the artifact
+- [ ] `JARSIGNER_VERIFY.txt` contains `jar verified.`
 - [ ] SHA-256 matches `SHA256SUMS`
 - [ ] app version/versionCode are the intended Play Console values
 - [ ] upload key/keystore is backed up offline; it is never committed to git
@@ -161,9 +166,10 @@ candidate) on physical Android devices.
       normal `Client/LoginWithCustomID(CreateAccount:false)` retry
 - [ ] Existing installations log in without invoking provisioning
 - [ ] Tampered/unlicensed/non-device-integrity builds cannot provision
+- [ ] A build signed with an unexpected certificate cannot provision
 - [ ] Create room produces a 5-character code and second device can join
 - [ ] A third simultaneous join attempt is rejected as room full
-- [ ] Live `getRoom` client state contains no host/guest secret
+- [ ] Live `getRoom` client state contains no host/guest secret or PlayFab IDs
 - [ ] Adding an invented `side` field to a guess request gives no authority;
       CloudScript derives identity from `currentPlayerId`
 - [ ] Double-submit the same turn → only one server turn claim succeeds
