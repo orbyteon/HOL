@@ -79,14 +79,16 @@ public class AdsManager : MonoBehaviour
         Debug.Log("Ads Initialized");
         sdkInitialized = true;
         sdkInitInFlight = false;
-        activeInstance?.HandleInitSuccess();
+        if (activeInstance != null)
+            activeInstance.HandleInitSuccess();
     }
 
     static void OnGlobalInitFailed(LevelPlayInitError error)
     {
         Debug.Log("Ads Init Failed: " + error);
         sdkInitInFlight = false;
-        activeInstance?.HandleInitFailed();
+        if (activeInstance != null)
+            activeInstance.HandleInitFailed();
     }
 
     void Start()
