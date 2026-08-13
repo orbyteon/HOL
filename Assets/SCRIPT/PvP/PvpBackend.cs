@@ -46,6 +46,14 @@ public abstract class PvpBackend : MonoBehaviour
         public int signalId;           // index into Signals.Table
         public int signalSeq;          // bumped per signal; how clients spot a new one
 
+        // Rematch handshake. A room outlives its match now, so friends can play
+        // again without re-sharing an invite code. matchIndex changing is how a
+        // client knows the next match actually started rather than being offered.
+        public int matchIndex;
+        public bool iWantRematch;
+        public bool theyWantRematch;
+        public bool opponentLeft;
+
         public bool LockUsedBy(string side)
         {
             return side == "host" ? hostLockUsed : guestLockUsed;
@@ -91,6 +99,11 @@ public abstract class PvpBackend : MonoBehaviour
     // Sends one entry from the fixed Signals table. Backends that cannot carry
     // signals simply report failure; the UI then leaves the control alone.
     public virtual void SendSignal(int signalId, Action<bool> done) { done?.Invoke(false); }
+
+    // Commits a fresh secret for another match in the same room. The next match
+    // is dealt only once both sides have committed.
+    public virtual void RequestRematch(int secret, Action<bool> done) { done?.Invoke(false); }
+
     public abstract void StartPolling(Action<RoomState> onState);
     public abstract void StopPolling();
     public abstract void DeleteRoom();

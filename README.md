@@ -52,7 +52,7 @@ the time, which is why the equal-turns rule matters: without it the player who
 moved first won 63.7% of duels regardless of skill. The Lock is what settles the
 ties — and what makes the endgame a decision rather than arithmetic.
 
-For a **live PvP duel**, create a room and share the 5-letter invite code, or join with a friend's code. Hints, turn order, the Lock and the result are all adjudicated server-side by `playfab/cloudscript.js`. Mid-match you can send **Signals** — six fixed phrases, capped per match — so the duel has a voice without the game carrying user-generated text.
+For a **live PvP duel**, create a room and share the 5-letter invite code, or join with a friend's code. When a duel ends, either player can offer a **rematch** — commit a new secret number and the next match is dealt in the same room, so the code only ever gets shared once. Hints, turn order, the Lock and the result are all adjudicated server-side by `playfab/cloudscript.js`. Mid-match you can send **Signals** — six fixed phrases, capped per match — so the duel has a voice without the game carrying user-generated text.
 
 The AI narrows its range with a midpoint (binary-search) strategy, guessing randomly at a difficulty-dependent rate to feel less mechanical. Who goes first is decided by a coin flip each round. Difficulty also sets how well the opponent uses its Lock: Easy over-commits it, Hard stakes it only on a certain guess.
 

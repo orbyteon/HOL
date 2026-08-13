@@ -235,6 +235,19 @@ public class PlayFabPvpClient : PvpBackend
         ExecuteCloudScript("sendSignal", args, (ok, resp) => done?.Invoke(ok && CloudOk(resp)));
     }
 
+    public override void RequestRematch(int secret, Action<bool> done)
+    {
+        if (string.IsNullOrEmpty(RoomCode) || secret < 1 || secret > 100)
+        {
+            done?.Invoke(false);
+            return;
+        }
+
+        string args = "{\"roomId\":\"" + EscapeJson(RoomCode) +
+                      "\",\"secret\":" + secret + "}";
+        ExecuteCloudScript("requestRematch", args, (ok, resp) => done?.Invoke(ok && CloudOk(resp)));
+    }
+
     public override void StartPolling(Action<RoomState> onState)
     {
         StopPolling();
@@ -374,6 +387,10 @@ public class PlayFabPvpClient : PvpBackend
             current.signalBy = applied.signalBy;
             current.signalId = applied.signalId;
             current.signalSeq = applied.signalSeq;
+            current.matchIndex = applied.matchIndex;
+            current.iWantRematch = applied.iWantRematch;
+            current.theyWantRematch = applied.theyWantRematch;
+            current.opponentLeft = applied.opponentLeft;
         }
         catch { }
     }

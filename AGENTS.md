@@ -27,7 +27,7 @@ missing so a skipped compile cannot look green.
 - `services/provisioner/` — Azure Functions first-install account provisioner;
   validates Google Play Integrity before using PlayFab Server credentials.
 - `playfab/cloudscript.js` — server authority for PlayFab room
-  create/read/join/guess/leave/cleanup.
+  create/read/join/guess/signal/rematch/leave/cleanup.
 - `tools/playfab/deploy-cloudscript.mjs` — publishes/verifies Legacy CloudScript
   and optionally adds Client Shared Group API deny policy statements.
 - `tools/test/` — Node rule tests (`node --test tools/test/cloudscript.test.mjs`)
@@ -74,6 +74,11 @@ missing so a skipped compile cannot look green.
   Keeping the vocabulary closed is what keeps HOL free of user-generated
   content — do not add a free-text path without revisiting `docs/privacy.html`
   and the Play Data Safety declaration first.
+- **A room outlives its match.** Rematch keeps the room and deals a new match
+  in place, so anything per-match must be cleared in `resetForRematch` — and
+  `turnIndex` must NOT be, because a reused turn id collides with the claim
+  group the previous match already created. `turnIndexBase` marks the live
+  claim window so teardown never walks a whole rematch chain.
 - **Gameplay-affecting rules need an adjudicator.** The Lock and Signals are
   gated on `PvpBackend.IsServerAuthoritative`; the Firebase fallback's room
   document is client-writable, so it plays the plain round rules and hides both

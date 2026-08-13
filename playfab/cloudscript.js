@@ -105,9 +105,20 @@ function deleteRoomArtifacts(roomId, state) {
     deleteGroupQuietly(ackGroupId(roomId, "host"));
     deleteGroupQuietly(ackGroupId(roomId, "guest"));
 
+    // Turn claims are never reused, and a rematch sweeps the previous match's
+    // window as it starts, so only the claims since turnIndexBase can still be
+    // around. Walking from 0 would re-delete a rematch chain's worth of ids.
+    var from = state && typeof state.turnIndexBase === "number" ? state.turnIndexBase : 0;
     var maxTurn = state && typeof state.turnIndex === "number" ? state.turnIndex : 0;
-    maxTurn = Math.max(0, Math.min(maxTurn, 200));
-    for (var i = 0; i <= maxTurn; i++)
+    sweepTurnClaims(roomId, from, maxTurn);
+}
+
+function sweepTurnClaims(roomId, from, to) {
+    from = Math.max(0, from | 0);
+    // Bounded so a long-running room can never turn teardown into hundreds of
+    // API calls; a single match spends well under this.
+    to = Math.min(to | 0, from + 200);
+    for (var i = from; i <= to; i++)
         deleteGroupQuietly(turnGroupId(roomId, i));
 }
 
@@ -235,7 +246,62 @@ function viewFor(state, playerId) {
         signalBy: String(state.signalBy || ""),
         signalId: state.signalId | 0,
         signalSeq: state.signalSeq | 0,
+
+        // Rematch handshake. matchIndex changing is how a client knows the next
+        // match has actually started rather than merely being offered.
+        matchIndex: state.matchIndex | 0,
+        iWantRematch: side === "host" ? !!state.rematchHost : !!state.rematchGuest,
+        theyWantRematch: side === "host" ? !!state.rematchGuest : !!state.rematchHost,
+        opponentLeft: side === "host" ? !!state.leftGuest : !!state.leftHost,
     };
+}
+
+// Both players committed a fresh secret, so deal the next match in the same
+// room. Everything that describes the finished match is cleared; turnIndex is
+// deliberately NOT reset, because a reused turn id would collide with the claim
+// group the previous match already created.
+function resetForRematch(roomId, state) {
+    sweepTurnClaims(roomId, state.turnIndexBase | 0, state.turnIndex | 0);
+    state.turnIndexBase = state.turnIndex | 0;
+
+    deleteGroupQuietly(ackGroupId(roomId, "host"));
+    deleteGroupQuietly(ackGroupId(roomId, "guest"));
+
+    state.hostSecret = state.rematchHost | 0;
+    state.guestSecret = state.rematchGuest | 0;
+    state.rematchHost = 0;
+    state.rematchGuest = 0;
+
+    state.matchIndex = (state.matchIndex | 0) + 1;
+    state.phase = "play";
+    state.opener = Math.random() < 0.5 ? "host" : "guest";
+    state.turn = state.opener;
+    state.winner = "";
+    state.lastGuess = 0;
+    state.lastBy = "";
+    state.lastHint = "";
+    state.lastLocked = false;
+    state.hostGuessCount = 0;
+    state.guestGuessCount = 0;
+    state.roundIndex = 0;
+    state.actedHost = false;
+    state.actedGuest = false;
+    state.skipHost = false;
+    state.skipGuest = false;
+    state.lockUsedHost = false;
+    state.lockUsedGuest = false;
+    state.pendingWin = "";
+    state.pendingWinLocked = false;
+    state.pendingWinCandidates = 0;
+    state.hostLo = 1;
+    state.hostHi = 100;
+    state.guestLo = 1;
+    state.guestHi = 100;
+
+    // Each match gets a fresh signal allowance; the sequence stays monotonic so
+    // a client that missed one does not replay it.
+    state.hostSignalCount = 0;
+    state.guestSignalCount = 0;
 }
 
 handlers.createRoom = function (args, context) {
@@ -277,6 +343,12 @@ handlers.createRoom = function (args, context) {
             hostGuessCount: 0,
             guestGuessCount: 0,
             turnIndex: 0,
+            turnIndexBase: 0,
+            matchIndex: 0,
+            rematchHost: 0,
+            rematchGuest: 0,
+            leftHost: false,
+            leftGuest: false,
             roundIndex: 0,
             hostLo: 1,
             hostHi: 100,
@@ -472,6 +544,38 @@ handlers.sendSignal = function (args, context) {
     return { ok: true, state: JSON.stringify(viewFor(state, currentPlayerId)) };
 };
 
+// Rematch handshake: each side commits a fresh secret, and the next match is
+// dealt only once both have. Keeping the same room means friends do not have to
+// re-share an invite code to play again.
+handlers.requestRematch = function (args, context) {
+    if (!args || !args.roomId) return { ok: false, error: "missing roomId" };
+
+    var roomId = String(args.roomId).toUpperCase().trim();
+    var secret = validSecret(args.secret);
+    if (!secret) return { ok: false, error: "bad secret" };
+
+    var state = readState(roomId);
+    if (!state) return { ok: false, error: "room not found" };
+
+    var side = sideForPlayer(state, currentPlayerId);
+    if (!side) return { ok: false, error: "not a member" };
+    if (state.phase !== "done") return { ok: false, error: "not done" };
+
+    var opponentGone = side === "host" ? state.leftGuest : state.leftHost;
+    if (opponentGone) return { ok: false, error: "opponent left" };
+
+    if (side === "host") state.rematchHost = secret;
+    else state.rematchGuest = secret;
+
+    if (state.rematchHost && state.rematchGuest)
+        resetForRematch(roomId, state);
+
+    try { writeState(roomId, state); }
+    catch (writeError) { return { ok: false, error: "write failed" }; }
+
+    return { ok: true, state: JSON.stringify(viewFor(state, currentPlayerId)) };
+};
+
 handlers.ackResult = function (args, context) {
     if (!args || !args.roomId) return { ok: false, error: "missing roomId" };
 
@@ -516,8 +620,15 @@ handlers.leaveRoom = function (args, context) {
         catch (alreadyAcknowledged) { }
 
         var otherAck = side === "host" ? "guest" : "host";
-        if (!groupExists(ackGroupId(roomId, otherAck)))
+        if (!groupExists(ackGroupId(roomId, otherAck))) {
+            // The opponent is still on the result screen, possibly waiting on a
+            // rematch that is never coming. Record the departure so their next
+            // poll can say so instead of offering a dead button.
+            if (side === "host") { state.leftHost = true; state.rematchHost = 0; }
+            else { state.leftGuest = true; state.rematchGuest = 0; }
+            try { writeState(roomId, state); } catch (writeError) { }
             return { ok: true };
+        }
     }
 
     deleteRoomArtifacts(roomId, state);

@@ -170,5 +170,12 @@ public static class L10n
         { "signal_gg",               new[] { "Good game!", "Καλό παιχνίδι!" } },
         { "signal_limit",            new[] { "No signals left", "Δεν έχεις άλλα σήματα" } },
         { "signal_from",             new[] { "{0}: {1}", "{0}: {1}" } },
+
+        // rematch — play again without re-sharing an invite code
+        // ("rematch" itself already lives in the result block above)
+        { "rematch_prompt",          new[] { "New secret number (1-100)", "Νέος μυστικός αριθμός (1-100)" } },
+        { "rematch_waiting",         new[] { "Waiting for your opponent to accept", "Αναμονή να δεχτεί ο αντίπαλος" } },
+        { "rematch_offered",         new[] { "{0} wants a rematch!", "Ο/Η {0} θέλει ρεβάνς!" } },
+        { "rematch_closed",          new[] { "Your opponent has left.", "Ο αντίπαλός σου έφυγε." } },
     };
 }

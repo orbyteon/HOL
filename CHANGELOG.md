@@ -36,6 +36,12 @@ Play Console versionName in `ProjectSettings.asset`.
 
 ### Added
 
+- **Rematch in the same room.** A finished duel no longer tears the room
+  down: both players commit a fresh secret and the next match is dealt in
+  place, so friends never re-share an invite code to play again. The
+  handshake needs both sides, a leaver is reported to the opponent instead
+  of leaving a dead button on screen, and an unanswered room is released
+  after about two minutes rather than being held open indefinitely.
 - **Signals** — a fixed six-entry vocabulary ("Good luck!", "So close!",
   "Ouch!", "Nice one!", "Your turn!", "Good game!") players can send
   during a PvP match and on the result screen. Only the index travels, so

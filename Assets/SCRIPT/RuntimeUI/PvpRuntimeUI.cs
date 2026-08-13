@@ -182,6 +182,14 @@ public class PvpRuntimeUI : MonoBehaviour
             signalButtons[i] = signalBtn;
         }
 
+        // Offered on the result screen, in the slot the guess controls vacate.
+        var rematchSecret = RuntimeUI.CreateInputField(matchPanel.transform, "RematchSecret",
+            "1-100", new Vector2(0f, -80f), new Vector2(460f, 90f));
+        var rematchBtn = RuntimeUI.CreateButton(matchPanel.transform, "RematchButton",
+            L10n.Get("rematch"), new Vector2(0f, -200f), new Vector2(460f, 90f), Accent, DarkLabel);
+        RuntimeUI.LocalizePlaceholder(rematchSecret, "rematch_prompt");
+        RuntimeUI.Localize(rematchBtn, "rematch");
+
         var resultText = RuntimeUI.CreateText(matchPanel.transform, "Result", "", 64,
             new Vector2(0f, -470f), new Vector2(1000f, 130f));
         var leaveBtn = RuntimeUI.CreateButton(matchPanel.transform, "LeaveButton",
@@ -220,6 +228,13 @@ public class PvpRuntimeUI : MonoBehaviour
         controller.lockButton = lockBtn.gameObject;
         controller.lockButtonLabel = lockLabel;
         controller.signalsRoot = signalsRoot;
+        controller.guessButton = guessBtn.gameObject;
+        controller.rematchButton = rematchBtn.gameObject;
+        controller.rematchSecretInput = rematchSecret;
+        // The turn line is empty once a match is decided, so the rematch
+        // handshake reports there rather than adding an element that would sit
+        // on top of it.
+        controller.rematchStatusText = controller.turnText;
 
         // Button hooks.
         createBtn.onClick.AddListener(() => ShowOnly(controller, createPanel));
@@ -232,6 +247,8 @@ public class PvpRuntimeUI : MonoBehaviour
         joinBack.onClick.AddListener(controller.CancelRoomAndLeave);
         guessBtn.onClick.AddListener(controller.OnSubmitGuessPressed);
         lockBtn.onClick.AddListener(controller.OnLockTogglePressed);
+        rematchBtn.onClick.AddListener(controller.OnRematchPressed);
+        rematchSecret.onSubmit.AddListener(_ => controller.OnRematchPressed());
         leaveBtn.onClick.AddListener(controller.OnLeaveMatchPressed);
 
         for (int i = 0; i < signalButtons.Length; i++)
@@ -252,6 +269,8 @@ public class PvpRuntimeUI : MonoBehaviour
         // All panels start hidden; OpenPvpMenu shows the menu panel.
         lockBtn.gameObject.SetActive(false);
         signalsRoot.SetActive(false);
+        rematchBtn.gameObject.SetActive(false);
+        rematchSecret.gameObject.SetActive(false);
         menuPanel.SetActive(false);
         createPanel.SetActive(false);
         joinPanel.SetActive(false);

@@ -32,6 +32,7 @@ public class PvpGameController : MonoBehaviour
 
     [Header("Match UI")]
     public TMP_InputField guessInput;
+    public GameObject guessButton;
     public TMP_Text opponentNameText;
     public TMP_Text turnText;
     public TMP_Text historyText;
@@ -48,6 +49,13 @@ public class PvpGameController : MonoBehaviour
     [Header("Signals")]
     public GameObject signalsRoot;
     public TMP_Text signalFeedText;
+
+    [Header("Rematch")]
+    // Offered on the result screen so friends can play again without swapping a
+    // new invite code. Needs the server-authoritative backend.
+    public GameObject rematchButton;
+    public TMP_InputField rematchSecretInput;
+    public TMP_Text rematchStatusText;
 
     public ConfettiBurst winConfetti;
     public AudioSource audioSource;
@@ -70,6 +78,13 @@ public class PvpGameController : MonoBehaviour
 
     int lastSignalSeq;
     int signalsSent;
+
+    int lastMatchIndex;
+    bool rematchInFlight;
+    int donePolls;
+    // A finished room is held open for a rematch, but not forever: at a 1.5s
+    // poll this is about two minutes before the room is released.
+    const int MaxDonePolls = 80;
 
     int flowGeneration;
     bool joinCreateInFlight;
@@ -295,6 +310,34 @@ public class PvpGameController : MonoBehaviour
         });
     }
 
+    // Commits a fresh secret for another match in this room. The server deals
+    // the next match only once both players have committed.
+    public void OnRematchPressed()
+    {
+        if (!matchOver || lastState == null || rematchInFlight) return;
+        if (!client.IsServerAuthoritative || lastState.opponentLeft) return;
+
+        int secret;
+        if (!TryReadSecret(rematchSecretInput, out secret))
+        {
+            SetRematchStatus(L10n.Get("pvp_secret"));
+            return;
+        }
+
+        rematchInFlight = true;
+        SetRematchStatus(L10n.Get("rematch_waiting"));
+
+        int gen = flowGeneration;
+        client.RequestRematch(secret, ok =>
+        {
+            if (gen != flowGeneration) return;
+
+            rematchInFlight = false;
+            if (ok) donePolls = 0;
+            else SetRematchStatus(L10n.Get("pvp_network_error"));
+        });
+    }
+
     public void OnLeaveMatchPressed()
     {
         flowGeneration++;
@@ -302,8 +345,10 @@ public class PvpGameController : MonoBehaviour
         client.DeleteRoom();
         matchOver = false;
         guessInFlight = false;
+        rematchInFlight = false;
         lastState = null;
         shownGuessKey = "";
+        ShowRematchOffer(false);
         OpenPvpMenu();
     }
 
@@ -351,6 +396,10 @@ public class PvpGameController : MonoBehaviour
         lockArmed = false;
         lastSignalSeq = 0;
         signalsSent = 0;
+        lastMatchIndex = 0;
+        rematchInFlight = false;
+        donePolls = 0;
+        ShowRematchOffer(false);
         UpdateRangeText();
         RefreshLockButton();
         RefreshSignalsAvailability();
@@ -402,7 +451,8 @@ public class PvpGameController : MonoBehaviour
         string me = client.IsHost ? "host" : "guest";
         string signature = s.phase + "|" + s.turn + "|" + s.lastBy + "|" +
                            s.lastGuess + "|" + s.winner + "|" + s.hostGuessCount +
-                           "|" + s.guestGuessCount;
+                           "|" + s.guestGuessCount + "|" + s.matchIndex + "|" +
+                           s.iWantRematch + "|" + s.theyWantRematch;
         if (signature != lastStateSignature)
         {
             lastStateSignature = signature;
@@ -420,6 +470,14 @@ public class PvpGameController : MonoBehaviour
             }
         }
         else silentPolls = 0;
+
+        // Both sides committed a new secret, so the room dealt a fresh match in
+        // place. Everything local to the old one has to go.
+        if (matchOver && s.phase == "play" && s.matchIndex != lastMatchIndex)
+        {
+            lastMatchIndex = s.matchIndex;
+            BeginRematchedMatch();
+        }
 
         if (s.phase == "waiting")
             return;
@@ -474,7 +532,11 @@ public class PvpGameController : MonoBehaviour
         if (s.phase == "done" && !matchOver)
         {
             matchOver = true;
-            client.StopPolling();
+
+            // Keep polling so the room can hear a rematch offer. Backends that
+            // cannot deal one release the room immediately, as before.
+            bool canRematch = client.IsServerAuthoritative;
+            if (!canRematch) client.StopPolling();
 
             bool isDraw = s.winner == "draw";
             bool iWon = !isDraw && s.winner == me;
@@ -531,7 +593,25 @@ public class PvpGameController : MonoBehaviour
             if (iWon && winConfetti != null)
                 winConfetti.Burst();
 
-            client.AcknowledgeResult();
+            if (canRematch)
+            {
+                donePolls = 0;
+                lastMatchIndex = s.matchIndex;
+                if (rematchSecretInput != null) rematchSecretInput.text = "";
+                SetRematchStatus("");
+                ShowRematchOffer(true);
+            }
+            else
+            {
+                client.AcknowledgeResult();
+            }
+            return;
+        }
+
+        // Later polls on a finished room carry the rematch handshake.
+        if (matchOver && s.phase == "done")
+        {
+            HandleRematchState(s, opponentName);
             return;
         }
 
@@ -570,6 +650,92 @@ public class PvpGameController : MonoBehaviour
         }
 
         turnText.text = myTurn ? L10n.Get("your_guess") : L10n.Get("opponent_thinking", opponentName);
+    }
+
+    // ------------------------------------------------------------- rematch UI
+
+    void HandleRematchState(PvpBackend.RoomState s, string opponentName)
+    {
+        if (!client.IsServerAuthoritative) return;
+
+        if (s.opponentLeft)
+        {
+            ShowRematchOffer(false);
+            SetRematchStatus(L10n.Get("rematch_closed"));
+            ReleaseFinishedRoom();
+            return;
+        }
+
+        if (s.iWantRematch)
+            SetRematchStatus(L10n.Get("rematch_waiting"));
+        else if (s.theyWantRematch)
+            SetRematchStatus(L10n.Get("rematch_offered", opponentName));
+
+        // Nobody is coming back. Let the room go rather than holding server
+        // state open for a player who has put the phone down — with a longer
+        // grace period when we are the ones waiting on an answer.
+        int limit = s.iWantRematch ? MaxDonePolls * 2 : MaxDonePolls;
+        if (++donePolls >= limit)
+        {
+            ShowRematchOffer(false);
+            SetRematchStatus(L10n.Get("rematch_closed"));
+            ReleaseFinishedRoom();
+        }
+    }
+
+    void ReleaseFinishedRoom()
+    {
+        client.StopPolling();
+        client.AcknowledgeResult();
+    }
+
+    // The room dealt a new match in place: clear everything that described the
+    // old one, keeping the connection and the opponent.
+    void BeginRematchedMatch()
+    {
+        matchOver = false;
+        guessInFlight = false;
+        rematchInFlight = false;
+        localAcceptedGuessCount = 0;
+        shownGuessKey = "";
+        silentPolls = 0;
+        donePolls = 0;
+        myMin = 1;
+        myMax = 100;
+        lockArmed = false;
+        signalsSent = 0; // the server grants a fresh allowance per match
+
+        ShowRematchOffer(false);
+        SetRematchStatus("");
+        if (resultText != null) resultText.text = "";
+        if (historyText != null) historyText.text = "";
+        if (signalFeedText != null) signalFeedText.text = "";
+        if (guessInput != null) guessInput.text = "";
+
+        UpdateRangeText();
+        RefreshLockButton();
+        RefreshSignalsAvailability();
+    }
+
+    void ShowRematchOffer(bool visible)
+    {
+        if (rematchButton != null) rematchButton.SetActive(visible);
+        if (rematchSecretInput != null) rematchSecretInput.gameObject.SetActive(visible);
+
+        // The guess controls are dead once the match is decided, so the rematch
+        // controls take their slot rather than sitting beside a field that can
+        // no longer be used. They come back only for a live match.
+        bool matchLive = !matchOver;
+        if (guessInput != null) guessInput.gameObject.SetActive(!visible && matchLive);
+        if (guessButton != null) guessButton.SetActive(!visible && matchLive);
+
+        if (!visible) SetRematchStatus("");
+    }
+
+    void SetRematchStatus(string message)
+    {
+        if (rematchStatusText != null)
+            rematchStatusText.text = message;
     }
 
     // ---------------------------------------------------------- duel rules UI

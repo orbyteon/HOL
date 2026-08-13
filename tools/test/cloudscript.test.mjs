@@ -203,6 +203,126 @@ test("signals survive into the result screen so players can say gg", () => {
   assert.equal(cs.call("sendSignal", "GUEST", { roomId, signalId: 5 }).ok, true);
 });
 
+// ------------------------------------------------------------------- rematch
+
+// Plays the current match out with both sides binary-searching, and returns the
+// finished view.
+function playToEnd(cs, roomId, view) {
+  const solvers = { host: midpointSolver(), guest: midpointSolver() };
+
+  for (let step = 0; step < 80 && view.phase === "play"; step++) {
+    const side = view.turn;
+    const value = solvers[side].next();
+    const result = guess(cs, roomId, side, value);
+    if (!result.ok) throw new Error(`submitGuess rejected: ${result.error}`);
+    view = cs.view(result);
+    solvers[side].tell(value, view.lastHint);
+  }
+
+  assert.equal(view.phase, "done", "match failed to finish");
+  return view;
+}
+
+test("a rematch needs both players to commit a new secret", () => {
+  const { cs, roomId } = matchWithOpener("host", { hostSecret: 42, guestSecret: 77 });
+  playToEnd(cs, roomId, cs.view(cs.call("getRoom", "HOST", { roomId })));
+
+  const asked = cs.view(cs.call("requestRematch", "HOST", { roomId, secret: 11 }));
+  assert.equal(asked.phase, "done", "one player asking must not restart the match");
+  assert.equal(asked.iWantRematch, true);
+  assert.equal(asked.theyWantRematch, false);
+
+  // The opponent sees the offer from their own side of the room.
+  const opponentView = cs.view(cs.call("getRoom", "GUEST", { roomId }));
+  assert.equal(opponentView.iWantRematch, false);
+  assert.equal(opponentView.theyWantRematch, true);
+
+  const started = cs.view(cs.call("requestRematch", "GUEST", { roomId, secret: 88 }));
+  assert.equal(started.phase, "play", "both committed, so the next match is dealt");
+  assert.equal(started.matchIndex, 1);
+  assert.equal(started.iWantRematch, false, "the handshake resets once it fires");
+});
+
+test("a rematch deals a clean match, and its first guess is accepted", () => {
+  const { cs, roomId } = matchWithOpener("host", { hostSecret: 42, guestSecret: 77 });
+  const finished = playToEnd(cs, roomId, cs.view(cs.call("getRoom", "HOST", { roomId })));
+  assert.ok(finished.hostGuessCount > 0);
+
+  cs.call("requestRematch", "HOST", { roomId, secret: 11 });
+  const next = cs.view(cs.call("requestRematch", "GUEST", { roomId, secret: 88 }));
+
+  assert.equal(next.hostGuessCount, 0, "guess counts start over");
+  assert.equal(next.guestGuessCount, 0);
+  assert.equal(next.hostLockUsed, false, "each match grants a fresh Lock");
+  assert.equal(next.guestLockUsed, false);
+  assert.equal(next.winner, "");
+  assert.equal(next.pendingWin, "");
+  assert.equal(next.revealedSecret, 0, "the previous secret is not still on show");
+
+  // The real hazard: turn claims from the finished match must not block the new
+  // one. Turn ids are never reused and the old window is swept on reset.
+  const opened = guess(cs, roomId, next.turn, 50);
+  assert.equal(opened.ok, true, `first guess of the rematch was rejected: ${opened.error}`);
+
+  // And the new secrets are the ones now in play.
+  const view = cs.view(opened);
+  const hunted = next.turn === "host" ? 88 : 11;
+  const expected = 50 === hunted ? "correct" : 50 < hunted ? "higher" : "lower";
+  assert.equal(view.lastHint, expected, "the rematch is being played against the new secrets");
+});
+
+test("a room survives a chain of rematches", () => {
+  const { cs, roomId } = matchWithOpener("host", { hostSecret: 42, guestSecret: 77 });
+  let view = cs.view(cs.call("getRoom", "HOST", { roomId }));
+
+  for (let match = 0; match < 4; match++) {
+    view = playToEnd(cs, roomId, view);
+    assert.equal(view.matchIndex, match);
+
+    cs.call("requestRematch", "HOST", { roomId, secret: 20 + match });
+    const next = cs.call("requestRematch", "GUEST", { roomId, secret: 60 + match });
+    assert.equal(next.ok, true, `rematch ${match + 1} failed: ${next.error}`);
+    view = cs.view(next);
+    assert.equal(view.phase, "play");
+  }
+
+  assert.equal(view.matchIndex, 4);
+});
+
+test("leaving the result screen tells the opponent and closes the offer", () => {
+  const { cs, roomId } = matchWithOpener("host", { hostSecret: 42, guestSecret: 77 });
+  playToEnd(cs, roomId, cs.view(cs.call("getRoom", "HOST", { roomId })));
+
+  assert.equal(cs.call("leaveRoom", "GUEST", { roomId }).ok, true);
+
+  const hostView = cs.view(cs.call("getRoom", "HOST", { roomId }));
+  assert.equal(hostView.opponentLeft, true, "the room must report the departure");
+
+  const refused = cs.call("requestRematch", "HOST", { roomId, secret: 11 });
+  assert.equal(refused.ok, false);
+  assert.equal(refused.error, "opponent left");
+});
+
+test("rematch rejects a bad secret, a stranger, and a live match", () => {
+  const { cs, roomId } = matchWithOpener("host", { hostSecret: 42, guestSecret: 77 });
+
+  const midMatch = cs.call("requestRematch", "HOST", { roomId, secret: 11 });
+  assert.equal(midMatch.ok, false);
+  assert.equal(midMatch.error, "not done");
+
+  playToEnd(cs, roomId, cs.view(cs.call("getRoom", "HOST", { roomId })));
+
+  for (const bad of [0, 101, -3, undefined]) {
+    const rejected = cs.call("requestRematch", "HOST", { roomId, secret: bad });
+    assert.equal(rejected.ok, false, `secret ${bad} must be rejected`);
+    assert.equal(rejected.error, "bad secret");
+  }
+
+  const stranger = cs.call("requestRematch", "STRANGER", { roomId, secret: 11 });
+  assert.equal(stranger.ok, false);
+  assert.equal(stranger.error, "not a member");
+});
+
 // --------------------------------------------------------------- the fairness
 // proof. This is the finding that motivated the rule change: under the old
 // "first correct guess wins" rule two identical players did not split matches
