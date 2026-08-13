@@ -173,6 +173,19 @@ and uploads the artifact with `JARSIGNER_VERIFY.txt` plus `SHA256SUMS`.
 Use the signed candidate (or a Play internal-testing build made from that exact
 candidate) on physical Android devices.
 
+> **Half of this section needs section 3 to have run first.** The duel rules
+> live in CloudScript, and `PlayFabPvpClient.IsServerAuthoritative` is hardcoded
+> `true` — it reports which *backend* is in use, not which CloudScript revision
+> is published. So a 0.3.0 client pointed at a pre-0.3.0 title shows the Lock
+> and Signals controls and then fails when they are tapped, and matches quietly
+> play by the old first-correct-guess rule with a fixed opener.
+>
+> Splash, main menu, solo, orientation, ads and localization are testable
+> against any published CloudScript. **PvP / provisioning and Duel rules are
+> not** — run them only after **Deploy PlayFab Production** has published the
+> matching revision, or every rule this release exists to change will read as a
+> client bug.
+
 ### Orientation
 
 `ProjectSettings.asset` sets `defaultScreenOrientation: 0` (Portrait). Anything
