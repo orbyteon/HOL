@@ -30,6 +30,8 @@ PURE, SHARP, ONE MORE ROUND
 
 REAL PvP DUELS
 • Create a room, share the 5-letter code, duel a friend live
+• Rematch in one tap — the code is only ever shared once
+• Send quick preset Signals: good luck, so close, good game
 • Works over any distance — no accounts, no sign-up
 
 YOUR GAME, YOUR WAY
@@ -86,6 +88,20 @@ CONVERGING LIGHT
 
 Κατέβασε το HOL και εμπιστεύσου το διάστημά σου.
 ```
+
+## Release notes — v0.3.0 (max 500 chars per language)
+
+- EN: `Duels are decided by skill now, not by who guessed first. Both players
+  get the same number of turns, so the win goes to whoever needed fewer
+  guesses. New: LOCK a guess to claim a tie — but miss and you lose your next
+  turn. Rematch a friend without swapping codes again, and send quick Signals
+  mid-duel. Solo plays by the same rules, so you can practise the Lock before
+  it costs you.`
+- EL: `Οι μονομαχίες κρίνονται πλέον από την ικανότητα, όχι από το ποιος
+  μάντεψε πρώτος. Και οι δύο παίκτες παίζουν τις ίδιες σειρές, οπότε κερδίζει
+  όποιος χρειάστηκε λιγότερες προσπάθειες. Νέο: ΚΛΕΙΔΩΣΕ μια μαντεψιά για να
+  πάρεις την ισοπαλία — αν αστοχήσεις όμως, χάνεις την επόμενη σειρά σου.
+  Ρεβάνς χωρίς νέο κωδικό, και γρήγορα Σήματα μέσα στη μονομαχία.`
 
 ## Release notes — v0.2.0 (max 500 chars per language)
 

@@ -3,7 +3,12 @@
 All notable changes to HOL. Dates are commit dates; versions follow the
 Play Console versionName in `ProjectSettings.asset`.
 
-## [Unreleased]
+## [0.3.0] — 2026-08-13
+
+> **Deploying this release is order-sensitive.** The duel rules are not
+> backward compatible with a 0.2.x client, which renders a drawn match as a
+> loss. Ship the client, set PlayFab `minVersion` to `0.3.0`, *then* deploy
+> CloudScript. See `docs/release-checklist.md` section 3.
 
 ### Fixed
 
