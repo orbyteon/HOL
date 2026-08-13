@@ -1,0 +1,75 @@
+name: Deploy PlayFab Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type DEPLOY to publish the main branch to production"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: playfab-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Publish CloudScript
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 10
+    env:
+      PLAYFAB_TITLE_ID: ${{ vars.PLAYFAB_TITLE_ID }}
+    steps:
+      - name: Enforce production source
+        shell: bash
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/main" || {
+            echo "::error::Production deployment must be dispatched from the main branch (got $GITHUB_REF)"
+            exit 1
+          }
+          test "$CONFIRM" = "DEPLOY" || {
+            echo "::error::Confirmation must be exactly DEPLOY"
+            exit 1
+          }
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate deployment inputs
+        shell: bash
+        env:
+          PLAYFAB_DEV_SECRET_KEY: ${{ secrets.PLAYFAB_DEV_SECRET_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$PLAYFAB_TITLE_ID" || { echo "::error::PLAYFAB_TITLE_ID production variable is missing"; exit 1; }
+          [[ "$PLAYFAB_TITLE_ID" =~ ^[A-Za-z0-9]{3,32}$ ]] || {
+            echo "::error::PLAYFAB_TITLE_ID must be 3-32 letters/digits"
+            exit 1
+          }
+          test -n "$PLAYFAB_DEV_SECRET_KEY" || { echo "::error::PLAYFAB_DEV_SECRET_KEY secret is missing"; exit 1; }
+          node --check playfab/cloudscript.js
+          node --check tools/playfab/deploy-cloudscript.mjs
+
+      - name: Publish Legacy CloudScript and enforce API policy
+        env:
+          PLAYFAB_DEV_SECRET_KEY: ${{ secrets.PLAYFAB_DEV_SECRET_KEY }}
+          HARDEN_SHARED_GROUP_POLICY: "true"
+        run: node tools/playfab/deploy-cloudscript.mjs
+
+      - name: Deployment summary
+        if: success()
+        run: |
+          {
+            echo "## PlayFab production deployment"
+            echo "- CloudScript source: \`playfab/cloudscript.js\`"
+            echo "- Commit: \`${GITHUB_SHA}\`"
+            echo "- Published CloudScript source verified against repository source"
+            echo "- Direct Client Shared Group APIs: \`Denied\`"
+          } >> "$GITHUB_STEP_SUMMARY"

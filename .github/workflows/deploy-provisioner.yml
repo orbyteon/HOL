@@ -1,0 +1,155 @@
+name: Deploy Provisioning Service
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type DEPLOY to publish the main branch provisioner to production"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: hol-provisioner-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy attested bootstrap
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 15
+    env:
+      FUNCTION_PATH: services/provisioner
+      AZURE_FUNCTIONAPP_NAME: ${{ vars.AZURE_FUNCTIONAPP_NAME }}
+      AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+      GOOGLE_PLAY_PACKAGE_NAME: ${{ vars.GOOGLE_PLAY_PACKAGE_NAME }}
+      GOOGLE_PLAY_CERT_SHA256: ${{ vars.GOOGLE_PLAY_CERT_SHA256 }}
+      PLAYFAB_TITLE_ID: ${{ vars.PLAYFAB_TITLE_ID }}
+    steps:
+      - name: Enforce production source
+        shell: bash
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/main" || {
+            echo "::error::Production deployment must be dispatched from the main branch (got $GITHUB_REF)"
+            exit 1
+          }
+          test "$CONFIRM" = "DEPLOY" || {
+            echo "::error::Confirmation must be exactly DEPLOY"
+            exit 1
+          }
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate deployment configuration
+        shell: bash
+        env:
+          PLAYFAB_DEV_SECRET_KEY: ${{ secrets.PLAYFAB_DEV_SECRET_KEY }}
+          GOOGLE_SERVICE_ACCOUNT_JSON_B64: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON_B64 }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        run: |
+          set -euo pipefail
+          for name in AZURE_FUNCTIONAPP_NAME AZURE_RESOURCE_GROUP GOOGLE_PLAY_PACKAGE_NAME \
+                      GOOGLE_PLAY_CERT_SHA256 PLAYFAB_TITLE_ID PLAYFAB_DEV_SECRET_KEY \
+                      GOOGLE_SERVICE_ACCOUNT_JSON_B64 AZURE_CLIENT_ID AZURE_TENANT_ID \
+                      AZURE_SUBSCRIPTION_ID; do
+            test -n "${!name:-}" || { echo "::error::$name is missing"; exit 1; }
+          done
+          test "$GOOGLE_PLAY_PACKAGE_NAME" = "com.Orbyteon.HOL" || {
+            echo "::error::GOOGLE_PLAY_PACKAGE_NAME must be com.Orbyteon.HOL"
+            exit 1
+          }
+          [[ "$PLAYFAB_TITLE_ID" =~ ^[A-Za-z0-9]{3,32}$ ]] || {
+            echo "::error::PLAYFAB_TITLE_ID must be 3-32 letters/digits"
+            exit 1
+          }
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install and test provisioner
+        working-directory: ${{ env.FUNCTION_PATH }}
+        run: |
+          npm install --no-audit --no-fund
+          npm test
+          npm run check
+
+      - name: Azure login with OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Configure production app settings
+        shell: bash
+        env:
+          PLAYFAB_DEV_SECRET_KEY: ${{ secrets.PLAYFAB_DEV_SECRET_KEY }}
+          GOOGLE_SERVICE_ACCOUNT_JSON_B64: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON_B64 }}
+        run: |
+          set -euo pipefail
+          az functionapp config appsettings set \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --name "$AZURE_FUNCTIONAPP_NAME" \
+            --settings \
+              PLAYFAB_TITLE_ID="$PLAYFAB_TITLE_ID" \
+              PLAYFAB_DEV_SECRET_KEY="$PLAYFAB_DEV_SECRET_KEY" \
+              GOOGLE_PLAY_PACKAGE_NAME="$GOOGLE_PLAY_PACKAGE_NAME" \
+              GOOGLE_SERVICE_ACCOUNT_JSON_B64="$GOOGLE_SERVICE_ACCOUNT_JSON_B64" \
+              GOOGLE_PLAY_CERT_SHA256="$GOOGLE_PLAY_CERT_SHA256" \
+              REQUIRE_LICENSED=true \
+              INTEGRITY_MAX_AGE_MS=120000 \
+              FUNCTIONS_NODE_BLOCK_ON_ENTRY_POINT_ERROR=true \
+            --output none
+
+      - name: Deploy Azure Function
+        uses: Azure/functions-action@v1
+        with:
+          app-name: ${{ env.AZURE_FUNCTIONAPP_NAME }}
+          package: ${{ env.FUNCTION_PATH }}
+
+      - name: Verify deployed endpoint is reachable
+        shell: bash
+        run: |
+          set -euo pipefail
+          endpoint="https://${AZURE_FUNCTIONAPP_NAME}.azurewebsites.net/api/provision"
+          status=""
+          for attempt in $(seq 1 12); do
+            status=$(curl --silent --show-error --output /tmp/hol-provision-response \
+              --write-out '%{http_code}' \
+              --header 'Content-Type: application/json' \
+              --data '{}' \
+              "$endpoint" || true)
+            if [ "$status" = "400" ]; then
+              echo "Provisioning endpoint is live and rejecting an invalid request as expected."
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::Provisioning endpoint did not become healthy (last HTTP status: ${status:-none})"
+          exit 1
+
+      - name: Deployment summary
+        if: success()
+        shell: bash
+        run: |
+          {
+            echo "## HOL provisioning service"
+            echo "- Commit: \`${GITHUB_SHA}\`"
+            echo "- Function App: \`${AZURE_FUNCTIONAPP_NAME}\`"
+            echo "- Endpoint: \`https://${AZURE_FUNCTIONAPP_NAME}.azurewebsites.net/api/provision\`"
+            echo "- Play Integrity licensing required: \`true\`"
+            echo "- Play signing certificate pin required: \`true\`"
+            echo "- Invalid-request health probe: \`HTTP 400\`"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -12,26 +12,35 @@
 </head>
 <body>
 <h1>HOL — Privacy Policy</h1>
-<p><em>Effective date: August 12, 2026</em></p>
+<p><em>Effective date: August 13, 2026</em></p>
 
 <p>HOL ("the game") is a mobile game developed and published by Orbyteon ("we", "us"). This policy explains what data is processed when you play the game and why.</p>
 
 <h2>Data stored on your device</h2>
 <p>Your music preference, language choice, ad-permission choice, player name, and gameplay statistics are stored locally on your device using Unity PlayerPrefs. The player name leaves your device only when you choose the optional online multiplayer mode described below.</p>
 
-<h2>Online multiplayer (PvP Duel) and version checks</h2>
-<p>HOL does not require you to create a named account. When PlayFab-backed features are used, the game uses a device-derived identifier as an anonymous PlayFab Custom ID so the same installation can be recognized by Microsoft PlayFab. PlayFab processes that identifier under Microsoft's privacy terms.</p>
+<h2>Anonymous account provisioning and app integrity</h2>
+<p>HOL does not require you to create a named account. For PlayFab-backed features, the game uses a device-derived identifier as an anonymous PlayFab Custom ID so the same installation can be recognized by Microsoft PlayFab.</p>
 
+<p>On a new production installation, HOL may use Google Play Integrity before an anonymous PlayFab account is created. The app asks Google Play for an integrity token that is bound to HOL's package name, the installation's PlayFab Custom ID, and the installed app version. The app sends the Custom ID, app version, and encrypted integrity token over HTTPS to HOL's provisioning service hosted on Microsoft Azure. The provisioning service sends the token to Google's Play Integrity service for verification and checks the app/package identity, token freshness, Play recognition, device-integrity verdict, licensing verdict, and configured app-signing certificate before it can create the anonymous PlayFab account.</p>
+
+<p>The provisioning endpoint and its hosting/network infrastructure necessarily receive normal connection information such as an IP address. HOL uses the source IP transiently for an abuse-rate-limit check; it is not used to build an advertising or gameplay profile. The service is designed not to log or return PlayFab server credentials, Google service-account credentials, the raw integrity token, or the PlayFab Custom ID as application telemetry.</p>
+
+<p>Google, Microsoft Azure, and Microsoft PlayFab process data involved in this flow under their respective privacy terms. The Play Integrity verdict is used only to decide whether a fresh HOL installation may create its anonymous PlayFab account.</p>
+
+<h2>Online multiplayer (PvP Duel) and version checks</h2>
 <p>During a PvP Duel, PlayFab processes the room code, both players' display names, both secret numbers, guesses, higher/lower/correct results, turn state, guess counts, and match result. Secret numbers are kept in private server-controlled room state while the match is live; the client receives only the hint and other information needed to render the duel. The opponent's secret is revealed after the match ends.</p>
 
 <p>Room data is deleted when either participant leaves cleanly, when the surviving client times out an abandoned match, or after both participants acknowledge the completed result. If both devices disappear without sending cleanup requests, an orphaned room may remain in PlayFab until backend cleanup is performed. We do not use PvP room data to build a server-side match-history profile.</p>
 
 <p>The same anonymous PlayFab session may be used to read the title's minimum-supported-version setting so the game can show a required-update screen. The solo "Find challenger" mode uses an on-device simulated opponent and does not send its match data to PlayFab.</p>
 
-<h2>Advertising</h2>
+<h2>Advertising and consent</h2>
 <p>HOL can show advertisements through Unity LevelPlay (ironSource), an ad-mediation service by Unity Technologies. On first launch, the game asks for permission before initializing LevelPlay. If you choose No, LevelPlay is not initialized on later launches and the game does not show ads. If you withdraw permission after the SDK has already initialized in the current session, HOL stops loading or showing further ads and does not initialize the SDK on the next launch.</p>
 
-<p>If you allow ads, Unity LevelPlay and its mediated ad networks may process data such as your advertising identifier, IP address, approximate location derived from IP, device and operating-system information, language, and ad-interaction data. We do not receive this information in directly identifiable form. For details, see <a href="https://unity.com/legal/privacy-policy">Unity's Privacy Policy</a> and the <a href="https://developers.is.com/ironsource-mobile/air/ironsource-mobile-privacy-policy/">ironSource Mobile Privacy Policy</a>.</p>
+<p>If you allow ads, Unity LevelPlay and its mediated ad networks may process data such as your advertising identifier, IP address, approximate location derived from IP, device and operating-system information, language, consent signals, and ad-interaction data. The exact partners and data uses depend on the mediation configuration used for the released build and your region. Where required, the production advertising configuration may also use a consent-management platform or Google consent framework so consent signals can be passed to participating advertising partners.</p>
+
+<p>We do not receive advertising-network data in directly identifiable form. For details, see <a href="https://unity.com/legal/privacy-policy">Unity's Privacy Policy</a> and the <a href="https://developers.is.com/ironsource-mobile/air/ironsource-mobile-privacy-policy/">ironSource Mobile Privacy Policy</a>. The Play Store Data safety disclosure should be read together with this policy because it reflects the exact advertising partners enabled for the current release.</p>
 
 <h2>Your choices</h2>
 <p>You can change the game's ad permission at any time in Settings → Ads privacy. You can also reset or delete your device's advertising identifier using your Android privacy settings. Deleting the app removes HOL's local PlayerPrefs data from the device, subject to normal operating-system backup behavior.</p>
@@ -40,7 +49,7 @@
 <p>The game is not directed at children under 13 (or the applicable age of digital consent in your region), and we do not knowingly collect personal data from children. The game contains no free-form chat or messaging.</p>
 
 <h2>Data retention and security</h2>
-<p>We do not operate a database of player profiles or match history. Online multiplayer and anonymous identity data are processed by Microsoft PlayFab, and advertising data is processed by Unity and its mediated networks when ads are enabled. Those providers retain their service data according to their own policies. We limit live PvP clients to sanitized room views and keep secret numbers in server-controlled private state.</p>
+<p>We do not operate a database of player profiles or match history. Online multiplayer and anonymous identity data are processed by Microsoft PlayFab; first-install integrity/provisioning data is processed by Google Play Integrity, Microsoft Azure, and PlayFab; and advertising data is processed by Unity and its mediated networks when ads are enabled. Those providers retain their service data according to their own policies. We limit live PvP clients to sanitized room views, keep secret numbers in server-controlled private state, and keep PlayFab server credentials out of the mobile app.</p>
 
 <h2>Changes to this policy</h2>
 <p>If the game's data practices change, we will update this page and the effective date above.</p>

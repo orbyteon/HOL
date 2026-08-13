@@ -13,6 +13,7 @@ missing so a skipped compile cannot look green.
 - `Assets/SCRIPT/` — gameplay (`GameManager`, `NumberManager`,
   `FakeMatchmaking`, `MenuManager`), ads (`AdsManager`, `ConsentManager`),
   ops (`ForceUpdate` — PlayFab TitleData `minVersion` gate, fail-open),
+  `ReleaseConfig` + `ReleaseBootstrap` (public production runtime config),
   `PvP/` (backend abstraction + Firebase/PlayFab clients + controller),
   `Localization/` (`L10n` table, `LocalizedText`, `LanguageSelector`),
   `SmartHooks/` (`GameEvents`, `DailyStreak`, `Haptics`),
@@ -20,10 +21,17 @@ missing so a skipped compile cannot look green.
   `RuntimeUI/` (`RuntimeUI` factory + runtime wiring components),
   `Design/` (Converging Light layer: `ConvergingLight` palette/textures,
   `SplashDesign`, `DesignRuntimeWiring`, `NumberDrift`).
-- `playfab/cloudscript.js` — deploy to PlayFab → Automation → CloudScript.
-  This is the authority for PlayFab room create/read/join/guess/leave/cleanup.
-- `docs/privacy.html` — privacy policy; keep it truthful when data
-  practices change.
+- `Assets/Editor/ReleaseBuildGuard.cs` — release-only fail-closed validation
+  activated by `-holReleaseBuild` in the signed-AAB workflow.
+- `services/provisioner/` — Azure Functions first-install account provisioner;
+  validates Google Play Integrity before using PlayFab Server credentials.
+- `playfab/cloudscript.js` — server authority for PlayFab room
+  create/read/join/guess/leave/cleanup.
+- `tools/playfab/deploy-cloudscript.mjs` — publishes/verifies Legacy CloudScript
+  and optionally adds Client Shared Group API deny policy statements.
+- `tools/release/write-release-config.mjs` — validates/injects public production
+  config into the temporary release-build workspace.
+- `docs/privacy.html` — privacy policy; keep it truthful when data practices change.
 
 ## Conventions (follow these)
 
@@ -55,8 +63,15 @@ missing so a skipped compile cannot look green.
 - **PlayFab clients never read or write Shared Group Data directly.** All
   gameplay-impacting room operations go through `ExecuteCloudScript`, and
   `playfab/cloudscript.js` derives the player side from `currentPlayerId`.
-  Keep Shared Group state `Private`; disable the Client Shared Group API
-  methods in PlayFab's API Access Policy before release.
+  Keep Shared Group state `Private`; production deployment keeps the Client
+  Shared Group API methods denied as defense in depth.
+- **Committed production config stays empty.** Do not put real production
+  values into `Assets/Resources/HOLReleaseConfig.json`. The signed release
+  workflow injects `PLAYFAB_TITLE_ID`, `PROVISIONING_URL`, and
+  `GOOGLE_CLOUD_PROJECT_NUMBER` only in its temporary Actions workspace.
+- **Production workflows are manual and fail closed.** Preserve the `main`
+  ref checks, typed `BUILD`/`DEPLOY` confirmations, `production` environment,
+  and serialized concurrency. Never turn merge-to-main into automatic deploy.
 - Git: feature branches merged with `--no-ff` into `main`, pushed
   immediately. Never commit tokens, keystores (`*.keystore` is ignored),
   or `hol.bundle` / `_to_delete/`. Watch for `.git/index.lock` — another
@@ -64,22 +79,28 @@ missing so a skipped compile cannot look green.
 
 ## Backend setup state
 
-- PvP backend is **PlayFab** (`usePlayFab: 1` in scene); Firebase client
-  (`PvpClient`) is a development fallback only and needs its RTDB URL in the
-  Inspector.
-- PlayFab requires the **Title ID** in `PvpRuntimeUI.playFabTitleId` and the
-  current `playfab/cloudscript.js` revision deployed. Production release
-  builds use `CreateAccount=false`; first-time anonymous players therefore
-  require trusted server-side provisioning via PlayFab Server/LoginWithCustomID.
-  Debug builds can opt into client account creation for local testing only.
-- Ads: LevelPlay app key `6076495` (Android) in `AdsManager`; iOS keys
-  are placeholders. Ads are opt-in: declining keeps LevelPlay uninitialized
-  on later launches and blocks ad loads/shows. Settings → Ads privacy re-opens
-  the choice. Interstitial unit `Interstitial_Android` plus rewarded unit
-  `Rewarded_Android` powers the save-your-streak offer.
-- Force update: optional PlayFab TitleData key `minVersion` (e.g. "0.2")
+- PvP backend is **PlayFab** for production. Firebase client (`PvpClient`) is a
+  development fallback only and needs its RTDB URL in the Inspector.
+- Debug/local development may use Inspector PlayFab values. A signed production
+  build instead reads `ReleaseConfig`; `ReleaseBootstrap` forces PlayFab and
+  applies the injected Title ID before `PvpRuntimeUI.Start` creates its backend.
+- Production PlayFab account creation is closed on the client
+  (`CreateAccount=false`). Fresh installs use `PlayIntegrityProvisioner` and the
+  Azure service in `services/provisioner/`; the PlayFab Title Secret Key must
+  remain server-only. Standard Play Integrity requires a positive Google Cloud
+  project number in the production config.
+- Ads: LevelPlay app key `6076495` (Android) in `AdsManager`; iOS keys are
+  placeholders. Ads are opt-in: declining keeps LevelPlay uninitialized on later
+  launches and blocks ad loads/shows. Settings → Ads privacy re-opens the choice.
+  Interstitial unit `Interstitial_Android` plus rewarded unit
+  `Rewarded_Android` powers the save-your-streak offer. Production CMP/mediation
+  compliance is an external release setting and must match `docs/privacy.html`.
+- Force update: optional PlayFab TitleData key `minVersion` (e.g. `0.2.0`)
   blocks older builds with a store-link dialog. It reuses the PvP PlayFab
-  session. Missing key / no Title ID / offline → players just play (fail-open).
-- Signing: debug only. No release keystore exists yet — generate one on a
-  machine with Unity/JDK, keep it out of git, back it up offline. Never
-  sign with another title's key (the project once pointed at RideCore's).
+  session. Missing key / no authenticated PlayFab session / offline remains
+  fail-open.
+- Signing: use `.github/workflows/build-release.yml` for production AABs. The
+  upload keystore is supplied as `ANDROID_KEYSTORE_BASE64` plus password/alias
+  environment secrets; the workflow passes `-holReleaseBuild`, and
+  `ReleaseBuildGuard` enables/validates custom signing only for that build.
+  Never commit the keystore or its passwords; keep an offline backup.

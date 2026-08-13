@@ -1,4 +1,4 @@
-# CI: static integrity + Unity EditMode tests + Android compile build.
+# CI: static integrity + server bootstrap tests + Unity EditMode tests + Android compile build.
 # Unity credentials are mandatory: missing secrets make CI fail loudly instead
 # of producing a misleading green run with the real jobs skipped.
 
@@ -21,8 +21,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Validate PlayFab CloudScript syntax
-        run: node --check playfab/cloudscript.js
+      - name: Validate JavaScript syntax
+        run: |
+          node --check playfab/cloudscript.js
+          node --check tools/playfab/deploy-cloudscript.mjs
+          node --check tools/release/write-release-config.mjs
+          node --check services/provisioner/src/index.js
+          node --check services/provisioner/src/security.js
 
       - name: Enforce server-authoritative PlayFab client
         shell: bash
@@ -43,6 +48,98 @@ jobs:
             echo "::error::PvP Shared Groups must have no client members; CloudScript tracks host/guest IDs itself"
             exit 1
           fi
+          node <<'NODE'
+          const fs = require('fs');
+          const source = fs.readFileSync('playfab/cloudscript.js', 'utf8');
+          const start = source.indexOf('function viewFor(');
+          const end = source.indexOf('\n}\n\nhandlers.createRoom', start);
+          if (start < 0 || end < 0) {
+            console.error('::error::Could not isolate CloudScript viewFor()');
+            process.exit(1);
+          }
+          const view = source.slice(start, end);
+          for (const forbidden of ['hostSecret:', 'guestSecret:', 'hostId:', 'guestId:']) {
+            if (view.includes(forbidden)) {
+              console.error(`::error::PlayFab client view leaks private field ${forbidden.slice(0, -1)}`);
+              process.exit(1);
+            }
+          }
+          for (const required of ['lastHint:', 'revealedSecret:', 'hostGuessCount:', 'guestGuessCount:']) {
+            if (!view.includes(required)) {
+              console.error(`::error::PlayFab client view is missing ${required.slice(0, -1)}`);
+              process.exit(1);
+            }
+          }
+          NODE
+
+      - name: Enforce production provisioning boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'CreateAccount\\":' Assets/SCRIPT/PvP/PlayFabPvpClient.cs
+          grep -q 'PlayIntegrityProvisioner' Assets/SCRIPT/PvP/PlayFabPvpClient.cs
+          grep -q 'Server/LoginWithCustomID' services/provisioner/src/index.js
+          grep -q 'MEETS_DEVICE_INTEGRITY' services/provisioner/src/security.js
+          grep -q 'PLAY_RECOGNIZED' services/provisioner/src/security.js
+          grep -q 'ReleaseConfig.IsConfigured' Assets/SCRIPT/ReleaseBootstrap.cs
+          if grep -R -E 'PLAYFAB_DEV_SECRET_KEY|X-SecretKey' Assets --include='*.cs' --include='*.json' --include='*.txt'; then
+            echo "::error::Server PlayFab credentials/references must never be compiled into Unity Assets"
+            exit 1
+          fi
+
+      - name: Enforce release configuration contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('fs');
+          const p = JSON.parse(fs.readFileSync('Assets/Resources/HOLReleaseConfig.json', 'utf8'));
+          if ((p.playFabTitleId || '').trim() || (p.provisioningUrl || '').trim() || Number(p.googleCloudProjectNumber) !== 0) {
+            console.error('::error::Committed HOLReleaseConfig.json must stay empty; production values are injected by build-release.yml');
+            process.exit(1);
+          }
+          NODE
+          grep -q 'customParameters: -holReleaseBuild' .github/workflows/build-release.yml
+          grep -q 'allowDirtyBuild: true' .github/workflows/build-release.yml
+          grep -q 'refs/heads/main' .github/workflows/build-release.yml
+          grep -q 'Release workspace must differ from main only by injected HOLReleaseConfig.json' .github/workflows/build-release.yml
+          grep -q 'jarsigner -verify' .github/workflows/build-release.yml
+          grep -q 'PlayerSettings.Android.useCustomKeystore = true' Assets/Editor/ReleaseBuildGuard.cs
+
+      - name: Enforce production workflow gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          for workflow in \
+            .github/workflows/build-release.yml \
+            .github/workflows/deploy-playfab.yml \
+            .github/workflows/deploy-provisioner.yml; do
+            grep -q 'environment: production' "$workflow"
+            grep -q 'refs/heads/main' "$workflow"
+          done
+          grep -q 'Confirmation must be exactly BUILD' .github/workflows/build-release.yml
+          grep -q 'Confirmation must be exactly DEPLOY' .github/workflows/deploy-playfab.yml
+          grep -q 'Confirmation must be exactly DEPLOY' .github/workflows/deploy-provisioner.yml
+          grep -q 'GOOGLE_PLAY_CERT_SHA256' .github/workflows/deploy-provisioner.yml
+          grep -q 'Provisioning endpoint did not become healthy' .github/workflows/deploy-provisioner.yml
+          grep -q 'HARDEN_SHARED_GROUP_POLICY: "true"' .github/workflows/deploy-playfab.yml
+          if grep -q 'harden_shared_group_policy:' .github/workflows/deploy-playfab.yml; then
+            echo "::error::Production PlayFab policy hardening must not be operator-optional"
+            exit 1
+          fi
+          grep -q 'verifySharedGroupPolicy' tools/playfab/deploy-cloudscript.mjs
+
+      - name: Enforce one dependency resolver source
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Google Play Integrity Unity 2.0.0 currently has an upstream V2 compile bug
+          # (google/play-integrity-unity#2). Keep HOL on the stable Standard API until fixed.
+          grep -q '"com.google.play.integrity": "1.4.1"' Packages/manifest.json
+          if [ -e Assets/MobileDependencyResolver ]; then
+            echo "::error::EDM4U is supplied through UPM for Play Integrity; do not also embed Assets/MobileDependencyResolver"
+            exit 1
+          fi
 
       - name: Verify Unity meta files for scripts
         shell: bash
@@ -56,6 +153,26 @@ jobs:
             fi
           done < <(find Assets -type f -name '*.cs' -print0)
           exit "$missing"
+
+  provisioner-test:
+    name: Provisioner tests
+    needs: static-checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install, test, and syntax-check
+        working-directory: services/provisioner
+        run: |
+          npm install --no-audit --no-fund
+          npm test
+          npm run check
 
   check-license:
     name: Require Unity credentials
@@ -78,7 +195,7 @@ jobs:
 
   test:
     name: EditMode tests
-    needs: [static-checks, check-license]
+    needs: [static-checks, provisioner-test, check-license]
     runs-on: ubuntu-latest
     permissions:
       checks: write
@@ -116,7 +233,7 @@ jobs:
 
   build:
     name: Build Android (compile check)
-    needs: [static-checks, check-license]
+    needs: [static-checks, provisioner-test, check-license]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
