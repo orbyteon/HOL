@@ -170,5 +170,18 @@ public static class L10n
         { "share_copied",            new[] { "Copied! Paste it to a friend.", "Αντιγράφηκε! Στείλ'το σε φίλο." } },
         { "daily_share",             new[] { "HOL Daily Hunt #{0} — {1}\n{2}", "HOL Καθημερινό Κυνήγι #{0} — {1}\n{2}" } },
         { "second_chance",           new[] { "Watch an ad for +{0} guesses", "Δες διαφήμιση για +{0} προσπάθειες" } },
+
+        // rival personas
+        { "persona_calculator",      new[] { "the Calculator", "ο Υπολογιστής" } },
+        { "persona_cautious",        new[] { "the Cautious", "ο Προσεκτικός" } },
+        { "persona_chaotic",         new[] { "the Chaotic", "ο Χαοτικός" } },
+        { "persona_intuitive",       new[] { "the Intuitive", "ο Διαισθητικός" } },
+
+        // solo modes
+        { "mode",                    new[] { "Mode", "Λειτουργία" } },
+        { "mode_classic",            new[] { "Classic", "Κλασικό" } },
+        { "mode_sudden",             new[] { "Sudden Death", "Ξαφνικός Θάνατος" } },
+        { "mode_timed",              new[] { "Time Attack", "Κόντρα στον Χρόνο" } },
+        { "time_left",               new[] { "Time: {0}s", "Χρόνος: {0}δ" } },
     };
 }

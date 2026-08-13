@@ -14,6 +14,20 @@ public class GameManager : MonoBehaviour
     const string DifficultyPrefKey = "AIDifficulty";
     static readonly float[] DifficultyRandomChance = { 0.6f, 0.2f, 0f, -1f };
 
+    // Solo mode (PlayerPrefs "GameMode"): 0 = Classic, 1 = Sudden Death
+    // (find the number within the guess limit or lose), 2 = Time Attack
+    // (a shared clock runs down only on your turn).
+    public const string ModePrefKey = "GameMode";
+    const int SuddenDeathGuessLimit = 7;
+    const float TimeAttackSeconds = 45f;
+
+    // Rival personas flavor HOW the AI errs; difficulty still decides how
+    // often it errs. Cautious reads deliberately weaker, Calculator plays
+    // the textbook interval — variety over strict symmetry.
+    enum Persona { Calculator, Cautious, Chaotic, Intuitive }
+    static readonly string[] PersonaKeys =
+        { "persona_calculator", "persona_cautious", "persona_chaotic", "persona_intuitive" };
+
     public TMP_Text aiNumberText;
     public TMP_Text aiAnswerText;
     public TMP_Text turnText;
@@ -24,6 +38,9 @@ public class GameManager : MonoBehaviour
     public TMP_Text rangeText;
     public TMP_Text playerHistoryText;
     public TMP_Text aiHistoryText;
+
+    // Optional (runtime-wired): Sudden Death guesses left / Time Attack clock.
+    public TMP_Text modeStatusText;
 
     public GameObject higherButton;
     public GameObject lowerButton;
@@ -62,6 +79,10 @@ public class GameManager : MonoBehaviour
     int aiSecretNumber;
     int playerGuessCount;
 
+    Persona persona;
+    int mode;
+    float timeLeft;
+
     readonly System.Text.StringBuilder playerHistory = new System.Text.StringBuilder();
     readonly System.Text.StringBuilder aiHistory = new System.Text.StringBuilder();
 
@@ -83,13 +104,20 @@ public class GameManager : MonoBehaviour
         stopGameButton.SetActive(false);
         HideButtons();
 
-        int randomIndex = Random.Range(0, fakeNames.Length);
-        currentOpponent = fakeNames[randomIndex];
-
-        opponentNameText.text = L10n.Get("opponent_label", currentOpponent);
+        PickOpponent();
 
         if (turnText != null)
             turnText.text = L10n.Get("enter_your_number");
+    }
+
+    // A rival is a name plus a persona; both show in the header so the
+    // variety is legible ("Nikos · the Chaotic"), not just felt.
+    void PickOpponent()
+    {
+        currentOpponent = fakeNames[Random.Range(0, fakeNames.Length)];
+        persona = (Persona)Random.Range(0, PersonaKeys.Length);
+        opponentNameText.text = L10n.Get("opponent_label",
+            currentOpponent + " · " + L10n.Get(PersonaKeys[(int)persona]));
     }
 
     public void SetPlayerNumber(int number)
@@ -110,6 +138,10 @@ public class GameManager : MonoBehaviour
         playerTurn = false;
         firstAIGuess = true;
         playerGuessCount = 0;
+
+        mode = Mathf.Clamp(PlayerPrefs.GetInt(ModePrefKey, 0), 0, 2);
+        timeLeft = TimeAttackSeconds;
+        UpdateModeStatus();
 
         aiSecretNumber = Random.Range(1, 101);
 
@@ -149,7 +181,11 @@ public class GameManager : MonoBehaviour
 
         if (firstAIGuess)
         {
-            aiGuess = Random.Range(min, max + 1);
+            // The Calculator opens at the textbook midpoint; everyone else
+            // opens on instinct.
+            aiGuess = persona == Persona.Calculator
+                ? (min + max) / 2
+                : Random.Range(min, max + 1);
             firstAIGuess = false;
         }
         else
@@ -159,11 +195,12 @@ public class GameManager : MonoBehaviour
                 ? AdaptiveRandomChance()
                 : DifficultyRandomChance[difficulty];
 
-            if (Random.value < randomChance)
-                aiGuess = Random.Range(min, max + 1);
-            else
-                aiGuess = (min + max) / 2;
+            aiGuess = Random.value < randomChance
+                ? PersonaWildGuess()
+                : PersonaFocusedGuess();
         }
+
+        aiGuess = Mathf.Clamp(aiGuess, min, max);
 
         aiNumberText.text = currentOpponent + ": " + aiGuess;
         AppendHistory(aiHistory, aiHistoryText, aiGuess);
@@ -206,6 +243,36 @@ public class GameManager : MonoBehaviour
             numberManager.FocusInput();
     }
 
+    // Focused guess: the persona's version of "playing well". Difficulty
+    // decides how OFTEN the AI errs; the persona decides what its play and
+    // its errors look like.
+    int PersonaFocusedGuess()
+    {
+        int mid = (min + max) / 2;
+        int range = max - min;
+        switch (persona)
+        {
+            case Persona.Cautious:   return min + Mathf.Max(1, range / 4);
+            case Persona.Chaotic:    return mid + Random.Range(-range / 5, range / 5 + 1);
+            case Persona.Intuitive:  return mid + Random.Range(-2, 3);
+            default:                 return mid; // Calculator
+        }
+    }
+
+    // Wild guess: the persona's version of a lapse.
+    int PersonaWildGuess()
+    {
+        int mid = (min + max) / 2;
+        int range = max - min;
+        switch (persona)
+        {
+            case Persona.Calculator: return mid + Random.Range(-2, 3);
+            case Persona.Cautious:   return Random.value < 0.5f ? min : min + Mathf.Max(1, range / 3);
+            case Persona.Intuitive:  return mid + Random.Range(-range / 4, range / 4 + 1);
+            default:                 return Random.Range(min, max + 1); // Chaotic
+        }
+    }
+
     static float AdaptiveRandomChance()
     {
         float winRate = GameStats.RecentWinRate();
@@ -233,6 +300,7 @@ public class GameManager : MonoBehaviour
         }
 
         playerGuessCount++;
+        UpdateModeStatus();
 
         string playerLabel = PlayerPrefs.GetString("PlayerName", "");
         if (string.IsNullOrEmpty(playerLabel))
@@ -260,11 +328,48 @@ public class GameManager : MonoBehaviour
         }
 
         UpdateRangeText();
+
+        // Sudden Death: the hunt ends when the guess budget does.
+        if (mode == 1 && playerGuessCount >= SuddenDeathGuessLimit)
+        {
+            EndGame(false);
+            return true;
+        }
+
         playerTurn = false;
 
         turnText.text = L10n.Get("opponent_thinking", currentOpponent);
         Invoke(nameof(AIGuess), Random.Range(1.5f, 3.5f));
         return true;
+    }
+
+    void Update()
+    {
+        // Time Attack: the clock burns only while the decision is yours.
+        if (mode != 2 || gameFinished || !playerTurn) return;
+
+        timeLeft -= Time.deltaTime;
+        if (timeLeft <= 0f)
+        {
+            timeLeft = 0f;
+            UpdateModeStatus();
+            EndGame(false);
+            return;
+        }
+        UpdateModeStatus();
+    }
+
+    void UpdateModeStatus()
+    {
+        if (modeStatusText == null) return;
+
+        if (mode == 1)
+            modeStatusText.text = L10n.Get("guesses_left",
+                Mathf.Max(0, SuddenDeathGuessLimit - playerGuessCount));
+        else if (mode == 2)
+            modeStatusText.text = L10n.Get("time_left", Mathf.CeilToInt(timeLeft));
+        else
+            modeStatusText.text = "";
     }
 
     void EndGame(bool playerWon)
@@ -390,9 +495,7 @@ public class GameManager : MonoBehaviour
         gameFinished = false;
         playerTurn = false;
 
-        int randomIndex = Random.Range(0, fakeNames.Length);
-        currentOpponent = fakeNames[randomIndex];
-        opponentNameText.text = L10n.Get("opponent_label", currentOpponent);
+        PickOpponent();
 
         aiNumberText.text = "?";
         aiAnswerText.text = "";

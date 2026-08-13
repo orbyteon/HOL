@@ -45,11 +45,59 @@ public class ExtrasRuntimeWiring : MonoBehaviour
         WireLanguageButtons();
         WireConsentSettings();
         WireDifficultyButtons();
+        WireModeChips();
         WireRangeAndHistories();
         WireHowToPlay();
         AddStatsLabel();
         AddDisclosureLabels();
         LocalizeSceneTexts();
+    }
+
+    // --- 13. Solo mode chips --------------------------------------------------
+    //
+    // Classic / Sudden Death / Time Attack, chosen on the challenger panel
+    // and read by GameManager per match. Selection mirrors the difficulty
+    // row (active chip gold).
+
+    readonly Button[] modeChips = new Button[3];
+
+    void WireModeChips()
+    {
+        var menu = FindObjectOfType<MenuManager>();
+        if (menu == null || menu.panelPlay == null)
+            return;
+
+        var label = RuntimeUI.CreateText(menu.panelPlay.transform, "ModeLabel",
+            L10n.Get("mode"), 30, new Vector2(0f, 80f), new Vector2(400f, 46f));
+        RuntimeUI.Localize(label, "mode");
+
+        string[] keys = { "mode_classic", "mode_sudden", "mode_timed" };
+        for (int i = 0; i < modeChips.Length; i++)
+        {
+            int m = i; // captured for the lambda
+            var chip = RuntimeUI.CreateButton(menu.panelPlay.transform, "ModeChip" + i,
+                L10n.Get(keys[i]), new Vector2(-250f + i * 250f, 0f),
+                new Vector2(230f, 78f), Neutral);
+            RuntimeUI.Localize(chip, keys[i]);
+            chip.onClick.AddListener(() => SetSoloMode(m));
+            modeChips[i] = chip;
+        }
+
+        RefreshModeChips();
+    }
+
+    void SetSoloMode(int mode)
+    {
+        PlayerPrefs.SetInt(GameManager.ModePrefKey, mode);
+        PlayerPrefs.Save();
+        RefreshModeChips();
+    }
+
+    void RefreshModeChips()
+    {
+        int current = Mathf.Clamp(PlayerPrefs.GetInt(GameManager.ModePrefKey, 0), 0, 2);
+        for (int i = 0; i < modeChips.Length; i++)
+            TintSelectable(modeChips[i], i == current);
     }
 
     // --- 10. Converging range + guess histories ------------------------------
@@ -88,6 +136,13 @@ public class ExtrasRuntimeWiring : MonoBehaviour
             gm.aiHistoryText = RuntimeUI.CreateTmpText(panel, "AiHistory", "", 28,
                 new Vector2(240f, 420f), new Vector2(460f, 60f),
                 ConvergingLight.WithAlpha(ConvergingLight.NearWhite, 0.75f));
+        }
+
+        if (gm.modeStatusText == null)
+        {
+            gm.modeStatusText = RuntimeUI.CreateTmpText(panel, "ModeStatus", "", 30,
+                new Vector2(0f, -420f), new Vector2(500f, 44f),
+                ConvergingLight.WithAlpha(ConvergingLight.Gold, 0.9f));
         }
     }
 
