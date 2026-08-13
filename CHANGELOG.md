@@ -5,6 +5,20 @@ Play Console versionName in `ProjectSettings.asset`.
 
 ## [Unreleased]
 
+### Added (product pass: daily ritual + telemetry)
+
+- Daily Hunt: everyone hunts the same date-seeded secret number, seven
+  guesses, one attempt per day — with an emoji-trail result that copies
+  to the clipboard for sharing, one rewarded-ad revive (+2 guesses), and
+  its own completion streak; reachable from the menu, in EN and EL
+- Anonymous gameplay telemetry (session start, match results, daily-hunt
+  results) through PlayFab's client event pipeline — no new SDKs; events
+  are silently dropped when PlayFab isn't configured; disclosed in the
+  privacy policy (solo-mode wording updated accordingly, effective date
+  bumped)
+- The range bar can now be driven manually (SetRange), powering the
+  Daily Hunt's converging window
+
 ### Improved (UX pass)
 
 - Solo play finally shows the converging interval: a live 1–100 range bar

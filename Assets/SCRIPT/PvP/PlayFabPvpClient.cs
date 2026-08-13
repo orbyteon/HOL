@@ -300,6 +300,21 @@ public class PlayFabPvpClient : PvpBackend
         }
     }
 
+    // ------------------------------------------------ telemetry
+
+    // Fire-and-forget gameplay event through PlayFab's client event pipeline,
+    // riding the same anonymous session the room flows use. `done` reports
+    // delivery so Analytics can drain its queue one event at a time.
+    public void WritePlayerEvent(string eventName, string bodyJson, Action<bool> done)
+    {
+        EnsureLogin(ok =>
+        {
+            if (!ok) { done?.Invoke(false); return; }
+            string body = "{\"EventName\":\"" + eventName + "\",\"Body\":" + bodyJson + "}";
+            StartCoroutine(Post(Api("WritePlayerEvent"), body, true, (ok2, _) => done?.Invoke(ok2)));
+        });
+    }
+
     // ------------------------------------------------ CloudScript state access
 
     void ReadState(string code, Action<bool, RoomState> done)

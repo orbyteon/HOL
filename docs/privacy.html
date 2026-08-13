@@ -33,7 +33,9 @@
 
 <p>Room data is deleted when a participant leaves an unfinished match cleanly, when the surviving client times out an abandoned match, or after both participants acknowledge (or leave after) a completed result. If both devices disappear without sending cleanup requests, an orphaned room may remain in PlayFab until backend cleanup is performed. We do not use PvP room data to build a server-side match-history profile.</p>
 
-<p>The same anonymous PlayFab session may be used to read the title's minimum-supported-version setting so the game can show a required-update screen. The solo "Find challenger" mode uses an on-device simulated opponent and does not send its match data to PlayFab.</p>
+<p>The same anonymous PlayFab session may be used to read the title's minimum-supported-version setting so the game can show a required-update screen. The solo "Find challenger" mode uses an on-device simulated opponent; its gameplay runs entirely on the device.</p>
+
+<p>Gameplay telemetry: when PlayFab is configured, the game records a small set of anonymous gameplay events against the same anonymous PlayFab account — app session start, match results (mode, win/loss, guess count), and daily-challenge results (found/failed, guess count). These events contain no free text, contacts, or precise location, and we use them only to understand how the game is played. If the anonymous PlayFab session is unavailable, the events are discarded.</p>
 
 <h2>Advertising and consent</h2>
 <p>HOL can show advertisements through Unity LevelPlay (ironSource), an ad-mediation service by Unity Technologies. On first launch, the game asks for permission before initializing LevelPlay. If you choose No, LevelPlay is not initialized on later launches and the game does not show ads. If you withdraw permission after the SDK has already initialized in the current session, HOL stops loading or showing further ads and does not initialize the SDK on the next launch.</p>

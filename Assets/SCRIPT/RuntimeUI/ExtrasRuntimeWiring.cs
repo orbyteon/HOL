@@ -36,7 +36,9 @@ public class ExtrasRuntimeWiring : MonoBehaviour
     {
         yield return null; // let every other Start() finish first
 
+        Analytics.Boot();
         EnsureDailyStreak();
+        WireDailyHunt();
         WireRematchButton();
         WireNumberInputSubmit();
         WireMatchmakingCancel();
@@ -87,6 +89,26 @@ public class ExtrasRuntimeWiring : MonoBehaviour
                 new Vector2(240f, 420f), new Vector2(460f, 60f),
                 ConvergingLight.WithAlpha(ConvergingLight.NearWhite, 0.75f));
         }
+    }
+
+    // --- 12. Daily Hunt -------------------------------------------------------
+    //
+    // The daily ritual: same seeded number for everyone, one attempt a day,
+    // shareable result. DailyHunt builds its own panel; the entry button
+    // lives on the menu below the PvP entry.
+
+    void WireDailyHunt()
+    {
+        var menu = FindObjectOfType<MenuManager>();
+        if (menu == null || menu.mainMenuPanel == null)
+            return;
+
+        var canvas = menu.mainMenuPanel.GetComponentInParent<Canvas>(true);
+        if (canvas == null)
+            return;
+
+        DailyHunt.Attach(canvas.transform, menu.mainMenuPanel.transform,
+            FindFirstObjectByType<AdsManager>());
     }
 
     // --- 11. How to play ------------------------------------------------------

@@ -468,6 +468,8 @@ public class PvpGameController : MonoBehaviour
                 : L10n.Get("you_lose") + "\n" + L10n.Get("number_was", huntedSecret);
             turnText.text = "";
 
+            Analytics.SetMatchMode("pvp");
+
             if (iWon)
             {
                 GameStats.RecordWin(myGuessCount, false);

@@ -6,8 +6,9 @@ using TMPro;
 // narrows with every answered guess, min/max in gold at the window's edges.
 // This is the game's core mental model — Converging Light's "field of
 // possibility being gently compressed from both sides" — surfaced as UI.
-// Build once via Attach(); it follows GameManager.OnPlayerRangeChanged and
-// animates the window toward each new interval.
+// Build once via Attach(); with a GameManager it follows
+// OnPlayerRangeChanged, and any owner can drive it manually via SetRange
+// (the Daily Hunt does).
 public class RangeBar : MonoBehaviour
 {
     const float TrackWidth = 700f;
@@ -84,6 +85,15 @@ public class RangeBar : MonoBehaviour
     {
         targetMin = min;
         targetMax = max;
+    }
+
+    // Manual drive for owners without a GameManager. `instant` snaps the
+    // window (fresh challenge) instead of animating from the previous state.
+    public void SetRange(int min, int max, bool instant = false)
+    {
+        targetMin = min;
+        targetMax = max;
+        if (instant) Apply(true);
     }
 
     void Update()
