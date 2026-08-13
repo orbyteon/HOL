@@ -106,6 +106,29 @@ jobs:
           grep -q 'jarsigner -verify' .github/workflows/build-release.yml
           grep -q 'PlayerSettings.Android.useCustomKeystore = true' Assets/Editor/ReleaseBuildGuard.cs
 
+      - name: Enforce production workflow gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          for workflow in \
+            .github/workflows/build-release.yml \
+            .github/workflows/deploy-playfab.yml \
+            .github/workflows/deploy-provisioner.yml; do
+            grep -q 'environment: production' "$workflow"
+            grep -q 'refs/heads/main' "$workflow"
+          done
+          grep -q 'Confirmation must be exactly BUILD' .github/workflows/build-release.yml
+          grep -q 'Confirmation must be exactly DEPLOY' .github/workflows/deploy-playfab.yml
+          grep -q 'Confirmation must be exactly DEPLOY' .github/workflows/deploy-provisioner.yml
+          grep -q 'GOOGLE_PLAY_CERT_SHA256' .github/workflows/deploy-provisioner.yml
+          grep -q 'Provisioning endpoint did not become healthy' .github/workflows/deploy-provisioner.yml
+          grep -q 'HARDEN_SHARED_GROUP_POLICY: "true"' .github/workflows/deploy-playfab.yml
+          if grep -q 'harden_shared_group_policy:' .github/workflows/deploy-playfab.yml; then
+            echo "::error::Production PlayFab policy hardening must not be operator-optional"
+            exit 1
+          fi
+          grep -q 'verifySharedGroupPolicy' tools/playfab/deploy-cloudscript.mjs
+
       - name: Enforce one dependency resolver source
         shell: bash
         run: |
