@@ -149,8 +149,10 @@ empty/default values. Never hand-edit production identifiers into it.
 Use **Build Android Release Candidate** from `main`:
 
 1. enter the public semantic version;
-2. enter a positive Google Play `versionCode` that is higher than every uploaded
-   build;
+2. enter a positive Google Play `versionCode` that is higher than every previous
+   build — including any distributed through **Internal App Sharing**, which
+   consumes a `versionCode` just as a track upload does, so a rebuilt candidate
+   always needs a fresh one rather than a reused one;
 3. type `BUILD`.
 
 The workflow validates all production variables/secrets, injects public release
@@ -170,6 +172,25 @@ and uploads the artifact with `JARSIGNER_VERIFY.txt` plus `SHA256SUMS`.
 
 Use the signed candidate (or a Play internal-testing build made from that exact
 candidate) on physical Android devices.
+
+### Orientation
+
+`ProjectSettings.asset` sets `defaultScreenOrientation: 0` (Portrait). Anything
+other than `4` (AutoRotation) is a hard lock, so the `allowedAutorotateTo*`
+allow-list below it is never consulted — which is how 0.3.0 rc2 shipped with
+`1` (PortraitUpsideDown) while the allow-list still read portrait-only. The
+config looked right and the app launched rotated 180°. Check the device, not
+the file.
+
+- [ ] Cold launch comes up the right way up, not inverted
+- [ ] Launching while holding the device upside down still comes up the right
+      way up
+- [ ] Rotating the device does **not** flip the UI — portrait is locked
+      unconditionally, so no rotation is the pass condition
+- [ ] Splash and main menu agree; no flip on the transition between them
+- [ ] Returning from the notification shade, recents, or another app restores
+      portrait
+- [ ] Returning from an interstitial or rewarded ad restores portrait
 
 ### Splash
 
@@ -218,6 +239,39 @@ candidate) on physical Android devices.
 - [ ] Completed match is removed after both clients acknowledge the result
 - [ ] Back out during create/join, then try the old code → no late UI hijack
 - [ ] PvP Android back navigates create/join/menu; mid-match uses explicit Leave
+
+### Duel rules (new in 0.3.0)
+
+The server owns all of this; the client only renders it. Every check here is a
+fairness claim, so a failure is a release blocker rather than a polish item.
+
+- [ ] Across ~10 matches the opener is not always the same side — it is a coin
+      flip taken at join, not a fixed role
+- [ ] When one side guesses correctly the match does **not** end immediately:
+      the other side gets the answering guess, so both have had equal turns
+- [ ] Both sides correct in the same round, neither locked and both left with
+      the same number of open candidates → **draw**, and the client shows a draw
+      rather than a loss (a 0.2.x client renders a server draw as "YOU LOSE";
+      that is the reason for the version gate in section 3)
+- [ ] Lock is hidden during the first guess and appears only afterwards, with
+      its one-line hint
+- [ ] Lock can be staked once per match per side; the control is unavailable
+      after it is spent
+- [ ] Correct **locked** guess beats a correct unlocked guess in the same round
+- [ ] Wrong locked guess forfeits that side's next turn, and the skipped turn is
+      visible to both players
+- [ ] Both locked, or neither → the tie goes to whichever side had fewer
+      candidates left before the winning guess; equal candidates → draw
+- [ ] Lock intro tooltip appears at most three times and stops once the player
+      has used Lock
+- [ ] Signals: all six send, arrive on the other device, and are text-only
+- [ ] A side that sends more than 12 signals in one match is refused further
+      sends; the other player is not spammed
+- [ ] Rematch: both sides accepting restarts in the **same room** with new
+      secrets, without returning to create/join
+- [ ] Rematch offered by one side shows as pending until the other accepts
+- [ ] Opponent leaving after a match is over is reported rather than hanging on
+      the rematch prompt
 
 ### Other regressions
 

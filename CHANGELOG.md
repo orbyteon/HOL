@@ -12,6 +12,14 @@ Play Console versionName in `ProjectSettings.asset`.
 
 ### Fixed
 
+- The app launched upside down on device. `defaultScreenOrientation` was `1`
+  (PortraitUpsideDown) rather than `0` (Portrait). Any value other than `4`
+  (AutoRotation) is a hard orientation lock, so the `allowedAutorotateTo*`
+  allow-list underneath it — which correctly permitted portrait only — was
+  never consulted. That combination is why the settings read as portrait-only
+  while every launch came up rotated 180°, and why it survived review: the
+  allow-list is the part a reader checks. Found on a real device against the
+  0.3.0 versionCode 2 candidate; fixed for versionCode 3.
 - Solo was playable exactly once per launch. The end-of-match button is
   relabelled "Rematch" and wired to `GameManager.RestartMatch`, but the
   match-over flag that `NumberManager` gates every number submission on
