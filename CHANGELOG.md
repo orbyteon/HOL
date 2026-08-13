@@ -5,6 +5,22 @@ Play Console versionName in `ProjectSettings.asset`.
 
 ## [Unreleased]
 
+### Improved (UX pass)
+
+- Solo play finally shows the converging interval: a live 1–100 range bar
+  whose lit window narrows with every answered guess (min/max in gold at
+  its edges), a "Between X and Y" caption, and both guess histories on
+  the game panel — all of it was tracked internally but never surfaced
+- New "How to play" card: shows once on first launch (never stacking over
+  the consent dialog) and stays reachable from a "?" button on the menu,
+  in English and Greek
+- PvP create/join/guess buttons disable while their request is in flight,
+  so a slow network reads as "working" instead of "broken"
+- Android back on a live PvP match now asks for a second press (same
+  contract as solo); a decided match leaves immediately
+- Answering Higher/Lower puts the caret straight back into the guess
+  field; the solo number input is numeric-only with a 3-character limit
+
 ### Improved (Converging Light visual redesign)
 
 - The menu and splash now wear a fully owned look: a deep multi-stop

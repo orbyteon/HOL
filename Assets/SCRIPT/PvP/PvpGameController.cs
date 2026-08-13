@@ -42,6 +42,13 @@ public class PvpGameController : MonoBehaviour
     public AudioClip winSound;
     public AudioClip loseSound;
 
+    [Header("Optional affordances")]
+    // In-flight requests disable their button so "is it doing anything?"
+    // never needs asking. All null-guarded — wire what exists.
+    public UnityEngine.UI.Button createGoButton;
+    public UnityEngine.UI.Button joinGoButton;
+    public UnityEngine.UI.Button guessButton;
+
     PvpBackend.RoomState lastState;
     string shownGuessKey = "";
     bool matchOver;
@@ -90,10 +97,12 @@ public class PvpGameController : MonoBehaviour
         roomCodeText.text = "-----";
 
         joinCreateInFlight = true;
+        SetInteractable(createGoButton, false);
         int gen = flowGeneration;
         client.CreateRoom(MyName, secret, (ok, codeOrError) =>
         {
             joinCreateInFlight = false;
+            SetInteractable(createGoButton, true);
             if (gen != flowGeneration)
             {
                 client.DeleteRoom();
@@ -164,10 +173,12 @@ public class PvpGameController : MonoBehaviour
 
         joinStatusText.text = L10n.Get("pvp_joining");
         joinCreateInFlight = true;
+        SetInteractable(joinGoButton, false);
         int gen = flowGeneration;
         client.JoinRoom(joinCodeInput.text, MyName, secret, (ok, error) =>
         {
             joinCreateInFlight = false;
+            SetInteractable(joinGoButton, true);
             if (gen != flowGeneration)
             {
                 client.DeleteRoom();
@@ -204,9 +215,11 @@ public class PvpGameController : MonoBehaviour
         guessInput.text = "";
         turnText.text = L10n.Get("pvp_sending");
         guessInFlight = true;
+        SetInteractable(guessButton, false);
         int gen = flowGeneration;
         client.SubmitGuess(guess, lastState, ok =>
         {
+            SetInteractable(guessButton, true);
             if (gen != flowGeneration) return;
 
             guessInFlight = false;
@@ -257,7 +270,19 @@ public class PvpGameController : MonoBehaviour
             return;
 
         if (matchPanel != null && matchPanel.activeSelf)
+        {
+            // Same contract as solo: a decided match has nothing to forfeit,
+            // so back leaves immediately; a live one asks for a second press.
+            if (matchOver || Time.unscaledTime - lastMatchBackTime <= BackConfirmSeconds)
+            {
+                OnLeaveMatchPressed();
+                return;
+            }
+
+            lastMatchBackTime = Time.unscaledTime;
+            ShowBackHint();
             return;
+        }
 
         if ((createPanel != null && createPanel.activeSelf) ||
             (joinPanel != null && joinPanel.activeSelf))
@@ -270,6 +295,38 @@ public class PvpGameController : MonoBehaviour
         }
     }
 
+    const float BackConfirmSeconds = 2f;
+    float lastMatchBackTime = -10f;
+    TMP_Text backHintLabel; // transient, built lazily on the match panel
+
+    void ShowBackHint()
+    {
+        if (backHintLabel == null)
+        {
+            backHintLabel = RuntimeUI.CreateTmpText(matchPanel.transform, "BackExitHint",
+                "", 26, new Vector2(0f, -660f), new Vector2(860f, 60f),
+                new Color(0.91f, 0.93f, 1f, 0.85f));
+        }
+
+        backHintLabel.text = L10n.Get("back_again_to_leave");
+        backHintLabel.gameObject.SetActive(true);
+
+        CancelInvoke(nameof(HideBackHint));
+        Invoke(nameof(HideBackHint), BackConfirmSeconds);
+    }
+
+    void HideBackHint()
+    {
+        if (backHintLabel != null)
+            backHintLabel.gameObject.SetActive(false);
+    }
+
+    static void SetInteractable(UnityEngine.UI.Button button, bool on)
+    {
+        if (button != null)
+            button.interactable = on;
+    }
+
     void BeginMatchPolling()
     {
         matchOver = false;
@@ -278,6 +335,10 @@ public class PvpGameController : MonoBehaviour
         shownGuessKey = "";
         silentPolls = 0;
         lastStateSignature = "";
+        // A leave mid-request must not strand next match's buttons disabled.
+        SetInteractable(createGoButton, true);
+        SetInteractable(joinGoButton, true);
+        SetInteractable(guessButton, true);
         client.OnRoomClosed = HandleRoomClosed;
         client.OnConnectionLost = HandleConnectionLost;
         client.StartPolling(OnState);

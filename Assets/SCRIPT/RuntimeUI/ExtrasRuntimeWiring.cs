@@ -43,9 +43,120 @@ public class ExtrasRuntimeWiring : MonoBehaviour
         WireLanguageButtons();
         WireConsentSettings();
         WireDifficultyButtons();
+        WireRangeAndHistories();
+        WireHowToPlay();
         AddStatsLabel();
         AddDisclosureLabels();
         LocalizeSceneTexts();
+    }
+
+    // --- 10. Converging range + guess histories ------------------------------
+    //
+    // GameManager has tracked the player's narrowed interval and both guess
+    // histories since launch, but its optional UI fields were never wired in
+    // the scene — the game's core mental model was invisible. Build the
+    // RangeBar plus history labels on the game panel and hand them over.
+
+    void WireRangeAndHistories()
+    {
+        var gm = FindObjectOfType<GameManager>();
+        var mm = FindObjectOfType<FakeMatchmaking>();
+        if (gm == null || mm == null || mm.panelGame == null)
+            return;
+
+        var panel = mm.panelGame.transform;
+
+        RangeBar.Attach(panel, gm, new Vector2(0f, 300f));
+
+        if (gm.rangeText == null)
+        {
+            gm.rangeText = RuntimeUI.CreateTmpText(panel, "RangeCaption", "", 26,
+                new Vector2(0f, 238f), new Vector2(520f, 40f),
+                ConvergingLight.WithAlpha(ConvergingLight.NearWhite, 0.6f));
+        }
+
+        if (gm.playerHistoryText == null)
+        {
+            gm.playerHistoryText = RuntimeUI.CreateTmpText(panel, "PlayerHistory", "", 28,
+                new Vector2(-240f, 420f), new Vector2(460f, 60f),
+                ConvergingLight.WithAlpha(ConvergingLight.NearWhite, 0.75f));
+        }
+        if (gm.aiHistoryText == null)
+        {
+            gm.aiHistoryText = RuntimeUI.CreateTmpText(panel, "AiHistory", "", 28,
+                new Vector2(240f, 420f), new Vector2(460f, 60f),
+                ConvergingLight.WithAlpha(ConvergingLight.NearWhite, 0.75f));
+        }
+    }
+
+    // --- 11. How to play ------------------------------------------------------
+    //
+    // The game never explained itself. A rules card shows once on first
+    // launch (after the consent choice exists, so modals never stack) and
+    // stays reachable from a small "?" on the menu.
+
+    const string HowToSeenKey = "HowToPlaySeen";
+    GameObject howToPanel;
+
+    void WireHowToPlay()
+    {
+        var menu = FindObjectOfType<MenuManager>();
+        if (menu == null || menu.mainMenuPanel == null)
+            return;
+
+        var canvas = menu.mainMenuPanel.GetComponentInParent<Canvas>(true);
+        if (canvas == null)
+            return;
+
+        BuildHowToPanel(canvas.transform);
+
+        var help = RuntimeUI.CreateButton(menu.mainMenuPanel.transform, "HowToButton",
+            "?", new Vector2(-460f, 850f), new Vector2(84f, 84f),
+            ConvergingLightFX.GhostSurface);
+        help.onClick.AddListener(() => howToPanel.SetActive(true));
+
+        // First run: show the rules once, but never stack over the consent
+        // dialog — if consent is still unanswered, wait for the next launch.
+        if (PlayerPrefs.GetInt(HowToSeenKey, 0) == 0 && PlayerPrefs.HasKey("AdsConsent"))
+            howToPanel.SetActive(true);
+    }
+
+    void BuildHowToPanel(Transform canvas)
+    {
+        howToPanel = RuntimeUI.FullscreenPanel(canvas, "HowToPanel",
+            ConvergingLight.WithAlpha(ConvergingLight.ScrimIndigo, 0.9f));
+
+        var card = RuntimeUI.CreateObject("Card", howToPanel.transform);
+        ConvergingLight.Center(card, new Vector2(0f, 40f), new Vector2(900f, 1060f));
+        var surface = card.AddComponent<Image>();
+        surface.raycastTarget = true;
+        ConvergingLightFX.StyleCard(surface, 0.985f);
+
+        var title = RuntimeUI.CreateTmpText(card.transform, "Title",
+            L10n.Get("how_to_play"), 46, new Vector2(0f, 440f), new Vector2(760f, 80f));
+        ConvergingLightFX.StyleHeading(title, 4f);
+        RuntimeUI.Localize(title, "how_to_play");
+
+        ConvergingLightFX.AddSeamRule(card.transform, new Vector2(0f, 380f), 420f);
+
+        var body = RuntimeUI.CreateTmpText(card.transform, "Body",
+            L10n.Get("howto_body"), 32, new Vector2(0f, 20f), new Vector2(760f, 620f));
+        body.alignment = TMPro.TextAlignmentOptions.Top;
+        RuntimeUI.Localize(body, "howto_body");
+
+        var gotIt = RuntimeUI.CreateButton(card.transform, "GotItButton",
+            L10n.Get("got_it"), new Vector2(0f, -440f), new Vector2(400f, 92f),
+            ConvergingLight.Gold, ConvergingLightFX.DarkLabel);
+        RuntimeUI.Localize(gotIt, "got_it");
+        gotIt.onClick.AddListener(() =>
+        {
+            PlayerPrefs.SetInt(HowToSeenKey, 1);
+            PlayerPrefs.Save();
+            howToPanel.SetActive(false);
+        });
+
+        howToPanel.AddComponent<PanelAnimator>();
+        howToPanel.SetActive(false);
     }
 
     // --- 8. Scene-authored static labels ------------------------------------
@@ -250,6 +361,11 @@ public class ExtrasRuntimeWiring : MonoBehaviour
             return;
 
         nm.numberInput.onSubmit.AddListener(_ => nm.SubmitNumber());
+
+        // The field only ever takes 1-100: numeric soft keyboard, three
+        // characters, no pasted letters reaching validation.
+        nm.numberInput.contentType = TMP_InputField.ContentType.IntegerNumber;
+        nm.numberInput.characterLimit = 3;
     }
 
     // --- 2. Matchmaking cancel ---------------------------------------------

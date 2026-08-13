@@ -143,5 +143,16 @@ public static class L10n
         { "save_streak_ad",          new[] { "Watch an ad to keep your {0}-win streak!", "Δες διαφήμιση για να κρατήσεις το σερί σου ({0})!" } },
         { "ad_not_ready",            new[] { "No ad available right now", "Δεν υπάρχει διαθέσιμη διαφήμιση αυτή τη στιγμή" } },
         { "perfect_game",            new[] { "PERFECT RUN!", "ΤΕΛΕΙΟ!" } },
+
+        // how to play
+        { "how_to_play",             new[] { "How to play", "Πώς παίζεται" } },
+        { "howto_body",              new[] {
+            "You and your opponent each pick a secret number from 1 to 100.\n\n" +
+            "Take turns guessing each other's number — after every guess you're told \"higher\" or \"lower\".\n\n" +
+            "Find their number first and you win. When it's your opponent's guess, answer honestly!",
+            "Εσύ και ο αντίπαλός σου διαλέγετε από έναν μυστικό αριθμό από το 1 έως το 100.\n\n" +
+            "Μαντεύετε εναλλάξ ο ένας τον αριθμό του άλλου — μετά από κάθε μαντεψιά μαθαίνεις «ψηλότερα» ή «χαμηλότερα».\n\n" +
+            "Βρες πρώτος τον αριθμό του αντιπάλου και κέρδισες. Όταν μαντεύει εκείνος, απάντα με ειλικρίνεια!" } },
+        { "got_it",                  new[] { "Got it!", "Κατάλαβα!" } },
     };
 }

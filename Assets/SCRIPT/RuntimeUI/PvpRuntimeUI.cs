@@ -186,6 +186,11 @@ public class PvpRuntimeUI : MonoBehaviour
         controller.historyText = AsTmp(historyText);
         controller.resultText = AsTmp(resultText);
 
+        // Busy affordances: these disable while their request is in flight.
+        controller.createGoButton = createGo;
+        controller.joinGoButton = joinGo;
+        controller.guessButton = guessBtn;
+
         // Button hooks.
         createBtn.onClick.AddListener(() => ShowOnly(controller, createPanel));
         joinBtn.onClick.AddListener(() => ShowOnly(controller, joinPanel));

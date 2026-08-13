@@ -94,6 +94,12 @@ public class NumberManager : MonoBehaviour
             numberInput.DeactivateInputField();
     }
 
+    public void FocusInput()
+    {
+        if (numberInput != null && numberInput.isActiveAndEnabled)
+            numberInput.ActivateInputField();
+    }
+
     public void ResetForNewMatch()
     {
         gameStarted = false;

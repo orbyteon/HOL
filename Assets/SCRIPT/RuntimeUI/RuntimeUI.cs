@@ -131,6 +131,28 @@ public static class RuntimeUI
         return text;
     }
 
+    // TMP variant for labels that need TMP-only features (letterspacing) or
+    // must satisfy a TMP_Text field on a game script (GameManager histories).
+    public static TextMeshProUGUI CreateTmpText(Transform parent, string name,
+        string content, int fontSize, Vector2 position, Vector2 size, Color? color = null)
+    {
+        var go = CreateObject(name, parent);
+        var rect = (RectTransform)go.transform;
+        rect.anchorMin = new Vector2(0.5f, 0.5f);
+        rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.sizeDelta = size;
+        rect.anchoredPosition = position;
+
+        var text = go.AddComponent<TextMeshProUGUI>();
+        text.text = content;
+        text.fontSize = fontSize;
+        text.color = color ?? new Color(0.91f, 0.93f, 1f);
+        text.alignment = TextAlignmentOptions.Center;
+        text.enableWordWrapping = true;
+        text.raycastTarget = false;
+        return text;
+    }
+
     public static Button CreateButton(Transform parent, string name, string label,
         Vector2 position, Vector2 size, Color color, Color? labelColor = null)
     {

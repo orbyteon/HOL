@@ -41,6 +41,12 @@ public class GameManager : MonoBehaviour
     public bool IsPlayerTurn => playerTurn && !gameFinished;
     public bool IsMatchOver => gameFinished;
 
+    // The player's narrowed hunting interval, for UI that visualizes the
+    // converging range (RangeBar). Fired from UpdateRangeText.
+    public System.Action<int, int> OnPlayerRangeChanged;
+    public int PlayerRangeMin => playerMin;
+    public int PlayerRangeMax => playerMax;
+
     int min = 1;
     int max = 100;
     int aiGuess;
@@ -180,6 +186,7 @@ public class GameManager : MonoBehaviour
         HideButtons();
         turnText.text = L10n.Get("your_guess");
         playerTurn = true;
+        FocusGuessInput();
     }
 
     public void Lower()
@@ -188,6 +195,15 @@ public class GameManager : MonoBehaviour
         HideButtons();
         turnText.text = L10n.Get("your_guess");
         playerTurn = true;
+        FocusGuessInput();
+    }
+
+    // Answering the opponent hands the turn back to the player — put the
+    // caret straight into the guess field so typing can start immediately.
+    void FocusGuessInput()
+    {
+        if (numberManager != null)
+            numberManager.FocusInput();
     }
 
     static float AdaptiveRandomChance()
@@ -416,5 +432,7 @@ public class GameManager : MonoBehaviour
     {
         if (rangeText != null)
             rangeText.text = L10n.Get("between_range", playerMin, playerMax);
+
+        OnPlayerRangeChanged?.Invoke(playerMin, playerMax);
     }
 }
