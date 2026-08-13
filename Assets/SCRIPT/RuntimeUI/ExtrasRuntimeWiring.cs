@@ -19,9 +19,9 @@ using TMPro;
 //   9. Settings -> difficulty selector (Easy/Normal/Hard/Adaptive).
 public class ExtrasRuntimeWiring : MonoBehaviour
 {
-    // Converging Light palette (design/philosophy.md).
-    static readonly Color Neutral = new Color(0.16f, 0.15f, 0.26f);   // indigo gray
-    static readonly Color DarkLabel = new Color(0.10f, 0.09f, 0.18f);
+    // Converging Light palette (design/philosophy.md), theme-routed.
+    static Color Neutral => ConvergingLightFX.GhostSurface;
+    static Color DarkLabel => ConvergingLightFX.DarkLabel;
 
     Text statsLabel;
     Text disclosurePlay;
@@ -45,12 +45,63 @@ public class ExtrasRuntimeWiring : MonoBehaviour
         WireLanguageButtons();
         WireConsentSettings();
         WireDifficultyButtons();
+        WireThemeChips();
         WireModeChips();
         WireRangeAndHistories();
         WireHowToPlay();
         AddStatsLabel();
         AddDisclosureLabels();
         LocalizeSceneTexts();
+    }
+
+    // --- 14. Theme swatches ---------------------------------------------------
+    //
+    // Cosmetic palettes over the whole design system, unlocked through play.
+    // The UI bakes palette colors at scene build, so applying a theme
+    // reloads the scene; tapping a locked swatch explains its unlock.
+
+    void WireThemeChips()
+    {
+        var menu = FindObjectOfType<MenuManager>();
+        if (menu == null || menu.settingsPanel == null)
+            return;
+
+        var themeLabel = RuntimeUI.CreateText(menu.settingsPanel.transform, "ThemeLabel",
+            L10n.Get("theme"), 32, new Vector2(0f, 330f), new Vector2(400f, 50f));
+        RuntimeUI.Localize(themeLabel, "theme");
+
+        var hint = RuntimeUI.CreateText(menu.settingsPanel.transform, "ThemeHint",
+            "", 24, new Vector2(0f, 158f), new Vector2(760f, 44f),
+            ConvergingLight.WithAlpha(ConvergingLight.NearWhite, 0.7f));
+
+        for (int i = 0; i < Themes.All.Length; i++)
+        {
+            var theme = Themes.All[i];
+            bool unlocked = Themes.IsUnlocked(theme);
+            bool current = theme.id == Themes.CurrentId;
+
+            var chip = RuntimeUI.CreateButton(menu.settingsPanel.transform,
+                "Theme_" + theme.id, L10n.Get(theme.nameKey),
+                new Vector2(-300f + i * 200f, 240f), new Vector2(184f, 84f),
+                current ? theme.palette.gold : ConvergingLight.WithAlpha(theme.palette.panelIndigo, 1f),
+                current ? DarkLabel : ConvergingLight.WithAlpha(theme.palette.nearWhite, unlocked ? 1f : 0.45f));
+            RuntimeUI.Localize(chip, theme.nameKey);
+
+            var captured = theme;
+            chip.onClick.AddListener(() =>
+            {
+                if (!Themes.IsUnlocked(captured))
+                {
+                    hint.text = Themes.LockHint(captured);
+                    return;
+                }
+                if (captured.id == Themes.CurrentId)
+                    return;
+
+                Themes.Apply(captured);
+                UnityEngine.SceneManagement.SceneManager.LoadScene("MainMenu");
+            });
+        }
     }
 
     // --- 13. Solo mode chips --------------------------------------------------
@@ -344,7 +395,7 @@ public class ExtrasRuntimeWiring : MonoBehaviour
 
     const string DifficultyPrefKey = "AIDifficulty"; // mirrors GameManager
 
-    static readonly Color Gold = new Color(1f, 0.78f, 0.34f);
+    static Color Gold => ConvergingLight.Gold;
 
     readonly Button[] difficultyButtons = new Button[4];
 

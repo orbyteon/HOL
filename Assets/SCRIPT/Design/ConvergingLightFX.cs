@@ -14,7 +14,9 @@ public static class ConvergingLightFX
     static readonly Vector2 ShadowOffset = new Vector2(0f, -7f);
 
     // Ghost surfaces sit between panel and depth; labels stay near-white.
-    public static readonly Color GhostSurface =
+    // Property, not field: themes swap mid-session and a baked static would
+    // keep serving the boot theme's color.
+    public static Color GhostSurface =>
         ConvergingLight.WithAlpha(ConvergingLight.TrackIndigo, 0.92f);
     public static readonly Color DarkLabel = new Color(0.10f, 0.09f, 0.18f);
 
@@ -26,22 +28,36 @@ public static class ConvergingLightFX
     static Sprite shineBand;
     static Sprite seam;
 
-    // The nocturnal field: layered indigo, darkest at the top, warming very
-    // slightly toward violet at the bottom — "a night made of layered indigo".
+    // The nocturnal field: layered depth, darkest at the top, warming very
+    // slightly toward the seam's second color at the bottom. Built from the
+    // active theme's depth colors.
     public static Sprite DeepField
     {
         get
         {
             if (deepField == null)
+            {
+                Color top = ConvergingLight.DepthTop;
+                Color bottom = ConvergingLight.DepthBottom;
                 deepField = MultiStopVertical(new[]
                 {
-                    new Color(0.028f, 0.028f, 0.092f),
-                    new Color(0.052f, 0.048f, 0.148f),
-                    new Color(0.096f, 0.080f, 0.228f),
-                    new Color(0.128f, 0.092f, 0.252f),
+                    Color.Lerp(top, Color.black, 0.18f),
+                    Color.Lerp(top, bottom, 0.45f),
+                    Color.Lerp(top, bottom, 0.82f),
+                    Color.Lerp(bottom, ConvergingLight.Magenta, 0.07f),
                 });
+            }
             return deepField;
         }
+    }
+
+    // Theme swaps must rebuild the sprites that bake palette colors; the
+    // white falloff sprites (glow, vignette, shine) are tinted per-Image
+    // and stay valid.
+    public static void InvalidateThemedSprites()
+    {
+        deepField = null;
+        seam = null;
     }
 
     // White radial falloff; tint with Image.color. "Every light source is

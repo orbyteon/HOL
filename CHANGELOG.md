@@ -5,6 +5,19 @@ Play Console versionName in `ProjectSettings.asset`.
 
 ## [Unreleased]
 
+### Added (product pass: rivals, modes, themes)
+
+- Rivals now carry a visible persona next to their name ("Nikos · the
+  Chaotic"): Calculator, Cautious, Chaotic, Intuitive — difficulty still
+  decides how often the AI errs, the persona decides what its play and
+  its lapses look like
+- Solo modes on the challenger panel: Classic, Sudden Death (find it
+  within 7 guesses), Time Attack (45 s clock that burns only on your
+  turn), with a live status readout during the match
+- Cosmetic themes over the whole design system, unlocked through play:
+  Converging (default), Ember (5 wins), Frost (3-day Daily Hunt streak),
+  Mono (perfect win) — swatches in Settings; unlocks are sticky
+
 ### Added (product pass: daily ritual + telemetry)
 
 - Daily Hunt: everyone hunts the same date-seeded secret number, seven

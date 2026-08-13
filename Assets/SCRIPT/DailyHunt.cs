@@ -23,7 +23,8 @@ public class DailyHunt : MonoBehaviour
     const string RevivedKey = "DailyHuntRevived";
     const string MinKey = "DailyHuntMin";
     const string MaxKey = "DailyHuntMax";
-    const string StreakKey = "DailyHuntStreak";
+    // Public: Themes gates the Frost unlock on this streak.
+    public const string StreakPrefKey = "DailyHuntStreak";
     const string LastFoundKey = "DailyHuntLastFound";
 
     // Day numbering epoch; #1 is 2026-01-01 in the device's local calendar
@@ -241,7 +242,7 @@ public class DailyHunt : MonoBehaviour
     {
         done = true;
         found = false;
-        PlayerPrefs.SetInt(StreakKey, 0);
+        PlayerPrefs.SetInt(StreakPrefKey, 0);
         Persist();
         Haptics.Error();
         Analytics.DailyEnded(day, false, used, revived);
@@ -250,8 +251,8 @@ public class DailyHunt : MonoBehaviour
     void UpdateStreakOnFound()
     {
         int last = PlayerPrefs.GetInt(LastFoundKey, -1);
-        int streak = last == day - 1 ? PlayerPrefs.GetInt(StreakKey, 0) + 1 : 1;
-        PlayerPrefs.SetInt(StreakKey, streak);
+        int streak = last == day - 1 ? PlayerPrefs.GetInt(StreakPrefKey, 0) + 1 : 1;
+        PlayerPrefs.SetInt(StreakPrefKey, streak);
         PlayerPrefs.SetInt(LastFoundKey, day);
     }
 
@@ -288,7 +289,7 @@ public class DailyHunt : MonoBehaviour
     void Refresh()
     {
         title.text = L10n.Get("daily_hunt_number", day);
-        streakText.text = L10n.Get("daily_streak", PlayerPrefs.GetInt(StreakKey, 0));
+        streakText.text = L10n.Get("daily_streak", PlayerPrefs.GetInt(StreakPrefKey, 0));
         trailText.text = trail;
         rangeBar.SetRange(min, max, true);
 

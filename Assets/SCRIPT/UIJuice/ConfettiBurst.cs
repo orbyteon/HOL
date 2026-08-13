@@ -13,12 +13,13 @@ public class ConfettiBurst : MonoBehaviour
     public float gravity = 1400f;
     public float lifetime = 1.6f;
 
-    static readonly Color[] Palette =
+    // Celebration wears the active theme's seam, metal, and near-white.
+    static Color[] Palette => new[]
     {
-        new Color(0.25f, 0.85f, 1f),   // cyan
-        new Color(0.91f, 0.36f, 1f),   // magenta
-        new Color(1f, 0.78f, 0.34f),   // gold
-        new Color(0.91f, 0.93f, 1f),   // near-white
+        ConvergingLight.Cyan,
+        ConvergingLight.Magenta,
+        ConvergingLight.Gold,
+        ConvergingLight.NearWhite,
     };
 
     class Piece

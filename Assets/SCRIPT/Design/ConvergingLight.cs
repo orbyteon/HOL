@@ -6,17 +6,20 @@ using UnityEngine.UI;
 // Everything is generated from code: no art assets, no scene surgery.
 public static class ConvergingLight
 {
-    // Palette canon: layered indigo depth, one cyan-to-magenta seam of light,
-    // muted gold reserved for the single most important mark, near-white text.
-    public static readonly Color DepthTop = new Color(0.035f, 0.035f, 0.110f);
-    public static readonly Color DepthBottom = new Color(0.100f, 0.090f, 0.235f);
-    public static readonly Color Cyan = new Color(0.25f, 0.85f, 1f);
-    public static readonly Color Magenta = new Color(0.83f, 0.35f, 1f);
-    public static readonly Color Gold = new Color(1f, 0.78f, 0.34f);
-    public static readonly Color NearWhite = new Color(0.91f, 0.93f, 1f);
-    public static readonly Color TrackIndigo = new Color(0.16f, 0.15f, 0.26f);
-    public static readonly Color PanelIndigo = new Color(0.09f, 0.08f, 0.19f);
-    public static readonly Color ScrimIndigo = new Color(0.05f, 0.05f, 0.12f);
+    // Palette canon: layered depth, one two-color seam of light, muted gold
+    // reserved for the single most important mark, near-white text. The
+    // concrete colors come from the active cosmetic theme (Themes.Active);
+    // the default theme is the original Converging Light indigo. The whole
+    // UI reads these at scene build, so a theme swap applies on reload.
+    public static Color DepthTop => Themes.Active.depthTop;
+    public static Color DepthBottom => Themes.Active.depthBottom;
+    public static Color Cyan => Themes.Active.cyan;
+    public static Color Magenta => Themes.Active.magenta;
+    public static Color Gold => Themes.Active.gold;
+    public static Color NearWhite => Themes.Active.nearWhite;
+    public static Color TrackIndigo => Themes.Active.trackIndigo;
+    public static Color PanelIndigo => Themes.Active.panelIndigo;
+    public static Color ScrimIndigo => Themes.Active.scrimIndigo;
 
     public static Color WithAlpha(Color c, float a)
     {

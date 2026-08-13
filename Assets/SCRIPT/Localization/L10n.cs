@@ -177,6 +177,16 @@ public static class L10n
         { "persona_chaotic",         new[] { "the Chaotic", "ο Χαοτικός" } },
         { "persona_intuitive",       new[] { "the Intuitive", "ο Διαισθητικός" } },
 
+        // themes
+        { "theme",                   new[] { "Theme", "Θέμα" } },
+        { "theme_converging",        new[] { "Converging", "Συγκλίνον" } },
+        { "theme_ember",             new[] { "Ember", "Θράκα" } },
+        { "theme_frost",             new[] { "Frost", "Πάχνη" } },
+        { "theme_mono",              new[] { "Mono", "Μονόχρωμο" } },
+        { "theme_locked_wins",       new[] { "Unlocks at {0} wins", "Ξεκλειδώνει στις {0} νίκες" } },
+        { "theme_locked_daily",      new[] { "Unlocks at a {0}-day Daily Hunt streak", "Ξεκλειδώνει με σερί {0} ημερών στο Καθημερινό Κυνήγι" } },
+        { "theme_locked_perfect",    new[] { "Unlocks with a perfect win (7 guesses or fewer)", "Ξεκλειδώνει με τέλεια νίκη (έως 7 προσπάθειες)" } },
+
         // solo modes
         { "mode",                    new[] { "Mode", "Λειτουργία" } },
         { "mode_classic",            new[] { "Classic", "Κλασικό" } },

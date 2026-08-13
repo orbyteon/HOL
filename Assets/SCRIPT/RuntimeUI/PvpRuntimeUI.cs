@@ -22,14 +22,15 @@ public class PvpRuntimeUI : MonoBehaviour
     [Tooltip("Firebase Realtime Database URL — copied onto the Firebase backend")]
     public string firebaseDatabaseUrl = "";
 
-    // Converging Light palette (design/philosophy.md): indigo depth, cyan and
-    // gold as the disciplined lights, near-white text. Gold is reserved for
-    // the single most important action on each screen (primary CTA).
-    static readonly Color PanelColor = new Color(0.08f, 0.05f, 0.15f, 0.97f);
-    static readonly Color Accent = new Color(1f, 0.78f, 0.34f, 1f);   // muted gold
-    static readonly Color AccentBlue = new Color(0.25f, 0.85f, 1f, 1f); // cyan seam
-    static readonly Color Neutral = new Color(0.16f, 0.15f, 0.26f, 1f); // indigo gray
-    static readonly Color DarkLabel = new Color(0.10f, 0.09f, 0.18f, 1f);
+    // Converging Light palette (design/philosophy.md), routed through the
+    // active theme: depth panels, cyan and gold as the disciplined lights,
+    // near-white text. Gold is reserved for the single most important
+    // action on each screen (primary CTA).
+    static Color PanelColor => ConvergingLight.WithAlpha(ConvergingLight.PanelIndigo, 0.97f);
+    static Color Accent => ConvergingLight.Gold;
+    static Color AccentBlue => ConvergingLight.Cyan;
+    static Color Neutral => ConvergingLightFX.GhostSurface;
+    static Color DarkLabel => ConvergingLightFX.DarkLabel;
 
     void Start()
     {
