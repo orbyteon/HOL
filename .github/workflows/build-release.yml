@@ -136,6 +136,20 @@ jobs:
           customParameters: -holReleaseBuild
           allowDirtyBuild: true
 
+      - name: Take ownership of the Unity build output
+        shell: bash
+        run: |
+          set -euo pipefail
+          # game-ci runs Unity inside a container as root, so build/ and
+          # everything under it comes back root-owned. Every later step runs as
+          # `runner`, which can read the bundle but cannot create a file beside
+          # it — which is how the signature log and the checksum both failed.
+          sudo chown -R "$(id -u):$(id -g)" build
+          test -w build/Android || {
+            echo "::error::build/Android is still not writable by the runner"
+            exit 1
+          }
+
       - name: Verify bundle signature and write checksum
         shell: bash
         run: |
