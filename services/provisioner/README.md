@@ -22,12 +22,12 @@ The token's `requestHash` must equal the SHA-256 hex digest of this exact UTF-8 
 <packageName>\n<customId>\n<appVersion>
 ```
 
-The service also requires, by default:
+The production deployment requires:
 
 - the expected Play package name;
 - a fresh token (maximum age 120 seconds);
 - `PLAY_RECOGNIZED` app integrity;
-- a signing-certificate digest match when configured;
+- a Play App Signing certificate digest match;
 - `MEETS_DEVICE_INTEGRITY`;
 - `LICENSED` app licensing.
 
@@ -39,11 +39,11 @@ After those checks, the service calls PlayFab `Server/LoginWithCustomID(CreateAc
 | --- | --- |
 | `PLAYFAB_TITLE_ID` | HOL PlayFab Title ID |
 | `PLAYFAB_DEV_SECRET_KEY` | PlayFab Title Secret Key; server only |
-| `GOOGLE_PLAY_PACKAGE_NAME` | Android package, currently `com.Orbyteon.HOL` |
-| `GOOGLE_SERVICE_ACCOUNT_JSON_B64` | Base64 of a Google service-account JSON credential with Play Integrity API access; omit only when Azure workload identity/ADC is configured |
-| `GOOGLE_PLAY_CERT_SHA256` | Comma-separated certificate SHA-256 digests returned by Play Integrity (recommended) |
-| `REQUIRE_LICENSED` | Defaults to `true`; do not disable in production |
-| `INTEGRITY_MAX_AGE_MS` | Defaults to `120000` |
+| `GOOGLE_PLAY_PACKAGE_NAME` | Android package; production workflow requires `com.Orbyteon.HOL` |
+| `GOOGLE_SERVICE_ACCOUNT_JSON_B64` | Base64 of a Google service-account JSON credential with Play Integrity API access |
+| `GOOGLE_PLAY_CERT_SHA256` | Comma-separated allowed Play App Signing certificate SHA-256 digest(s); required by production deployment |
+| `REQUIRE_LICENSED` | Production workflow sets `true`; do not disable in production |
+| `INTEGRITY_MAX_AGE_MS` | Production workflow sets `120000` |
 
 Do not log, commit, or return the service-account JSON, PlayFab secret, integrity token, or Custom ID.
 
@@ -75,7 +75,7 @@ The endpoint will normally be:
 https://<function-app-name>.azurewebsites.net/api/provision
 ```
 
-Copy that URL into HOL's production provisioning configuration after the app is deployed.
+The deployment workflow waits for this endpoint after publishing and verifies that an empty JSON request is rejected with HTTP 400. Copy the URL into HOL's `PROVISIONING_URL` production variable only after the deployment is healthy.
 
 ## Local validation
 
