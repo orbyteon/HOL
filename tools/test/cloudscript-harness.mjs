@@ -115,12 +115,17 @@ export function guess(cs, roomId, side, value, lock = false) {
   return cs.call("submitGuess", PLAYER[side], { roomId, guess: value, lock });
 }
 
-// The strategy every rational player converges on: halve the interval.
-export function midpointSolver() {
+// The strategy every rational player converges on: halve the interval. `slop`
+// is the chance of straying to a random number inside the known range instead,
+// which is what separates a real player from a flawless one.
+export function midpointSolver(slop = 0) {
   let lo = 1;
   let hi = 100;
   return {
-    next: () => Math.floor((lo + hi) / 2),
+    next: () =>
+      slop > 0 && Math.random() < slop
+        ? lo + Math.floor(Math.random() * (hi - lo + 1))
+        : Math.floor((lo + hi) / 2),
     remaining: () => hi - lo + 1,
     tell(value, hint) {
       if (hint === "higher") lo = value + 1;

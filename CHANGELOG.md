@@ -5,6 +5,50 @@ Play Console versionName in `ProjectSettings.asset`.
 
 ## [Unreleased]
 
+### Changed (duel rules — gameplay balance)
+
+- **Whoever moves first no longer wins the duel.** Two players who both
+  binary-search a number in 1–100 need the same number of guesses 27% of
+  the time and otherwise reach each guess number in lockstep, so under
+  "first correct guess wins" the opening player took **63.7%** of matches
+  against an identical opponent. PvP was worse still: CloudScript
+  hardcoded `turn: "guest"`, so the joiner opened *every* match and
+  carried that win rate by default.
+- The opener is now a coin flip, taken when the second player joins and
+  fixed for the match (PlayFab and the Firebase fallback both).
+- **Equal turns.** A round is one guess per side, and a match can only end
+  once a round closes — so the responder always answers the opener's
+  winning guess. Simulated over the real rules, the opener now takes
+  35.5% and the responder 36.8%.
+- **The Lock**, one per match: stake it on a guess and a correct one wins
+  a same-round tie, while a wrong one forfeits your next turn. It is the
+  game's first genuine decision — staking it only on a certain guess
+  beats never locking 50.3% to 36.6%, and locking on every guess loses
+  18.2% to 63.8%. The button turns into a prompt once the range is down
+  to three candidates, which is what keeps draws rare in practice.
+- A tied round with both sides locked, or neither, is an honest draw. It
+  counts as a match, breaks no streak, and stays out of the window that
+  tunes the adaptive AI.
+- Solo plays by exactly these rules too, so the mechanic is learned
+  against the AI before it decides a real duel. Difficulty now shapes the
+  opponent's *judgement* as well as its aim: Easy over-commits the Lock,
+  Hard waits for certainty and opens on the midpoint instead of at random.
+
+### Added
+
+- **Signals** — a fixed six-entry vocabulary ("Good luck!", "So close!",
+  "Ouch!", "Nice one!", "Your turn!", "Good game!") players can send
+  during a PvP match and on the result screen. Only the index travels, so
+  each player reads it in their own language. Deliberately not free-form
+  chat: with no user-authored text there is nothing to moderate, no
+  reports or blocks to build, and nothing new to declare on the Play Data
+  Safety form. Server-validated and capped at 12 per side per match.
+- PvP now shows the narrowed guess range that solo play has always shown.
+- Rule tests: `tools/test/cloudscript.test.mjs` drives the real
+  CloudScript through an in-memory Shared Group store (`node --test`), and
+  `Assets/Tests/EditMode/DuelRulesTests.cs` covers the C# implementation.
+  `tools/test/lock-policy-sim.mjs` plays Lock policies head to head.
+
 ### Improved (frontend experience pass)
 
 - Losses now reveal the secret number you were hunting (solo and PvP) —

@@ -14,7 +14,13 @@
 //     Turn order therefore no longer decides the duel — efficiency does.
 //   * Each side holds one Lock per match. A correct locked guess wins a
 //     same-round tie; a wrong locked guess forfeits that side's next turn.
-//     Both locked or neither locked on a tie is an honest draw.
+//   * If the Lock does not separate a tied round, the win goes to whoever had
+//     narrowed the number further. The hints a side has received imply an exact
+//     interval, and finding the number among two candidates is a better claim
+//     than hitting it among twelve. Without this step two players using the
+//     same strategy both lock or both do not, and roughly a quarter of duels
+//     ended in stalemate; only a tie on guess count, Lock and remaining
+//     candidates alike is a draw now.
 //   * Signals are a closed vocabulary of six pre-localized messages. There is no
 //     free text anywhere in the protocol, by design.
 
@@ -159,12 +165,41 @@ function advanceTurn(state) {
     state.turn = state.opener;
 }
 
-// Both sides found the number in the same round. The Lock is the tiebreaker:
-// whoever staked it and was right takes the match, otherwise it is a draw.
-function resolveTie(state, latestSide, latestLocked) {
+// Both sides found the number in the same round. The Lock decides first —
+// whoever staked it and was right takes the match. Failing that, the tighter
+// search wins: fewer candidates left means the win was earned, not stumbled on.
+function resolveTie(state, latestSide, latestLocked, latestCandidates) {
     if (latestLocked && !state.pendingWinLocked) return latestSide;
     if (!latestLocked && state.pendingWinLocked) return state.pendingWin;
+
+    var held = state.pendingWinCandidates | 0;
+    if (latestCandidates > 0 && held > 0) {
+        if (latestCandidates < held) return latestSide;
+        if (held < latestCandidates) return state.pendingWin;
+    }
+
     return "draw";
+}
+
+// How many numbers the hints this side has received still leave open. It is
+// objective: it follows from the answers given, not from how well the player
+// used them.
+function candidatesFor(state, side) {
+    var lo = side === "host" ? (state.hostLo | 0) : (state.guestLo | 0);
+    var hi = side === "host" ? (state.hostHi | 0) : (state.guestHi | 0);
+    if (lo < 1) lo = 1;
+    if (hi < 1 || hi > 100) hi = 100;
+    return hi >= lo ? hi - lo + 1 : 1;
+}
+
+function narrowFor(state, side, guess, hint) {
+    if (side === "host") {
+        if (hint === "higher" && guess + 1 > (state.hostLo | 0)) state.hostLo = guess + 1;
+        else if (hint === "lower" && guess - 1 < (state.hostHi | 0)) state.hostHi = guess - 1;
+    } else {
+        if (hint === "higher" && guess + 1 > (state.guestLo | 0)) state.guestLo = guess + 1;
+        else if (hint === "lower" && guess - 1 < (state.guestHi | 0)) state.guestHi = guess - 1;
+    }
 }
 
 function viewFor(state, playerId) {
@@ -243,6 +278,10 @@ handlers.createRoom = function (args, context) {
             guestGuessCount: 0,
             turnIndex: 0,
             roundIndex: 0,
+            hostLo: 1,
+            hostHi: 100,
+            guestLo: 1,
+            guestHi: 100,
             actedHost: false,
             actedGuest: false,
             skipHost: false,
@@ -251,6 +290,7 @@ handlers.createRoom = function (args, context) {
             lockUsedGuest: false,
             pendingWin: "",
             pendingWinLocked: false,
+            pendingWinCandidates: 0,
             signalBy: "",
             signalId: 0,
             signalSeq: 0,
@@ -363,13 +403,21 @@ handlers.submitGuess = function (args, context) {
 
     if (locked) state[lockKey] = true;
 
+    // Candidates left *before* this guess narrowed anything: that is the pool
+    // the guess was actually drawn from.
+    var candidates = candidatesFor(state, side);
+    narrowFor(state, side, guess, state.lastHint);
+
     if (correct) {
         // A win is provisional until the round closes, so the responder always
         // gets the answering guess the opener just had.
-        state.pendingWin = state.pendingWin
-            ? resolveTie(state, side, locked)
-            : side;
-        if (!state.pendingWinLocked) state.pendingWinLocked = locked;
+        if (state.pendingWin) {
+            state.pendingWin = resolveTie(state, side, locked, candidates);
+        } else {
+            state.pendingWin = side;
+            state.pendingWinLocked = locked;
+            state.pendingWinCandidates = candidates;
+        }
     } else if (locked) {
         // Staking the Lock and missing costs the next turn.
         if (side === "host") state.skipHost = true;

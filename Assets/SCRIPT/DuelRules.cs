@@ -21,8 +21,17 @@ using System;
 //     closes — so the responder always answers the opener's winning guess
 //     ("last licks"). Efficiency decides the duel instead of tempo.
 //   * Each side holds one Lock. Staking it on a correct guess wins a same-round
-//     tie; staking it on a wrong guess forfeits that side's next turn. Both
-//     sides locking, or neither, leaves an honest draw.
+//     tie; staking it on a wrong guess forfeits that side's next turn.
+//   * If the Lock does not separate a tied round, the win goes to whoever had
+//     narrowed the number further: finding it among two candidates is a better
+//     claim than hitting it among twelve.
+//
+// A round can still tie on all three counts, and that is an honest draw. It
+// happens about a quarter of the time between two flawless binary searchers,
+// who narrow in lockstep and so cannot be separated by anything drawn from
+// their own search — but that is the worst case, not the normal one. Once
+// players stray from the midpoint at all the guess counts diverge, and at
+// human accuracy the draw rate lands near 8%.
 public class DuelRules
 {
     public enum Side { None = 0, Host = 1, Guest = 2 }
@@ -59,6 +68,11 @@ public class DuelRules
     bool skipHost, skipGuest;
     bool lockUsedHost, lockUsedGuest;
 
+    // The interval each side's received hints leave open. Objective: it follows
+    // from the answers given, not from how well the player used them.
+    int hostLo, hostHi, guestLo, guestHi;
+    int pendingWinCandidates;
+
     public static Side Other(Side side)
     {
         if (side == Side.Host) return Side.Guest;
@@ -84,6 +98,31 @@ public class DuelRules
         actedHost = actedGuest = false;
         skipHost = skipGuest = false;
         lockUsedHost = lockUsedGuest = false;
+        hostLo = guestLo = 1;
+        hostHi = guestHi = 100;
+        pendingWinCandidates = 0;
+    }
+
+    // How many numbers this side has not ruled out yet.
+    public int CandidatesFor(Side side)
+    {
+        int lo = side == Side.Host ? hostLo : guestLo;
+        int hi = side == Side.Host ? hostHi : guestHi;
+        return hi >= lo ? hi - lo + 1 : 1;
+    }
+
+    void Narrow(Side side, int guess, Hint hint)
+    {
+        if (side == Side.Host)
+        {
+            if (hint == Hint.Higher && guess + 1 > hostLo) hostLo = guess + 1;
+            else if (hint == Hint.Lower && guess - 1 < hostHi) hostHi = guess - 1;
+        }
+        else
+        {
+            if (hint == Hint.Higher && guess + 1 > guestLo) guestLo = guess + 1;
+            else if (hint == Hint.Lower && guess - 1 < guestHi) guestHi = guess - 1;
+        }
     }
 
     public bool LockAvailable(Side side)
@@ -131,19 +170,24 @@ public class DuelRules
             else lockUsedGuest = true;
         }
 
+        // Candidates left before this guess narrowed anything: the pool the
+        // guess was actually drawn from.
+        int candidates = CandidatesFor(side);
+        Narrow(side, guess, move.Hint);
+
         if (correct)
         {
             if (pendingResolved)
             {
-                // Both sides found the number in the same round. The Lock is
-                // the only thing that separates them.
-                PendingWin = ResolveTie(side, useLock);
+                // Both sides found the number in the same round.
+                PendingWin = ResolveTie(side, useLock, candidates);
             }
             else
             {
                 pendingResolved = true;
                 PendingWin = side;
                 pendingWinLocked = useLock;
+                pendingWinCandidates = candidates;
             }
         }
         else if (useLock)
@@ -158,11 +202,19 @@ public class DuelRules
         return move;
     }
 
-    Side ResolveTie(Side latest, bool latestLocked)
+    // The Lock decides first. Failing that, the tighter search wins.
+    Side ResolveTie(Side latest, bool latestLocked, int latestCandidates)
     {
         if (latestLocked && !pendingWinLocked) return latest;
         if (!latestLocked && pendingWinLocked) return PendingWin;
-        return Side.None; // a draw: both staked the Lock, or neither did
+
+        if (latestCandidates > 0 && pendingWinCandidates > 0)
+        {
+            if (latestCandidates < pendingWinCandidates) return latest;
+            if (pendingWinCandidates < latestCandidates) return PendingWin;
+        }
+
+        return Side.None; // a genuine dead heat
     }
 
     void MarkActed(Side side)

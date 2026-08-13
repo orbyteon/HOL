@@ -1,6 +1,9 @@
 using UnityEngine;
 using TMPro;
 
+// Solo duel against the on-device AI. Turn order, rounds and the Lock all live
+// in DuelRules, which the PvP backends mirror — so a player learns one set of
+// rules here and meets the same ones in a real duel.
 public class GameManager : MonoBehaviour
 {
     // Disclosure hook: show this line in-game / store listing.
@@ -13,6 +16,11 @@ public class GameManager : MonoBehaviour
     // more human opponent.
     const string DifficultyPrefKey = "AIDifficulty";
     static readonly float[] DifficultyRandomChance = { 0.6f, 0.2f, 0f, -1f };
+
+    // The player is always the host seat; nothing in the rules depends on which
+    // seat is which, only on who opens, and that is a coin flip each match.
+    const DuelRules.Side PlayerSide = DuelRules.Side.Host;
+    const DuelRules.Side AiSide = DuelRules.Side.Guest;
 
     public TMP_Text aiNumberText;
     public TMP_Text aiAnswerText;
@@ -38,8 +46,15 @@ public class GameManager : MonoBehaviour
     public ConfettiBurst winConfetti;
     public AdsManager adsManager;
 
-    public bool IsPlayerTurn => playerTurn && !gameFinished;
-    public bool IsMatchOver => gameFinished;
+    // The player may guess only on their own turn, and only once they have
+    // answered the opponent's outstanding guess.
+    public bool IsPlayerTurn => !rules.Finished && rules.Turn == PlayerSide && !awaitingAnswer;
+    public bool IsMatchOver => rules.Finished;
+
+    readonly DuelRules rules = new DuelRules();
+    bool awaitingAnswer;
+    bool lockArmed;
+    bool matchRunning;
 
     int min = 1;
     int max = 100;
@@ -48,8 +63,6 @@ public class GameManager : MonoBehaviour
     int playerMin = 1;
     int playerMax = 100;
 
-    bool playerTurn = false;
-    bool gameFinished = false;
     bool firstAIGuess = true;
 
     int playerSecretNumber;
@@ -60,6 +73,11 @@ public class GameManager : MonoBehaviour
     readonly System.Text.StringBuilder aiHistory = new System.Text.StringBuilder();
 
     string currentOpponent;
+
+    // Built at runtime next to the stop button, the same way the rewarded
+    // streak-save offer is, so no scene surgery is needed.
+    UnityEngine.UI.Button lockButton;
+    UnityEngine.UI.Text lockButtonLabel;
 
     string[] fakeNames =
     {
@@ -76,6 +94,8 @@ public class GameManager : MonoBehaviour
 
         stopGameButton.SetActive(false);
         HideButtons();
+        EnsureLockButton();
+        RefreshLockButton();
 
         int randomIndex = Random.Range(0, fakeNames.Length);
         currentOpponent = fakeNames[randomIndex];
@@ -100,8 +120,9 @@ public class GameManager : MonoBehaviour
         playerMin = 1;
         playerMax = 100;
 
-        gameFinished = false;
-        playerTurn = false;
+        awaitingAnswer = false;
+        lockArmed = false;
+        matchRunning = true;
         firstAIGuess = true;
         playerGuessCount = 0;
 
@@ -116,9 +137,12 @@ public class GameManager : MonoBehaviour
         stopGameButton.SetActive(false);
         HideButtons();
 
-        bool aiStarts = Random.value < 0.5f;
+        // A fair coin decides who opens; the equal-turns rule then makes sure
+        // opening is not itself worth a win.
+        rules.StartMatch(Random.value < 0.5f ? AiSide : PlayerSide);
+        RefreshLockButton();
 
-        if (aiStarts)
+        if (rules.Turn == AiSide)
         {
             turnText.text = L10n.Get("opponent_thinking", currentOpponent);
             Invoke(nameof(AIGuess), Random.Range(0.8f, 1.5f));
@@ -126,7 +150,6 @@ public class GameManager : MonoBehaviour
         else
         {
             turnText.text = L10n.Get("your_guess");
-            playerTurn = true;
         }
     }
 
@@ -139,16 +162,18 @@ public class GameManager : MonoBehaviour
 
     void AIGuess()
     {
-        if (gameFinished) return;
+        if (rules.Finished || rules.Turn != AiSide) return;
 
         if (firstAIGuess)
         {
-            aiGuess = Random.Range(min, max + 1);
+            // Hard opens on the midpoint like a solver should; the softer modes
+            // keep the random opening, which costs about a quarter of a guess.
+            aiGuess = Difficulty() == 2 ? (min + max) / 2 : Random.Range(min, max + 1);
             firstAIGuess = false;
         }
         else
         {
-            int difficulty = Mathf.Clamp(PlayerPrefs.GetInt(DifficultyPrefKey, 1), 0, 3);
+            int difficulty = Difficulty();
             float randomChance = difficulty == 3
                 ? AdaptiveRandomChance()
                 : DifficultyRandomChance[difficulty];
@@ -159,35 +184,60 @@ public class GameManager : MonoBehaviour
                 aiGuess = (min + max) / 2;
         }
 
-        aiNumberText.text = currentOpponent + ": " + aiGuess;
+        bool aiLocks = DuelRules.ShouldLock(AiLockStyle(), max - min + 1, rules.LockAvailable(AiSide));
+        var move = rules.Submit(AiSide, aiGuess, playerSecretNumber, aiLocks);
+        if (!move.Accepted) return;
+
+        aiNumberText.text = currentOpponent + ": " + aiGuess +
+                            (aiLocks ? "  [" + L10n.Get("lock_armed") + "]" : "");
         AppendHistory(aiHistory, aiHistoryText, aiGuess);
 
-        playerTurn = false;
+        // The player still confirms the answer, so the hint the rules computed
+        // decides which single button is offered — a player cannot lie.
+        awaitingAnswer = true;
         turnText.text = L10n.Get("answer_opponent", currentOpponent);
         HideButtons();
 
-        if (playerSecretNumber > aiGuess)
-            higherButton.SetActive(true);
-        else if (playerSecretNumber < aiGuess)
-            lowerButton.SetActive(true);
-        else
-            correctButton.SetActive(true);
+        if (move.Hint == DuelRules.Hint.Higher) higherButton.SetActive(true);
+        else if (move.Hint == DuelRules.Hint.Lower) lowerButton.SetActive(true);
+        else correctButton.SetActive(true);
+
+        RefreshLockButton();
     }
 
     public void Higher()
     {
         min = aiGuess + 1;
-        HideButtons();
-        turnText.text = L10n.Get("your_guess");
-        playerTurn = true;
+        AnswerGiven();
     }
 
     public void Lower()
     {
         max = aiGuess - 1;
+        AnswerGiven();
+    }
+
+    // The opponent found the player's number. Under the equal-turns rule that
+    // is provisional: if it is still the player's round, they get an answering
+    // guess before the match is called.
+    public void Correct()
+    {
+        aiAnswerText.text = L10n.Get("opponent_found_number", currentOpponent);
+        AnswerGiven();
+    }
+
+    void AnswerGiven()
+    {
+        if (!awaitingAnswer) return;
+
+        awaitingAnswer = false;
         HideButtons();
-        turnText.text = L10n.Get("your_guess");
-        playerTurn = true;
+        ContinueAfterMove();
+    }
+
+    static int Difficulty()
+    {
+        return Mathf.Clamp(PlayerPrefs.GetInt(DifficultyPrefKey, 1), 0, 3);
     }
 
     static float AdaptiveRandomChance()
@@ -200,15 +250,25 @@ public class GameManager : MonoBehaviour
         return 0.25f;
     }
 
-    public void Correct()
+    // Difficulty now shapes the opponent's judgement, not just its aim. A
+    // reckless Lock loses far more matches than a random guess ever did, so an
+    // Easy opponent over-commits and a Hard one waits for certainty.
+    static DuelRules.LockStyle AiLockStyle()
     {
-        aiAnswerText.text = L10n.Get("opponent_found_number", currentOpponent);
-        EndGame(false);
+        switch (Difficulty())
+        {
+            case 0: return DuelRules.LockStyle.Reckless;
+            case 1: return DuelRules.LockStyle.Bold;
+            case 2: return DuelRules.LockStyle.Precise;
+            default:
+                float winRate = GameStats.RecentWinRate();
+                return winRate > 0.6f ? DuelRules.LockStyle.Precise : DuelRules.LockStyle.Bold;
+        }
     }
 
     public bool PlayerGuess(int guess)
     {
-        if (!playerTurn || gameFinished) return false;
+        if (!IsPlayerTurn) return false;
 
         if (guess < playerMin || guess > playerMax)
         {
@@ -216,23 +276,28 @@ public class GameManager : MonoBehaviour
             return false;
         }
 
-        playerGuessCount++;
+        bool staked = lockArmed;
+        var move = rules.Submit(PlayerSide, guess, aiSecretNumber, staked);
+        if (!move.Accepted) return false;
+
+        lockArmed = false;
+        playerGuessCount = rules.GuessCount(PlayerSide);
 
         string playerLabel = PlayerPrefs.GetString("PlayerName", "");
         if (string.IsNullOrEmpty(playerLabel))
             playerLabel = L10n.Get("you");
+        if (staked)
+            playerLabel += "  [" + L10n.Get("lock_armed") + "]";
 
         aiAnswerText.text = playerLabel + ": " + guess;
         AppendHistory(playerHistory, playerHistoryText, guess);
 
-        if (guess == aiSecretNumber)
+        if (move.Hint == DuelRules.Hint.Correct)
         {
-            aiAnswerText.text = playerLabel + ": " + guess + "\n" + L10n.Get("you_win");
-            EndGame(true);
-            return true;
+            // Not "you win" yet — the opponent may still answer this round.
+            aiAnswerText.text = playerLabel + ": " + guess + "\n" + L10n.Get("correct") + "!";
         }
-
-        if (guess < aiSecretNumber)
+        else if (move.Hint == DuelRules.Hint.Higher)
         {
             aiAnswerText.text = playerLabel + ": " + guess + "\n" + currentOpponent + ": " + L10n.Get("higher");
             if (guess + 1 > playerMin) playerMin = guess + 1;
@@ -243,25 +308,69 @@ public class GameManager : MonoBehaviour
             if (guess - 1 < playerMax) playerMax = guess - 1;
         }
 
-        UpdateRangeText();
-        playerTurn = false;
+        if (staked && move.Hint != DuelRules.Hint.Correct)
+            aiAnswerText.text += "\n" + L10n.Get("lock_missed");
 
-        turnText.text = L10n.Get("opponent_thinking", currentOpponent);
-        Invoke(nameof(AIGuess), Random.Range(1.5f, 3.5f));
+        UpdateRangeText();
+        ContinueAfterMove();
         return true;
     }
 
-    void EndGame(bool playerWon)
+    // Hands play on after a completed move, or ends the match if the round that
+    // just closed settled it.
+    void ContinueAfterMove()
     {
-        gameFinished = true;
+        RefreshLockButton();
+
+        if (rules.Finished)
+        {
+            EndGame();
+            return;
+        }
+
+        if (rules.Turn == AiSide)
+        {
+            turnText.text = rules.ForfeitPending(AiSide)
+                ? L10n.Get("opponent_forfeits", currentOpponent)
+                : L10n.Get("opponent_thinking", currentOpponent);
+            Invoke(nameof(AIGuess), Random.Range(1.5f, 3.5f));
+            return;
+        }
+
+        if (rules.IsMatchPointAgainst(PlayerSide))
+            turnText.text = L10n.Get("match_point");
+        else if (rules.PendingWin == PlayerSide)
+            turnText.text = L10n.Get("match_point_yours", currentOpponent);
+        else if (rules.ForfeitPending(PlayerSide))
+            turnText.text = L10n.Get("turn_forfeited");
+        else
+            turnText.text = L10n.Get("your_guess");
+    }
+
+    void EndGame()
+    {
+        matchRunning = false;
+        awaitingAnswer = false;
+        lockArmed = false;
 
         HideButtons();
         stopGameButton.SetActive(true);
+        RefreshLockButton();
 
         if (numberManager != null)
             numberManager.CloseInput();
 
-        if (playerWon)
+        if (rules.Result == DuelRules.Outcome.Draw)
+        {
+            GameStats.RecordDraw();
+            Haptics.Light();
+            GameEvents.StatsChanged();
+
+            turnText.text = L10n.Get("you_draw") + "\n" +
+                            L10n.Get("draw_in_guesses", playerGuessCount) + "\n" +
+                            L10n.Get("draw_tip");
+        }
+        else if (rules.Result == DuelRules.Outcome.HostWins)
         {
             GameStats.RecordWin(playerGuessCount);
             Haptics.Success();
@@ -292,6 +401,63 @@ public class GameManager : MonoBehaviour
         if (adsManager != null && GameStats.Matches % 2 == 0)
             adsManager.ShowAd(null);
     }
+
+    // ------------------------------------------------------------- the Lock
+
+    public void OnLockTogglePressed()
+    {
+        if (!matchRunning || rules.Finished) return;
+        if (!rules.LockAvailable(PlayerSide)) return;
+
+        lockArmed = !lockArmed;
+        Haptics.Light();
+        RefreshLockButton();
+    }
+
+    void EnsureLockButton()
+    {
+        if (lockButton != null || stopGameButton == null) return;
+
+        var btn = RuntimeUI.CreateButton(stopGameButton.transform.parent, "LockButton",
+            L10n.Get("lock"), Vector2.zero, new Vector2(320f, 84f),
+            ConvergingLight.Cyan, ConvergingLight.WithAlpha(ConvergingLight.PanelIndigo, 1f));
+
+        var stopRect = (RectTransform)stopGameButton.transform;
+        var rect = (RectTransform)btn.transform;
+        rect.anchorMin = stopRect.anchorMin;
+        rect.anchorMax = stopRect.anchorMax;
+        rect.pivot = stopRect.pivot;
+        rect.anchoredPosition = stopRect.anchoredPosition + new Vector2(0f, 210f);
+
+        btn.onClick.AddListener(OnLockTogglePressed);
+        lockButton = btn;
+
+        lockButtonLabel = btn.GetComponentInChildren<UnityEngine.UI.Text>();
+        if (lockButtonLabel != null) lockButtonLabel.fontSize = 26;
+    }
+
+    // The button is also how the mechanic teaches itself: once the range is
+    // down to a few candidates it stops reading "LOCK" and starts asking.
+    void RefreshLockButton()
+    {
+        if (lockButton == null) return;
+
+        bool available = matchRunning && !rules.Finished && rules.LockAvailable(PlayerSide);
+        lockButton.gameObject.SetActive(available);
+        if (!available) return;
+
+        int left = playerMax >= playerMin ? playerMax - playerMin + 1 : 0;
+        string text = lockArmed
+            ? L10n.Get("lock_armed")
+            : DuelRules.ShouldSuggestLock(left, true)
+                ? L10n.Get("lock_suggest", left)
+                : L10n.Get("lock");
+
+        if (lockButtonLabel != null)
+            lockButtonLabel.text = text;
+    }
+
+    // -------------------------------------------------- rewarded streak save
 
     const int MinStreakToSave = 2;
     GameObject streakSaveButton;
@@ -371,8 +537,12 @@ public class GameManager : MonoBehaviour
             streakSaveButton = null;
         }
 
-        gameFinished = false;
-        playerTurn = false;
+        matchRunning = false;
+        awaitingAnswer = false;
+        lockArmed = false;
+        playerMin = 1;
+        playerMax = 100;
+        RefreshLockButton();
 
         int randomIndex = Random.Range(0, fakeNames.Length);
         currentOpponent = fakeNames[randomIndex];
