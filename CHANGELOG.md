@@ -45,6 +45,13 @@ Play Console versionName in `ProjectSettings.asset`.
   beats never locking 50.3% to 36.6%, and locking on every guess loses
   18.2% to 63.8%. The button turns into a prompt once the range is down
   to three candidates, which is what keeps draws rare in practice.
+- The Lock is **revealed only after the player has played a round**, and
+  explains itself in one line the first few times it appears. A first
+  match should read as plain higher-or-lower — the original concept — with
+  the one added decision arriving after the loop has been felt. Nothing is
+  lost strategically: with a hundred candidates still open there is nothing
+  sensible to stake it on. This is presentation only; the server still
+  accepts a Lock on any turn.
 - A tied round with both sides locked, or neither, is an honest draw. It
   counts as a match, breaks no streak, and stays out of the window that
   tunes the adaptive AI.

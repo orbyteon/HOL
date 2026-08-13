@@ -68,6 +68,10 @@ public class GameManager : MonoBehaviour
     // being shown.
     bool matchSetUp;
 
+    // The Lock is revealed once the player has played a round, and explains
+    // itself the first time it appears. See LockIntro.
+    bool lockRevealedThisMatch;
+
     int min = 1;
     int max = 100;
     int aiGuess;
@@ -135,6 +139,7 @@ public class GameManager : MonoBehaviour
         awaitingAnswer = false;
         lockArmed = false;
         matchSetUp = true;
+        lockRevealedThisMatch = false;
         firstAIGuess = true;
         playerGuessCount = 0;
 
@@ -307,6 +312,7 @@ public class GameManager : MonoBehaviour
         if (!move.Accepted) return false;
 
         lockArmed = false;
+        if (staked) LockIntro.MarkUsed();
         playerGuessCount = rules.GuessCount(PlayerSide);
 
         string playerLabel = PlayerPrefs.GetString("PlayerName", "");
@@ -467,9 +473,27 @@ public class GameManager : MonoBehaviour
     {
         if (lockButton == null) return;
 
-        bool available = matchSetUp && !rules.Finished && rules.LockAvailable(PlayerSide);
+        // Not offered until the player has taken a turn: a first match should
+        // feel like plain higher-or-lower, and staking the Lock on an opening
+        // guess is a trap rather than a choice.
+        bool revealed = rules.GuessCount(PlayerSide) > 0;
+        bool available = matchSetUp && !rules.Finished && revealed &&
+                         rules.LockAvailable(PlayerSide);
+
         lockButton.gameObject.SetActive(available);
         if (!available) return;
+
+        if (!lockRevealedThisMatch)
+        {
+            lockRevealedThisMatch = true;
+            if (LockIntro.ShouldExplain && rangeText != null)
+            {
+                // One line, in the secondary slot, replaced by the range again
+                // on the next guess.
+                rangeText.text = L10n.Get("lock_hint");
+                LockIntro.MarkExplained();
+            }
+        }
 
         int left = playerMax >= playerMin ? playerMax - playerMin + 1 : 0;
         string text = lockArmed
@@ -566,6 +590,7 @@ public class GameManager : MonoBehaviour
         matchSetUp = false;
         awaitingAnswer = false;
         lockArmed = false;
+        lockRevealedThisMatch = false;
         playerMin = 1;
         playerMax = 100;
         RefreshLockButton();

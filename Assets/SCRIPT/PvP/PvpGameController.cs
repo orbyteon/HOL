@@ -79,6 +79,10 @@ public class PvpGameController : MonoBehaviour
     int lastSignalSeq;
     int signalsSent;
 
+    // The Lock is revealed once the player has played a round, and explains
+    // itself the first time it appears. See LockIntro.
+    bool lockRevealedThisMatch;
+
     int lastMatchIndex;
     bool rematchInFlight;
     int donePolls;
@@ -253,6 +257,7 @@ public class PvpGameController : MonoBehaviour
             {
                 localAcceptedGuessCount++;
                 lockArmed = false;
+                if (staked) LockIntro.MarkUsed();
                 NarrowMyRange(guess, lastState != null ? lastState.lastHint : "");
 
                 // Render the server's answer straight away rather than leaving
@@ -394,6 +399,7 @@ public class PvpGameController : MonoBehaviour
         myMin = 1;
         myMax = 100;
         lockArmed = false;
+        lockRevealedThisMatch = false;
         lastSignalSeq = 0;
         signalsSent = 0;
         lastMatchIndex = 0;
@@ -703,6 +709,7 @@ public class PvpGameController : MonoBehaviour
         myMin = 1;
         myMax = 100;
         lockArmed = false;
+        lockRevealedThisMatch = false;
         signalsSent = 0; // the server grants a fresh allowance per match
 
         ShowRematchOffer(false);
@@ -774,12 +781,31 @@ public class PvpGameController : MonoBehaviour
         if (lockButton == null) return;
 
         string me = client != null && client.IsHost ? "host" : "guest";
+
+        // Not offered until the player has taken a turn: a first duel should
+        // feel like plain higher-or-lower, and staking the Lock on an opening
+        // guess is a trap rather than a choice.
+        bool revealed = lastState != null && lastState.GuessCountFor(me) > 0;
         bool available = client != null && client.IsServerAuthoritative &&
-                         !matchOver && lastState != null &&
+                         !matchOver && lastState != null && revealed &&
                          lastState.phase == "play" && !lastState.LockUsedBy(me);
 
         lockButton.SetActive(available);
-        if (!available || lockButtonLabel == null) return;
+        if (!available) return;
+
+        if (!lockRevealedThisMatch)
+        {
+            lockRevealedThisMatch = true;
+            if (LockIntro.ShouldExplain && rangeText != null)
+            {
+                // One line, in the secondary slot, replaced by the range again
+                // on the next guess.
+                rangeText.text = L10n.Get("lock_hint");
+                LockIntro.MarkExplained();
+            }
+        }
+
+        if (lockButtonLabel == null) return;
 
         int left = CandidatesLeft();
         if (lockArmed)
