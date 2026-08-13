@@ -32,22 +32,67 @@ public class AdsManager : MonoBehaviour
     bool adInProgress;
     float lastAdShowTime = -999f;
     int initRetries;
+
     // LevelPlay initialization is process-global while this component is
-    // scene-local and recreated on every MainMenu reload; instance flags here
-    // would re-run LevelPlay.Init on an already-initialized SDK, which never
-    // re-fires OnInitSuccess for the new instance.
+    // scene-local and recreated on MainMenu reloads. Keep SDK lifecycle state
+    // and callbacks global too, otherwise destroying the instance during an
+    // in-flight init can unsubscribe the only callback while leaving the
+    // process-wide in-flight flag stuck forever.
     static bool sdkInitialized;
     static bool sdkInitInFlight;
+    static bool globalInitCallbacksRegistered;
+    static AdsManager activeInstance;
+
     bool adsAllowedThisSession;
 
     System.Action onRewardEarned;
     System.Action onRewardUnavailable;
     bool rewardGranted;
 
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetStaticState()
+    {
+        if (globalInitCallbacksRegistered)
+        {
+            LevelPlay.OnInitSuccess -= OnGlobalInitSuccess;
+            LevelPlay.OnInitFailed -= OnGlobalInitFailed;
+        }
+
+        sdkInitialized = false;
+        sdkInitInFlight = false;
+        globalInitCallbacksRegistered = false;
+        activeInstance = null;
+    }
+
+    static void EnsureGlobalInitCallbacks()
+    {
+        if (globalInitCallbacksRegistered)
+            return;
+
+        LevelPlay.OnInitSuccess += OnGlobalInitSuccess;
+        LevelPlay.OnInitFailed += OnGlobalInitFailed;
+        globalInitCallbacksRegistered = true;
+    }
+
+    static void OnGlobalInitSuccess(LevelPlayConfiguration config)
+    {
+        Debug.Log("Ads Initialized");
+        sdkInitialized = true;
+        sdkInitInFlight = false;
+        activeInstance?.HandleInitSuccess();
+    }
+
+    static void OnGlobalInitFailed(LevelPlayInitError error)
+    {
+        Debug.Log("Ads Init Failed: " + error);
+        sdkInitInFlight = false;
+        activeInstance?.HandleInitFailed();
+    }
+
     void Start()
     {
-        LevelPlay.OnInitSuccess += OnInitSuccess;
-        LevelPlay.OnInitFailed += OnInitFailed;
+        activeInstance = this;
+        EnsureGlobalInitCallbacks();
 
         // Consent is an opt-in to initialize the third-party ads SDK at all.
         // A stored decline keeps LevelPlay completely uninitialized on launch.
@@ -58,8 +103,8 @@ public class AdsManager : MonoBehaviour
 
     void OnDestroy()
     {
-        LevelPlay.OnInitSuccess -= OnInitSuccess;
-        LevelPlay.OnInitFailed -= OnInitFailed;
+        if (activeInstance == this)
+            activeInstance = null;
 
         if (interstitialAd != null)
         {
@@ -113,17 +158,14 @@ public class AdsManager : MonoBehaviour
         if (sdkInitInFlight)
             return;
 
+        EnsureGlobalInitCallbacks();
         sdkInitInFlight = true;
         LevelPlayPrivacySettings.SetGDPRConsent(true);
         LevelPlay.Init(GameId);
     }
 
-    void OnInitSuccess(LevelPlayConfiguration config)
+    void HandleInitSuccess()
     {
-        Debug.Log("Ads Initialized");
-
-        sdkInitialized = true;
-        sdkInitInFlight = false;
         initRetries = 0;
 
         // Consent could have been withdrawn while initialization was in flight.
@@ -131,6 +173,12 @@ public class AdsManager : MonoBehaviour
             return;
 
         EnsureAdObjects();
+    }
+
+    void HandleInitFailed()
+    {
+        if (adsAllowedThisSession && initRetries < MaxInitRetries)
+            Invoke(nameof(RetryInit), 60f);
     }
 
     void EnsureAdObjects()
@@ -351,14 +399,6 @@ public class AdsManager : MonoBehaviour
         var cb = onAdFinished;
         onAdFinished = null;
         cb?.Invoke();
-    }
-
-    void OnInitFailed(LevelPlayInitError error)
-    {
-        Debug.Log("Ads Init Failed: " + error);
-        sdkInitInFlight = false;
-        if (adsAllowedThisSession && initRetries < MaxInitRetries)
-            Invoke(nameof(RetryInit), 60f);
     }
 
     void RetryInit()
