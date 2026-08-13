@@ -101,6 +101,26 @@ public class DesignRuntimeWiring : MonoBehaviour
 
     void RestyleControls(Transform canvasRoot)
     {
+        // The scene's art buttons carry large transparent padding, so their
+        // rects are far bigger than their visible pills. Once the art sprite
+        // is replaced by a solid rounded surface the full rect shows —
+        // normalize geometry to design-system sizes first, and give the
+        // settings pair a spot clear of the runtime-built rows.
+        Resize(canvasRoot, "ButtonPlay", null, new Vector2(560f, 124f));
+        Resize(canvasRoot, "ButtonChallenger", null, new Vector2(560f, 124f));
+        Resize(canvasRoot, "ButtonConfirm", null, new Vector2(520f, 104f));
+        Resize(canvasRoot, "ButtonSTOPGAME", null, new Vector2(520f, 104f));
+        Resize(canvasRoot, "ButtonHIGHER", null, new Vector2(420f, 96f));
+        Resize(canvasRoot, "ButtonLOWER", new Vector2(0f, -130f), new Vector2(420f, 96f));
+        Resize(canvasRoot, "ButtonCORRECT", new Vector2(0f, -260f), new Vector2(420f, 96f));
+        Resize(canvasRoot, "ButtonBack", new Vector2(0f, -350f), new Vector2(360f, 96f));
+        Resize(canvasRoot, "Buttonback", new Vector2(-200f, -180f), new Vector2(340f, 92f));
+        Resize(canvasRoot, "Buttonsave", new Vector2(200f, -180f), new Vector2(340f, 92f));
+
+        // ButtonPlay's "PLAY" lived in its art sprite; the restyled surface
+        // needs a real label (the L10n key already exists).
+        EnsurePlayLabel(FindButton(canvasRoot, "ButtonPlay"));
+
         foreach (var name in PrimaryButtons)
             ConvergingLightFX.StyleButton(FindButton(canvasRoot, name),
                 ConvergingLightFX.ButtonRole.Primary);
@@ -148,6 +168,41 @@ public class DesignRuntimeWiring : MonoBehaviour
     {
         var t = DeepFind(root, name);
         return t != null ? t.GetComponent<Button>() : null;
+    }
+
+    // Resizes a scene control and re-stretches its label children so text
+    // centers on the new surface (art-era labels carried baseline offsets).
+    static void Resize(Transform root, string name, Vector2? pos, Vector2 size)
+    {
+        var t = DeepFind(root, name) as RectTransform;
+        if (t == null) return;
+
+        if (pos.HasValue) t.anchoredPosition = pos.Value;
+        t.sizeDelta = size;
+
+        foreach (var label in t.GetComponentsInChildren<TMP_Text>(true))
+        {
+            if (label.transform.parent != t) continue;
+            var rect = label.rectTransform;
+            if (rect.anchorMin == Vector2.zero && rect.anchorMax == Vector2.one)
+            {
+                rect.offsetMin = Vector2.zero;
+                rect.offsetMax = Vector2.zero;
+            }
+        }
+    }
+
+    static void EnsurePlayLabel(Button play)
+    {
+        if (play == null) return;
+        if (play.GetComponentInChildren<TMP_Text>(true) != null) return;
+        if (play.GetComponentInChildren<Text>(true) != null) return;
+
+        var label = RuntimeUI.CreateTmpText(play.transform, "Label",
+            L10n.Get("play"), 56, Vector2.zero, Vector2.zero,
+            ConvergingLightFX.DarkLabel);
+        RuntimeUI.Stretch(label.gameObject);
+        RuntimeUI.Localize(label, "play");
     }
 
     static void StyleCardPanel(Transform root, string name)
@@ -208,13 +263,15 @@ public class DesignRuntimeWiring : MonoBehaviour
         return null;
     }
 
-    // Texts on light button art or inside white input fields keep their dark
-    // color — flipping them would make them unreadable.
+    // Texts on buttons or inside input fields keep their explicit colors —
+    // flipping them would break contrast. includeInactive matters: labels on
+    // buttons inside closed panels (settings, runtime dialogs) must be
+    // skipped too, or the palette pass remaps their dark-on-gold labels.
     static bool Skippable(Transform t)
     {
-        return t.GetComponentInParent<Button>() != null
-            || t.GetComponentInParent<TMP_InputField>() != null
-            || t.GetComponentInParent<InputField>() != null;
+        return t.GetComponentInParent<Button>(true) != null
+            || t.GetComponentInParent<TMP_InputField>(true) != null
+            || t.GetComponentInParent<InputField>(true) != null;
     }
 
     // Maps the scene's ad-hoc label colors onto the Converging Light canon.
