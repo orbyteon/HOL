@@ -137,9 +137,43 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          endpoint="https://${AZURE_FUNCTIONAPP_NAME}.azurewebsites.net/api/provision"
+          # Newly created Function Apps carry a unique default hostname
+          # (<name>-<hash>.<region>-01.azurewebsites.net), so the classic
+          # <name>.azurewebsites.net form must never be assumed — ask ARM
+          # for the real one.
+          # Some CLI/api-version combinations return an empty
+          # defaultHostName for Flex apps — fall back through the ARM
+          # resource view and the hostNames list before giving up.
+          host=$(az functionapp show \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --name "$AZURE_FUNCTIONAPP_NAME" \
+            --query defaultHostName --output tsv 2>/dev/null || true)
+          if [ -z "$host" ] || [ "$host" = "None" ]; then
+            host=$(az resource show \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --name "$AZURE_FUNCTIONAPP_NAME" \
+              --resource-type Microsoft.Web/sites \
+              --query properties.defaultHostName --output tsv 2>/dev/null || true)
+          fi
+          if [ -z "$host" ] || [ "$host" = "None" ]; then
+            host=$(az functionapp show \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --name "$AZURE_FUNCTIONAPP_NAME" \
+              --query "hostNames[0]" --output tsv 2>/dev/null || true)
+          fi
+          if [ -z "$host" ] || [ "$host" = "None" ]; then
+            echo "::error::Could not read the Function App default hostname"
+            az functionapp show \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --name "$AZURE_FUNCTIONAPP_NAME" \
+              --query "{state:state, defaultHostName:defaultHostName, hostNames:hostNames}" \
+              --output json || true
+            exit 1
+          fi
+          endpoint="https://${host}/api/provision"
+          echo "Health-checking ${endpoint}"
           status=""
-          for attempt in $(seq 1 12); do
+          for attempt in $(seq 1 24); do
             status=$(curl --silent --show-error --output /tmp/hol-provision-response \
               --write-out '%{http_code}' \
               --header 'Content-Type: application/json' \
@@ -162,7 +196,7 @@ jobs:
             echo "## HOL provisioning service"
             echo "- Commit: \`${GITHUB_SHA}\`"
             echo "- Function App: \`${AZURE_FUNCTIONAPP_NAME}\`"
-            echo "- Endpoint: \`https://${AZURE_FUNCTIONAPP_NAME}.azurewebsites.net/api/provision\`"
+            echo "- Endpoint: \`$(az functionapp show --resource-group "$AZURE_RESOURCE_GROUP" --name "$AZURE_FUNCTIONAPP_NAME" --query defaultHostName --output tsv)/api/provision\`"
             echo "- Play Integrity licensing required: \`true\`"
             echo "- Play signing certificate pin required: \`true\`"
             echo "- Invalid-request health probe: \`HTTP 400\`"
