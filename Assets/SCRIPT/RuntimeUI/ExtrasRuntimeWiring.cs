@@ -37,6 +37,7 @@ public class ExtrasRuntimeWiring : MonoBehaviour
         yield return null; // let every other Start() finish first
 
         Analytics.Boot();
+        DailyReminder.EnsureScheduled();
         EnsureDailyStreak();
         WireDailyHunt();
         WireRematchButton();

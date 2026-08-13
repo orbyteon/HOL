@@ -13,6 +13,7 @@
   ],
   "dependencies": {
     "com.google.play.integrity": "1.4.1",
+    "com.unity.mobile.notifications": "2.3.2",
     "com.unity.services.levelplay": "9.5.0",
     "com.unity.test-framework": "1.1.33",
     "com.unity.textmeshpro": "3.0.7",

@@ -300,6 +300,19 @@ public class PlayFabPvpClient : PvpBackend
         }
     }
 
+    // ------------------------------------------------ shared CloudScript access
+
+    // Public entry for non-room CloudScript functions (Daily Hunt stats).
+    // Same anonymous session and plumbing as the room flows.
+    public void CallCloudScript(string functionName, string argsJson, Action<bool, string> done)
+    {
+        EnsureLogin(ok =>
+        {
+            if (!ok) { done?.Invoke(false, ""); return; }
+            ExecuteCloudScript(functionName, argsJson, done);
+        });
+    }
+
     // ------------------------------------------------ telemetry
 
     // Fire-and-forget gameplay event through PlayFab's client event pipeline,

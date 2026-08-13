@@ -5,6 +5,17 @@ Play Console versionName in `ProjectSettings.asset`.
 
 ## [Unreleased]
 
+### Added (product pass: social proof + re-engagement)
+
+- Finishing the Daily Hunt now shows how you ranked ("You beat 62% of
+  today's hunters") — server-computed from an anonymous per-day counter
+  bucket in CloudScript (`submitDaily`), best-effort by design, with
+  day-old buckets cleaned up opportunistically
+- One respectful Daily Hunt reminder via Unity Mobile Notifications:
+  the permission prompt appears only after your first completed hunt, a
+  decline is never re-prompted, and at most one notification (next day,
+  local evening) is ever pending
+
 ### Added (product pass: rivals, modes, themes)
 
 - Rivals now carry a visible persona next to their name ("Nikos · the

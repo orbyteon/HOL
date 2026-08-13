@@ -26,6 +26,8 @@ public class DailyHunt : MonoBehaviour
     // Public: Themes gates the Frost unlock on this streak.
     public const string StreakPrefKey = "DailyHuntStreak";
     const string LastFoundKey = "DailyHuntLastFound";
+    const string SubmittedKey = "DailyHuntSubmitted"; // day already reported
+    const string PercentileKey = "DailyHuntPct";      // -1 = none received
 
     // Day numbering epoch; #1 is 2026-01-01 in the device's local calendar
     // (matching DailyStreak's local-day semantics).
@@ -166,6 +168,8 @@ public class DailyHunt : MonoBehaviour
             PlayerPrefs.SetInt(RevivedKey, 0);
             PlayerPrefs.SetInt(MinKey, 1);
             PlayerPrefs.SetInt(MaxKey, 100);
+            PlayerPrefs.SetInt(SubmittedKey, 0);
+            PlayerPrefs.SetInt(PercentileKey, -1);
             PlayerPrefs.Save();
         }
 
@@ -216,6 +220,7 @@ public class DailyHunt : MonoBehaviour
             Persist();
             Haptics.Success();
             Analytics.DailyEnded(day, true, used, revived);
+            OnHuntCompleted();
         }
         else
         {
@@ -246,6 +251,57 @@ public class DailyHunt : MonoBehaviour
         Persist();
         Haptics.Error();
         Analytics.DailyEnded(day, false, used, revived);
+        OnHuntCompleted();
+    }
+
+    // ------------------------------------------------------------ social proof
+
+    // A finished hunt reports its result once and asks the server how it
+    // ranks among today's hunters; the reminder for tomorrow's hunt is
+    // scheduled at the same moment (the one contextual point where a
+    // notification permission prompt makes sense).
+    void OnHuntCompleted()
+    {
+        DailyReminder.OnHuntCompleted(this);
+
+        if (PlayerPrefs.GetInt(SubmittedKey, 0) == 1) return;
+        PlayerPrefs.SetInt(SubmittedKey, 1);
+        PlayerPrefs.Save();
+
+        var client = FindObjectOfType<PlayFabPvpClient>();
+        if (client == null || string.IsNullOrEmpty(client.titleId)) return;
+
+        int score = found ? used : 0;
+        string args = "{\"day\":" + day + ",\"guesses\":" + score + "}";
+        int submittedDay = day;
+        client.CallCloudScript("submitDaily", args, (ok, resp) =>
+        {
+            if (!ok || string.IsNullOrEmpty(resp) || !resp.Contains("\"ok\":true")) return;
+
+            int total = ExtractInt(resp, "total");
+            int better = ExtractInt(resp, "better");
+            if (total < 2 || !found) return; // percentile needs company and a find
+
+            int pct = Mathf.Clamp(Mathf.RoundToInt(better * 100f / total), 0, 99);
+            PlayerPrefs.SetInt(PercentileKey, pct);
+            PlayerPrefs.Save();
+
+            // Refresh only if the panel still shows the same finished day.
+            if (this != null && gameObject.activeInHierarchy && day == submittedDay)
+                Refresh();
+        });
+    }
+
+    static int ExtractInt(string json, string name)
+    {
+        string marker = "\"" + name + "\":";
+        int i = json.IndexOf(marker, StringComparison.Ordinal);
+        if (i < 0) return -1;
+        i += marker.Length;
+        int end = i;
+        while (end < json.Length && (char.IsDigit(json[end]) || json[end] == '-')) end++;
+        int value;
+        return int.TryParse(json.Substring(i, end - i), out value) ? value : -1;
     }
 
     void UpdateStreakOnFound()
@@ -322,10 +378,15 @@ public class DailyHunt : MonoBehaviour
         }
         else
         {
-            status.text = (found
+            string line = found
                 ? L10n.Get("daily_found", used, budget)
-                : L10n.Get("daily_failed", secret))
-                + "\n" + L10n.Get("daily_come_back");
+                : L10n.Get("daily_failed", secret);
+
+            int pct = PlayerPrefs.GetInt(PercentileKey, -1);
+            if (found && pct >= 0)
+                line += "\n" + L10n.Get("daily_percentile", pct);
+
+            status.text = line + "\n" + L10n.Get("daily_come_back");
         }
     }
 }

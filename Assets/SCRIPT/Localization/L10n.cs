@@ -170,6 +170,9 @@ public static class L10n
         { "share_copied",            new[] { "Copied! Paste it to a friend.", "Αντιγράφηκε! Στείλ'το σε φίλο." } },
         { "daily_share",             new[] { "HOL Daily Hunt #{0} — {1}\n{2}", "HOL Καθημερινό Κυνήγι #{0} — {1}\n{2}" } },
         { "second_chance",           new[] { "Watch an ad for +{0} guesses", "Δες διαφήμιση για +{0} προσπάθειες" } },
+        { "daily_percentile",        new[] { "You beat {0}% of today's hunters", "Νίκησες το {0}% των σημερινών κυνηγών" } },
+        { "notif_daily_title",       new[] { "Daily Hunt", "Καθημερινό Κυνήγι" } },
+        { "notif_daily_body",        new[] { "A new secret number is waiting. Keep your streak!", "Ένας νέος μυστικός αριθμός σε περιμένει. Κράτα το σερί σου!" } },
 
         // rival personas
         { "persona_calculator",      new[] { "the Calculator", "ο Υπολογιστής" } },

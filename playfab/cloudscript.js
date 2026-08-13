@@ -287,6 +287,61 @@ handlers.ackResult = function (args, context) {
     return { ok: true, deleted: false };
 };
 
+// ---------------------------------------------------------------- daily hunt
+
+function dailyStatsGroupId(day) {
+    return "DAILY-STATS-" + day;
+}
+
+// One counter bucket per day: { "1".."20": count, "fail": count }. Counters
+// are best-effort (Shared Groups have no atomic increment, so simultaneous
+// submissions can lose an update) — the percentile is display-grade social
+// proof, not an authoritative leaderboard.
+handlers.submitDaily = function (args, context) {
+    var day = args ? (args.day | 0) : 0;
+    var guesses = args ? (args.guesses | 0) : -1; // 0 = failed, else guesses used
+    if (day < 1) return { ok: false, error: "bad day" };
+    if (guesses < 0 || guesses > 20) return { ok: false, error: "bad guesses" };
+
+    // Clients number days from local-calendar 2026-01-01; allow one day of
+    // timezone skew around the server's UTC day.
+    var serverDay = Math.floor((Date.now() - Date.UTC(2026, 0, 1)) / 86400000) + 1;
+    if (Math.abs(day - serverDay) > 1) return { ok: false, error: "bad day" };
+
+    var groupId = dailyStatsGroupId(day);
+    try { server.CreateSharedGroup({ SharedGroupId: groupId }); } catch (exists) { }
+
+    var stats = {};
+    try {
+        var data = server.GetSharedGroupData({ SharedGroupId: groupId, Keys: ["stats"] });
+        if (data && data.Data && data.Data.stats && data.Data.stats.Value)
+            stats = JSON.parse(data.Data.stats.Value);
+    } catch (e) { stats = {}; }
+
+    var key = guesses === 0 ? "fail" : String(guesses);
+    stats[key] = (stats[key] | 0) + 1;
+    server.UpdateSharedGroupData({
+        SharedGroupId: groupId,
+        Data: { stats: JSON.stringify(stats) },
+        Permission: "Private",
+    });
+
+    // Opportunistic cleanup keeps storage bounded: yesterday's bucket is
+    // still being read, day-2 is done.
+    deleteGroupQuietly(dailyStatsGroupId(day - 2));
+
+    // "better" = submissions this result beats: every fail, and every find
+    // that needed more guesses.
+    var total = 0, better = 0;
+    for (var k in stats) {
+        var n = stats[k] | 0;
+        total += n;
+        if (guesses !== 0 && (k === "fail" || parseInt(k, 10) > guesses))
+            better += n;
+    }
+    return { ok: true, total: total, better: better };
+};
+
 handlers.leaveRoom = function (args, context) {
     if (!args || !args.roomId) return { ok: false, error: "missing roomId" };
 
