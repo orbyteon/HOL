@@ -22,6 +22,17 @@ Play Console versionName in `ProjectSettings.asset`.
   guess was the one that closed the round, the game still asked the player
   to answer Higher/Lower for a match that was already over, putting a dead
   interaction between them and the result.
+- Solo never actually showed the narrowed range. `GameManager.rangeText` is
+  an optional Inspector field wired nowhere — not in the scene, not at
+  runtime — so `UpdateRangeText` had always written into nothing, and the
+  "live range label" the README credits to solo play only ever existed in
+  PvP. It is built at runtime now, which is also what gives the Lock's
+  one-line explanation somewhere to appear.
+- The PvP result line no longer collides with the Signals row. A drawn
+  match is three lines in English and four in Greek, where the closing tip
+  wraps; at 64pt that spilled into the second row of Signal buttons, which
+  shares the result screen. The result is now 48pt in a taller box, with
+  the leave button moved down to match.
 
 ### Changed (duel rules — gameplay balance)
 
