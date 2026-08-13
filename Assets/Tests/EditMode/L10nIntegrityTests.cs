@@ -106,7 +106,7 @@ public class L10nIntegrityTests
     }
 
     [Test]
-    public void PvpRoomStateExposesOnlySanitizedPlayFabViewFields()
+    public void PvpRoomStateContainsServerViewFields()
     {
         var backend = FindGameType("PvpBackend");
         var room = backend.GetNestedType("RoomState", BindingFlags.Public);
@@ -130,6 +130,45 @@ public class L10nIntegrityTests
             "abd56a777ec513b24d8bc3180d808efb6965271533f8ac97ef0fb6385799758e",
             actual,
             "Unity's attested request serialization/hash no longer matches the server test vector");
+    }
+
+    [Test]
+    public void ReleaseConfigAcceptsValidProductionValues()
+    {
+        string error;
+        Assert.IsTrue(ValidateReleaseConfig(
+            "1A2B3",
+            "https://hol-provisioner.example.com/api/provision",
+            123456789012,
+            out error), error);
+        Assert.AreEqual("", error);
+    }
+
+    [TestCase("AB", "https://example.com/api/provision", 123L)]
+    [TestCase("AB-CD", "https://example.com/api/provision", 123L)]
+    [TestCase("1A2B3", "http://example.com/api/provision", 123L)]
+    [TestCase("1A2B3", "https://user:password@example.com/api/provision", 123L)]
+    [TestCase("1A2B3", "https://example.com/api/provision", 0L)]
+    public void ReleaseConfigRejectsUnsafeOrIncompleteValues(
+        string titleId, string provisioningUrl, long cloudProjectNumber)
+    {
+        string error;
+        Assert.IsFalse(ValidateReleaseConfig(
+            titleId, provisioningUrl, cloudProjectNumber, out error));
+        Assert.IsFalse(string.IsNullOrWhiteSpace(error));
+    }
+
+    static bool ValidateReleaseConfig(string titleId, string provisioningUrl,
+        long cloudProjectNumber, out string error)
+    {
+        var releaseConfig = FindGameType("ReleaseConfig");
+        var method = releaseConfig.GetMethod("ValidateValues", BindingFlags.Public | BindingFlags.Static);
+        Assert.IsNotNull(method, "ReleaseConfig.ValidateValues missing");
+
+        object[] args = { titleId, provisioningUrl, cloudProjectNumber, null };
+        bool valid = (bool)method.Invoke(null, args);
+        error = args[3] as string ?? "";
+        return valid;
     }
 
     [TestCase("0.1", "0.2", true)]
