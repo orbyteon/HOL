@@ -83,47 +83,64 @@ const sharedGroupClientResources = [
   "pfrn:api--/Client/RemoveSharedGroupMembers",
 ];
 
+function isGlobalDeny(statement, resource) {
+  return statement?.Resource === resource &&
+    String(statement?.Effect).toLowerCase() === "deny" &&
+    (statement?.Principal ?? "*") === "*";
+}
+
+async function verifySharedGroupPolicy() {
+  const policy = await playFab("/Admin/GetPolicy", { PolicyName: "ApiPolicy" });
+  const current = Array.isArray(policy.Statements) ? policy.Statements : [];
+  const missing = sharedGroupClientResources.filter(resource =>
+    !current.some(statement => isGlobalDeny(statement, resource))
+  );
+
+  if (missing.length > 0)
+    throw new Error(`PlayFab API policy verification failed; missing deny statements: ${missing.join(", ")}`);
+
+  console.log("Verified direct Client Shared Group APIs are denied by PlayFab API policy.");
+  return policy;
+}
+
 async function hardenSharedGroupPolicy() {
   const policy = await playFab("/Admin/GetPolicy", { PolicyName: "ApiPolicy" });
   const current = Array.isArray(policy.Statements) ? policy.Statements : [];
 
   const missing = sharedGroupClientResources.filter(resource =>
-    !current.some(statement =>
-      statement?.Resource === resource &&
-      String(statement?.Effect).toLowerCase() === "deny" &&
-      (statement?.Principal ?? "*") === "*"
-    )
+    !current.some(statement => isGlobalDeny(statement, resource))
   );
 
-  if (missing.length === 0) {
+  if (missing.length > 0) {
+    const statements = missing.map(Resource => ({
+      Resource,
+      Action: "*",
+      Effect: "Deny",
+      Principal: "*",
+      Comment: "HOL server-authoritative PvP: deny direct Client Shared Group access",
+    }));
+
+    const update = {
+      PolicyName: "ApiPolicy",
+      PolicyVersion: policy.PolicyVersion,
+      OverwritePolicy: false,
+      Statements: statements,
+    };
+
+    const validation = await playFab("/Admin/ValidateApiPolicy", update);
+    if (!validation.IsValid) {
+      throw new Error(`PlayFab rejected the proposed API policy: ${(validation.ValidationErrors || []).join("; ")}`);
+    }
+    for (const warning of validation.Warnings || []) console.warn(`Policy warning: ${warning}`);
+
+    const result = await playFab("/Admin/UpdatePolicy", update);
+    for (const warning of result.Warnings || []) console.warn(`Policy warning: ${warning}`);
+    console.log(`Added ${missing.length} Client Shared Group deny statement(s).`);
+  } else {
     console.log("Client Shared Group APIs are already denied by explicit policy statements.");
-    return;
   }
 
-  const statements = missing.map(Resource => ({
-    Resource,
-    Action: "*",
-    Effect: "Deny",
-    Principal: "*",
-    Comment: "HOL server-authoritative PvP: deny direct Client Shared Group access",
-  }));
-
-  const update = {
-    PolicyName: "ApiPolicy",
-    PolicyVersion: policy.PolicyVersion,
-    OverwritePolicy: false,
-    Statements: statements,
-  };
-
-  const validation = await playFab("/Admin/ValidateApiPolicy", update);
-  if (!validation.IsValid) {
-    throw new Error(`PlayFab rejected the proposed API policy: ${(validation.ValidationErrors || []).join("; ")}`);
-  }
-  for (const warning of validation.Warnings || []) console.warn(`Policy warning: ${warning}`);
-
-  const result = await playFab("/Admin/UpdatePolicy", update);
-  for (const warning of result.Warnings || []) console.warn(`Policy warning: ${warning}`);
-  console.log(`Added ${missing.length} Client Shared Group deny statement(s).`);
+  await verifySharedGroupPolicy();
 }
 
 await deployCloudScript();
