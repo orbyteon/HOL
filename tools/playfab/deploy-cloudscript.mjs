@@ -143,5 +143,9 @@ async function hardenSharedGroupPolicy() {
   await verifySharedGroupPolicy();
 }
 
-await deployCloudScript();
+// Fail closed: production sets HARDEN_SHARED_GROUP_POLICY=true, so the client
+// access policy must be hardened and verified before any new CloudScript is
+// published. If policy hardening fails, production code remains untouched. If
+// CloudScript publishing then fails, the safer deny policy remains in effect.
 if (hardenPolicy) await hardenSharedGroupPolicy();
+await deployCloudScript();
