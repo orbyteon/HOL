@@ -141,14 +141,35 @@ jobs:
           # (<name>-<hash>.<region>-01.azurewebsites.net), so the classic
           # <name>.azurewebsites.net form must never be assumed — ask ARM
           # for the real one.
+          # Some CLI/api-version combinations return an empty
+          # defaultHostName for Flex apps — fall back through the ARM
+          # resource view and the hostNames list before giving up.
           host=$(az functionapp show \
             --resource-group "$AZURE_RESOURCE_GROUP" \
             --name "$AZURE_FUNCTIONAPP_NAME" \
-            --query defaultHostName --output tsv)
-          test -n "$host" || {
+            --query defaultHostName --output tsv 2>/dev/null || true)
+          if [ -z "$host" ] || [ "$host" = "None" ]; then
+            host=$(az resource show \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --name "$AZURE_FUNCTIONAPP_NAME" \
+              --resource-type Microsoft.Web/sites \
+              --query properties.defaultHostName --output tsv 2>/dev/null || true)
+          fi
+          if [ -z "$host" ] || [ "$host" = "None" ]; then
+            host=$(az functionapp show \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --name "$AZURE_FUNCTIONAPP_NAME" \
+              --query "hostNames[0]" --output tsv 2>/dev/null || true)
+          fi
+          if [ -z "$host" ] || [ "$host" = "None" ]; then
             echo "::error::Could not read the Function App default hostname"
+            az functionapp show \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --name "$AZURE_FUNCTIONAPP_NAME" \
+              --query "{state:state, defaultHostName:defaultHostName, hostNames:hostNames}" \
+              --output json || true
             exit 1
-          }
+          fi
           endpoint="https://${host}/api/provision"
           echo "Health-checking ${endpoint}"
           status=""
