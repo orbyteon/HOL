@@ -106,7 +106,7 @@ public class SplashDesign : MonoBehaviour
         img.raycastTarget = false;
 
         // Just beneath the logo in paint order.
-        halo.SetSiblingIndex(logoT.GetSiblingIndex());
+        halo.transform.SetSiblingIndex(logoT.GetSiblingIndex());
     }
 
     void BuildSeam(Transform canvas)
