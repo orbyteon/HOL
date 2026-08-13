@@ -5,6 +5,19 @@ Play Console versionName in `ProjectSettings.asset`.
 
 ## [Unreleased]
 
+### Fixed
+
+- Solo was playable exactly once per launch. The end-of-match button is
+  relabelled "Rematch" and wired to `GameManager.RestartMatch`, but the
+  match-over flag that `NumberManager` gates every number submission on
+  was left set, so the next match could never be started. The flag now
+  tracks whether a match is *set up* rather than whether the rules object
+  has finished, and clears when the board is reset.
+- A decided match no longer waits on a pointless tap. When the opponent's
+  guess was the one that closed the round, the game still asked the player
+  to answer Higher/Lower for a match that was already over, putting a dead
+  interaction between them and the result.
+
 ### Changed (duel rules — gameplay balance)
 
 - **Whoever moves first no longer wins the duel.** Two players who both

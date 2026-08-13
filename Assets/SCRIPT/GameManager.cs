@@ -48,13 +48,25 @@ public class GameManager : MonoBehaviour
 
     // The player may guess only on their own turn, and only once they have
     // answered the opponent's outstanding guess.
-    public bool IsPlayerTurn => !rules.Finished && rules.Turn == PlayerSide && !awaitingAnswer;
-    public bool IsMatchOver => rules.Finished;
+    public bool IsPlayerTurn => matchSetUp && !rules.Finished &&
+                                rules.Turn == PlayerSide && !awaitingAnswer;
+
+    // "This match is decided, stop taking input." NumberManager gates the whole
+    // submit path on this, so it MUST go false again once RestartMatch clears
+    // the board — otherwise the player can never enter a number for the next
+    // match and solo becomes a one-match-per-launch game. That is why it is not
+    // simply rules.Finished: the rules object stays finished until the next
+    // StartMatch, which does not happen until a number has been submitted.
+    public bool IsMatchOver => matchSetUp && rules.Finished;
 
     readonly DuelRules rules = new DuelRules();
     bool awaitingAnswer;
     bool lockArmed;
-    bool matchRunning;
+
+    // True from StartGame until RestartMatch clears the board. It stays true
+    // across the result screen — the match is over, but it is still the match
+    // being shown.
+    bool matchSetUp;
 
     int min = 1;
     int max = 100;
@@ -122,7 +134,7 @@ public class GameManager : MonoBehaviour
 
         awaitingAnswer = false;
         lockArmed = false;
-        matchRunning = true;
+        matchSetUp = true;
         firstAIGuess = true;
         playerGuessCount = 0;
 
@@ -191,6 +203,20 @@ public class GameManager : MonoBehaviour
         aiNumberText.text = currentOpponent + ": " + aiGuess +
                             (aiLocks ? "  [" + L10n.Get("lock_armed") + "]" : "");
         AppendHistory(aiHistory, aiHistoryText, aiGuess);
+
+        // If that guess closed the round the match is already decided, so do
+        // not make the player answer a guess nobody can act on — it would put
+        // a dead tap between them and the result.
+        if (rules.Finished)
+        {
+            if (move.Hint == DuelRules.Hint.Correct)
+                aiAnswerText.text = L10n.Get("opponent_found_number", currentOpponent);
+
+            awaitingAnswer = false;
+            HideButtons();
+            ContinueAfterMove();
+            return;
+        }
 
         // The player still confirms the answer, so the hint the rules computed
         // decides which single button is offered — a player cannot lie.
@@ -349,7 +375,6 @@ public class GameManager : MonoBehaviour
 
     void EndGame()
     {
-        matchRunning = false;
         awaitingAnswer = false;
         lockArmed = false;
 
@@ -406,7 +431,7 @@ public class GameManager : MonoBehaviour
 
     public void OnLockTogglePressed()
     {
-        if (!matchRunning || rules.Finished) return;
+        if (!matchSetUp || rules.Finished) return;
         if (!rules.LockAvailable(PlayerSide)) return;
 
         lockArmed = !lockArmed;
@@ -442,7 +467,7 @@ public class GameManager : MonoBehaviour
     {
         if (lockButton == null) return;
 
-        bool available = matchRunning && !rules.Finished && rules.LockAvailable(PlayerSide);
+        bool available = matchSetUp && !rules.Finished && rules.LockAvailable(PlayerSide);
         lockButton.gameObject.SetActive(available);
         if (!available) return;
 
@@ -537,7 +562,8 @@ public class GameManager : MonoBehaviour
             streakSaveButton = null;
         }
 
-        matchRunning = false;
+        // Clearing this is what re-opens number entry for the next match.
+        matchSetUp = false;
         awaitingAnswer = false;
         lockArmed = false;
         playerMin = 1;
