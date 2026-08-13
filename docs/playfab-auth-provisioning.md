@@ -40,14 +40,28 @@ serialization:
 EditMode and Node tests carry the same regression vector so a serialization
 change on one side cannot silently weaken the binding.
 
+## Signing-certificate pin
+
+Google Play Integrity returns `certificateSha256Digest` as a URL-safe Base64
+SHA-256 digest. Operators often obtain the same Play App Signing certificate as
+a colon-separated hexadecimal SHA-256 fingerprint from Play Console or keytool.
+The provisioner accepts either representation (plus standard padded Base64) and
+normalizes it before comparison. Every comma-separated configured digest must be
+a valid 32-byte SHA-256 value; malformed configuration is rejected rather than
+silently disabling the certificate check.
+
+Pin the **Play App Signing** certificate used by Google Play to sign installs,
+not the developer upload-key certificate. Multiple comma-separated pins are
+supported for an intentional signing-certificate transition.
+
 ## Deployment
 
 `.github/workflows/deploy-provisioner.yml` is the production deployment path. It
 is manual, uses the `production` GitHub Environment, refuses refs other than
 `main`, and requires the operator to type `DEPLOY`. Production deployment also
-requires the `com.Orbyteon.HOL` package value and a non-empty Play App Signing
-certificate digest, then probes the deployed endpoint and requires an invalid
-empty request to return HTTP 400 before reporting success.
+requires the `com.Orbyteon.HOL` package value and a valid non-empty Play App
+Signing certificate digest, then probes the deployed endpoint and requires an
+invalid empty request to return HTTP 400 before reporting success.
 
 Required production settings are documented in `services/provisioner/README.md`.
 The PlayFab and Google credentials are secrets. The function-app name, resource
@@ -71,7 +85,8 @@ the resulting AAB signature with `jarsigner`, and records its SHA-256 checksum.
 
 Google Play Integrity is the primary attestation boundary. The request hash binds
 an integrity token to the exact installation ID and app version being provisioned,
-and the service accepts only fresh tokens.
+and the service accepts only fresh tokens. Standard Play Integrity requests also
+receive Google's replay protection when their token is decoded.
 
 The function also has a small in-process IP limiter, but that limiter is not a
 distributed quota across serverless instances. Configure platform-level rate
@@ -86,7 +101,8 @@ before public release.
   `Client/LoginWithCustomID(CreateAccount:false)` succeeds.
 - Verify an unprovisioned Custom ID cannot create an account directly from Unity.
 - Verify a tampered package/request hash, stale token, unlicensed app, wrong
-  signing certificate, or failed device-integrity verdict is rejected.
+  signing certificate, malformed certificate configuration, or failed
+  device-integrity verdict is rejected.
 - Verify PlayFab API Access Policy blocks Client Shared Group operations while
   `ExecuteCloudScript` PvP continues to work.
 
