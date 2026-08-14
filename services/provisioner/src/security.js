@@ -45,6 +45,18 @@ export function parseCertificateConfig(value) {
   };
 }
 
+// Renders the value a verdict check actually saw, for the rejection log.
+//
+// A refusal that reports only its reason cannot distinguish an app Play does
+// not know from a device that failed the integrity bar — the first is fixed by
+// the distribution channel, the second cannot be fixed by uploading anything.
+// These are Play Integrity enum strings and public certificate digests: no
+// player identifier, no token, nothing secret.
+function observed(value) {
+  if (Array.isArray(value)) return value.length ? value.join(",") : "(empty)";
+  return value === undefined || value === null || value === "" ? "(absent)" : String(value);
+}
+
 export function validateIntegrityPayload(payload, options) {
   const {
     packageName,
@@ -69,7 +81,11 @@ export function validateIntegrityPayload(payload, options) {
 
   const app = payload?.appIntegrity || {};
   if (app.appRecognitionVerdict !== "PLAY_RECOGNIZED")
-    return { ok: false, reason: "app_not_recognized" };
+    return {
+      ok: false,
+      reason: "app_not_recognized",
+      observed: observed(app.appRecognitionVerdict),
+    };
   if (app.packageName && app.packageName !== packageName)
     return { ok: false, reason: "app_package_mismatch" };
 
@@ -82,15 +98,27 @@ export function validateIntegrityPayload(payload, options) {
       ? app.certificateSha256Digest.map(normalizeCertificateDigest).filter(Boolean)
       : [];
     if (!verdictCerts.some(cert => certConfig.certificates.includes(cert)))
-      return { ok: false, reason: "certificate_mismatch" };
+      return {
+        ok: false,
+        reason: "certificate_mismatch",
+        observed: observed(verdictCerts),
+      };
   }
 
   const deviceVerdicts = payload?.deviceIntegrity?.deviceRecognitionVerdict;
   if (!Array.isArray(deviceVerdicts) || !deviceVerdicts.includes("MEETS_DEVICE_INTEGRITY"))
-    return { ok: false, reason: "device_integrity_failed" };
+    return {
+      ok: false,
+      reason: "device_integrity_failed",
+      observed: observed(deviceVerdicts),
+    };
 
   if (requireLicensed && payload?.accountDetails?.appLicensingVerdict !== "LICENSED")
-    return { ok: false, reason: "app_not_licensed" };
+    return {
+      ok: false,
+      reason: "app_not_licensed",
+      observed: observed(payload?.accountDetails?.appLicensingVerdict),
+    };
 
   return { ok: true, reason: "ok" };
 }
