@@ -40,8 +40,8 @@ public sealed class HolDuelBoardLayout : MonoBehaviour
         input = numberManager != null ? numberManager.numberInput : FindObjectOfType<TMP_InputField>(true);
 
         BuildHeader();
-        LayoutExistingGameplay();
         BuildHistoryCard();
+        LayoutExistingGameplay();
         BuildKeypad();
         built = true;
     }
