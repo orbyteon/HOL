@@ -123,7 +123,13 @@ app.http("provision", {
       });
 
       if (!verdict.ok) {
-        context.warn(`Provisioning rejected: ${verdict.reason}`);
+        // The observed value stays in the log and out of the response: the
+        // caller learns only that it was refused, never which check refused it
+        // or what would satisfy it.
+        context.warn(
+          `Provisioning rejected: ${verdict.reason}` +
+          (verdict.observed ? ` (observed: ${verdict.observed})` : "")
+        );
         return json(403, { ok: false, error: "integrity_rejected" });
       }
 
