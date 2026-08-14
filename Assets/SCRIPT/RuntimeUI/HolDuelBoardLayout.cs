@@ -41,6 +41,7 @@ public sealed class HolDuelBoardLayout : MonoBehaviour
 
         BuildHeader();
         LayoutExistingGameplay();
+        BuildHistoryCard();
         BuildKeypad();
         built = true;
     }
@@ -147,9 +148,38 @@ public sealed class HolDuelBoardLayout : MonoBehaviour
             range.color = Muted;
         }
 
+        if (gameManager != null)
+        {
+            LayoutText(gameManager.turnText, new Vector2(0f, 250f), new Vector2(900f, 60f), 28f, Muted);
+            LayoutText(gameManager.aiNumberText, new Vector2(260f, 305f), new Vector2(360f, 58f), 27f, NearWhite);
+            LayoutText(gameManager.aiAnswerText, new Vector2(260f, 180f), new Vector2(360f, 105f), 24f, NearWhite);
+            LayoutText(gameManager.playerHistoryText, new Vector2(285f, -245f), new Vector2(310f, 90f), 24f, NearWhite);
+            LayoutText(gameManager.aiHistoryText, new Vector2(285f, -365f), new Vector2(310f, 90f), 24f, NearWhite);
+        }
+
         MoveIfFound("ButtonHIGHER", new Vector2(-300f, -650f), new Vector2(260f, 100f));
         MoveIfFound("ButtonCORRECT", new Vector2(0f, -650f), new Vector2(260f, 100f));
         MoveIfFound("ButtonLOWER", new Vector2(300f, -650f), new Vector2(260f, 100f));
+    }
+
+    static void LayoutText(TMP_Text text, Vector2 position, Vector2 size, float fontSize, Color color)
+    {
+        if (text == null) return;
+        Center(text.rectTransform, size, position);
+        text.alignment = TextAlignmentOptions.Center;
+        text.fontSize = fontSize;
+        text.color = color;
+        text.enableWordWrapping = true;
+    }
+
+    void BuildHistoryCard()
+    {
+        var history = Card("HistoryCard", new Vector2(360f, 360f), new Vector2(300f, -260f),
+            new Color(0.05f, 0.04f, 0.20f, 0.98f));
+        Label(history.transform, "HistoryTitle", L10n.Get("guesses"), 28,
+            new Vector2(0f, 130f), new Vector2(320f, 48f), NearWhite);
+        Label(history.transform, "HistoryHint", L10n.Get("your_guess"), 22,
+            new Vector2(0f, 85f), new Vector2(300f, 40f), Muted);
     }
 
     void MoveIfFound(string name, Vector2 position, Vector2 size)
