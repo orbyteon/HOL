@@ -6,11 +6,11 @@ using TMPro;
 // top of PvpBackend — no edits to the single-player scripts.
 //
 // PlayFab hints and result counts come from the server-authoritative room
-// view. The Firebase fallback still fills the same RoomState locally.
+// view; no client-writable fallback participates in the match.
 public class PvpGameController : MonoBehaviour
 {
     [Header("Wiring")]
-    [Tooltip("Drag in either a PvpClient (Firebase) or PlayFabPvpClient (Azure PlayFab)")]
+    [Tooltip("Drag in the server-authoritative PlayFab PvP client")]
     public PvpBackend client;
 
     [Header("Panels")]
@@ -40,8 +40,8 @@ public class PvpGameController : MonoBehaviour
 
     [Header("Duel rules UI")]
     // How far the player has narrowed the opponent's number, plus the Lock.
-    // Both are optional: the Firebase development fallback does not adjudicate
-    // the Lock, so PvpRuntimeUI leaves the control hidden there.
+    // Both are optional and are shown only when the server-authoritative backend
+    // exposes the corresponding controls.
     public TMP_Text rangeText;
     public GameObject lockButton;
     public TMP_Text lockButtonLabel;
