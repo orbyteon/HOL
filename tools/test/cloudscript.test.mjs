@@ -160,6 +160,66 @@ test("a turn can only be submitted once", () => {
   assert.equal(replay.error, "not your turn");
 });
 
+test("a concurrent signal cannot overwrite a guess snapshot", () => {
+  const { cs, roomId, state } = matchWithOpener("host", { hostSecret: 42, guestSecret: 77 });
+  assert.equal(state.turn, "host");
+
+  let concurrent;
+  cs.store.beforeUpdate = ({ SharedGroupId, Data }) => {
+    if (SharedGroupId !== roomId || !Data?.state) return;
+    cs.store.beforeUpdate = null;
+    concurrent = cs.call("sendSignal", "GUEST", { roomId, signalId: 4 });
+  };
+
+  const guessed = guess(cs, roomId, "host", 50);
+  assert.equal(guessed.ok, true);
+  assert.equal(concurrent?.ok, false);
+  assert.equal(concurrent?.error, "room busy", "the overlapping mutation must fail closed");
+
+  const retried = cs.call("sendSignal", "GUEST", { roomId, signalId: 4 });
+  assert.equal(retried.ok, true);
+  const view = cs.view(cs.call("getRoom", "HOST", { roomId }));
+  assert.equal(view.lastGuess, 50, "the retry must preserve the committed guess");
+  assert.equal(view.signalBy, "guest");
+  assert.equal(view.signalId, 4);
+});
+
+test("a stale mutation lock is fenced and recovered", () => {
+  let now = 1_900_000_000_000;
+  const cs = loadCloudScript({ now: () => now });
+  const { roomId } = startMatch(cs, { hostSecret: 42, guestSecret: 77 });
+  const state = JSON.parse(cs.store.groups.get(roomId).state);
+  const lockId = `${roomId}-MUT-${state.revision}-${state.lockEpoch}`;
+
+  cs.store.CreateSharedGroup({ SharedGroupId: lockId });
+  cs.store.UpdateSharedGroupData({
+    SharedGroupId: lockId,
+    Data: { startedAt: String(now - 121_000) },
+  });
+
+  const recovery = cs.call("sendSignal", "HOST", { roomId, signalId: 1 });
+  assert.equal(recovery.ok, false);
+  assert.equal(recovery.error, "room busy");
+
+  const recoveredState = JSON.parse(cs.store.groups.get(roomId).state);
+  assert.equal(recoveredState.lockEpoch, state.lockEpoch + 1);
+  assert.equal(cs.call("sendSignal", "HOST", { roomId, signalId: 1 }).ok, true);
+});
+
+test("a lock abandoned before lease metadata is written is eventually recovered", () => {
+  let now = 1_900_000_000_000;
+  const cs = loadCloudScript({ now: () => now });
+  const { roomId } = startMatch(cs, { hostSecret: 42, guestSecret: 77 });
+  const state = JSON.parse(cs.store.groups.get(roomId).state);
+  const lockId = `${roomId}-MUT-${state.revision}-${state.lockEpoch}`;
+  cs.store.CreateSharedGroup({ SharedGroupId: lockId });
+
+  assert.equal(cs.call("sendSignal", "HOST", { roomId, signalId: 1 }).error, "room busy");
+  now += 121_000;
+  assert.equal(cs.call("sendSignal", "HOST", { roomId, signalId: 1 }).error, "room busy");
+  assert.equal(cs.call("sendSignal", "HOST", { roomId, signalId: 1 }).ok, true);
+});
+
 // ------------------------------------------------------------------- signals
 
 test("signals carry an index, are capped, and reject anything off the table", () => {
@@ -170,7 +230,7 @@ test("signals carry an index, are capped, and reject anything off the table", ()
   assert.equal(sent.signalId, 3);
   assert.equal(sent.signalSeq, 1, "the sequence is what tells the client a signal is new");
 
-  for (const bad of [-1, 6, 99]) {
+  for (const bad of [-1, 1.5, 6, 99, undefined]) {
     const rejected = cs.call("sendSignal", "HOST", { roomId, signalId: bad });
     assert.equal(rejected.ok, false, `signal id ${bad} must be rejected`);
     assert.equal(rejected.error, "bad signal");
@@ -245,6 +305,66 @@ test("a rematch needs both players to commit a new secret", () => {
   assert.equal(started.iWantRematch, false, "the handshake resets once it fires");
 });
 
+test("concurrent rematch commitments are retried without losing either side", () => {
+  const { cs, roomId } = matchWithOpener("host", { hostSecret: 42, guestSecret: 77 });
+  playToEnd(cs, roomId, cs.view(cs.call("getRoom", "HOST", { roomId })));
+
+  let concurrent;
+  cs.store.beforeUpdate = ({ SharedGroupId, Data }) => {
+    if (SharedGroupId !== roomId || !Data?.state) return;
+    cs.store.beforeUpdate = null;
+    concurrent = cs.call("requestRematch", "GUEST", { roomId, secret: 88 });
+  };
+
+  const host = cs.call("requestRematch", "HOST", { roomId, secret: 11 });
+  assert.equal(host.ok, true);
+  assert.equal(concurrent?.error, "room busy");
+
+  const guestRetry = cs.call("requestRematch", "GUEST", { roomId, secret: 88 });
+  assert.equal(guestRetry.ok, true);
+  const next = cs.view(guestRetry);
+  assert.equal(next.phase, "play");
+  assert.equal(next.matchIndex, 1);
+});
+
+test("scheduled cleanup removes expired orphan rooms and registry entries", () => {
+  let now = 1_900_000_000_000;
+  const cs = loadCloudScript({ now: () => now });
+  const created = cs.call("createRoom", "HOST", { hostName: "Host", hostSecret: 42 });
+  assert.equal(created.ok, true);
+
+  now += 31 * 60 * 1000;
+  const denied = cs.call("cleanupExpiredRooms", "HOST", {});
+  assert.equal(denied.ok, false);
+  assert.equal(denied.error, "not authorized");
+
+  const cleanup = cs.call("cleanupExpiredRooms", "", {});
+  assert.equal(cleanup.ok, true);
+  assert.equal(cleanup.cleaned, 1);
+  assert.equal(cs.store.groups.has(created.roomId), false);
+
+  const registry = [...cs.store.groups.entries()]
+    .find(([id]) => id.startsWith("HOL-ROOM-REG-"))?.[1] || {};
+  assert.equal(created.roomId in registry, false);
+});
+
+test("scheduled cleanup bounds work and drains remaining rooms on the next run", () => {
+  let now = 1_900_000_000_000;
+  const cs = loadCloudScript({ now: () => now });
+  const rooms = [];
+  for (let i = 0; i < 3; i++) {
+    const created = cs.call("createRoom", `HOST-${i}`, { hostName: "Host", hostSecret: 42 });
+    assert.equal(created.ok, true);
+    rooms.push(created.roomId);
+  }
+
+  now += 31 * 60 * 1000;
+  assert.equal(cs.call("cleanupExpiredRooms", "", {}).cleaned, 2);
+  assert.equal(rooms.filter(roomId => cs.store.groups.has(roomId)).length, 1);
+  assert.equal(cs.call("cleanupExpiredRooms", "", {}).cleaned, 1);
+  assert.equal(rooms.some(roomId => cs.store.groups.has(roomId)), false);
+});
+
 test("a rematch deals a clean match, and its first guess is accepted", () => {
   const { cs, roomId } = matchWithOpener("host", { hostSecret: 42, guestSecret: 77 });
   const finished = playToEnd(cs, roomId, cs.view(cs.call("getRoom", "HOST", { roomId })));
@@ -314,7 +434,7 @@ test("rematch rejects a bad secret, a stranger, and a live match", () => {
 
   playToEnd(cs, roomId, cs.view(cs.call("getRoom", "HOST", { roomId })));
 
-  for (const bad of [0, 101, -3, undefined]) {
+  for (const bad of [0, 11.5, 101, -3, undefined]) {
     const rejected = cs.call("requestRematch", "HOST", { roomId, secret: bad });
     assert.equal(rejected.ok, false, `secret ${bad} must be rejected`);
     assert.equal(rejected.error, "bad secret");

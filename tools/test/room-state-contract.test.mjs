@@ -93,10 +93,7 @@ test("RoomState carries nothing the PlayFab view forgot to send", () => {
   const emitted = emittedKeys();
   const fields = roomStateFields();
 
-  // The Firebase fallback keeps live secrets in its own room document; the
-  // PlayFab view deliberately never sends them. Everything else must arrive.
-  const firebaseOnly = new Set(["hostSecret", "guestSecret"]);
-  const unset = [...fields].filter((f) => !emitted.has(f) && !firebaseOnly.has(f));
+  const unset = [...fields].filter((f) => !emitted.has(f));
 
   assert.deepEqual(
     unset,

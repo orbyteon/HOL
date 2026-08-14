@@ -6,21 +6,13 @@ using TMPro;
 // a "PvP DUEL" entry button into the scene's main Canvas. No scene wiring
 // needed beyond dropping this component on one GameObject.
 //
-// Backend choice: Firebase (PvpClient) by default; tick usePlayFab to use
-// PlayFabPvpClient instead. Either way the backend component needs its
-// dashboard config (Firebase databaseUrl / PlayFab titleId) — set it in the
-// fields below; they are copied onto the backend component created at Start.
+// PvP is always server-authoritative through PlayFab. The public Title ID is
+// copied onto the backend component created at Start.
 [RequireComponent(typeof(Canvas), typeof(GraphicRaycaster))]
 public class PvpRuntimeUI : MonoBehaviour
 {
-    [Tooltip("Use PlayFab backend instead of Firebase")]
-    public bool usePlayFab;
-
     [Tooltip("PlayFab Title ID from Game Manager — copied onto the PlayFab backend")]
     public string playFabTitleId = "";
-
-    [Tooltip("Firebase Realtime Database URL — copied onto the Firebase backend")]
-    public string firebaseDatabaseUrl = "";
 
     // Converging Light palette (design/philosophy.md): indigo depth, cyan and
     // gold as the disciplined lights, near-white text. Gold is reserved for
@@ -33,33 +25,10 @@ public class PvpRuntimeUI : MonoBehaviour
 
     void Start()
     {
-        // Release builds must not run the Firebase fallback when PlayFab is
-        // configured: PvpClient is dev-only (secrets readable in the room
-        // document, last-write-wins joins — see its header). A stray
-        // Inspector tick must not silently downgrade production security.
-        if (!usePlayFab && !Debug.isDebugBuild && !string.IsNullOrEmpty(playFabTitleId))
-        {
-            Debug.LogWarning("PvpRuntimeUI: Firebase backend selected in a release build " +
-                "with PlayFab configured — overriding to PlayFab (Firebase is dev-only).");
-            usePlayFab = true;
-        }
-
         // Backend + controller live on this same GameObject. The backend is
-        // created here, so its dashboard config comes from our own fields.
-        PvpBackend backend;
-        if (usePlayFab)
-        {
-            var playFab = gameObject.AddComponent<PlayFabPvpClient>();
-            playFab.titleId = playFabTitleId;
-            backend = playFab;
-        }
-        else
-        {
-            var firebase = gameObject.AddComponent<PvpClient>();
-            if (!string.IsNullOrEmpty(firebaseDatabaseUrl))
-                firebase.databaseUrl = firebaseDatabaseUrl;
-            backend = firebase;
-        }
+        // created here, so its public dashboard config comes from this field.
+        var backend = gameObject.AddComponent<PlayFabPvpClient>();
+        backend.titleId = playFabTitleId;
 
         var controller = gameObject.AddComponent<PvpGameController>();
         controller.client = backend;

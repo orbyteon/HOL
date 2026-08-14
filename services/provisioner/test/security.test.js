@@ -2,10 +2,40 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   canonicalRequestHash,
+  createFixedWindowRateLimiter,
   normalizeCertificateDigest,
   parseCertificateConfig,
   validateIntegrityPayload,
 } from "../src/security.js";
+
+test("fixed-window limiter caps requests and resets after the window", () => {
+  const limiter = createFixedWindowRateLimiter({
+    windowMs: 1_000,
+    maxRequests: 2,
+    maxEntries: 10,
+  });
+
+  assert.equal(limiter.consume("198.51.100.1", 100), true);
+  assert.equal(limiter.consume("198.51.100.1", 200), true);
+  assert.equal(limiter.consume("198.51.100.1", 300), false);
+  assert.equal(limiter.consume("198.51.100.1", 1_100), true);
+});
+
+test("fixed-window limiter bounds high-cardinality keys and evicts expired windows", () => {
+  const limiter = createFixedWindowRateLimiter({
+    windowMs: 1_000,
+    maxRequests: 2,
+    maxEntries: 2,
+  });
+
+  assert.equal(limiter.consume("198.51.100.1", 0), true);
+  assert.equal(limiter.consume("198.51.100.2", 0), true);
+  assert.equal(limiter.consume("198.51.100.3", 10), false, "new keys fail closed at capacity");
+  assert.equal(limiter.size(), 2);
+
+  assert.equal(limiter.consume("198.51.100.3", 1_001), true, "expired windows are pruned");
+  assert.equal(limiter.size(), 1);
+});
 
 const packageName = "com.Orbyteon.HOL";
 const customId = "device-123";

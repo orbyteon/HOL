@@ -35,7 +35,7 @@
 
 <p>If both players agree to a rematch, the same room is reused for the next match: each player commits a new secret number and the room's per-match state is reset. No history of previous matches in that room is retained.</p>
 
-<p>Room data is deleted when a participant leaves an unfinished match cleanly, when the surviving client times out an abandoned match, or after both participants acknowledge (or leave after) a completed result. A finished room is held briefly so a rematch can be offered; if neither player accepts within roughly two minutes, the client releases it. If both devices disappear without sending cleanup requests, an orphaned room may remain in PlayFab until backend cleanup is performed. We do not use PvP room data to build a server-side match-history profile.</p>
+<p>Room data is deleted when a participant leaves an unfinished match cleanly or after both participants acknowledge (or leave after) a completed result. A finished room is held briefly so a rematch can be offered. As a backstop when devices disappear without sending cleanup requests, server-side expiry is refreshed on room mutations: waiting rooms expire after 30 minutes, active matches after six hours, and completed rooms after 15 minutes. A PlayFab scheduled task runs every five minutes to remove expired room data and stale registry entries. We do not use PvP room data to build a server-side match-history profile.</p>
 
 <p>The same anonymous PlayFab session may be used to read the title's minimum-supported-version setting so the game can show a required-update screen. The solo "Find challenger" mode uses an on-device simulated opponent and does not send its match data to PlayFab.</p>
 
