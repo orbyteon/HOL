@@ -36,7 +36,7 @@ public sealed class HolDuelBoardLayout : MonoBehaviour
         if (built) return;
         board = (RectTransform)transform;
         numberManager = GetComponent<NumberManager>();
-        gameManager = GetComponentInChildren<GameManager>(true);
+        gameManager = FindObjectOfType<GameManager>(true);
         input = numberManager != null ? numberManager.numberInput : FindObjectOfType<TMP_InputField>(true);
 
         BuildHeader();
