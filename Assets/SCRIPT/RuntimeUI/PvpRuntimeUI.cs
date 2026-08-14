@@ -71,6 +71,21 @@ public class PvpRuntimeUI : MonoBehaviour
 
     // ------------------------------------------------------------ construction
 
+    // The indigo depth gradient the rest of Converging Light sits on. Added as
+    // the panel's first child so it draws behind every control placed after it,
+    // which is why it is called immediately after the panel is created.
+    static void NeonBackdrop(GameObject panel)
+    {
+        var backdrop = RuntimeUI.CreateObject("Backdrop", panel.transform);
+        RuntimeUI.Stretch(backdrop);
+
+        var image = backdrop.AddComponent<Image>();
+        image.sprite = ConvergingLight.VerticalGradient(
+            ConvergingLight.DepthTop, ConvergingLight.DepthBottom);
+        image.type = Image.Type.Simple;
+        image.raycastTarget = false;
+    }
+
     void BuildPanels(PvpGameController controller)
     {
         // PvP menu: create or join.
@@ -91,24 +106,43 @@ public class PvpRuntimeUI : MonoBehaviour
         RuntimeUI.Localize(joinBtn, "pvp_join_room");
         RuntimeUI.Localize(closeBtn, "back");
 
-        // Create flow.
+        // Create flow. The room code is the one thing on this screen a player
+        // has to read aloud or copy accurately, so it gets the frame, the glow
+        // and a caption naming it; everything else stays quieter than it.
         var createPanel = RuntimeUI.FullscreenPanel(transform, "PvPCreatePanel", PanelColor);
+        NeonBackdrop(createPanel);
         var createTitle = RuntimeUI.CreateText(createPanel.transform, "Title", L10n.Get("pvp_create_room"), 48,
-            new Vector2(0f, 420f), new Vector2(800f, 100f));
+            new Vector2(0f, 560f), new Vector2(800f, 100f));
         var createSecret = RuntimeUI.CreateInputField(createPanel.transform, "SecretInput",
-            L10n.Get("pvp_secret"), new Vector2(0f, 240f), new Vector2(460f, 90f));
+            L10n.Get("pvp_secret"), new Vector2(0f, 350f), new Vector2(460f, 90f));
         var createGo = RuntimeUI.CreateButton(createPanel.transform, "GoButton",
-            L10n.Get("confirm"), new Vector2(0f, 110f), new Vector2(460f, 90f), Accent, DarkLabel);
-        var codeText = RuntimeUI.CreateText(createPanel.transform, "RoomCode", "-----", 96,
-            new Vector2(0f, -80f), new Vector2(800f, 140f));
+            L10n.Get("confirm"), new Vector2(0f, 225f), new Vector2(460f, 90f), Accent, DarkLabel);
+
+        var codeFrame = NeonFrame.Frame(createPanel.transform, "RoomCodeFrame",
+            new Vector2(0f, 0f), new Vector2(760f, 280f), ConvergingLight.Cyan);
+        var codeCaption = RuntimeUI.CreateText(codeFrame.transform, "CodeCaption",
+            L10n.Get("pvp_enter_code"), 28, new Vector2(0f, 90f), new Vector2(700f, 50f),
+            ConvergingLight.WithAlpha(ConvergingLight.NearWhite, 0.7f));
+        var codeText = RuntimeUI.CreateText(codeFrame.transform, "RoomCode", "-----", 96,
+            new Vector2(0f, -25f), new Vector2(700f, 140f));
+
         var copyBtn = RuntimeUI.CreateButton(createPanel.transform, "CopyButton",
-            L10n.Get("pvp_copy"), new Vector2(0f, -220f), new Vector2(460f, 90f), AccentBlue, DarkLabel);
-        var createStatus = RuntimeUI.CreateText(createPanel.transform, "Status", "", 32,
-            new Vector2(0f, -380f), new Vector2(900f, 120f));
+            L10n.Get("pvp_copy"), new Vector2(0f, -215f), new Vector2(460f, 90f), AccentBlue, DarkLabel);
+
+        // The wait for a challenger is the longest pause in the game. Framing
+        // the status keeps it looking like a live thing rather than a caption
+        // stranded on a background.
+        var statusFrame = NeonFrame.Frame(createPanel.transform, "StatusFrame",
+            new Vector2(0f, -380f), new Vector2(860f, 150f),
+            ConvergingLight.WithAlpha(ConvergingLight.Magenta, 0.5f), 0.5f);
+        var createStatus = RuntimeUI.CreateText(statusFrame.transform, "Status", "", 32,
+            Vector2.zero, new Vector2(800f, 130f));
+
         var createBack = RuntimeUI.CreateButton(createPanel.transform, "BackButton",
-            L10n.Get("back"), new Vector2(0f, -540f), new Vector2(300f, 80f), Neutral);
+            L10n.Get("back"), new Vector2(0f, -580f), new Vector2(300f, 80f), Neutral);
 
         RuntimeUI.Localize(createTitle, "pvp_create_room");
+        RuntimeUI.Localize(codeCaption, "pvp_enter_code");
         RuntimeUI.LocalizePlaceholder(createSecret, "pvp_secret");
         RuntimeUI.Localize(createGo, "confirm");
         RuntimeUI.Localize(copyBtn, "pvp_copy");
