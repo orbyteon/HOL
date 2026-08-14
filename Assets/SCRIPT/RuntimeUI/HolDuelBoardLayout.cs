@@ -186,7 +186,7 @@ public sealed class HolDuelBoardLayout : MonoBehaviour
         }
 
         var submit = RuntimeUI.CreateButton(board, "NumberSubmit", L10n.Get("confirm"),
-            new Vector2(-180f, -815f), new Vector2(660f, 112f), Gold, new Color(0.15f, 08f, 0.04f, 1f));
+            new Vector2(-180f, -815f), new Vector2(660f, 112f), Gold, new Color(0.15f, 0.08f, 0.04f, 1f));
         RuntimeUI.Localize(submit, "confirm");
         submit.onClick.AddListener(SubmitNumber);
     }
