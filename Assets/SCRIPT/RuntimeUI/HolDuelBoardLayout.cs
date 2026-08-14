@@ -108,7 +108,7 @@ public sealed class HolDuelBoardLayout : MonoBehaviour
 
         Label(board, "VsLabel", "VS", 78, new Vector2(0f, 565f),
             new Vector2(180f, 110f), Gold);
-        Label(board, "RoundLabel", "ΓΥΡΟΣ 3/10", 34, new Vector2(0f, 385f),
+        Label(board, "RoundLabel", L10n.Get("round_label", 1, 10), 34, new Vector2(0f, 385f),
             new Vector2(700f, 52f), NearWhite);
         Label(board, "PromptLabel", L10n.Get("your_guess"), 42, new Vector2(0f, 325f),
             new Vector2(850f, 64f), NearWhite);
