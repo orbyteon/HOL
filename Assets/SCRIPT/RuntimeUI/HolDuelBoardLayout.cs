@@ -89,6 +89,7 @@ public sealed class HolDuelBoardLayout : MonoBehaviour
             new Vector2(-438f, 790f), new Vector2(118f, 92f), new Color(0.26f, 0.10f, 0.60f, 1f),
             NearWhite);
         RuntimeUI.Localize(back, "back");
+        if (numberManager != null) back.onClick.AddListener(numberManager.ExitToMenu);
 
         Label(board, "DuelTitle", "HOL", 82, new Vector2(0f, 790f),
             new Vector2(360f, 110f), new Color(0.95f, 0.20f, 0.82f, 1f));
@@ -102,7 +103,7 @@ public sealed class HolDuelBoardLayout : MonoBehaviour
         var opponent = Card("OpponentCard", new Vector2(470f, 205f), new Vector2(265f, 565f), CardPink);
         Label(opponent.transform, "OpponentCaption", L10n.Get("opponent_label", ""),
             30, new Vector2(0f, 62f), new Vector2(420f, 44f), NearWhite);
-        Label(opponent.transform, "OpponentName", gameManager != null ? gameManager.opponentNameText.text : "Andreas",
+        Label(opponent.transform, "OpponentName", gameManager != null && gameManager.opponentNameText != null ? gameManager.opponentNameText.text : "Andreas",
             42, new Vector2(0f, -20f), new Vector2(410f, 56f), NearWhite);
 
         Label(board, "VsLabel", "VS", 78, new Vector2(0f, 565f),
