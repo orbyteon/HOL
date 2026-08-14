@@ -101,6 +101,7 @@ public static class L10n
         { "stats_best",              new[] { "Best", "Ρεκόρ" } },
         { "stats_fastest_win",       new[] { "Fastest win: {0} guesses", "Ταχύτερη νίκη: {0} προσπάθειες" } },
         { "guesses",                 new[] { "Guesses:", "Προσπάθειες:" } },
+        { "round_label",             new[] { "ROUND {0}/{1}", "ΓΥΡΟΣ {0}/{1}" } },
         { "your_number",             new[] { "Your number? (1-100)", "Ο αριθμός σου; (1-100)" } },
 
         // pvp
