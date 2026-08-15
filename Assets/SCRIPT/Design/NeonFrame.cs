@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 
 // The framed panels the PvP screens are drawn from: a filled plate, a thin
 // accent border, and light escaping around it.
@@ -146,8 +147,8 @@ public static class NeonFrame
     // One cell of the match-stat row: a small caption over a large value.
     // The caption is the label the player reads once; the value is what they
     // glance back at, so it carries the weight and the accent.
-    public static Text StatChip(Transform parent, string name, Vector2 pos, Vector2 size,
-                                string caption, string value, Color accent)
+    public static TextMeshProUGUI StatChip(Transform parent, string name, Vector2 pos, Vector2 size,
+                                           string caption, string value, Color accent)
     {
         var frame = Frame(parent, name, pos, size, ConvergingLight.WithAlpha(accent, 0.55f),
                           0.55f, false);

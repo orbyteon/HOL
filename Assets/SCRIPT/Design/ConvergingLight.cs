@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 
 // Converging Light (design/philosophy.md) — shared palette and runtime
 // texture helpers for the design layer (SplashDesign, DesignRuntimeWiring).
@@ -82,11 +83,10 @@ public static class ConvergingLight
                 Mathf.Lerp(-520f, 520f, (float)rng.NextDouble()),
                 Mathf.Lerp(-940f, 940f, (float)rng.NextDouble()));
 
-            var text = go.AddComponent<Text>();
+            var text = go.AddComponent<TextMeshProUGUI>();
             text.text = rng.Next(0, 10).ToString();
             text.fontSize = rng.Next(18, 44);
-            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            text.alignment = TextAnchor.MiddleCenter;
+            text.alignment = TextAlignmentOptions.Center;
             text.color = WithAlpha(NearWhite,
                 Mathf.Lerp(maxAlpha * 0.4f, maxAlpha, (float)rng.NextDouble()));
             text.raycastTarget = false;

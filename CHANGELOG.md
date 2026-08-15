@@ -3,6 +3,23 @@
 All notable changes to HOL. Dates are commit dates; versions follow the
 Play Console versionName in `ProjectSettings.asset`.
 
+## [Unreleased]
+
+### Changed
+
+- Every runtime-built label now renders through TextMesh Pro instead of
+  legacy `UnityEngine.UI.Text`. The board was split between the two stacks
+  — TMP in the scene and the input fields, legacy Arial in every label
+  built from code — which is why screens never quite matched the mockups'
+  type. `RuntimeUI.CreateText` (and the ConsentManager twin) now produce
+  `TextMeshProUGUI`, the PvP board no longer rebuilds its labels through
+  the `AsTmp` destroy-and-replace bridge, and `LocalizedLegacyText` is
+  gone — runtime labels all localize through `LocalizedText`. Labels the
+  scene itself serializes stay legacy until an editor session converts
+  them; `ExtrasRuntimeWiring` still refreshes those on language change.
+  The font is TMP's default atlas (LiberationSans SDF); a brand typeface
+  remains an editor-session task.
+
 ## [0.4.0] — 2026-08-15
 
 ### Added

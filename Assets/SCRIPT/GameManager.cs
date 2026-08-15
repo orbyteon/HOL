@@ -93,12 +93,12 @@ public class GameManager : MonoBehaviour
     // Built at runtime next to the stop button, the same way the rewarded
     // streak-save offer is, so no scene surgery is needed.
     UnityEngine.UI.Button lockButton;
-    UnityEngine.UI.Text lockButtonLabel;
+    TMP_Text lockButtonLabel;
 
     // The rangeText Inspector field was never wired in MainMenu, so the range
     // line — and the Lock's one-line explanation, which shares the slot — had
     // nowhere to render in solo. Built at runtime like the Lock button.
-    UnityEngine.UI.Text runtimeRangeLabel;
+    TMP_Text runtimeRangeLabel;
 
     string[] fakeNames =
     {
@@ -506,7 +506,7 @@ public class GameManager : MonoBehaviour
         btn.onClick.AddListener(OnLockTogglePressed);
         lockButton = btn;
 
-        lockButtonLabel = btn.GetComponentInChildren<UnityEngine.UI.Text>();
+        lockButtonLabel = btn.GetComponentInChildren<TMP_Text>();
         if (lockButtonLabel != null) lockButtonLabel.fontSize = 26;
     }
 

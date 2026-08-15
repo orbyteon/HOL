@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 
 // First-launch ads permission dialog. A decline means LevelPlay is not
 // initialized at all on the next launch and no ads are shown this session.
@@ -76,22 +77,22 @@ public class ConsentManager : MonoBehaviour
         var yes = CreateButton(card.transform, "YesButton", L10n.Get("yes"),
             new Vector2(0f, -80f), ConsumerTokens.Cyan, new Color(0.10f, 0.09f, 0.18f));
         yes.onClick.AddListener(AcceptPersonalized);
-        Localize(yes.GetComponentInChildren<Text>(true), "yes");
+        Localize(yes.GetComponentInChildren<TMP_Text>(true), "yes");
 
         var no = CreateButton(card.transform, "NoButton", L10n.Get("no"),
             new Vector2(0f, -170f), ConsumerTokens.SurfaceElevated);
         no.onClick.AddListener(DeclinePersonalized);
-        Localize(no.GetComponentInChildren<Text>(true), "no");
+        Localize(no.GetComponentInChildren<TMP_Text>(true), "no");
 
         return panel;
     }
 
-    static void Localize(Text text, string key)
+    static void Localize(TMP_Text text, string key)
     {
         if (text == null) return;
-        var localized = text.GetComponent<LocalizedLegacyText>();
+        var localized = text.GetComponent<LocalizedText>();
         if (localized == null)
-            localized = text.gameObject.AddComponent<LocalizedLegacyText>();
+            localized = text.gameObject.AddComponent<LocalizedText>();
         localized.key = key;
     }
 
@@ -111,7 +112,7 @@ public class ConsentManager : MonoBehaviour
         rect.offsetMax = Vector2.zero;
     }
 
-    static Text CreateText(Transform parent, string name, string content, int fontSize, Vector2 position,
+    static TextMeshProUGUI CreateText(Transform parent, string name, string content, int fontSize, Vector2 position,
         Color? color = null)
     {
         var go = CreateUIObject(name, parent);
@@ -121,12 +122,12 @@ public class ConsentManager : MonoBehaviour
         rect.sizeDelta = new Vector2(520f, 160f);
         rect.anchoredPosition = position;
 
-        var text = go.AddComponent<Text>();
+        var text = go.AddComponent<TextMeshProUGUI>();
         text.text = content;
         text.fontSize = fontSize;
         text.color = color ?? new Color(0.91f, 0.93f, 1f);
-        text.alignment = TextAnchor.MiddleCenter;
-        text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        text.alignment = TextAlignmentOptions.Center;
+        text.enableWordWrapping = true;
         return text;
     }
 
