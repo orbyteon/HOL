@@ -104,11 +104,11 @@ public static class NeonFrame
 
     // A framed plate: glow, fill, then border. Returns the frame object itself,
     // so children added to it sit above the border and inside the padding.
-    // `fill` overrides the plate colour; the default stays the indigo panel so
+    // `fillColor` overrides the plate colour; the default stays the indigo panel so
     // existing callers render unchanged.
     public static GameObject Frame(Transform parent, string name, Vector2 pos, Vector2 size,
                                    Color accent, float fillAlpha = 0.85f, bool glow = true,
-                                   Color? fill = null)
+                                   Color? fillColor = null)
     {
         var frame = RuntimeUI.CreateObject(name, parent);
         ConvergingLight.Center(frame, pos, size);
@@ -129,7 +129,7 @@ public static class NeonFrame
         var fillImage = fill.AddComponent<Image>();
         fillImage.sprite = RuntimeUI.RoundedRectSprite;
         fillImage.type = Image.Type.Sliced;
-        fillImage.color = ConvergingLight.WithAlpha(fill ?? ConvergingLight.PanelIndigo, fillAlpha);
+        fillImage.color = ConvergingLight.WithAlpha(fillColor ?? ConvergingLight.PanelIndigo, fillAlpha);
         fillImage.raycastTarget = false;
 
         var border = RuntimeUI.CreateObject("Border", frame.transform);
