@@ -312,7 +312,11 @@ TCF-compatible CMP or supported Google consent framework for the final mediation
 stack; a custom two-button app dialog alone must not be assumed to satisfy every
 network/platform consent requirement.
 
-- [ ] LevelPlay production app key/bundle `com.Orbyteon.HOL` are correct
+- [ ] LevelPlay production app key/bundle `com.Orbyteon.HOL` are correct.
+      **Known failing:** `AdsManager.GameId` is `6076495`, which has the shape
+      of a Unity Ads game id, not an ironSource app key — LevelPlay rejects it
+      with init error 2110 (seen in the rc3 device log). Paste the real App Key
+      from the LevelPlay dashboard and rebuild before store submission
 - [ ] `Interstitial_Android` and `Rewarded_Android` units are active
 - [ ] final mediated-network list has been reviewed for consent requirements
 - [ ] CMP/Google Additional Consent configuration is completed where required

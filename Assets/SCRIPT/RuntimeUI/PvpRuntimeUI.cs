@@ -354,6 +354,20 @@ public class PvpRuntimeUI : MonoBehaviour
                 ConsumerTokens.SurfaceElevated);
             var signalLabel = signalBtn.GetComponentInChildren<Text>();
             if (signalLabel != null) signalLabel.fontSize = 24;
+
+            // The drawn signal icons ship in Resources so no scene wiring is
+            // needed; a missing or unimportable icon leaves the text button
+            // exactly as it was. An EditMode test holds the load path green.
+            var icon = Resources.Load<Sprite>("design/" + Signals.Key(i));
+            if (icon != null)
+            {
+                var iconGo = RuntimeUI.CreateObject("Icon", signalBtn.transform);
+                ConvergingLight.Center(iconGo, new Vector2(-135f, 0f), new Vector2(40f, 40f));
+                var iconImage = iconGo.AddComponent<Image>();
+                iconImage.sprite = icon;
+                iconImage.preserveAspect = true;
+                iconImage.raycastTarget = false;
+            }
             RuntimeUI.Localize(signalBtn, Signals.Key(i));
             signalButtons[i] = signalBtn;
         }
