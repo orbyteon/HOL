@@ -7,6 +7,18 @@ Play Console versionName in `ProjectSettings.asset`.
 
 ### Fixed
 
+- The Consumer First art actually renders. All 25 hand-authored design
+  asset `.meta` files carried invalid GUIDs (30–31 hex chars where Unity
+  requires exactly 32), so Unity silently regenerated them at import and
+  the MainMenu scene's sprite references on `DesignRuntimeWiring` resolved
+  to nothing — the menu kept the old art and every runtime-built screen
+  fell back to flat colors, which is exactly how versionCode 5 looked on
+  hardware. Every meta now carries a valid GUID with the scene references
+  updated in lockstep, the four surface SVGs (background, panel, both
+  buttons) moved under `Resources/design/` where `DesignRuntimeWiring`
+  falls back to loading them by path when a scene reference is null, and a
+  new `DesignSurfaceTests` EditMode test holds that load path green the
+  same way `SignalIconTests` holds the signal icons.
 - Ads initialize. `AdsManager` sent LevelPlay a Unity Ads-shaped game id
   where the ironSource App Key belongs, so every build so far failed ad
   init with error 2110 "Bad Request" — the consent flow worked, but no ad

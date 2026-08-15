@@ -35,6 +35,16 @@ public class DesignRuntimeWiring : MonoBehaviour
 
     void Awake()
     {
+        // A scene reference can silently come back null (a stale GUID resolves
+        // to nothing, with no error anywhere) — which is exactly how vc5
+        // shipped with the old menu art. The Resources path cannot break that
+        // way and is pinned green by DesignSurfaceTests, so it backstops the
+        // scene wiring instead of trusting it.
+        if (backgroundSprite == null) backgroundSprite = Resources.Load<Sprite>("design/background_deep");
+        if (panelSprite == null) panelSprite = Resources.Load<Sprite>("design/panel_surface");
+        if (primaryButtonSprite == null) primaryButtonSprite = Resources.Load<Sprite>("design/button_primary");
+        if (secondaryButtonSprite == null) secondaryButtonSprite = Resources.Load<Sprite>("design/button_secondary");
+
         // Publish the assigned assets before any runtime-built PvP UI is created.
         BackgroundAsset = backgroundSprite;
         PanelSurfaceAsset = panelSprite;
