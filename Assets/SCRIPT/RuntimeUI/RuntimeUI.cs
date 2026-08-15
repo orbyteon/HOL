@@ -82,6 +82,51 @@ public static class RuntimeUI
             new Vector4(border, border, border, border));
     }
 
+    // Runtime page roots use a 1080x1920 portrait reference canvas. Clamp
+    // direct children of a full-screen page to Android's safe area while leaving
+    // nested labels/children in their local card coordinates.
+    static bool IsPageChild(RectTransform rect)
+    {
+        if (rect == null || rect.parent == null) return false;
+        var parent = rect.parent as RectTransform;
+        if (parent == null) return false;
+        if (parent.GetComponent<Canvas>() != null) return true;
+        return parent.parent != null &&
+               parent.anchorMin == Vector2.zero &&
+               parent.anchorMax == Vector2.one &&
+               parent.parent.GetComponent<Canvas>() != null;
+    }
+
+    static void ClampPageChild(RectTransform rect, Vector2 size, Vector2 requested)
+    {
+        if (!IsPageChild(rect)) return;
+
+        var canvas = rect.parent.GetComponent<Canvas>();
+        if (canvas == null && rect.parent.parent != null)
+            canvas = rect.parent.parent.GetComponent<Canvas>();
+        var canvasRect = canvas != null ? canvas.transform as RectTransform : null;
+        Vector2 canvasSize = canvasRect != null && canvasRect.rect.size.sqrMagnitude > 0f
+            ? canvasRect.rect.size
+            : new Vector2(1080f, 1920f);
+
+        Rect safe = Screen.safeArea;
+        float width = Mathf.Max(1f, Screen.width);
+        float height = Mathf.Max(1f, Screen.height);
+        float left = safe.xMin / width * canvasSize.x - canvasSize.x * 0.5f;
+        float right = safe.xMax / width * canvasSize.x - canvasSize.x * 0.5f;
+        float bottom = safe.yMin / height * canvasSize.y - canvasSize.y * 0.5f;
+        float top = safe.yMax / height * canvasSize.y - canvasSize.y * 0.5f;
+        float halfW = size.x * 0.5f + 16f;
+        float halfH = size.y * 0.5f + 16f;
+
+        rect.anchoredPosition = new Vector2(
+            Mathf.Clamp(requested.x, left + halfW, right - halfW),
+            Mathf.Clamp(requested.y, bottom + halfH, top - halfH));
+
+        if (size.x < 48f || size.y < 48f)
+            Debug.LogWarning("HOL UI: page touch target below 48px: " + rect.name);
+    }
+
     public static GameObject CreateObject(string name, Transform parent)
     {
         var go = new GameObject(name, typeof(RectTransform));
@@ -103,7 +148,10 @@ public static class RuntimeUI
         var panel = CreateObject(name, parent);
         Stretch(panel);
         var image = panel.AddComponent<Image>();
-        image.color = color;
+        var designBackground = DesignRuntimeWiring.BackgroundAsset;
+        image.sprite = designBackground != null ? designBackground : null;
+        image.type = designBackground != null ? Image.Type.Simple : Image.Type.Simple;
+        image.color = designBackground != null ? Color.white : color;
         image.raycastTarget = true;
         return panel;
     }
@@ -117,6 +165,7 @@ public static class RuntimeUI
         rect.anchorMax = new Vector2(0.5f, 0.5f);
         rect.sizeDelta = size;
         rect.anchoredPosition = position;
+        ClampPageChild(rect, size, position);
 
         var text = go.AddComponent<Text>();
         text.text = content;
@@ -140,11 +189,20 @@ public static class RuntimeUI
         rect.anchorMax = new Vector2(0.5f, 0.5f);
         rect.sizeDelta = size;
         rect.anchoredPosition = position;
+        ClampPageChild(rect, size, position);
 
         var image = go.AddComponent<Image>();
-        image.sprite = RoundedRectSprite;
-        image.type = Image.Type.Sliced;
-        image.color = color;
+        var primaryAsset = name.IndexOf("Play", System.StringComparison.OrdinalIgnoreCase) >= 0
+            || name.IndexOf("Start", System.StringComparison.OrdinalIgnoreCase) >= 0
+            || name.IndexOf("Confirm", System.StringComparison.OrdinalIgnoreCase) >= 0
+            || name.IndexOf("Save", System.StringComparison.OrdinalIgnoreCase) >= 0
+            || name.IndexOf("Submit", System.StringComparison.OrdinalIgnoreCase) >= 0;
+        var designAsset = primaryAsset
+            ? DesignRuntimeWiring.PrimaryButtonAsset
+            : DesignRuntimeWiring.SecondaryButtonAsset;
+        image.sprite = designAsset != null ? designAsset : RoundedRectSprite;
+        image.type = designAsset != null ? Image.Type.Simple : Image.Type.Sliced;
+        image.color = designAsset != null ? Color.white : color;
 
         var button = go.AddComponent<Button>();
         button.targetGraphic = image;
@@ -172,6 +230,7 @@ public static class RuntimeUI
         rect.anchorMax = new Vector2(0.5f, 0.5f);
         rect.sizeDelta = size;
         rect.anchoredPosition = position;
+        ClampPageChild(rect, size, position);
 
         var image = go.AddComponent<Image>();
         image.sprite = RoundedRectSprite;
