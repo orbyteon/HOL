@@ -21,6 +21,13 @@ public class DesignRuntimeWiring : MonoBehaviour
     const float OverlayAlpha = 0.62f;
     static readonly Color BackdropTint = new Color(0.62f, 0.60f, 0.85f);
 
+    // Assigned from the Unity scene so the approved design assets are used
+    // by the live UI, rather than existing only as an unused asset library.
+    [SerializeField] Sprite backgroundSprite;
+    [SerializeField] Sprite panelSprite;
+    [SerializeField] Sprite primaryButtonSprite;
+    [SerializeField] Sprite secondaryButtonSprite;
+
     void Start()
     {
         StartCoroutine(BuildNextFrame());
@@ -58,6 +65,7 @@ public class DesignRuntimeWiring : MonoBehaviour
             field.transform.SetSiblingIndex(insert + 1);
 
             RestylePalette(canvas.transform);
+            ApplyDesignAssets(canvas.transform);
             break;
         }
     }
@@ -87,6 +95,55 @@ public class DesignRuntimeWiring : MonoBehaviour
             if (Skippable(txt.transform)) continue;
             txt.color = MapColor(txt.color);
         }
+    }
+
+    void ApplyDesignAssets(Transform canvasRoot)
+    {
+        // The background is a full-bleed 1080x1920 sprite, so it is safe to
+        // stretch to the CanvasScaler reference frame.
+        var background = DeepFind(canvasRoot, "BACKROUND");
+        AssignSprite(background, backgroundSprite, Image.Type.Simple);
+
+        foreach (var panelName in new[] { "PanelPlay", "PanelGAME", "PanelSettings" })
+        {
+            var panel = DeepFind(canvasRoot, panelName);
+            AssignSprite(panel, panelSprite, Image.Type.Simple);
+        }
+
+        foreach (var button in canvasRoot.GetComponentsInChildren<Button>(true))
+        {
+            var image = button.GetComponent<Image>();
+            if (image == null) continue;
+
+            bool primary = IsPrimary(button.transform.name);
+            var sprite = primary ? primaryButtonSprite : secondaryButtonSprite;
+            if (sprite == null) continue;
+
+            image.sprite = sprite;
+            image.type = Image.Type.Simple;
+            image.color = Color.white;
+        }
+    }
+
+    static bool IsPrimary(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return false;
+        return name.IndexOf("Play", System.StringComparison.OrdinalIgnoreCase) >= 0
+            || name.IndexOf("Confirm", System.StringComparison.OrdinalIgnoreCase) >= 0
+            || name.IndexOf("Save", System.StringComparison.OrdinalIgnoreCase) >= 0
+            || name.IndexOf("Challenger", System.StringComparison.OrdinalIgnoreCase) >= 0
+            || name.IndexOf("START", System.StringComparison.OrdinalIgnoreCase) >= 0;
+    }
+
+    static void AssignSprite(Transform target, Sprite sprite, Image.Type type)
+    {
+        if (target == null || sprite == null) return;
+        var image = target.GetComponent<Image>();
+        if (image == null) return;
+        image.sprite = sprite;
+        image.type = type;
+        image.color = Color.white;
+        image.preserveAspect = false;
     }
 
     static void SetImageColor(Transform root, string name, Color color)
