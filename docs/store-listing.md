@@ -89,6 +89,16 @@ CONVERGING LIGHT
 Κατέβασε το HOL και εμπιστεύσου το διάστημά σου.
 ```
 
+## Release notes — v0.4.0 (max 500 chars per language)
+
+### EN
+
+A fresh look and a fairer duel. New game board with an on-screen keypad, live round counter, guess history, and your narrowed range always visible. Online matches are now fully server-refereed, and abandoned rooms clean themselves up. Anonymous match statistics help us keep the duel balanced — see the privacy policy. Good luck out there!
+
+### EL
+
+Νέα εμφάνιση και πιο δίκαιη μονομαχία. Νέος πίνακας παιχνιδιού με πληκτρολόγιο οθόνης, μετρητή γύρων, ιστορικό προσπαθειών και το εύρος σου πάντα ορατό. Οι online αγώνες κρίνονται πλέον πλήρως από τον server, και τα εγκαταλελειμμένα δωμάτια καθαρίζουν μόνα τους. Ανώνυμα στατιστικά αγώνων μάς βοηθούν να κρατάμε τη μονομαχία ισορροπημένη — δες την πολιτική απορρήτου. Καλή επιτυχία!
+
 ## Release notes — v0.3.0 (max 500 chars per language)
 
 - EN: `Duels are decided by skill now, not by who guessed first. Both players
