@@ -148,7 +148,10 @@ public static class RuntimeUI
         var panel = CreateObject(name, parent);
         Stretch(panel);
         var image = panel.AddComponent<Image>();
-        image.color = color;
+        var designBackground = DesignRuntimeWiring.BackgroundAsset;
+        image.sprite = designBackground != null ? designBackground : null;
+        image.type = designBackground != null ? Image.Type.Simple : Image.Type.Simple;
+        image.color = designBackground != null ? Color.white : color;
         image.raycastTarget = true;
         return panel;
     }
