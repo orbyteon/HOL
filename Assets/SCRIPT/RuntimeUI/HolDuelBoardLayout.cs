@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -25,6 +26,7 @@ public sealed class HolDuelBoardLayout : MonoBehaviour
     TMP_InputField input;
     GameObject keypadRoot;
     bool built;
+    readonly List<RectTransform> layoutRoots = new List<RectTransform>();
 
     void Start()
     {
@@ -35,6 +37,8 @@ public sealed class HolDuelBoardLayout : MonoBehaviour
     {
         if (built) return;
         board = (RectTransform)transform;
+        board.localScale = Vector3.one;
+        board.localPosition = Vector3.zero;
         numberManager = GetComponent<NumberManager>();
         gameManager = FindObjectOfType<GameManager>(true);
         input = numberManager != null ? numberManager.numberInput : FindObjectOfType<TMP_InputField>(true);
@@ -63,11 +67,41 @@ public sealed class HolDuelBoardLayout : MonoBehaviour
         image.sprite = RuntimeUI.RoundedRectSprite;
     }
 
+    void CenterRoot(RectTransform rect, Vector2 size, Vector2 position)
+    {
+        Center(rect, size, position);
+        rect.anchoredPosition = ClampToSafeArea(position, size);
+        if (!layoutRoots.Contains(rect))
+            layoutRoots.Add(rect);
+    }
+
+    Vector2 ClampToSafeArea(Vector2 position, Vector2 size)
+    {
+        var canvasRect = board != null ? board.parent as RectTransform : null;
+        Vector2 canvasSize = canvasRect != null && canvasRect.rect.size.sqrMagnitude > 0f
+            ? canvasRect.rect.size
+            : new Vector2(1080f, 1920f);
+
+        Rect safe = Screen.safeArea;
+        float width = Mathf.Max(1f, Screen.width);
+        float height = Mathf.Max(1f, Screen.height);
+        float left = (safe.xMin / width) * canvasSize.x - canvasSize.x * 0.5f;
+        float right = (safe.xMax / width) * canvasSize.x - canvasSize.x * 0.5f;
+        float bottom = (safe.yMin / height) * canvasSize.y - canvasSize.y * 0.5f;
+        float top = (safe.yMax / height) * canvasSize.y - canvasSize.y * 0.5f;
+
+        float halfWidth = size.x * 0.5f + 16f;
+        float halfHeight = size.y * 0.5f + 16f;
+        return new Vector2(
+            Mathf.Clamp(position.x, left + halfWidth, right - halfWidth),
+            Mathf.Clamp(position.y, bottom + halfHeight, top - halfHeight));
+    }
+
     GameObject Card(string name, Vector2 size, Vector2 position, Color color)
     {
         var card = RuntimeUI.CreateObject(name, board);
         var rect = (RectTransform)card.transform;
-        Center(rect, size, position);
+        CenterRoot(rect, size, position);
         var image = card.AddComponent<Image>();
         image.color = color;
         MakeDecorative(image);
@@ -89,6 +123,7 @@ public sealed class HolDuelBoardLayout : MonoBehaviour
         var back = RuntimeUI.CreateButton(board, "DuelBack", L10n.Get("back"),
             new Vector2(-438f, 790f), new Vector2(118f, 92f), new Color(0.26f, 0.10f, 0.60f, 1f),
             NearWhite);
+        CenterRoot((RectTransform)back.transform, new Vector2(118f, 92f), new Vector2(-438f, 790f));
         RuntimeUI.Localize(back, "back");
         if (numberManager != null) back.onClick.AddListener(numberManager.ExitToMenu);
 
@@ -119,7 +154,7 @@ public sealed class HolDuelBoardLayout : MonoBehaviour
     {
         if (input != null)
         {
-            Center(input.transform as RectTransform, new Vector2(440f, 122f), new Vector2(-220f, 180f));
+            CenterRoot(input.transform as RectTransform, new Vector2(440f, 122f), new Vector2(-220f, 180f));
             input.shouldHideMobileInput = true;
             var image = input.GetComponent<Image>();
             if (image != null)
@@ -132,7 +167,7 @@ public sealed class HolDuelBoardLayout : MonoBehaviour
 
         if (numberManager != null && numberManager.playerNumberText != null)
         {
-            Center(numberManager.playerNumberText.rectTransform, new Vector2(420f, 60f),
+            CenterRoot(numberManager.playerNumberText.rectTransform, new Vector2(420f, 60f),
                 new Vector2(-220f, 310f));
             numberManager.playerNumberText.alignment = TextAlignmentOptions.Center;
             numberManager.playerNumberText.fontSize = 28f;
@@ -142,7 +177,7 @@ public sealed class HolDuelBoardLayout : MonoBehaviour
         var range = gameManager != null ? gameManager.rangeText : null;
         if (range != null)
         {
-            Center(range.rectTransform, new Vector2(420f, 60f), new Vector2(260f, 180f));
+            CenterRoot(range.rectTransform, new Vector2(420f, 60f), new Vector2(260f, 180f));
             range.alignment = TextAlignmentOptions.Center;
             range.fontSize = 27f;
             range.color = Muted;
@@ -162,10 +197,10 @@ public sealed class HolDuelBoardLayout : MonoBehaviour
         MoveIfFound("ButtonLOWER", new Vector2(300f, -650f), new Vector2(260f, 100f));
     }
 
-    static void LayoutText(TMP_Text text, Vector2 position, Vector2 size, float fontSize, Color color)
+    void LayoutText(TMP_Text text, Vector2 position, Vector2 size, float fontSize, Color color)
     {
         if (text == null) return;
-        Center(text.rectTransform, size, position);
+        CenterRoot(text.rectTransform, size, position);
         text.alignment = TextAlignmentOptions.Center;
         text.fontSize = fontSize;
         text.color = color;
@@ -186,7 +221,7 @@ public sealed class HolDuelBoardLayout : MonoBehaviour
     {
         var child = FindChild(name);
         if (child == null) return;
-        Center(child, size, position);
+        CenterRoot(child, size, position);
     }
 
     RectTransform FindChild(string name)
@@ -200,7 +235,7 @@ public sealed class HolDuelBoardLayout : MonoBehaviour
     {
         keypadRoot = RuntimeUI.CreateObject("NumberKeypad", board);
         var rootRect = (RectTransform)keypadRoot.transform;
-        Center(rootRect, new Vector2(660f, 620f), new Vector2(-180f, -360f));
+        CenterRoot(rootRect, new Vector2(660f, 620f), new Vector2(-180f, -360f));
 
         string[] keys = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "×", "0", "⌫" };
         for (int i = 0; i < keys.Length; i++)
@@ -218,8 +253,34 @@ public sealed class HolDuelBoardLayout : MonoBehaviour
 
         var submit = RuntimeUI.CreateButton(board, "NumberSubmit", L10n.Get("confirm"),
             new Vector2(-180f, -815f), new Vector2(660f, 112f), Gold, new Color(0.15f, 0.08f, 0.04f, 1f));
+        CenterRoot((RectTransform)submit.transform, new Vector2(660f, 112f), new Vector2(-180f, -815f));
         RuntimeUI.Localize(submit, "confirm");
         submit.onClick.AddListener(SubmitNumber);
+
+        ValidateLayout();
+    }
+
+    void ValidateLayout()
+    {
+        if (board == null) return;
+        if (Vector3.Distance(board.localScale, Vector3.one) > 0.001f)
+            Debug.LogWarning("HOL layout: PanelGAME scale is not 1.0.");
+
+        var canvas = board.parent != null ? board.parent.GetComponentInParent<Canvas>() : null;
+        var scaler = canvas != null ? canvas.GetComponent<CanvasScaler>() : null;
+        if (scaler != null && (scaler.referenceResolution.x != 1080f || scaler.referenceResolution.y != 1920f))
+            Debug.LogWarning("HOL layout: expected CanvasScaler reference resolution 1080x1920.");
+
+        foreach (var rect in layoutRoots)
+        {
+            if (rect == null) continue;
+            if (rect.anchorMin != new Vector2(0.5f, 0.5f) ||
+                rect.anchorMax != new Vector2(0.5f, 0.5f) ||
+                rect.pivot != new Vector2(0.5f, 0.5f))
+                Debug.LogWarning("HOL layout: non-centered root " + rect.name);
+            if (rect.rect.width < 48f || rect.rect.height < 48f)
+                Debug.LogWarning("HOL layout: touch target below 48px: " + rect.name);
+        }
     }
 
     void OnKeyPressed(string key)
