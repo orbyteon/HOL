@@ -118,8 +118,9 @@ missing so a skipped compile cannot look green.
   Azure service in `services/provisioner/`; the PlayFab Title Secret Key must
   remain server-only. Standard Play Integrity requires a positive Google Cloud
   project number in the production config.
-- Ads: LevelPlay app key `6076495` (Android) in `AdsManager`; iOS keys are
-  placeholders. Ads are opt-in: declining keeps LevelPlay uninitialized on later
+- Ads: the Android LevelPlay App Key lives in `AdsManager.AppKey` (single
+  source of truth, from the LevelPlay dashboard — a Unity Ads-shaped game
+  id there fails init with 2110); iOS keys are placeholders. Ads are opt-in: declining keeps LevelPlay uninitialized on later
   launches and blocks ad loads/shows. Settings → Ads privacy re-opens the choice.
   Interstitial unit `Interstitial_Android` plus rewarded unit
   `Rewarded_Android` powers the save-your-streak offer. Production CMP/mediation

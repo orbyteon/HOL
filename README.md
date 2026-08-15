@@ -157,7 +157,11 @@ The game uses only two scenes. All gameplay (menu, settings, matchmaking, and th
 
 Ad settings are constants at the top of `Assets/SCRIPT/AdsManager.cs`:
 
-- **LevelPlay Game ID:** `6076495`
+- **LevelPlay App Key:** `AdsManager.AppKey` — the ironSource App Key from
+  LevelPlay dashboard → Apps → HOL. Not a Unity Ads game id: that
+  look-alike credential fails init with error 2110, which is exactly what
+  every pre-vc5 build shipped. The constant is the single source of truth;
+  don't copy its value into docs, where it goes stale.
 - **Interstitial ad unit:** `Interstitial_Android` (an `Interstitial_iOS` unit is selected automatically on iOS builds via `#if UNITY_IOS` — create it in the LevelPlay dashboard before shipping iOS)
 - **Rewarded ad unit:** `Rewarded_Android` (same `#if UNITY_IOS` pattern with `Rewarded_iOS`) — powers the save-your-streak offer; create it in the dashboard or the offer silently never appears
 

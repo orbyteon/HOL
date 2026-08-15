@@ -4,15 +4,13 @@ using Unity.Services.LevelPlay;
 public class AdsManager : MonoBehaviour
 {
 #if UNITY_IOS
-    const string GameId = "SET_IOS_APP_KEY";
+    const string AppKey = "SET_IOS_APP_KEY";
 #else
-    // RELEASE BLOCKER (checklist section 6): LevelPlay.Init takes the
-    // ironSource APP KEY (8-10 alphanumerics, e.g. "85460dcd"), and this
-    // seven-digit value has the shape of a Unity Ads game id instead — the
-    // dashboard rejects it with init error 2110 "Bad Request", which is
-    // exactly what the rc3 device log showed. Replace with the App Key from
-    // LevelPlay dashboard -> Apps -> HOL (com.Orbyteon.HOL, Android).
-    const string GameId = "6076495";
+    // The ironSource APP KEY from LevelPlay dashboard -> Apps -> HOL
+    // (com.Orbyteon.HOL, Android) — not a Unity Ads game id. The two look
+    // alike but only this one initializes: a game id here fails init with
+    // 2110 "Bad Request", which is what shipped in every build before vc5.
+    const string AppKey = "27a32fc45";
 #endif
 #if UNITY_IOS
     const string InterstitialUnit = "Interstitial_iOS";
@@ -169,7 +167,7 @@ public class AdsManager : MonoBehaviour
         EnsureGlobalInitCallbacks();
         sdkInitInFlight = true;
         LevelPlayPrivacySettings.SetGDPRConsent(true);
-        LevelPlay.Init(GameId);
+        LevelPlay.Init(AppKey);
     }
 
     void HandleInitSuccess()
