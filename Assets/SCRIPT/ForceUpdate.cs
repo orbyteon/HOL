@@ -118,24 +118,23 @@ public class ForceUpdate : MonoBehaviour
         var panel = RuntimeUI.FullscreenPanel(transform, "ForceUpdatePanel",
             ConvergingLight.WithAlpha(ConvergingLight.ScrimIndigo, 0.96f));
 
-        var card = RuntimeUI.CreateObject("Card", panel.transform);
-        ConvergingLight.Center(card, Vector2.zero, new Vector2(640f, 560f));
-        var cardImage = card.AddComponent<Image>();
-        cardImage.sprite = RuntimeUI.RoundedRectSprite;
-        cardImage.type = Image.Type.Sliced;
-        cardImage.color = ConvergingLight.PanelIndigo;
+        var card = NeonFrame.Frame(panel.transform, "Card", Vector2.zero,
+            new Vector2(640f, 560f), ConsumerTokens.Gold, 0.97f, true,
+            ConsumerTokens.Surface);
 
         RuntimeUI.CreateText(card.transform, "Message", L10n.Get("update_required"),
             34, new Vector2(0f, 80f), new Vector2(560f, 200f));
 
-        var update = RuntimeUI.CreateButton(card.transform, "UpdateButton",
+        // "Confirm" keeps this on the primary design sprite; gold is this
+        // screen's one action that matters.
+        var update = RuntimeUI.CreateButton(card.transform, "ConfirmUpdateButton",
             L10n.Get("update_now"), new Vector2(0f, -110f), new Vector2(420f, 100f),
-            ConvergingLight.Gold, ConvergingLight.WithAlpha(ConvergingLight.PanelIndigo, 1f));
+            ConsumerTokens.Gold, ConvergingLight.WithAlpha(ConvergingLight.PanelIndigo, 1f));
         update.onClick.AddListener(OpenStore);
 
         var quit = RuntimeUI.CreateButton(card.transform, "QuitButton",
             L10n.Get("quit"), new Vector2(0f, -220f), new Vector2(420f, 100f),
-            ConvergingLight.TrackIndigo);
+            ConsumerTokens.SurfaceElevated);
         quit.onClick.AddListener(Application.Quit);
     }
 
