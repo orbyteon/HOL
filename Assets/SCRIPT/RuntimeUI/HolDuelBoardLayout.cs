@@ -192,9 +192,9 @@ public sealed class HolDuelBoardLayout : MonoBehaviour
             LayoutText(gameManager.aiHistoryText, new Vector2(285f, -365f), new Vector2(310f, 90f), 24f, NearWhite);
         }
 
-        MoveIfFound("ButtonHIGHER", new Vector2(-300f, -650f), new Vector2(260f, 100f));
-        MoveIfFound("ButtonCORRECT", new Vector2(0f, -650f), new Vector2(260f, 100f));
-        MoveIfFound("ButtonLOWER", new Vector2(300f, -650f), new Vector2(260f, 100f));
+        MoveIfFound("ButtonHIGHER", new Vector2(-300f, -705f), new Vector2(260f, 100f));
+        MoveIfFound("ButtonCORRECT", new Vector2(0f, -705f), new Vector2(260f, 100f));
+        MoveIfFound("ButtonLOWER", new Vector2(300f, -705f), new Vector2(260f, 100f));
     }
 
     void LayoutText(TMP_Text text, Vector2 position, Vector2 size, float fontSize, Color color)
@@ -235,7 +235,7 @@ public sealed class HolDuelBoardLayout : MonoBehaviour
     {
         keypadRoot = RuntimeUI.CreateObject("NumberKeypad", board);
         var rootRect = (RectTransform)keypadRoot.transform;
-        CenterRoot(rootRect, new Vector2(660f, 620f), new Vector2(-180f, -360f));
+        CenterRoot(rootRect, new Vector2(660f, 620f), new Vector2(-180f, -285f));
 
         string[] keys = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "×", "0", "⌫" };
         for (int i = 0; i < keys.Length; i++)
@@ -252,8 +252,8 @@ public sealed class HolDuelBoardLayout : MonoBehaviour
         }
 
         var submit = RuntimeUI.CreateButton(board, "NumberSubmit", L10n.Get("confirm"),
-            new Vector2(-180f, -815f), new Vector2(660f, 112f), Gold, new Color(0.15f, 0.08f, 0.04f, 1f));
-        CenterRoot((RectTransform)submit.transform, new Vector2(660f, 112f), new Vector2(-180f, -815f));
+            new Vector2(-180f, -850f), new Vector2(660f, 112f), Gold, new Color(0.15f, 0.08f, 0.04f, 1f));
+        CenterRoot((RectTransform)submit.transform, new Vector2(660f, 112f), new Vector2(-180f, -850f));
         RuntimeUI.Localize(submit, "confirm");
         submit.onClick.AddListener(SubmitNumber);
 
