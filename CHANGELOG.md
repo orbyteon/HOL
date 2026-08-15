@@ -5,6 +5,15 @@ Play Console versionName in `ProjectSettings.asset`.
 
 ## [Unreleased]
 
+### Fixed
+
+- Ads initialize. `AdsManager` sent LevelPlay a Unity Ads-shaped game id
+  where the ironSource App Key belongs, so every build so far failed ad
+  init with error 2110 "Bad Request" — the consent flow worked, but no ad
+  could ever load behind it. The constant now carries the dashboard's real
+  App Key and is named `AppKey` so the two credential types cannot be
+  confused again.
+
 ### Added
 
 - **Daily Hunt** — the parked product-pass draft's one unshipped idea (#6),

@@ -313,10 +313,10 @@ stack; a custom two-button app dialog alone must not be assumed to satisfy every
 network/platform consent requirement.
 
 - [ ] LevelPlay production app key/bundle `com.Orbyteon.HOL` are correct.
-      **Known failing:** `AdsManager.GameId` is `6076495`, which has the shape
-      of a Unity Ads game id, not an ironSource app key — LevelPlay rejects it
-      with init error 2110 (seen in the rc3 device log). Paste the real App Key
-      from the LevelPlay dashboard and rebuild before store submission
+      `AdsManager.AppKey` carries the dashboard's App Key as of versionCode 5;
+      earlier builds shipped a Unity Ads-shaped game id that failed init with
+      error 2110 (seen in the rc3 device log). The device smoke test is what
+      proves init actually succeeds — watch for "Ads Init Failed" in logcat
 - [ ] `Interstitial_Android` and `Rewarded_Android` units are active
 - [ ] final mediated-network list has been reviewed for consent requirements
 - [ ] CMP/Google Additional Consent configuration is completed where required
