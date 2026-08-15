@@ -108,7 +108,7 @@ public sealed class HolDuelBoardLayout : MonoBehaviour
         return card;
     }
 
-    Text Label(Transform parent, string name, string value, int size, Vector2 position,
+    TextMeshProUGUI Label(Transform parent, string name, string value, int size, Vector2 position,
         Vector2 dimensions, Color color = default)
     {
         var label = RuntimeUI.CreateText(parent, name, value, size, position, dimensions,
@@ -246,7 +246,7 @@ public sealed class HolDuelBoardLayout : MonoBehaviour
             var button = RuntimeUI.CreateButton(keypadRoot.transform, "Key_" + keys[i], keys[i],
                 new Vector2(-220f + column * 220f, 215f - row * 142f),
                 new Vector2(190f, 118f), KeyBlue, NearWhite);
-            var text = button.GetComponentInChildren<Text>();
+            var text = button.GetComponentInChildren<TMP_Text>();
             if (text != null) text.fontSize = keys[i] == "⌫" || keys[i] == "×" ? 38 : 48;
             button.onClick.AddListener(() => OnKeyPressed(keys[index]));
         }

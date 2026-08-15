@@ -89,6 +89,16 @@ CONVERGING LIGHT
 Κατέβασε το HOL και εμπιστεύσου το διάστημά σου.
 ```
 
+## Release notes — v0.4.0 (max 500 chars per language)
+
+### EN
+
+A fresh look and a fairer duel. New game board with an on-screen keypad, live round counter, guess history, and your narrowed range always visible. Online matches are now fully server-refereed, and abandoned rooms clean themselves up. Anonymous match statistics help us keep the duel balanced — see the privacy policy. Good luck out there!
+
+### EL
+
+Νέα εμφάνιση και πιο δίκαιη μονομαχία. Νέος πίνακας παιχνιδιού με πληκτρολόγιο οθόνης, μετρητή γύρων, ιστορικό προσπαθειών και το εύρος σου πάντα ορατό. Οι online αγώνες κρίνονται πλέον πλήρως από τον server, και τα εγκαταλελειμμένα δωμάτια καθαρίζουν μόνα τους. Ανώνυμα στατιστικά αγώνων μάς βοηθούν να κρατάμε τη μονομαχία ισορροπημένη — δες την πολιτική απορρήτου. Καλή επιτυχία!
+
 ## Release notes — v0.3.0 (max 500 chars per language)
 
 - EN: `Duels are decided by skill now, not by who guessed first. Both players
@@ -123,3 +133,32 @@ CONVERGING LIGHT
 
 - Category: Casual / Board
 - Tags: number game, guessing game, higher or lower, duel, PvP, casual
+
+## Play Console Data safety answers (0.4.0, with match telemetry)
+
+Answers for the Data safety form, matching `docs/privacy.html` exactly. The
+0.3.0 form differs in one row: `match_completed` ships in 0.4.0, so the
+App-activity row below applies only from that release.
+
+**Does your app collect or share any of the required user data types?** Yes.
+
+| Data type | Collected | Shared | Processed ephemerally | Required | Purpose |
+|---|---|---|---|---|---|
+| App activity → Other actions (PvP room state: guesses, results, Signals) | Yes | No | Yes — deleted with the room | Required for PvP | App functionality |
+| App activity → Other actions (end-of-match summary `match_completed`) | Yes | No | No — retained by PlayFab per player | Required (0.4.0+) | Analytics |
+| App info and performance → Diagnostics (Play Integrity verdict at first install) | Yes | No | Yes — used once to authorize provisioning | Required for PvP | App functionality, fraud prevention |
+| Device or other IDs (`ANDROID_ID`-derived anonymous PlayFab Custom ID) | Yes | No | No | Required for PvP | App functionality, account management |
+| Personal info → Name (self-chosen display name) | Yes — only when entering PvP | No | Yes — lives in room state | Optional | App functionality |
+| Advertising IDs (only if ads consented) | Yes — by LevelPlay | Yes — mediation partners | No | Optional | Advertising |
+| Approximate location (IP-derived, only if ads consented) | Yes — by ad SDKs | Yes — mediation partners | Yes | Optional | Advertising |
+
+**Not collected:** precise location, contacts, files, photos, audio, health,
+financial data, browsing history, search history, installed apps.
+
+- Data is encrypted in transit (HTTPS everywhere).
+- Deletion: the room state deletes itself (see privacy policy retention
+  windows); the anonymous identity and its match summaries are deleted on
+  request via the contact address in the policy.
+- No data sold. "Shared" applies only to advertising mediation, gated on the
+  in-app consent choice; with ads declined, nothing in the two advertising
+  rows is collected at all.

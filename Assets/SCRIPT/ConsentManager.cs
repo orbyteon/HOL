@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 
 // First-launch ads permission dialog. A decline means LevelPlay is not
 // initialized at all on the next launch and no ads are shown this session.
@@ -60,42 +61,38 @@ public class ConsentManager : MonoBehaviour
         var panel = CreateUIObject("ConsentPanel", transform);
         Stretch(panel);
         var bg = panel.AddComponent<Image>();
-        bg.color = new Color(0.05f, 0.05f, 0.12f, 0.92f);
+        bg.color = ConvergingLight.WithAlpha(ConsumerTokens.Background0, 0.92f);
         bg.raycastTarget = true;
 
-        var card = CreateUIObject("Card", panel.transform);
-        var cardRect = (RectTransform)card.transform;
-        cardRect.anchorMin = new Vector2(0.5f, 0.5f);
-        cardRect.anchorMax = new Vector2(0.5f, 0.5f);
-        cardRect.sizeDelta = new Vector2(600f, 420f);
-        var cardImage = card.AddComponent<Image>();
-        cardImage.sprite = RuntimeUI.RoundedRectSprite;
-        cardImage.type = Image.Type.Sliced;
-        cardImage.color = new Color(0.10f, 0.09f, 0.18f, 1f);
+        // The first dialog a new player ever sees, so it is the first place
+        // the Consumer First board has to hold: framed card, token surface.
+        var card = NeonFrame.Frame(panel.transform, "Card", Vector2.zero,
+            new Vector2(600f, 420f), ConsumerTokens.Cyan, 0.97f, true,
+            ConsumerTokens.Surface);
 
         var message = CreateText(card.transform, "Message",
             L10n.Get("consent_message"), 34, new Vector2(0f, 60f));
         Localize(message, "consent_message");
 
         var yes = CreateButton(card.transform, "YesButton", L10n.Get("yes"),
-            new Vector2(0f, -80f), new Color(0.25f, 0.85f, 1f), new Color(0.10f, 0.09f, 0.18f));
+            new Vector2(0f, -80f), ConsumerTokens.Cyan, new Color(0.10f, 0.09f, 0.18f));
         yes.onClick.AddListener(AcceptPersonalized);
-        Localize(yes.GetComponentInChildren<Text>(true), "yes");
+        Localize(yes.GetComponentInChildren<TMP_Text>(true), "yes");
 
         var no = CreateButton(card.transform, "NoButton", L10n.Get("no"),
-            new Vector2(0f, -170f), new Color(0.16f, 0.15f, 0.26f));
+            new Vector2(0f, -170f), ConsumerTokens.SurfaceElevated);
         no.onClick.AddListener(DeclinePersonalized);
-        Localize(no.GetComponentInChildren<Text>(true), "no");
+        Localize(no.GetComponentInChildren<TMP_Text>(true), "no");
 
         return panel;
     }
 
-    static void Localize(Text text, string key)
+    static void Localize(TMP_Text text, string key)
     {
         if (text == null) return;
-        var localized = text.GetComponent<LocalizedLegacyText>();
+        var localized = text.GetComponent<LocalizedText>();
         if (localized == null)
-            localized = text.gameObject.AddComponent<LocalizedLegacyText>();
+            localized = text.gameObject.AddComponent<LocalizedText>();
         localized.key = key;
     }
 
@@ -115,7 +112,7 @@ public class ConsentManager : MonoBehaviour
         rect.offsetMax = Vector2.zero;
     }
 
-    static Text CreateText(Transform parent, string name, string content, int fontSize, Vector2 position,
+    static TextMeshProUGUI CreateText(Transform parent, string name, string content, int fontSize, Vector2 position,
         Color? color = null)
     {
         var go = CreateUIObject(name, parent);
@@ -125,12 +122,12 @@ public class ConsentManager : MonoBehaviour
         rect.sizeDelta = new Vector2(520f, 160f);
         rect.anchoredPosition = position;
 
-        var text = go.AddComponent<Text>();
+        var text = go.AddComponent<TextMeshProUGUI>();
         text.text = content;
         text.fontSize = fontSize;
         text.color = color ?? new Color(0.91f, 0.93f, 1f);
-        text.alignment = TextAnchor.MiddleCenter;
-        text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        text.alignment = TextAlignmentOptions.Center;
+        text.enableWordWrapping = true;
         return text;
     }
 

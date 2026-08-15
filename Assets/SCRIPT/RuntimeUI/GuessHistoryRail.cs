@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
-using UnityEngine.UI;
 
 // Accumulates the duel's guess history for the HISTORY card.
 //
@@ -18,7 +17,7 @@ using UnityEngine.UI;
 public class GuessHistoryRail : MonoBehaviour
 {
     public TMP_Text source; // the controller's latest-guess line
-    public Text target;     // renders the guesses before it, newest first
+    public TMP_Text target; // renders the guesses before it, newest first
     public int keep = 3;
 
     readonly List<string> previous = new List<string>();

@@ -129,6 +129,13 @@ public class PlayFabPvpClient : PvpBackend
         EnsureLogin(ok => done?.Invoke(ok, ok ? sessionTicket : ""));
     }
 
+    // True once this launch already holds a session. GetSessionTicket would
+    // sign in — and on a fresh release install, provision an account — so
+    // callers that must never be the reason an identity exists check this
+    // first. MatchTelemetry does; it reports only what an already-online
+    // session can report.
+    public bool HasSession => !string.IsNullOrEmpty(sessionTicket);
+
     // ------------------------------------------------ create / join
 
     public override void CreateRoom(string hostName, int hostSecret, Action<bool, string> done)

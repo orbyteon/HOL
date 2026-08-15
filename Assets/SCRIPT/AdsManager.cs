@@ -6,6 +6,12 @@ public class AdsManager : MonoBehaviour
 #if UNITY_IOS
     const string GameId = "SET_IOS_APP_KEY";
 #else
+    // RELEASE BLOCKER (checklist section 6): LevelPlay.Init takes the
+    // ironSource APP KEY (8-10 alphanumerics, e.g. "85460dcd"), and this
+    // seven-digit value has the shape of a Unity Ads game id instead — the
+    // dashboard rejects it with init error 2110 "Bad Request", which is
+    // exactly what the rc3 device log showed. Replace with the App Key from
+    // LevelPlay dashboard -> Apps -> HOL (com.Orbyteon.HOL, Android).
     const string GameId = "6076495";
 #endif
 #if UNITY_IOS

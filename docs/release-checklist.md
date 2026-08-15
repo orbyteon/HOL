@@ -152,8 +152,10 @@ empty/default values. Never hand-edit production identifiers into it.
 Use **Build Android Release Candidate** from `main`:
 
 1. enter the public semantic version;
-2. enter a positive Google Play `versionCode` that is higher than every uploaded
-   build;
+2. enter a positive Google Play `versionCode` that is higher than every previous
+   build — including any distributed through **Internal App Sharing**, which
+   consumes a `versionCode` just as a track upload does, so a rebuilt candidate
+   always needs a fresh one rather than a reused one;
 3. type `BUILD`.
 
 The workflow validates all production variables/secrets, injects public release
@@ -174,6 +176,38 @@ and uploads the artifact with `JARSIGNER_VERIFY.txt` plus `SHA256SUMS`.
 
 Use the signed candidate (or a Play internal-testing build made from that exact
 candidate) on physical Android devices.
+
+> **Half of this section needs section 3 to have run first.** The duel rules
+> live in CloudScript, and `PlayFabPvpClient.IsServerAuthoritative` is hardcoded
+> `true` — it reports which *backend* is in use, not which CloudScript revision
+> is published. So a 0.3.0 client pointed at a pre-0.3.0 title shows the Lock
+> and Signals controls and then fails when they are tapped, and matches quietly
+> play by the old first-correct-guess rule with a fixed opener.
+>
+> Splash, main menu, solo, orientation, ads and localization are testable
+> against any published CloudScript. **PvP / provisioning and Duel rules are
+> not** — run them only after **Deploy PlayFab Production** has published the
+> matching revision, or every rule this release exists to change will read as a
+> client bug.
+
+### Orientation
+
+`ProjectSettings.asset` sets `defaultScreenOrientation: 0` (Portrait). Anything
+other than `4` (AutoRotation) is a hard lock, so the `allowedAutorotateTo*`
+allow-list below it is never consulted — which is how 0.3.0 rc2 shipped with
+`1` (PortraitUpsideDown) while the allow-list still read portrait-only. The
+config looked right and the app launched rotated 180°. Check the device, not
+the file.
+
+- [ ] Cold launch comes up the right way up, not inverted
+- [ ] Launching while holding the device upside down still comes up the right
+      way up
+- [ ] Rotating the device does **not** flip the UI — portrait is locked
+      unconditionally, so no rotation is the pass condition
+- [ ] Splash and main menu agree; no flip on the transition between them
+- [ ] Returning from the notification shade, recents, or another app restores
+      portrait
+- [ ] Returning from an interstitial or rewarded ad restores portrait
 
 ### Splash
 
@@ -226,6 +260,39 @@ candidate) on physical Android devices.
 - [ ] Back out during create/join, then try the old code → no late UI hijack
 - [ ] PvP Android back navigates create/join/menu; mid-match uses explicit Leave
 
+### Duel rules (new in 0.3.0)
+
+The server owns all of this; the client only renders it. Every check here is a
+fairness claim, so a failure is a release blocker rather than a polish item.
+
+- [ ] Across ~10 matches the opener is not always the same side — it is a coin
+      flip taken at join, not a fixed role
+- [ ] When one side guesses correctly the match does **not** end immediately:
+      the other side gets the answering guess, so both have had equal turns
+- [ ] Both sides correct in the same round, neither locked and both left with
+      the same number of open candidates → **draw**, and the client shows a draw
+      rather than a loss (a 0.2.x client renders a server draw as "YOU LOSE";
+      that is the reason for the version gate in section 3)
+- [ ] Lock is hidden during the first guess and appears only afterwards, with
+      its one-line hint
+- [ ] Lock can be staked once per match per side; the control is unavailable
+      after it is spent
+- [ ] Correct **locked** guess beats a correct unlocked guess in the same round
+- [ ] Wrong locked guess forfeits that side's next turn, and the skipped turn is
+      visible to both players
+- [ ] Both locked, or neither → the tie goes to whichever side had fewer
+      candidates left before the winning guess; equal candidates → draw
+- [ ] Lock intro tooltip appears at most three times and stops once the player
+      has used Lock
+- [ ] Signals: all six send, arrive on the other device, and are text-only
+- [ ] A side that sends more than 12 signals in one match is refused further
+      sends; the other player is not spammed
+- [ ] Rematch: both sides accepting restarts in the **same room** with new
+      secrets, without returning to create/join
+- [ ] Rematch offered by one side shows as pending until the other accepts
+- [ ] Opponent leaving after a match is over is reported rather than hanging on
+      the rematch prompt
+
 ### Other regressions
 
 - [ ] Solo out-of-range guess is rejected without clearing typed input
@@ -245,7 +312,11 @@ TCF-compatible CMP or supported Google consent framework for the final mediation
 stack; a custom two-button app dialog alone must not be assumed to satisfy every
 network/platform consent requirement.
 
-- [ ] LevelPlay production app key/bundle `com.Orbyteon.HOL` are correct
+- [ ] LevelPlay production app key/bundle `com.Orbyteon.HOL` are correct.
+      **Known failing:** `AdsManager.GameId` is `6076495`, which has the shape
+      of a Unity Ads game id, not an ironSource app key — LevelPlay rejects it
+      with init error 2110 (seen in the rc3 device log). Paste the real App Key
+      from the LevelPlay dashboard and rebuild before store submission
 - [ ] `Interstitial_Android` and `Rewarded_Android` units are active
 - [ ] final mediated-network list has been reviewed for consent requirements
 - [ ] CMP/Google Additional Consent configuration is completed where required
@@ -255,12 +326,23 @@ network/platform consent requirement.
       prevents LevelPlay initialization on the next launch
 - [ ] Play Console Data safety answers match `docs/privacy.html` and the final
       mediation/configuration stack
+- [ ] **New in 0.4.0:** Data safety declares the end-of-match analytics event —
+      "App activity → Other actions", collected, tied to the anonymous PlayFab
+      identity, not shared with third parties beyond PlayFab as processor, not
+      used for advertising or tracking. Adding it changed two claims in
+      `docs/privacy.html` that were previously true: solo matches now report a
+      result, and PlayFab now retains per-player match summaries. Both are
+      described under "Gameplay analytics"; ship the updated policy in the same
+      release as the build, not after it.
 
 ## 7. Privacy policy hosting
 
-Host `docs/privacy.html` at a stable public HTTPS URL before publishing.
+The provisioning Function App serves the policy itself: `GET /api/privacy` on
+the same host as `/api/provision` returns `services/provisioner/static/privacy.html`,
+a byte-copy of `docs/privacy.html` that CI and the provisioner tests both verify.
+Deploying the provisioner publishes policy updates.
 
-- [ ] open the policy URL without authentication/incognito
+- [ ] open `https://<function-app-host>/api/privacy` without authentication/incognito
 - [ ] link that exact URL in Play Console
 - [ ] re-read the policy after final Azure, PlayFab, Play Integrity, LevelPlay,
       and CMP configuration; update it if actual handling differs
