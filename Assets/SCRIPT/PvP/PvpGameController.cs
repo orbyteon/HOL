@@ -573,23 +573,23 @@ public class PvpGameController : MonoBehaviour
             if (isDraw)
             {
                 // Neither a win nor a loss: the streak survives, and the
-                // win/lose analytics event would misreport it, so it is left
-                // to the stats listeners alone.
+                // win/lose analytics event would misreport it, so MatchCompleted
+                // routes it to the stats listeners alone.
                 GameStats.RecordDraw();
                 Haptics.Light();
-                GameEvents.StatsChanged();
+                GameEvents.MatchCompleted(PvpOutcome(s, MatchOutcome.Result.Draw, myGuessCount));
             }
             else if (iWon)
             {
                 GameStats.RecordWin(myGuessCount, false);
                 Haptics.Success();
-                GameEvents.MatchEnded(true, myGuessCount);
+                GameEvents.MatchCompleted(PvpOutcome(s, MatchOutcome.Result.Win, myGuessCount));
             }
             else
             {
                 GameStats.RecordLoss(false);
                 Haptics.Error();
-                GameEvents.MatchEnded(false, 0);
+                GameEvents.MatchCompleted(PvpOutcome(s, MatchOutcome.Result.Loss, myGuessCount));
             }
             if (audioSource != null && !isDraw)
             {
@@ -656,6 +656,27 @@ public class PvpGameController : MonoBehaviour
         }
 
         turnText.text = myTurn ? L10n.Get("your_guess") : L10n.Get("opponent_thinking", opponentName);
+    }
+
+    // The guess count is passed in rather than re-read: the caller has already
+    // reconciled the authoritative count against the local one for the case
+    // where the winning guess is still in flight when "done" arrives.
+    MatchOutcome PvpOutcome(PvpBackend.RoomState s, MatchOutcome.Result result, int myGuessCount)
+    {
+        string me = client.IsHost ? "host" : "guest";
+        string them = client.IsHost ? "guest" : "host";
+
+        return new MatchOutcome
+        {
+            PlayMode = MatchOutcome.Mode.Pvp,
+            Outcome = result,
+            Guesses = myGuessCount,
+            OpponentGuesses = s.GuessCountFor(them),
+            Opened = s.opener == me,
+            LockStaked = s.LockUsedBy(me),
+            RematchIndex = s.matchIndex,
+            AppVersion = Application.version,
+        };
     }
 
     // ------------------------------------------------------------- rematch UI

@@ -5,6 +5,42 @@ Play Console versionName in `ProjectSettings.asset`.
 
 ## [Unreleased]
 
+### Added
+
+- End-of-match analytics. The 0.3.0 duel rules were tuned against a
+  simulation — the opener coin flip took first-mover advantage from 63.7%
+  to roughly even, and draws sit near 7% at human accuracy but climb
+  toward 23% as both players approach a flawless binary search. That last
+  number moves with the real population's skill and a simulation cannot
+  settle it, so the release would have felt fine at launch and grown
+  steadily more drawish with no signal but reviews. `MatchOutcome` carries
+  result (draw included), both guess counts, who opened, whether the Lock
+  was staked, and the rematch depth; `MatchTelemetry` posts one PlayFab
+  event per finished match.
+- `GameEvents.OnMatchCompleted`, the draw-capable counterpart to
+  `OnMatchEnded`. `GameEvents.MatchCompleted` is now the single raise point
+  for a finished match, so a call site cannot report one event and forget
+  the other. Win/lose still reach `OnMatchEnded` unchanged, and a draw
+  still does not — `(bool, int)` has no truthful way to say "draw".
+- `PlayFabPvpClient.HasSession`, so a caller can reuse an existing session
+  without being the reason one is created.
+
+### Changed
+
+- `docs/privacy.html` gains a "Gameplay analytics" section, and two claims
+  that were true before this change are corrected: solo matches previously
+  sent nothing to PlayFab, and the service previously held no match
+  history. Both statements now describe what actually happens. The Play
+  Console Data safety declaration has to be updated in the same release —
+  see `docs/release-checklist.md` section 6.
+
+### Fixed
+
+- A lost match no longer discards its guess count. `MatchEnded(false, 0)`
+  reported every defeat identically, which left the draw rate
+  uninterpretable: a duel decided on the last candidate and a rout looked
+  the same in the data.
+
 ### Security and reliability
 
 - Serialized every PlayFab room mutation with a revision/epoch-fenced server
@@ -30,6 +66,14 @@ Play Console versionName in `ProjectSettings.asset`.
 
 ### Fixed
 
+- The app launched upside down on device. `defaultScreenOrientation` was `1`
+  (PortraitUpsideDown) rather than `0` (Portrait). Any value other than `4`
+  (AutoRotation) is a hard orientation lock, so the `allowedAutorotateTo*`
+  allow-list underneath it — which correctly permitted portrait only — was
+  never consulted. That combination is why the settings read as portrait-only
+  while every launch came up rotated 180°, and why it survived review: the
+  allow-list is the part a reader checks. Found on a real device against the
+  0.3.0 versionCode 2 candidate; fixed for versionCode 3.
 - Solo was playable exactly once per launch. The end-of-match button is
   relabelled "Rematch" and wired to `GameManager.RestartMatch`, but the
   match-over flag that `NumberManager` gates every number submission on

@@ -401,7 +401,7 @@ public class GameManager : MonoBehaviour
         {
             GameStats.RecordDraw();
             Haptics.Light();
-            GameEvents.StatsChanged();
+            GameEvents.MatchCompleted(SoloOutcome(MatchOutcome.Result.Draw));
 
             turnText.text = L10n.Get("you_draw") + "\n" +
                             L10n.Get("draw_in_guesses", playerGuessCount) + "\n" +
@@ -411,7 +411,7 @@ public class GameManager : MonoBehaviour
         {
             GameStats.RecordWin(playerGuessCount);
             Haptics.Success();
-            GameEvents.MatchEnded(true, playerGuessCount);
+            GameEvents.MatchCompleted(SoloOutcome(MatchOutcome.Result.Win));
 
             turnText.text = L10n.Get("you_win") + "\n" + L10n.Get("won_in_guesses", playerGuessCount);
             if (playerGuessCount <= 7)
@@ -426,7 +426,7 @@ public class GameManager : MonoBehaviour
             int streakBeforeLoss = GameStats.CurrentStreak;
             GameStats.RecordLoss();
             Haptics.Error();
-            GameEvents.MatchEnded(false, 0);
+            GameEvents.MatchCompleted(SoloOutcome(MatchOutcome.Result.Loss));
 
             turnText.text = L10n.Get("you_lose") + "\n" + L10n.Get("number_was", aiSecretNumber);
             if (audioSource != null && loseSound != null)
@@ -437,6 +437,24 @@ public class GameManager : MonoBehaviour
 
         if (adsManager != null && GameStats.Matches % 2 == 0)
             adsManager.ShowAd(null);
+    }
+
+    // The Lock starts available and is never returned, so "no longer available"
+    // is exactly "was staked". Solo starts a fresh match every time rather than
+    // rematching inside a room, so the rematch index is always zero.
+    MatchOutcome SoloOutcome(MatchOutcome.Result result)
+    {
+        return new MatchOutcome
+        {
+            PlayMode = MatchOutcome.Mode.Solo,
+            Outcome = result,
+            Guesses = playerGuessCount,
+            OpponentGuesses = rules.GuessCount(AiSide),
+            Opened = rules.Opener == PlayerSide,
+            LockStaked = !rules.LockAvailable(PlayerSide),
+            RematchIndex = 0,
+            AppVersion = Application.version,
+        };
     }
 
     // ------------------------------------------------------------- the Lock
