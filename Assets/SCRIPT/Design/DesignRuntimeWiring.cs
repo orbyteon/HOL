@@ -28,12 +28,16 @@ public class DesignRuntimeWiring : MonoBehaviour
     [SerializeField] Sprite primaryButtonSprite;
     [SerializeField] Sprite secondaryButtonSprite;
 
+    public static Sprite BackgroundAsset { get; private set; }
+    public static Sprite PanelSurfaceAsset { get; private set; }
     public static Sprite PrimaryButtonAsset { get; private set; }
     public static Sprite SecondaryButtonAsset { get; private set; }
 
     void Awake()
     {
         // Publish the assigned assets before any runtime-built PvP UI is created.
+        BackgroundAsset = backgroundSprite;
+        PanelSurfaceAsset = panelSprite;
         PrimaryButtonAsset = primaryButtonSprite;
         SecondaryButtonAsset = secondaryButtonSprite;
     }
