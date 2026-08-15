@@ -145,15 +145,15 @@ public class PvpRuntimeUI : MonoBehaviour
         var opponentText = RuntimeUI.CreateText(matchPanel.transform, "Opponent", "", 44,
             new Vector2(0f, 420f), new Vector2(1000f, 90f));
         var turnText = RuntimeUI.CreateText(matchPanel.transform, "Turn", "", 44,
-            new Vector2(0f, 300f), new Vector2(1000f, 90f));
+            new Vector2(0f, 300f), new Vector2(1000f, 80f));
         var historyText = RuntimeUI.CreateText(matchPanel.transform, "History", "", 40,
-            new Vector2(0f, 120f), new Vector2(1000f, 120f));
+            new Vector2(0f, 120f), new Vector2(1000f, 100f));
         // How far the player has narrowed the opponent's number. Solo play has
         // always shown this; PvP never did.
         var rangeText = RuntimeUI.CreateText(matchPanel.transform, "Range", "", 34,
-            new Vector2(0f, 205f), new Vector2(1000f, 70f), AccentBlue);
+            new Vector2(0f, 215f), new Vector2(1000f, 50f), AccentBlue);
         var signalFeed = RuntimeUI.CreateText(matchPanel.transform, "SignalFeed", "", 34,
-            new Vector2(0f, 20f), new Vector2(1000f, 70f), AccentBlue);
+            new Vector2(0f, 15f), new Vector2(1000f, 50f), AccentBlue);
         var guessInput = RuntimeUI.CreateInputField(matchPanel.transform, "GuessInput",
             "1-100", new Vector2(0f, -80f), new Vector2(460f, 90f));
         var guessBtn = RuntimeUI.CreateButton(matchPanel.transform, "GuessButton",
