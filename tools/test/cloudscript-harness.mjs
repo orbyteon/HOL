@@ -20,6 +20,8 @@ class SharedGroupStore {
   constructor() {
     this.groups = new Map();
     this.calls = { create: 0, read: 0, write: 0, delete: 0 };
+    this.beforeUpdate = null;
+    this.runningUpdateHook = false;
   }
 
   CreateSharedGroup({ SharedGroupId }) {
@@ -43,11 +45,20 @@ class SharedGroupStore {
     return { Data };
   }
 
-  UpdateSharedGroupData({ SharedGroupId, Data }) {
+  UpdateSharedGroupData({ SharedGroupId, Data, KeysToRemove }) {
     this.calls.write++;
     if (!this.groups.has(SharedGroupId))
       throw new Error(`SharedGroupId ${SharedGroupId} not found`);
-    Object.assign(this.groups.get(SharedGroupId), Data);
+
+    if (this.beforeUpdate && !this.runningUpdateHook) {
+      this.runningUpdateHook = true;
+      try { this.beforeUpdate({ SharedGroupId, Data, KeysToRemove }); }
+      finally { this.runningUpdateHook = false; }
+    }
+
+    const stored = this.groups.get(SharedGroupId);
+    if (Data) Object.assign(stored, Data);
+    for (const key of KeysToRemove || []) delete stored[key];
     return {};
   }
 
@@ -60,8 +71,12 @@ class SharedGroupStore {
   }
 }
 
-export function loadCloudScript({ random } = {}) {
+export function loadCloudScript({ random, now } = {}) {
   const store = new SharedGroupStore();
+  const nowFn = typeof now === "function" ? now : Date.now;
+  class CloudScriptDate extends Date {
+    static now() { return nowFn(); }
+  }
   const sandbox = {
     handlers: {},
     server: store,
@@ -71,6 +86,7 @@ export function loadCloudScript({ random } = {}) {
     Number,
     Math: random ? Object.assign(Object.create(Math), { random }) : Math,
     Object,
+    Date: CloudScriptDate,
   };
 
   vm.createContext(sandbox);
@@ -80,8 +96,10 @@ export function loadCloudScript({ random } = {}) {
   const call = (name, playerId, args) => {
     if (typeof sandbox.handlers[name] !== "function")
       throw new Error(`handler '${name}' is not defined in cloudscript.js`);
+    const previousPlayerId = sandbox.currentPlayerId;
     sandbox.currentPlayerId = playerId;
-    return sandbox.handlers[name](args, {});
+    try { return sandbox.handlers[name](args, {}); }
+    finally { sandbox.currentPlayerId = previousPlayerId; }
   };
 
   return {

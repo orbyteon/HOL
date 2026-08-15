@@ -1,9 +1,7 @@
 using System;
 using UnityEngine;
 
-// Abstract transport for HOL's PvP rooms. Two implementations ship:
-//   - PvpClient          (Firebase Realtime Database, REST; dev fallback)
-//   - PlayFabPvpClient   (PlayFab REST + server-authoritative CloudScript)
+// Abstract transport for HOL's server-authoritative PlayFab PvP rooms.
 public abstract class PvpBackend : MonoBehaviour
 {
     [Serializable]
@@ -11,12 +9,6 @@ public abstract class PvpBackend : MonoBehaviour
     {
         public string hostName = "";
         public string guestName = "";
-
-        // Firebase fallback still carries secrets in its room document.
-        // PlayFab's sanitized room view leaves these at 0 and instead returns
-        // lastHint/revealedSecret from server authority.
-        public int hostSecret;
-        public int guestSecret;
 
         public string turn = "";    // "host" | "guest"
         public string phase = "";   // "waiting" | "play" | "done" | "closed"
@@ -80,10 +72,8 @@ public abstract class PvpBackend : MonoBehaviour
     public string RoomCode { get; protected set; } = "";
     public bool IsHost { get; protected set; }
 
-    // The Lock and Signals are only offered on a backend that adjudicates them.
-    // Firebase's room document is client-writable, so a client could forge a
-    // Lock it never staked or a result it never earned; the development
-    // fallback therefore plays the plain round rules and hides both controls.
+    // Optional transports must explicitly opt into controls that require
+    // server adjudication. The shipping PlayFab implementation does.
     public virtual bool IsServerAuthoritative { get { return false; } }
 
     public Action OnRoomClosed;
@@ -96,8 +86,7 @@ public abstract class PvpBackend : MonoBehaviour
     // tie, and a miss forfeits the next turn.
     public abstract void SubmitGuess(int guess, bool useLock, RoomState current, Action<bool> done);
 
-    // Sends one entry from the fixed Signals table. Backends that cannot carry
-    // signals simply report failure; the UI then leaves the control alone.
+    // Sends one entry from the fixed Signals table.
     public virtual void SendSignal(int signalId, Action<bool> done) { done?.Invoke(false); }
 
     // Commits a fresh secret for another match in the same room. The next match
@@ -108,8 +97,7 @@ public abstract class PvpBackend : MonoBehaviour
     public abstract void StopPolling();
     public abstract void DeleteRoom();
 
-    // PlayFab uses this to delete completed room data after both clients have
-    // observed the result. Firebase has no separate acknowledgement flow.
+    // Deletes completed room data after both clients observed the result.
     public virtual void AcknowledgeResult() { }
 
     protected const string CodeAlphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";

@@ -1,10 +1,19 @@
 import { app } from "@azure/functions";
 import { GoogleAuth } from "google-auth-library";
-import { canonicalRequestHash, validateIntegrityPayload } from "./security.js";
+import {
+  canonicalRequestHash,
+  createFixedWindowRateLimiter,
+  validateIntegrityPayload,
+} from "./security.js";
 
 const WINDOW_MS = 60_000;
 const MAX_REQUESTS_PER_WINDOW = 12;
-const ipWindows = new Map();
+const MAX_RATE_LIMIT_ENTRIES = 10_000;
+const ipRateLimiter = createFixedWindowRateLimiter({
+  windowMs: WINDOW_MS,
+  maxRequests: MAX_REQUESTS_PER_WINDOW,
+  maxEntries: MAX_RATE_LIMIT_ENTRIES,
+});
 
 function env(name, fallback = "") {
   const value = (process.env[name] || fallback).trim();
@@ -19,16 +28,6 @@ function optionalEnv(name, fallback = "") {
 function clientIp(request) {
   const forwarded = request.headers.get("x-forwarded-for") || "";
   return forwarded.split(",")[0].trim() || "unknown";
-}
-
-function consumeRateLimit(ip, now = Date.now()) {
-  const current = ipWindows.get(ip);
-  if (!current || now - current.startedAt >= WINDOW_MS) {
-    ipWindows.set(ip, { startedAt: now, count: 1 });
-    return true;
-  }
-  current.count += 1;
-  return current.count <= MAX_REQUESTS_PER_WINDOW;
 }
 
 function serviceAccountCredentials() {
@@ -92,7 +91,7 @@ app.http("provision", {
   authLevel: "anonymous",
   handler: async (request, context) => {
     const ip = clientIp(request);
-    if (!consumeRateLimit(ip)) return json(429, { ok: false, error: "rate_limited" });
+    if (!ipRateLimiter.consume(ip)) return json(429, { ok: false, error: "rate_limited" });
 
     let body;
     try { body = await request.json(); }

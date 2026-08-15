@@ -41,6 +41,22 @@ Play Console versionName in `ProjectSettings.asset`.
   uninterpretable: a duel decided on the last candidate and a rout looked
   the same in the data.
 
+### Security and reliability
+
+- Serialized every PlayFab room mutation with a revision/epoch-fenced server
+  lock, with bounded client retries for ordinary contention and stale-lock
+  recovery. Signals, rematch commitments, acknowledgements, leaves, and guesses
+  can no longer overwrite one another through Shared Group last-write-wins.
+- Added sharded room expiry indexes and a deployment-managed five-minute
+  `cleanupExpiredRooms` task for orphaned waiting, active, and completed rooms.
+- Removed the client-writable Firebase fallback; PlayFab CloudScript is now the
+  only PvP authority in every build.
+- Raised Android target API from 35 to 36, pinned third-party GitHub Actions to
+  immutable commits, and added automated dependency updates.
+- Bounded the provisioning service's in-memory abuse limiter and added eviction
+  tests so spoofed/high-cardinality IP input cannot grow the process map without
+  limit.
+
 ## [0.3.0] — 2026-08-13
 
 > **Deploying this release is order-sensitive.** The duel rules are not

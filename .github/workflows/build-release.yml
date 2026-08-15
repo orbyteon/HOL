@@ -74,10 +74,10 @@ jobs:
           done
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Setup Node 22
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
 
@@ -107,7 +107,7 @@ jobs:
           df -h /
 
       - name: Cache Library
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: Library
           key: Library-Release-Android-${{ hashFiles('Packages/manifest.json', 'Packages/packages-lock.json') }}
@@ -117,7 +117,7 @@ jobs:
             Library-
 
       - name: Build signed Android App Bundle
-        uses: game-ci/unity-builder@v4
+        uses: game-ci/unity-builder@1d4ee0697f193f54668e98961d79907911f4b4f2 # v4
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
@@ -172,7 +172,7 @@ jobs:
           sha256sum "${bundles[0]}" | tee build/Android/SHA256SUMS
 
       - name: Upload signed release candidate
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: hol-android-release-${{ inputs.version }}-${{ inputs.version_code }}
           path: build/Android

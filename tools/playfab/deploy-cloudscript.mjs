@@ -4,6 +4,8 @@ const titleId = required("PLAYFAB_TITLE_ID");
 const secretKey = required("PLAYFAB_DEV_SECRET_KEY");
 const hardenPolicy = /^(1|true|yes)$/i.test(process.env.HARDEN_SHARED_GROUP_POLICY || "");
 const commit = process.env.GITHUB_SHA || "local";
+const cleanupTaskName = "HOL expired PvP room cleanup";
+const cleanupTaskSchedule = "*/5 * * * *";
 
 function required(name) {
   const value = (process.env[name] || "").trim();
@@ -73,6 +75,51 @@ async function deployCloudScript() {
   console.log(`Published Legacy CloudScript version ${result.Version}, revision ${result.Revision}.`);
   await verifyPublishedCloudScript(source, result);
   return result;
+}
+
+function cleanupTaskDefinition() {
+  return {
+    Name: cleanupTaskName,
+    Description: "Delete expired server-authoritative PvP room state and stale registry entries.",
+    IsActive: true,
+    Schedule: cleanupTaskSchedule,
+    Parameter: {
+      FunctionName: "cleanupExpiredRooms",
+      Argument: {},
+    },
+  };
+}
+
+async function ensureCleanupTask() {
+  const found = await playFab("/Admin/GetTasks", {
+    Identifier: { Name: cleanupTaskName },
+  });
+  const existing = Array.isArray(found.Tasks) ? found.Tasks[0] : undefined;
+  const desired = cleanupTaskDefinition();
+
+  if (existing) {
+    await playFab("/Admin/UpdateTask", {
+      ...desired,
+      Type: "CloudScript",
+      Identifier: { Id: existing.TaskId },
+    });
+    console.log(`Updated scheduled cleanup task ${existing.TaskId}.`);
+  } else {
+    const created = await playFab("/Admin/CreateCloudScriptTask", desired);
+    if (!created.TaskId) throw new Error("CreateCloudScriptTask returned no TaskId");
+    console.log(`Created scheduled cleanup task ${created.TaskId}.`);
+  }
+
+  const verified = await playFab("/Admin/GetTasks", {
+    Identifier: { Name: cleanupTaskName },
+  });
+  const task = Array.isArray(verified.Tasks) ? verified.Tasks[0] : undefined;
+  if (!task || task.Type !== "CloudScript" || task.IsActive !== true ||
+      task.Schedule !== cleanupTaskSchedule ||
+      task.Parameter?.FunctionName !== "cleanupExpiredRooms") {
+    throw new Error("Scheduled cleanup task verification failed");
+  }
+  console.log(`Verified scheduled room cleanup (${cleanupTaskSchedule} UTC).`);
 }
 
 const sharedGroupClientResources = [
@@ -149,3 +196,4 @@ async function hardenSharedGroupPolicy() {
 // CloudScript publishing then fails, the safer deny policy remains in effect.
 if (hardenPolicy) await hardenSharedGroupPolicy();
 await deployCloudScript();
+await ensureCleanupTask();

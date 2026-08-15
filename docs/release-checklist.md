@@ -122,10 +122,13 @@ their own host/guest identity.
 - [ ] Run **Deploy PlayFab Production** from `main` and type `DEPLOY`
 - [ ] The workflow successfully reads the published CloudScript revision back
       and verifies `cloudscript.js` matches repository source exactly
+- [ ] The workflow creates or updates the active `HOL expired PvP room cleanup`
+      task with schedule `*/5 * * * *` (UTC) and verifies its handler
 - [ ] The workflow verifies explicit deny statements for all direct Client Shared
       Group APIs; this hardening is mandatory in the production workflow
 - [ ] Confirm the deployed revision exposes `createRoom`, `joinRoom`, `getRoom`,
-      `submitGuess`, `sendSignal`, `requestRematch`, `ackResult`, and `leaveRoom`
+      `submitGuess`, `sendSignal`, `requestRematch`, `ackResult`, `leaveRoom`,
+      and `cleanupExpiredRooms`
 - [ ] Confirm `Duel rule tests` was green on the commit being deployed — it runs
       the published rules against an in-memory room store and checks every field
       the client binds by name
@@ -166,6 +169,7 @@ and uploads the artifact with `JARSIGNER_VERIFY.txt` plus `SHA256SUMS`.
 - [ ] `JARSIGNER_VERIFY.txt` contains `jar verified.`
 - [ ] SHA-256 matches `SHA256SUMS`
 - [ ] app version/versionCode are the intended Play Console values
+- [ ] bundle targets Android API 36 (`AndroidTargetSdkVersion: 36`)
 - [ ] upload key/keystore is backed up offline; it is never committed to git
 
 ## 5. Smoke-test the intended release build
@@ -244,12 +248,15 @@ the file.
 - [ ] Live `getRoom` client state contains no host/guest secret or PlayFab IDs
 - [ ] Adding an invented `side` field to a guess request gives no authority;
       CloudScript derives identity from `currentPlayerId`
-- [ ] Double-submit the same turn → only one server turn claim succeeds
+- [ ] Double-submit the same turn → only one revision-fenced mutation succeeds
+- [ ] Overlap a guess with a Signal/rematch request → the second request retries
+      `room busy` and neither committed state change is lost
 - [ ] Higher/lower/correct hint is returned by the server and displays correctly
 - [ ] Win count stays correct if result polling wins the race with submit callback
 - [ ] A loss reveals only the opponent secret after `phase == done`
 - [ ] Normal Leave removes the PlayFab room and notifies the other client
 - [ ] Completed match is removed after both clients acknowledge the result
+- [ ] An intentionally expired test room is removed by the scheduled cleanup task
 - [ ] Back out during create/join, then try the old code → no late UI hijack
 - [ ] PvP Android back navigates create/join/menu; mid-match uses explicit Leave
 

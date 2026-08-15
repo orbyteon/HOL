@@ -14,7 +14,7 @@ missing so a skipped compile cannot look green.
   `FakeMatchmaking`, `MenuManager`), ads (`AdsManager`, `ConsentManager`),
   ops (`ForceUpdate` — PlayFab TitleData `minVersion` gate, fail-open),
   `ReleaseConfig` + `ReleaseBootstrap` (public production runtime config),
-  `PvP/` (backend abstraction + Firebase/PlayFab clients + controller +
+  `PvP/` (backend abstraction + PlayFab client + controller +
   `Signals` quick-chat table),
   `Localization/` (`L10n` table, `LocalizedText`, `LanguageSelector`),
   `SmartHooks/` (`GameEvents`, `DailyStreak`, `Haptics`),
@@ -28,8 +28,9 @@ missing so a skipped compile cannot look green.
   validates Google Play Integrity before using PlayFab Server credentials.
 - `playfab/cloudscript.js` — server authority for PlayFab room
   create/read/join/guess/signal/rematch/leave/cleanup.
-- `tools/playfab/deploy-cloudscript.mjs` — publishes/verifies Legacy CloudScript
-  and optionally adds Client Shared Group API deny policy statements.
+- `tools/playfab/deploy-cloudscript.mjs` — publishes/verifies Legacy CloudScript,
+  manages the expired-room scheduled task, and optionally adds Client Shared
+  Group API deny policy statements.
 - `tools/test/` — Node tests, run with `node --test tools/test/*.test.mjs` (the
   bare directory form does not resolve). `cloudscript.test.mjs` drives the real
   CloudScript against an in-memory Shared Group store;
@@ -67,7 +68,7 @@ missing so a skipped compile cannot look green.
   `(0.91, 0.93, 1)` — never pure white or pure black. Gold/cyan buttons
   use dark indigo labels for contrast.
 - **The duel rules live in two places and must stay in step.**
-  `Assets/SCRIPT/DuelRules.cs` (solo + Firebase fallback) and
+  `Assets/SCRIPT/DuelRules.cs` (solo) and
   `playfab/cloudscript.js` (PlayFab, server-authoritative) implement the same
   round/last-licks/Lock machine. Change one, change the other, and update both
   test suites — `Assets/Tests/EditMode/DuelRulesTests.cs` and
@@ -79,14 +80,14 @@ missing so a skipped compile cannot look green.
   content — do not add a free-text path without revisiting `docs/privacy.html`
   and the Play Data Safety declaration first.
 - **A room outlives its match.** Rematch keeps the room and deals a new match
-  in place, so anything per-match must be cleared in `resetForRematch` — and
-  `turnIndex` must NOT be, because a reused turn id collides with the claim
-  group the previous match already created. `turnIndexBase` marks the live
-  claim window so teardown never walks a whole rematch chain.
-- **Gameplay-affecting rules need an adjudicator.** The Lock and Signals are
-  gated on `PvpBackend.IsServerAuthoritative`; the Firebase fallback's room
-  document is client-writable, so it plays the plain round rules and hides both
-  controls rather than trusting a client to report its own Lock.
+  in place, so anything per-match must be cleared in `resetForRematch`.
+- **Every room mutation uses `withRoomMutation`.** Its revision/epoch fence is
+  the protection against last-write-wins Shared Group updates. Never add a
+  mutating handler that reads and writes room state outside that lock. Keep the
+  client retry for the transient `room busy` response.
+- **Room expiry stays discoverable.** `writeState` refreshes the sharded room
+  registry, and `cleanupExpiredRooms` is scheduled by the deployment script.
+  A new deletion path must unregister the room as well as deleting its group.
 - **Null-guard optional scene references** (`if (x != null)`) — several
   Inspector fields are intentionally unwired and filled at runtime.
 - **PlayFab clients never read or write Shared Group Data directly.** All
@@ -108,11 +109,10 @@ missing so a skipped compile cannot look green.
 
 ## Backend setup state
 
-- PvP backend is **PlayFab** for production. Firebase client (`PvpClient`) is a
-  development fallback only and needs its RTDB URL in the Inspector.
+- PvP backend is **PlayFab** in every build; there is no client-writable fallback.
 - Debug/local development may use Inspector PlayFab values. A signed production
-  build instead reads `ReleaseConfig`; `ReleaseBootstrap` forces PlayFab and
-  applies the injected Title ID before `PvpRuntimeUI.Start` creates its backend.
+  build instead reads `ReleaseConfig`; `ReleaseBootstrap` applies the injected
+  Title ID before `PvpRuntimeUI.Start` creates its backend.
 - Production PlayFab account creation is closed on the client
   (`CreateAccount=false`). Fresh installs use `PlayIntegrityProvisioner` and the
   Azure service in `services/provisioner/`; the PlayFab Title Secret Key must

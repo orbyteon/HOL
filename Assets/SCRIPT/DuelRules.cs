@@ -2,9 +2,9 @@ using System;
 
 // The HOL duel state machine: rounds, last licks, and the Lock.
 //
-// One implementation shared by solo play (GameManager) and the Firebase
-// development fallback (PvpClient). playfab/cloudscript.js mirrors it for the
-// server-authoritative PlayFab backend — keep the two in step. The same cases
+// One implementation shared by solo play (GameManager). playfab/cloudscript.js
+// mirrors it for the server-authoritative PlayFab backend — keep the two in
+// step. The same cases
 // are covered on each side by Assets/Tests/EditMode/DuelRulesTests.cs and
 // tools/test/cloudscript.test.mjs.
 //
