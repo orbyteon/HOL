@@ -26,9 +26,9 @@ public class PvpRuntimeUI : MonoBehaviour
     // gold as the disciplined lights, near-white text. Gold is reserved for
     // the single most important action on each screen (primary CTA).
     static readonly Color PanelColor = new Color(0.08f, 0.05f, 0.15f, 0.97f);
-    static readonly Color Accent = new Color(1f, 0.78f, 0.34f, 1f);   // muted gold
-    static readonly Color AccentBlue = new Color(0.25f, 0.85f, 1f, 1f); // cyan seam
-    static readonly Color Neutral = new Color(0.16f, 0.15f, 0.26f, 1f); // indigo gray
+    static readonly Color Accent = ConsumerTokens.Gold;
+    static readonly Color AccentBlue = ConsumerTokens.Cyan;
+    static readonly Color Neutral = ConsumerTokens.SurfaceElevated;
     static readonly Color DarkLabel = new Color(0.10f, 0.09f, 0.18f, 1f);
 
     void Start()
@@ -105,6 +105,19 @@ public class PvpRuntimeUI : MonoBehaviour
         }
     }
 
+    // CreateButton swaps in the wired design sprites and paints them white,
+    // which is right for ordinary buttons but would erase the keypad's KeyBlue
+    // and the Lock's cyan — identities this board depends on. These buttons
+    // keep the procedural plate whatever the scene has wired.
+    static void ForceProceduralButton(Button button, Color color)
+    {
+        var image = button.GetComponent<Image>();
+        if (image == null) return;
+        image.sprite = RuntimeUI.RoundedRectSprite;
+        image.type = Image.Type.Sliced;
+        image.color = color;
+    }
+
     // The indigo depth gradient the rest of Converging Light sits on. Added as
     // the panel's first child so it draws behind every control placed after it,
     // which is why it is called immediately after the panel is created.
@@ -150,11 +163,12 @@ public class PvpRuntimeUI : MonoBehaviour
             new Vector2(0f, 560f), new Vector2(800f, 100f));
         var createSecret = RuntimeUI.CreateInputField(createPanel.transform, "SecretInput",
             L10n.Get("pvp_secret"), new Vector2(0f, 350f), new Vector2(460f, 90f));
-        var createGo = RuntimeUI.CreateButton(createPanel.transform, "GoButton",
+        var createGo = RuntimeUI.CreateButton(createPanel.transform, "ConfirmCreateButton",
             L10n.Get("confirm"), new Vector2(0f, 225f), new Vector2(460f, 90f), Accent, DarkLabel);
 
         var codeFrame = NeonFrame.Frame(createPanel.transform, "RoomCodeFrame",
-            new Vector2(0f, 0f), new Vector2(760f, 280f), ConvergingLight.Cyan);
+            new Vector2(0f, 0f), new Vector2(760f, 280f), ConsumerTokens.Cyan,
+            0.9f, true, ConsumerTokens.Surface);
         var codeCaption = RuntimeUI.CreateText(codeFrame.transform, "CodeCaption",
             L10n.Get("pvp_enter_code"), 28, new Vector2(0f, 90f), new Vector2(700f, 50f),
             ConvergingLight.WithAlpha(ConvergingLight.NearWhite, 0.7f));
@@ -169,7 +183,8 @@ public class PvpRuntimeUI : MonoBehaviour
         // stranded on a background.
         var statusFrame = NeonFrame.Frame(createPanel.transform, "StatusFrame",
             new Vector2(0f, -380f), new Vector2(860f, 150f),
-            ConvergingLight.WithAlpha(ConvergingLight.Magenta, 0.5f), 0.5f);
+            ConvergingLight.WithAlpha(ConsumerTokens.Magenta, 0.5f), 0.7f,
+            true, ConsumerTokens.Surface);
         var createStatus = RuntimeUI.CreateText(statusFrame.transform, "Status", "", 32,
             Vector2.zero, new Vector2(800f, 130f));
 
@@ -186,6 +201,9 @@ public class PvpRuntimeUI : MonoBehaviour
         // Join flow.
         var joinPanel = RuntimeUI.FullscreenPanel(transform, "PvPJoinPanel", PanelColor);
         NeonBackdrop(joinPanel);
+        NeonFrame.Frame(joinPanel.transform, "JoinCard",
+            new Vector2(0f, 110f), new Vector2(640f, 420f), ConsumerTokens.Blue,
+            0.9f, true, ConsumerTokens.Surface);
         var joinTitle = RuntimeUI.CreateText(joinPanel.transform, "Title", L10n.Get("pvp_join_room"), 48,
             new Vector2(0f, 420f), new Vector2(800f, 100f));
         var joinCode = RuntimeUI.CreateInputField(joinPanel.transform, "CodeInput",
@@ -197,7 +215,7 @@ public class PvpRuntimeUI : MonoBehaviour
         joinCode.onValidateInput = (text, index, ch) => char.ToUpperInvariant(ch);
         var joinSecret = RuntimeUI.CreateInputField(joinPanel.transform, "SecretInput",
             L10n.Get("pvp_secret"), new Vector2(0f, 110f), new Vector2(460f, 90f));
-        var joinGo = RuntimeUI.CreateButton(joinPanel.transform, "GoButton",
+        var joinGo = RuntimeUI.CreateButton(joinPanel.transform, "ConfirmJoinButton",
             L10n.Get("confirm"), new Vector2(0f, -20f), new Vector2(460f, 90f), AccentBlue, DarkLabel);
         var joinStatus = RuntimeUI.CreateText(joinPanel.transform, "Status", "", 32,
             new Vector2(0f, -200f), new Vector2(900f, 120f));
@@ -249,8 +267,10 @@ public class PvpRuntimeUI : MonoBehaviour
         var banner = NeonFrame.Frame(matchPanel.transform, "PromptBanner",
             new Vector2(0f, 555f), new Vector2(900f, 200f),
             ConsumerTokens.Gold, 0.9f, true, ConsumerTokens.SurfaceElevated);
+        var roundText = RuntimeUI.CreateText(banner.transform, "Round", "", 24,
+            new Vector2(0f, 70f), new Vector2(840f, 36f), ConsumerTokens.TextSecondary);
         var turnText = RuntimeUI.CreateText(banner.transform, "Turn", "", 40,
-            Vector2.zero, new Vector2(840f, 190f));
+            new Vector2(0f, -22f), new Vector2(840f, 130f));
         var resultText = RuntimeUI.CreateText(banner.transform, "Result", "", 36,
             Vector2.zero, new Vector2(840f, 190f));
 
@@ -290,6 +310,7 @@ public class PvpRuntimeUI : MonoBehaviour
             var keyBtn = RuntimeUI.CreateButton(guessCard.transform, "Key" + keyLabel, keyLabel,
                 new Vector2((i % 3 - 1) * 152f, 180f - (i / 3) * 118f),
                 new Vector2(142f, 104f), ConsumerTokens.KeyBlue);
+            ForceProceduralButton(keyBtn, ConsumerTokens.KeyBlue);
             var keyText = keyBtn.GetComponentInChildren<Text>();
             if (keyText != null) keyText.fontSize = 44;
             keyBtn.onClick.AddListener(() => tapKey(key));
@@ -302,6 +323,7 @@ public class PvpRuntimeUI : MonoBehaviour
         var lockBtn = RuntimeUI.CreateButton(guessCard.transform, "LockButton",
             L10n.Get("lock"), new Vector2(0f, -290f), new Vector2(440f, 80f),
             ConsumerTokens.Cyan, DarkLabel);
+        ForceProceduralButton(lockBtn, ConsumerTokens.Cyan);
         var lockLabel = AsTmp(lockBtn.GetComponentInChildren<Text>());
         lockLabel.fontSize = 26;
 
@@ -310,10 +332,10 @@ public class PvpRuntimeUI : MonoBehaviour
         var rematchStatus = RuntimeUI.CreateText(guessCard.transform, "RematchStatus", "", 28,
             new Vector2(0f, -290f), new Vector2(440f, 80f), ConsumerTokens.TextSecondary);
 
-        var guessBtn = RuntimeUI.CreateButton(guessCard.transform, "GuessButton",
+        var guessBtn = RuntimeUI.CreateButton(guessCard.transform, "SubmitGuessButton",
             L10n.Get("pvp_guess"), new Vector2(0f, -395f), new Vector2(460f, 100f),
             ConsumerTokens.Gold, DarkLabel);
-        var rematchBtn = RuntimeUI.CreateButton(guessCard.transform, "RematchButton",
+        var rematchBtn = RuntimeUI.CreateButton(guessCard.transform, "RematchConfirmButton",
             L10n.Get("rematch"), new Vector2(0f, -395f), new Vector2(460f, 100f),
             ConsumerTokens.Gold, DarkLabel);
         RuntimeUI.Localize(rematchBtn, "rematch");
@@ -331,8 +353,13 @@ public class PvpRuntimeUI : MonoBehaviour
         var historyCaption = RuntimeUI.CreateText(historyCard.transform, "Caption",
             L10n.Get("hud_history"), 26, new Vector2(0f, 120f), new Vector2(420f, 40f),
             ConsumerTokens.TextSecondary);
+        // Latest guess on top, the rail of earlier ones underneath. The rail
+        // watches the latest-guess label rather than the controller, so it
+        // needs no controller surface at all.
         var historyText = RuntimeUI.CreateText(historyCard.transform, "History", "", 32,
-            new Vector2(0f, -30f), new Vector2(420f, 220f));
+            new Vector2(0f, 42f), new Vector2(420f, 84f));
+        var historyRailText = RuntimeUI.CreateText(historyCard.transform, "HistoryRail", "", 22,
+            new Vector2(0f, -72f), new Vector2(420f, 128f), ConsumerTokens.TextSecondary);
 
         // How far the player has narrowed the opponent's number. Solo play has
         // always shown this; PvP never did.
@@ -395,7 +422,14 @@ public class PvpRuntimeUI : MonoBehaviour
         controller.guessInput = guessInput;
         controller.opponentNameText = AsTmp(opponentText);
         controller.turnText = AsTmp(turnText);
+        controller.roundText = AsTmp(roundText);
         controller.historyText = AsTmp(historyText);
+
+        // The rail watches the latest-guess label the controller writes into;
+        // repaints are signature-gated, so every change is a real guess.
+        var rail = historyCard.AddComponent<GuessHistoryRail>();
+        rail.source = controller.historyText;
+        rail.target = historyRailText;
         controller.resultText = AsTmp(resultText);
         controller.rangeText = AsTmp(rangeText);
         controller.signalFeedText = AsTmp(signalFeed);
