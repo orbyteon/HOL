@@ -23,9 +23,9 @@ public class ExtrasRuntimeWiring : MonoBehaviour
     static readonly Color Neutral = ConsumerTokens.SurfaceElevated;
     static readonly Color DarkLabel = new Color(0.10f, 0.09f, 0.18f);
 
-    Text statsLabel;
-    Text disclosurePlay;
-    Text disclosureSearch;
+    TMP_Text statsLabel;
+    TMP_Text disclosurePlay;
+    TMP_Text disclosureSearch;
 
     void Start()
     {
@@ -339,7 +339,7 @@ public class ExtrasRuntimeWiring : MonoBehaviour
         if (image != null)
             image.color = selected ? Gold : Neutral;
 
-        var label = button.GetComponentInChildren<Text>();
+        var label = button.GetComponentInChildren<TMP_Text>();
         if (label != null)
             label.color = selected ? DarkLabel : new Color(0.91f, 0.93f, 1f);
     }

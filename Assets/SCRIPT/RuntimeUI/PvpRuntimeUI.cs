@@ -64,7 +64,7 @@ public class PvpRuntimeUI : MonoBehaviour
     // between matches, so it is re-read every time the match panel comes up.
     class PlayerNameLabel : MonoBehaviour
     {
-        public Text target;
+        public TMP_Text target;
 
         void OnEnable()
         {
@@ -280,7 +280,7 @@ public class PvpRuntimeUI : MonoBehaviour
                 new Vector2((i % 3 - 1) * 152f, 180f - (i / 3) * 118f),
                 new Vector2(142f, 104f), ConsumerTokens.KeyBlue);
             ForceProceduralButton(keyBtn, ConsumerTokens.KeyBlue);
-            var keyText = keyBtn.GetComponentInChildren<Text>();
+            var keyText = keyBtn.GetComponentInChildren<TMP_Text>();
             if (keyText != null) keyText.fontSize = 44;
             keyBtn.onClick.AddListener(() => tapKey(key));
         }
@@ -293,7 +293,7 @@ public class PvpRuntimeUI : MonoBehaviour
             L10n.Get("lock"), new Vector2(0f, -290f), new Vector2(440f, 80f),
             ConsumerTokens.Cyan, DarkLabel);
         ForceProceduralButton(lockBtn, ConsumerTokens.Cyan);
-        var lockLabel = AsTmp(lockBtn.GetComponentInChildren<Text>());
+        var lockLabel = lockBtn.GetComponentInChildren<TMP_Text>();
         lockLabel.fontSize = 26;
 
         // The rematch handshake reports here; the Lock hides once the match is
@@ -352,7 +352,7 @@ public class PvpRuntimeUI : MonoBehaviour
             var signalBtn = RuntimeUI.CreateButton(signalsRoot.transform, "Signal" + i,
                 Signals.Text(i), new Vector2(x, y), new Vector2(330f, 64f),
                 ConsumerTokens.SurfaceElevated);
-            var signalLabel = signalBtn.GetComponentInChildren<Text>();
+            var signalLabel = signalBtn.GetComponentInChildren<TMP_Text>();
             if (signalLabel != null) signalLabel.fontSize = 24;
 
             // The drawn signal icons ship in Resources so no scene wiring is
@@ -390,8 +390,8 @@ public class PvpRuntimeUI : MonoBehaviour
         controller.matchPanel = matchPanel;
 
         controller.createSecretInput = createSecret;
-        controller.roomCodeText = AsTmp(codeText);
-        controller.createStatusText = AsTmp(createStatus);
+        controller.roomCodeText = codeText;
+        controller.createStatusText = createStatus;
 
         // Waiting-state dots for the create panel's status line; disabled
         // until the controller shows an animated status (SetCreateStatus).
@@ -401,21 +401,21 @@ public class PvpRuntimeUI : MonoBehaviour
         controller.createStatusEllipsis = statusEllipsis;
         controller.joinCodeInput = joinCode;
         controller.joinSecretInput = joinSecret;
-        controller.joinStatusText = AsTmp(joinStatus);
+        controller.joinStatusText = joinStatus;
         controller.guessInput = guessInput;
-        controller.opponentNameText = AsTmp(opponentText);
-        controller.turnText = AsTmp(turnText);
-        controller.roundText = AsTmp(roundText);
-        controller.historyText = AsTmp(historyText);
+        controller.opponentNameText = opponentText;
+        controller.turnText = turnText;
+        controller.roundText = roundText;
+        controller.historyText = historyText;
 
         // The rail watches the latest-guess label the controller writes into;
         // repaints are signature-gated, so every change is a real guess.
         var rail = historyCard.AddComponent<GuessHistoryRail>();
         rail.source = controller.historyText;
         rail.target = historyRailText;
-        controller.resultText = AsTmp(resultText);
-        controller.rangeText = AsTmp(rangeText);
-        controller.signalFeedText = AsTmp(signalFeed);
+        controller.resultText = resultText;
+        controller.rangeText = rangeText;
+        controller.signalFeedText = signalFeed;
         controller.lockButton = lockBtn.gameObject;
         controller.lockButtonLabel = lockLabel;
         controller.signalsRoot = signalsRoot;
@@ -425,7 +425,7 @@ public class PvpRuntimeUI : MonoBehaviour
         // The rematch handshake reports into the Lock's slot in the guess card
         // — free exactly when a match is decided — so the banner can hold the
         // result text without the status writing over it.
-        controller.rematchStatusText = AsTmp(rematchStatus);
+        controller.rematchStatusText = rematchStatus;
 
         // Button hooks.
         createBtn.onClick.AddListener(() => ShowOnly(controller, createPanel));
@@ -501,26 +501,4 @@ public class PvpRuntimeUI : MonoBehaviour
         panel.SetActive(true);
     }
 
-    // The controller's fields are TMP_Text; RuntimeUI builds legacy Text for
-    // labels, so replace the legacy Text with a TMP_Text on the same object.
-    // Both are Graphic components and Unity allows only one Graphic per
-    // GameObject, so the legacy Text must be destroyed first — immediately,
-    // since Destroy() is deferred to end-of-frame and AddComponent would
-    // still conflict (and return null).
-    static TMP_Text AsTmp(Text legacy)
-    {
-        var go = legacy.gameObject;
-        string content = legacy.text;
-        int fontSize = legacy.fontSize;
-        Color color = legacy.color;
-        DestroyImmediate(legacy);
-
-        var tmp = go.AddComponent<TextMeshProUGUI>();
-        tmp.text = content;
-        tmp.fontSize = fontSize;
-        tmp.color = color;
-        tmp.alignment = TextAlignmentOptions.Center;
-        tmp.enableWordWrapping = true;
-        return tmp;
-    }
 }

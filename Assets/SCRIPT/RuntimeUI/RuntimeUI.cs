@@ -156,7 +156,11 @@ public static class RuntimeUI
         return panel;
     }
 
-    public static Text CreateText(Transform parent, string name, string content,
+    // Every runtime-built label is TextMesh Pro, same as the scene's TMP
+    // labels and the input fields below — one text stack, one default font
+    // asset. Wrapping and overflow mirror what the legacy version did: wrap
+    // horizontally, overflow vertically rather than truncate.
+    public static TextMeshProUGUI CreateText(Transform parent, string name, string content,
         int fontSize, Vector2 position, Vector2 size, Color? color = null)
     {
         var go = CreateObject(name, parent);
@@ -167,16 +171,15 @@ public static class RuntimeUI
         rect.anchoredPosition = position;
         ClampPageChild(rect, size, position);
 
-        var text = go.AddComponent<Text>();
+        var text = go.AddComponent<TextMeshProUGUI>();
         text.text = content;
         text.fontSize = fontSize;
         // Converging Light (design/philosophy.md): white exists only as
         // near-white, softened so it belongs to the night.
         text.color = color ?? new Color(0.91f, 0.93f, 1f);
-        text.alignment = TextAnchor.MiddleCenter;
-        text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        text.horizontalOverflow = HorizontalWrapMode.Wrap;
-        text.verticalOverflow = VerticalWrapMode.Overflow;
+        text.alignment = TextAlignmentOptions.Center;
+        text.enableWordWrapping = true;
+        text.overflowMode = TextOverflowModes.Overflow;
         return text;
     }
 
@@ -287,18 +290,11 @@ public static class RuntimeUI
         loc.key = key;
     }
 
-    public static void Localize(Text text, string key)
-    {
-        if (text == null) return;
-        var loc = text.gameObject.AddComponent<LocalizedLegacyText>();
-        loc.key = key;
-    }
-
     // Same, for a button's child label.
     public static void Localize(Button button, string key)
     {
         if (button == null) return;
-        Localize(button.GetComponentInChildren<Text>(true), key);
+        Localize(button.GetComponentInChildren<TMP_Text>(true), key);
     }
 
     // Same, for an input field's placeholder.

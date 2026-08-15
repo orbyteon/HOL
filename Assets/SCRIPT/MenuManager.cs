@@ -1,6 +1,6 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
-using UnityEngine.UI;
+using TMPro;
 
 public class MenuManager : MonoBehaviour
 {
@@ -18,7 +18,7 @@ public class MenuManager : MonoBehaviour
     // decided there is nothing left to forfeit, so back exits immediately.
     const float BackConfirmSeconds = 2f;
     float lastMatchBackTime = -10f;
-    Text backHintLabel; // transient, built lazily on the game panel
+    TMP_Text backHintLabel; // transient, built lazily on the game panel
 
     GameManager gameManager; // found once; used to detect the decided state
 
