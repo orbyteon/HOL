@@ -3,7 +3,7 @@
 All notable changes to HOL. Dates are commit dates; versions follow the
 Play Console versionName in `ProjectSettings.asset`.
 
-## [Unreleased]
+## [0.4.0] — 2026-08-15
 
 ### Added
 
