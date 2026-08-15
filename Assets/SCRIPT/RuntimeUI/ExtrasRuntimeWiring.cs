@@ -36,6 +36,7 @@ public class ExtrasRuntimeWiring : MonoBehaviour
     {
         yield return null; // let every other Start() finish first
 
+        NormalizeReferencePanels();
         EnsureDailyStreak();
         WireRematchButton();
         WireNumberInputSubmit();
@@ -122,6 +123,24 @@ public class ExtrasRuntimeWiring : MonoBehaviour
         foreach (var pair in legacySceneTexts)
             if (pair.Key != null)
                 pair.Key.text = L10n.Get(pair.Value);
+    }
+
+    // The hand-authored pages were historically scaled to 1.1 while runtime
+    // coordinates and the CanvasScaler are authored in reference pixels. Reset
+    // only full-screen page roots so every page shares one coordinate system.
+    void NormalizeReferencePanels()
+    {
+        string[] pageNames = { "PanelGAME", "PanelPlay", "PanelSearching", "PanelSettings" };
+        foreach (var rect in FindObjectsOfType<RectTransform>(true))
+        {
+            bool isPage = false;
+            for (int i = 0; i < pageNames.Length; i++)
+                if (rect.name == pageNames[i]) { isPage = true; break; }
+            if (!isPage) continue;
+
+            if (rect.anchorMin == Vector2.zero && rect.anchorMax == Vector2.one)
+                rect.localScale = Vector3.one;
+        }
     }
 
     // DailyStreak is not placed in any scene; attach it here so the streak
