@@ -125,6 +125,9 @@ public static class L10n
         { "pvp_opponent_left",       new[] { "Your opponent left the match.", "Ο αντίπαλός σου αποχώρησε." } },
         { "pvp_connection_lost",     new[] { "Connection lost. Try again later.", "Χάθηκε η σύνδεση. Δοκίμασε αργότερα." } },
         { "pvp_invite_text",         new[] { "Duel me in HOL — Higher or Lower! My room code: {0}", "Έλα για μονομαχία στο HOL! Κωδικός δωματίου: {0}" } },
+        { "hud_current_number",      new[] { "CURRENT NUMBER", "ΤΡΕΧΩΝ ΑΡΙΘΜΟΣ" } },
+        { "hud_history",             new[] { "HISTORY", "ΙΣΤΟΡΙΚΟ" } },
+        { "hud_tip",                 new[] { "TIP", "ΣΥΜΒΟΥΛΗ" } },
         { "you",                     new[] { "You", "Εσύ" } },
 
         // disclosure / consent
