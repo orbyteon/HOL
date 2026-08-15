@@ -189,9 +189,17 @@ public static class RuntimeUI
         ClampPageChild(rect, size, position);
 
         var image = go.AddComponent<Image>();
-        image.sprite = RoundedRectSprite;
-        image.type = Image.Type.Sliced;
-        image.color = color;
+        var primaryAsset = name.IndexOf("Play", System.StringComparison.OrdinalIgnoreCase) >= 0
+            || name.IndexOf("Start", System.StringComparison.OrdinalIgnoreCase) >= 0
+            || name.IndexOf("Confirm", System.StringComparison.OrdinalIgnoreCase) >= 0
+            || name.IndexOf("Save", System.StringComparison.OrdinalIgnoreCase) >= 0
+            || name.IndexOf("Submit", System.StringComparison.OrdinalIgnoreCase) >= 0;
+        var designAsset = primaryAsset
+            ? DesignRuntimeWiring.PrimaryButtonAsset
+            : DesignRuntimeWiring.SecondaryButtonAsset;
+        image.sprite = designAsset != null ? designAsset : RoundedRectSprite;
+        image.type = designAsset != null ? Image.Type.Simple : Image.Type.Sliced;
+        image.color = designAsset != null ? Color.white : color;
 
         var button = go.AddComponent<Button>();
         button.targetGraphic = image;
