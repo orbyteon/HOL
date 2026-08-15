@@ -38,6 +38,7 @@ public class ExtrasRuntimeWiring : MonoBehaviour
 
         NormalizeReferencePanels();
         EnsureDailyStreak();
+        WireDailyHunt();
         WireRematchButton();
         WireNumberInputSubmit();
         WireMatchmakingCancel();
@@ -149,6 +150,18 @@ public class ExtrasRuntimeWiring : MonoBehaviour
     {
         if (FindFirstObjectByType<DailyStreak>() == null)
             gameObject.AddComponent<DailyStreak>();
+    }
+
+    // The Daily Hunt panel and its menu entry, built the same zero-scene-edit
+    // way as the PvP screens. Runs after PvpRuntimeUI's Start so the entry
+    // button can seat itself right below the PvP one.
+    void WireDailyHunt()
+    {
+        var canvasGo = GameObject.Find("Canvas");
+        if (canvasGo == null || FindFirstObjectByType<DailyHunt>() != null)
+            return;
+
+        DailyHunt.Attach(canvasGo.transform, FindFirstObjectByType<AdsManager>());
     }
 
     // "Ads privacy" button in Settings -> re-opens the consent dialog.

@@ -149,6 +149,22 @@ public static class L10n
         { "ad_not_ready",            new[] { "No ad available right now", "Δεν υπάρχει διαθέσιμη διαφήμιση αυτή τη στιγμή" } },
         { "perfect_game",            new[] { "PERFECT RUN!", "ΤΕΛΕΙΟ!" } },
 
+        // daily hunt — one shared secret number per UTC day
+        { "daily_hunt",              new[] { "Daily Hunt", "Καθημερινό Κυνήγι" } },
+        { "daily_hunt_number",       new[] { "Daily Hunt #{0}", "Καθημερινό Κυνήγι #{0}" } },
+        { "daily_intro",             new[] {
+            "Everyone hunts the same secret number today. Find it in {0} guesses!",
+            "Όλοι κυνηγούν τον ίδιο μυστικό αριθμό σήμερα. Βρες τον σε {0} προσπάθειες!" } },
+        { "guesses_left",            new[] { "Guesses left: {0}", "Απομένουν προσπάθειες: {0}" } },
+        { "daily_found",             new[] { "Found it in {0}/{1}!", "Τον βρήκες σε {0}/{1}!" } },
+        { "daily_failed",            new[] { "Out of guesses! The number was {0}.", "Τέλος οι προσπάθειες! Ο αριθμός ήταν {0}." } },
+        { "daily_come_back",         new[] { "New hunt tomorrow.", "Νέο κυνήγι αύριο." } },
+        { "daily_streak",            new[] { "Daily streak: {0}", "Καθημερινό σερί: {0}" } },
+        { "share_result",            new[] { "Share result", "Κοινοποίηση" } },
+        { "share_copied",            new[] { "Copied! Paste it to a friend.", "Αντιγράφηκε! Στείλ'το σε φίλο." } },
+        { "daily_share",             new[] { "HOL Daily Hunt #{0} — {1}\n{2}", "HOL Καθημερινό Κυνήγι #{0} — {1}\n{2}" } },
+        { "second_chance",           new[] { "Watch an ad for +{0} guesses", "Δες διαφήμιση για +{0} προσπάθειες" } },
+
         // duel rules — rounds, last licks, the Lock
         { "lock",                    new[] { "LOCK", "ΚΛΕΙΔΩΜΑ" } },
         { "lock_hint",               new[] { "Lock a guess to win a tie — but miss and you forfeit your next turn.", "Κλείδωσε μια μαντεψιά για να κερδίσεις την ισοπαλία — αν αστοχήσεις όμως, χάνεις την επόμενη σειρά σου." } },
