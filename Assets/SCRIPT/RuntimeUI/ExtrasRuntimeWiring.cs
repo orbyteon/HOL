@@ -20,7 +20,7 @@ using TMPro;
 public class ExtrasRuntimeWiring : MonoBehaviour
 {
     // Converging Light palette (design/philosophy.md).
-    static readonly Color Neutral = new Color(0.16f, 0.15f, 0.26f);   // indigo gray
+    static readonly Color Neutral = ConsumerTokens.SurfaceElevated;
     static readonly Color DarkLabel = new Color(0.10f, 0.09f, 0.18f);
 
     Text statsLabel;
@@ -175,7 +175,7 @@ public class ExtrasRuntimeWiring : MonoBehaviour
 
     const string DifficultyPrefKey = "AIDifficulty"; // mirrors GameManager
 
-    static readonly Color Gold = new Color(1f, 0.78f, 0.34f);
+    static readonly Color Gold = ConsumerTokens.Gold;
 
     readonly Button[] difficultyButtons = new Button[4];
 

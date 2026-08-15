@@ -74,7 +74,7 @@ public class MenuManager : MonoBehaviour
         {
             backHintLabel = RuntimeUI.CreateText(matchmaking.panelGame.transform,
                 "BackExitHint", "", 26, new Vector2(0f, -760f), new Vector2(820f, 60f),
-                new Color(0.91f, 0.93f, 1f, 0.85f));
+                ConvergingLight.WithAlpha(ConsumerTokens.TextPrimary, 0.85f));
             backHintLabel.raycastTarget = false;
         }
 

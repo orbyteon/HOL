@@ -17,7 +17,7 @@ public class PvpRuntimeUI : MonoBehaviour
     // Converging Light palette (design/philosophy.md): indigo depth, cyan and
     // gold as the disciplined lights, near-white text. Gold is reserved for
     // the single most important action on each screen (primary CTA).
-    static readonly Color PanelColor = new Color(0.08f, 0.05f, 0.15f, 0.97f);
+    static readonly Color PanelColor = ConvergingLight.WithAlpha(ConsumerTokens.Background0, 0.97f);
     static readonly Color Accent = ConsumerTokens.Gold;
     static readonly Color AccentBlue = ConsumerTokens.Cyan;
     static readonly Color Neutral = ConsumerTokens.SurfaceElevated;
