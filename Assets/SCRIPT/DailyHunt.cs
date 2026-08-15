@@ -33,6 +33,11 @@ public class DailyHunt : MonoBehaviour
     const string MaxKey = "DailyHuntMax";
     const string StreakPrefKey = "DailyHuntStreak";
     const string LastFoundKey = "DailyHuntLastFound";
+    // Intent marker for the revive ad, holding the day it was requested
+    // for. Pairs with AdsManager.PendingRewardEarnedKey exactly the way the
+    // solo streak save's PendingStreakRestoreKey does — see
+    // ReconcilePendingRevive for why both halves are needed.
+    const string PendingReviveKey = "DailyHuntPendingRevive";
 
     // Day numbering epoch; #1 is 2026-01-01 UTC. The UTC anchor keeps the
     // day number stable across timezone travel — a local-day anchor replayed
@@ -235,6 +240,36 @@ public class DailyHunt : MonoBehaviour
             PlayerPrefs.SetInt(StreakPrefKey, 0);
             PlayerPrefs.Save();
         }
+
+        ReconcilePendingRevive();
+    }
+
+    // A revive earned right as the app died: AdsManager persists its earned
+    // marker the moment LevelPlay reports the reward, but the callback that
+    // applies it here never ran. Pairing that marker with this feature's own
+    // intent marker — the same two-key handshake the solo streak save uses —
+    // honors the reward once, on the day it was bought for, and consumes it
+    // so it can never validate the other flow's restore instead.
+    void ReconcilePendingRevive()
+    {
+        int pendingDay = PlayerPrefs.GetInt(PendingReviveKey, 0);
+        if (pendingDay == 0) return;
+
+        if (PlayerPrefs.GetInt(AdsManager.PendingRewardEarnedKey, 0) == 1)
+        {
+            if (pendingDay == day && !done && !revived)
+            {
+                revived = true;
+                budget = GuessBudget + ReviveGuesses;
+                Persist();
+            }
+            // Ours either way: a next-day open consumes the moot reward
+            // rather than leaving it primed for a false streak restore.
+            PlayerPrefs.DeleteKey(AdsManager.PendingRewardEarnedKey);
+        }
+
+        PlayerPrefs.DeleteKey(PendingReviveKey);
+        PlayerPrefs.Save();
     }
 
     void Persist()
@@ -316,15 +351,30 @@ public class DailyHunt : MonoBehaviour
     {
         if (ads == null) { FinalizeFail(); Refresh(); return; }
 
+        // Intent first, like the streak save: if the process dies after the
+        // reward lands but before the callback below runs, the next open
+        // grants the revive from the persisted pair instead of losing it.
+        PlayerPrefs.SetInt(PendingReviveKey, day);
+        PlayerPrefs.Save();
+
         ads.ShowRewardedAd(() =>
         {
             revived = true;
             budget = GuessBudget + ReviveGuesses;
             Persist();
+            // On success AdsManager leaves the earned marker for the
+            // consumer to clear (FinishRewarded only deletes it when no
+            // reward was granted). Left behind, it would pair with a later
+            // abandoned streak-save attempt and fake a restore.
+            PlayerPrefs.DeleteKey(PendingReviveKey);
+            PlayerPrefs.DeleteKey(AdsManager.PendingRewardEarnedKey);
+            PlayerPrefs.Save();
             Refresh();
         },
         () =>
         {
+            PlayerPrefs.DeleteKey(PendingReviveKey);
+            PlayerPrefs.Save();
             status.text = L10n.Get("ad_not_ready");
             FinalizeFail();
             Refresh();
