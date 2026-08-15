@@ -89,8 +89,10 @@ public static class RuntimeUI
     {
         if (rect == null || rect.parent == null) return false;
         var parent = rect.parent as RectTransform;
-        if (parent == null || parent.parent == null) return false;
-        return parent.anchorMin == Vector2.zero &&
+        if (parent == null) return false;
+        if (parent.GetComponent<Canvas>() != null) return true;
+        return parent.parent != null &&
+               parent.anchorMin == Vector2.zero &&
                parent.anchorMax == Vector2.one &&
                parent.parent.GetComponent<Canvas>() != null;
     }
@@ -99,7 +101,9 @@ public static class RuntimeUI
     {
         if (!IsPageChild(rect)) return;
 
-        var canvas = rect.parent.parent.GetComponent<Canvas>();
+        var canvas = rect.parent.GetComponent<Canvas>();
+        if (canvas == null && rect.parent.parent != null)
+            canvas = rect.parent.parent.GetComponent<Canvas>();
         var canvasRect = canvas != null ? canvas.transform as RectTransform : null;
         Vector2 canvasSize = canvasRect != null && canvasRect.rect.size.sqrMagnitude > 0f
             ? canvasRect.rect.size
