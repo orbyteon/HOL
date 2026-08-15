@@ -101,6 +101,7 @@ public static class L10n
         { "stats_best",              new[] { "Best", "Ρεκόρ" } },
         { "stats_fastest_win",       new[] { "Fastest win: {0} guesses", "Ταχύτερη νίκη: {0} προσπάθειες" } },
         { "guesses",                 new[] { "Guesses:", "Προσπάθειες:" } },
+        { "round_label",             new[] { "ROUND {0}/{1}", "ΓΥΡΟΣ {0}/{1}" } },
         { "your_number",             new[] { "Your number? (1-100)", "Ο αριθμός σου; (1-100)" } },
 
         // pvp
@@ -124,6 +125,10 @@ public static class L10n
         { "pvp_opponent_left",       new[] { "Your opponent left the match.", "Ο αντίπαλός σου αποχώρησε." } },
         { "pvp_connection_lost",     new[] { "Connection lost. Try again later.", "Χάθηκε η σύνδεση. Δοκίμασε αργότερα." } },
         { "pvp_invite_text",         new[] { "Duel me in HOL — Higher or Lower! My room code: {0}", "Έλα για μονομαχία στο HOL! Κωδικός δωματίου: {0}" } },
+        { "hud_current_number",      new[] { "CURRENT NUMBER", "ΤΡΕΧΩΝ ΑΡΙΘΜΟΣ" } },
+        { "round_label_open",        new[] { "ROUND {0}", "ΓΥΡΟΣ {0}" } },
+        { "hud_history",             new[] { "HISTORY", "ΙΣΤΟΡΙΚΟ" } },
+        { "hud_tip",                 new[] { "TIP", "ΣΥΜΒΟΥΛΗ" } },
         { "you",                     new[] { "You", "Εσύ" } },
 
         // disclosure / consent

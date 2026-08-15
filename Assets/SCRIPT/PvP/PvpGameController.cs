@@ -34,6 +34,8 @@ public class PvpGameController : MonoBehaviour
     public TMP_InputField guessInput;
     public GameObject guessButton;
     public TMP_Text opponentNameText;
+    // Optional: the Consumer First banner's round counter; null-safe everywhere.
+    public TMP_Text roundText;
     public TMP_Text turnText;
     public TMP_Text historyText;
     public TMP_Text resultText;
@@ -507,6 +509,13 @@ public class PvpGameController : MonoBehaviour
 
         string opponentName = client.IsHost ? s.guestName : s.hostName;
         opponentNameText.text = L10n.Get("opponent_label", opponentName);
+
+        // Optional HUD: the live round number, blank once the match is over so
+        // the result banner has the slot to itself.
+        if (roundText != null)
+            roundText.text = s.phase == "play"
+                ? L10n.Get("round_label_open", s.roundIndex + 1)
+                : "";
 
         string key = s.lastBy + ":" + s.lastGuess;
         if (s.lastBy != "" && s.lastGuess != 0 && key != shownGuessKey)
