@@ -5,6 +5,21 @@ Play Console versionName in `ProjectSettings.asset`.
 
 ## [Unreleased]
 
+### Added
+
+- **Daily Hunt** — the parked product-pass draft's one unshipped idea (#6),
+  ported onto the Consumer First board. One date-seeded secret number
+  shared by every player per UTC day, seven guesses, an emoji-trail result
+  that copies to the clipboard for sharing, one rewarded-ad revive worth
+  two extra guesses, and its own found-day streak. Pure client and fully
+  resumable: state persists after every guess, the secret is a keyed hash
+  of the day number (not a predictable seeded PRNG), a backwards clock
+  cannot replay a revealed answer, and a missed day ends the streak the
+  moment the panel opens rather than at the next win. Deliberately left
+  for follow-ups so this ships without a server or package change: the
+  CloudScript percentile, the local notification reminder, and the
+  draft's RangeBar visual.
+
 ### Changed
 
 - The privacy policy's contact address is now `support@orbyteon.com` —
