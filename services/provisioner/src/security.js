@@ -1,5 +1,43 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 
+export function createFixedWindowRateLimiter({ windowMs, maxRequests, maxEntries }) {
+  if (!Number.isFinite(windowMs) || windowMs <= 0 ||
+      !Number.isInteger(maxRequests) || maxRequests <= 0 ||
+      !Number.isInteger(maxEntries) || maxEntries <= 0) {
+    throw new Error("invalid fixed-window rate limiter configuration");
+  }
+
+  const windows = new Map();
+
+  function pruneExpired(now) {
+    for (const [key, value] of windows)
+      if (now - value.startedAt >= windowMs) windows.delete(key);
+  }
+
+  return {
+    consume(key, now = Date.now()) {
+      const normalized = String(key || "unknown");
+      const current = windows.get(normalized);
+      if (current && now - current.startedAt < windowMs) {
+        current.count += 1;
+        return current.count <= maxRequests;
+      }
+
+      if (current) windows.delete(normalized);
+      if (windows.size >= maxEntries) pruneExpired(now);
+
+      // Fail closed for a previously unseen key when the bounded map is full.
+      // This limiter is only a cheap first layer before Play Integrity, but an
+      // attacker-controlled high-cardinality header must not grow process memory.
+      if (windows.size >= maxEntries) return false;
+
+      windows.set(normalized, { startedAt: now, count: 1 });
+      return true;
+    },
+    size() { return windows.size; },
+  };
+}
+
 export function canonicalRequestHash(packageName, customId, appVersion) {
   return createHash("sha256")
     .update(`${packageName}\n${customId}\n${appVersion}`, "utf8")

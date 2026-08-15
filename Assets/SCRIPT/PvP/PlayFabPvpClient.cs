@@ -18,6 +18,7 @@ public class PlayFabPvpClient : PvpBackend
     public string titleId = "";
 
     public float pollIntervalSeconds = 1.5f;
+    const int MutationBusyRetries = 3;
 
     [Tooltip("Debug builds may create anonymous players client-side for local testing. Release builds always use CreateAccount=false and require server-side provisioning.")]
     public bool allowClientAccountCreationInDebugBuilds = true;
@@ -399,7 +400,34 @@ public class PlayFabPvpClient : PvpBackend
     {
         string body = "{\"FunctionName\":\"" + functionName +
                       "\",\"FunctionParameter\":" + functionArgsJson + "}";
-        StartCoroutine(Post(Api("ExecuteCloudScript"), body, true, done));
+        StartCoroutine(ExecuteCloudScriptRoutine(body, done));
+    }
+
+    IEnumerator ExecuteCloudScriptRoutine(string body, Action<bool, string> done)
+    {
+        bool ok = false;
+        string response = "";
+
+        for (int attempt = 0; attempt <= MutationBusyRetries; attempt++)
+        {
+            yield return StartCoroutine(Post(Api("ExecuteCloudScript"), body, true, (requestOk, text) =>
+            {
+                ok = requestOk;
+                response = text ?? "";
+            }));
+
+            if (!ok || !HasCloudError(response, "room busy") || attempt == MutationBusyRetries)
+                break;
+
+            // CloudScript serializes all room mutations. Short jittered retries
+            // hide ordinary overlap between a guess, Signal, rematch, or leave
+            // without turning a stale client snapshot into a last-write-wins
+            // overwrite.
+            float delay = 0.12f * (attempt + 1) + UnityEngine.Random.Range(0f, 0.08f);
+            yield return new WaitForSeconds(delay);
+        }
+
+        done?.Invoke(ok, response);
     }
 
     static bool CloudOk(string resp)

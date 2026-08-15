@@ -29,6 +29,9 @@ public sealed class ReleaseBuildGuard : IPreprocessBuildWithReport
         if (!string.Equals(identifier, "com.Orbyteon.HOL", StringComparison.Ordinal))
             throw new BuildFailedException("Unexpected Android application identifier: " + identifier);
 
+        if (PlayerSettings.Android.targetSdkVersion != AndroidSdkVersions.AndroidApiLevel36)
+            throw new BuildFailedException("HOL release builds must target Android API 36.");
+
         // GameCI supplies the keystore path/passwords immediately before the
         // BuildPipeline call. Its signing values only take effect when Unity's
         // Custom Keystore switch is enabled, so enable it for this build only.

@@ -4,8 +4,8 @@
 // therefore unreadable and unwritable through Client Shared Group APIs even if
 // an API Access Policy is accidentally left permissive.
 //
-// Duel rules (mirrored in C# by Assets/SCRIPT/DuelRules.cs for solo play and
-// the Firebase development fallback — keep the two in step):
+// Duel rules are mirrored in C# by Assets/SCRIPT/DuelRules.cs for solo play.
+// Keep the two implementations in step:
 //   * The opener is a coin flip taken when the guest joins, and stays fixed for
 //     the match. Before this, the guest always opened, which handed the joiner a
 //     ~64% win rate between equally skilled players.
@@ -22,12 +22,21 @@
 //     ended in stalemate; only a tie on guess count, Lock and remaining
 //     candidates alike is a draw now.
 //   * Signals are a closed vocabulary of six pre-localized messages. There is no
-//     free text anywhere in the protocol, by design.
+//     free text in the messaging channel, by design.
 
 var CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // no 0/O/1/I/L
 var ROOM_CREATE_ATTEMPTS = 12;
 var SIGNAL_COUNT = 6;       // valid signal ids are 0..5, resolved to text on the client
 var SIGNAL_CAP_PER_SIDE = 12; // per match; blocks spam and caps CloudScript spend
+var ROOM_REGISTRY_SHARDS = 8;
+// Keep scheduled executions well below Legacy CloudScript's four-second API
+// time budget. Two rooms plus eight registry reads is a bounded request count;
+// the five-minute schedule drains ordinary orphan volume continuously.
+var ROOM_CLEANUP_LIMIT = 2;
+var MUTATION_LOCK_STALE_MS = 120000;
+var WAITING_ROOM_TTL_MS = 30 * 60 * 1000;
+var PLAY_ROOM_TTL_MS = 6 * 60 * 60 * 1000;
+var DONE_ROOM_TTL_MS = 15 * 60 * 1000;
 
 function cleanName(value, fallback) {
     var s = String(value || fallback || "Player").trim();
@@ -36,7 +45,8 @@ function cleanName(value, fallback) {
 }
 
 function validSecret(value) {
-    var n = value | 0;
+    var n = Number(value);
+    if (n !== Math.floor(n)) return 0;
     return n >= 1 && n <= 100 ? n : 0;
 }
 
@@ -51,25 +61,33 @@ function otherSide(side) {
     return side === "host" ? "guest" : "host";
 }
 
-function claimGroupId(roomId) {
-    return roomId + "-GUEST";
+function nowMs() {
+    return Date.now ? Date.now() : new Date().getTime();
 }
 
-function turnGroupId(roomId, turnIndex) {
-    return roomId + "-TURN-" + turnIndex;
+function registryShard(roomId) {
+    var total = 0;
+    for (var i = 0; i < roomId.length; i++) total += roomId.charCodeAt(i);
+    return total % ROOM_REGISTRY_SHARDS;
 }
 
-function ackGroupId(roomId, side) {
-    return roomId + "-ACK-" + side.toUpperCase();
+function registryGroupId(roomId) {
+    return "HOL-ROOM-REG-" + registryShard(roomId);
 }
 
-function groupExists(groupId) {
-    try {
-        server.GetSharedGroupData({ SharedGroupId: groupId, Keys: [] });
-        return true;
-    } catch (e) {
-        return false;
-    }
+function mutationLockId(roomId, revision, epoch) {
+    return roomId + "-MUT-" + revision + "-" + epoch;
+}
+
+function recoveryGroupId(lockId, timestamp) {
+    // Time-bucketed so an invocation that dies immediately after claiming
+    // recovery cannot block the room forever. A later bucket may take over;
+    // normal CloudScript executions cannot survive long enough to overlap it.
+    return lockId + "-RECOVERY-" + Math.floor(timestamp / MUTATION_LOCK_STALE_MS);
+}
+
+function observationGroupId(lockId) {
+    return lockId + "-OBSERVED";
 }
 
 function readState(roomId) {
@@ -86,7 +104,7 @@ function readState(roomId) {
     catch (e2) { return null; }
 }
 
-function writeState(roomId, state) {
+function writeStateRaw(roomId, state) {
     server.UpdateSharedGroupData({
         SharedGroupId: roomId,
         Data: { state: JSON.stringify(state) },
@@ -94,32 +112,184 @@ function writeState(roomId, state) {
     });
 }
 
+function roomTtlMs(state) {
+    if (state.phase === "waiting") return WAITING_ROOM_TTL_MS;
+    if (state.phase === "done") return DONE_ROOM_TTL_MS;
+    return PLAY_ROOM_TTL_MS;
+}
+
+function updateRegistry(roomId, expiresAt) {
+    var groupId = registryGroupId(roomId);
+    var data = {};
+    data[roomId] = String(expiresAt);
+
+    try {
+        server.UpdateSharedGroupData({
+            SharedGroupId: groupId,
+            Data: data,
+            Permission: "Private",
+        });
+    } catch (missingRegistry) {
+        try { server.CreateSharedGroup({ SharedGroupId: groupId }); }
+        catch (createdByAnotherInvocation) { }
+        server.UpdateSharedGroupData({
+            SharedGroupId: groupId,
+            Data: data,
+            Permission: "Private",
+        });
+    }
+}
+
+function unregisterRoom(roomId) {
+    try {
+        server.UpdateSharedGroupData({
+            SharedGroupId: registryGroupId(roomId),
+            KeysToRemove: [roomId],
+            Permission: "Private",
+        });
+    } catch (e) { }
+}
+
+function writeState(roomId, state) {
+    var now = nowMs();
+    if (!Number(state.createdAt)) state.createdAt = now;
+    state.updatedAt = now;
+    state.expiresAt = now + roomTtlMs(state);
+
+    // Register first. If the room write then fails, cleanup will remove the
+    // dangling registry entry after observing that the room does not exist.
+    // The reverse order could create an unindexed room that never expires.
+    updateRegistry(roomId, state.expiresAt);
+    writeStateRaw(roomId, state);
+}
+
 function deleteGroupQuietly(groupId) {
     try { server.DeleteSharedGroup({ SharedGroupId: groupId }); }
     catch (e) { }
 }
 
-function deleteRoomArtifacts(roomId, state) {
+function deleteRoomArtifacts(roomId) {
     deleteGroupQuietly(roomId);
-    deleteGroupQuietly(claimGroupId(roomId));
-    deleteGroupQuietly(ackGroupId(roomId, "host"));
-    deleteGroupQuietly(ackGroupId(roomId, "guest"));
-
-    // Turn claims are never reused, and a rematch sweeps the previous match's
-    // window as it starts, so only the claims since turnIndexBase can still be
-    // around. Walking from 0 would re-delete a rematch chain's worth of ids.
-    var from = state && typeof state.turnIndexBase === "number" ? state.turnIndexBase : 0;
-    var maxTurn = state && typeof state.turnIndex === "number" ? state.turnIndex : 0;
-    sweepTurnClaims(roomId, from, maxTurn);
+    unregisterRoom(roomId);
 }
 
-function sweepTurnClaims(roomId, from, to) {
-    from = Math.max(0, from | 0);
-    // Bounded so a long-running room can never turn teardown into hundreds of
-    // API calls; a single match spends well under this.
-    to = Math.min(to | 0, from + 200);
-    for (var i = from; i <= to; i++)
-        deleteGroupQuietly(turnGroupId(roomId, i));
+function sameMutationGeneration(state, revision, epoch) {
+    return !!state && (state.revision | 0) === revision &&
+        (state.lockEpoch | 0) === epoch;
+}
+
+function storedValue(group, key) {
+    return group && group.Data && group.Data[key] ? group.Data[key].Value : "";
+}
+
+// A lock is fenced by both room revision and epoch. Recovery advances the
+// epoch before removing a stale lock, so a delayed invocation cannot write a
+// state snapshot acquired under the previous lease.
+function recoverStaleMutationLock(roomId, state, lockId) {
+    var lock;
+    try { lock = server.GetSharedGroupData({ SharedGroupId: lockId, Keys: ["startedAt"] }); }
+    catch (missingLock) { return; }
+
+    var startedAt = Number(storedValue(lock, "startedAt"));
+    if (!startedAt) {
+        var observationId = observationGroupId(lockId);
+        try {
+            server.CreateSharedGroup({ SharedGroupId: observationId });
+            server.UpdateSharedGroupData({
+                SharedGroupId: observationId,
+                Data: { startedAt: String(nowMs()) },
+                Permission: "Private",
+            });
+            return;
+        } catch (alreadyObserved) {
+            try {
+                var observed = server.GetSharedGroupData({
+                    SharedGroupId: observationId,
+                    Keys: ["startedAt"],
+                });
+                startedAt = Number(storedValue(observed, "startedAt"));
+            } catch (missingObservation) { return; }
+        }
+    }
+    if (!startedAt || nowMs() - startedAt < MUTATION_LOCK_STALE_MS) return;
+
+    var recoveryId = recoveryGroupId(lockId, nowMs());
+    try {
+        server.CreateSharedGroup({ SharedGroupId: recoveryId });
+    } catch (anotherRecovery) {
+        return;
+    }
+
+    try {
+        var latest = readState(roomId);
+        var revision = state.revision | 0;
+        var epoch = state.lockEpoch | 0;
+        if (sameMutationGeneration(latest, revision, epoch)) {
+            latest.lockEpoch = epoch + 1;
+            writeState(roomId, latest);
+        }
+        deleteGroupQuietly(lockId);
+        deleteGroupQuietly(observationGroupId(lockId));
+    } finally {
+        deleteGroupQuietly(recoveryId);
+    }
+}
+
+function withRoomMutation(roomId, mutate) {
+    var initial = readState(roomId);
+    if (!initial) return { ok: false, error: "room not found" };
+
+    var revision = initial.revision | 0;
+    var epoch = initial.lockEpoch | 0;
+    var lockId = mutationLockId(roomId, revision, epoch);
+    var created = false;
+
+    try {
+        server.CreateSharedGroup({ SharedGroupId: lockId });
+        created = true;
+        server.UpdateSharedGroupData({
+            SharedGroupId: lockId,
+            Data: { startedAt: String(nowMs()) },
+            Permission: "Private",
+        });
+    } catch (lockError) {
+        if (created) deleteGroupQuietly(lockId);
+        else recoverStaleMutationLock(roomId, initial, lockId);
+        return { ok: false, error: "room busy" };
+    }
+
+    try {
+        var state = readState(roomId);
+        if (!sameMutationGeneration(state, revision, epoch))
+            return { ok: false, error: "room busy" };
+
+        var change = mutate(state) || {};
+        if (!change.commit && !change.remove)
+            return change.result || { ok: false, error: "mutation rejected" };
+
+        // Fence immediately before the unconditional Shared Group write.
+        // A stale-lock recovery changes the epoch, making this invocation fail
+        // closed instead of overwriting a newer room snapshot.
+        var fence = readState(roomId);
+        if (!sameMutationGeneration(fence, revision, epoch))
+            return { ok: false, error: "room busy" };
+
+        if (change.remove) {
+            deleteRoomArtifacts(roomId);
+            return change.result || { ok: true, deleted: true };
+        }
+
+        state.revision = revision + 1;
+        state.lockEpoch = 0;
+        writeState(roomId, state);
+        return typeof change.afterCommit === "function"
+            ? change.afterCommit(state)
+            : (change.result || { ok: true });
+    } catch (writeError) {
+        return { ok: false, error: "write failed" };
+    } finally {
+        deleteGroupQuietly(lockId);
+    }
 }
 
 function sideForPlayer(state, playerId) {
@@ -257,20 +427,16 @@ function viewFor(state, playerId) {
 }
 
 // Both players committed a fresh secret, so deal the next match in the same
-// room. Everything that describes the finished match is cleared; turnIndex is
-// deliberately NOT reset, because a reused turn id would collide with the claim
-// group the previous match already created.
-function resetForRematch(roomId, state) {
-    sweepTurnClaims(roomId, state.turnIndexBase | 0, state.turnIndex | 0);
-    state.turnIndexBase = state.turnIndex | 0;
-
-    deleteGroupQuietly(ackGroupId(roomId, "host"));
-    deleteGroupQuietly(ackGroupId(roomId, "guest"));
-
+// room. Everything that describes the finished match is cleared.
+function resetForRematch(state) {
     state.hostSecret = state.rematchHost | 0;
     state.guestSecret = state.rematchGuest | 0;
     state.rematchHost = 0;
     state.rematchGuest = 0;
+    state.ackedHost = false;
+    state.ackedGuest = false;
+    state.leftHost = false;
+    state.leftGuest = false;
 
     state.matchIndex = (state.matchIndex | 0) + 1;
     state.phase = "play";
@@ -342,13 +508,15 @@ handlers.createRoom = function (args, context) {
             lastLocked: false,
             hostGuessCount: 0,
             guestGuessCount: 0,
-            turnIndex: 0,
-            turnIndexBase: 0,
             matchIndex: 0,
             rematchHost: 0,
             rematchGuest: 0,
+            ackedHost: false,
+            ackedGuest: false,
             leftHost: false,
             leftGuest: false,
+            revision: 0,
+            lockEpoch: 0,
             roundIndex: 0,
             hostLo: 1,
             hostHi: 100,
@@ -372,7 +540,7 @@ handlers.createRoom = function (args, context) {
         writeState(roomId, state);
         return { ok: true, roomId: roomId, state: JSON.stringify(viewFor(state, currentPlayerId)) };
     } catch (e2) {
-        deleteRoomArtifacts(roomId, null);
+        deleteRoomArtifacts(roomId);
         return { ok: false, error: "create failed" };
     }
 };
@@ -383,42 +551,27 @@ handlers.joinRoom = function (args, context) {
     var roomId = String(args.roomId).toUpperCase().trim();
     var guestSecret = validSecret(args.guestSecret);
     if (!guestSecret) return { ok: false, error: "bad secret" };
+    var playerId = currentPlayerId;
 
-    var state = readState(roomId);
-    if (!state || state.phase === "closed") return { ok: false, error: "room not found" };
-    if (state.phase !== "waiting" || state.guestId) return { ok: false, error: "room full" };
-    if (state.hostId === currentPlayerId) return { ok: false, error: "room full" };
+    return withRoomMutation(roomId, function (state) {
+        if (state.phase !== "waiting" || state.guestId)
+            return { result: { ok: false, error: "room full" } };
+        if (state.hostId === playerId)
+            return { result: { ok: false, error: "room full" } };
 
-    // Atomic guest-slot claim: CreateSharedGroup is unique by ID. Exactly one
-    // concurrent joiner can create the claim group; all others get a conflict.
-    try {
-        server.CreateSharedGroup({ SharedGroupId: claimGroupId(roomId) });
-    } catch (claimError) {
-        return { ok: false, error: "room full" };
-    }
-
-    try {
-        // Re-read after claiming in case the host closed the room immediately
-        // before this invocation won the claim.
-        state = readState(roomId);
-        if (!state || state.phase !== "waiting" || state.guestId) {
-            deleteGroupQuietly(claimGroupId(roomId));
-            return { ok: false, error: state ? "room full" : "room not found" };
-        }
-
-        state.guestId = currentPlayerId;
+        state.guestId = playerId;
         state.guestName = cleanName(args.guestName, "Player");
         state.guestSecret = guestSecret;
         state.phase = "play";
         state.opener = Math.random() < 0.5 ? "host" : "guest";
         state.turn = state.opener;
-        writeState(roomId, state);
-
-        return { ok: true, state: JSON.stringify(viewFor(state, currentPlayerId)) };
-    } catch (e) {
-        deleteGroupQuietly(claimGroupId(roomId));
-        return { ok: false, error: "join failed" };
-    }
+        return {
+            commit: true,
+            afterCommit: function (committed) {
+                return { ok: true, state: JSON.stringify(viewFor(committed, playerId)) };
+            },
+        };
+    });
 };
 
 handlers.getRoom = function (args, context) {
@@ -439,76 +592,63 @@ handlers.submitGuess = function (args, context) {
     var guess = validSecret(args.guess);
     if (!guess) return { ok: false, error: "bad guess" };
 
-    var state = readState(roomId);
-    if (!state) return { ok: false, error: "room not found" };
-
-    var side = sideForPlayer(state, currentPlayerId);
-    if (!side) return { ok: false, error: "not a member" };
-    if (state.phase !== "play") return { ok: false, error: "not in play" };
-    if (state.turn !== side) return { ok: false, error: "not your turn" };
-
+    var playerId = currentPlayerId;
     var locked = args.lock === true || args.lock === 1;
-    var lockKey = side === "host" ? "lockUsedHost" : "lockUsedGuest";
-    if (locked && state[lockKey]) return { ok: false, error: "lock already spent" };
 
-    // One immutable claim group per turn makes duplicate/concurrent submissions
-    // for the same turn fail closed without relying on client-side tap guards.
-    var turnIndex = state.turnIndex | 0;
-    var turnClaim = turnGroupId(roomId, turnIndex);
-    try {
-        server.CreateSharedGroup({ SharedGroupId: turnClaim });
-    } catch (turnClaimError) {
-        return { ok: false, error: "turn already submitted" };
-    }
+    return withRoomMutation(roomId, function (state) {
+        var side = sideForPlayer(state, playerId);
+        if (!side) return { result: { ok: false, error: "not a member" } };
+        if (state.phase !== "play")
+            return { result: { ok: false, error: "not in play" } };
+        if (state.turn !== side)
+            return { result: { ok: false, error: "not your turn" } };
 
-    var opponentSecret = side === "host" ? (state.guestSecret | 0) : (state.hostSecret | 0);
-    var correct = guess === opponentSecret;
+        var lockKey = side === "host" ? "lockUsedHost" : "lockUsedGuest";
+        if (locked && state[lockKey])
+            return { result: { ok: false, error: "lock already spent" } };
 
-    state.lastGuess = guess;
-    state.lastBy = side;
-    state.lastLocked = locked;
-    state.lastHint = correct ? "correct" : (guess < opponentSecret ? "higher" : "lower");
-    state.turnIndex = turnIndex + 1;
+        var opponentSecret = side === "host" ? (state.guestSecret | 0) : (state.hostSecret | 0);
+        var correct = guess === opponentSecret;
 
-    if (side === "host") state.hostGuessCount = (state.hostGuessCount | 0) + 1;
-    else state.guestGuessCount = (state.guestGuessCount | 0) + 1;
+        state.lastGuess = guess;
+        state.lastBy = side;
+        state.lastLocked = locked;
+        state.lastHint = correct ? "correct" : (guess < opponentSecret ? "higher" : "lower");
 
-    if (locked) state[lockKey] = true;
+        if (side === "host") state.hostGuessCount = (state.hostGuessCount | 0) + 1;
+        else state.guestGuessCount = (state.guestGuessCount | 0) + 1;
 
-    // Candidates left *before* this guess narrowed anything: that is the pool
-    // the guess was actually drawn from.
-    var candidates = candidatesFor(state, side);
-    narrowFor(state, side, guess, state.lastHint);
+        if (locked) state[lockKey] = true;
 
-    if (correct) {
-        // A win is provisional until the round closes, so the responder always
-        // gets the answering guess the opener just had.
-        if (state.pendingWin) {
-            state.pendingWin = resolveTie(state, side, locked, candidates);
-        } else {
-            state.pendingWin = side;
-            state.pendingWinLocked = locked;
-            state.pendingWinCandidates = candidates;
+        // Candidates left *before* this guess narrowed anything: that is the
+        // pool the guess was actually drawn from.
+        var candidates = candidatesFor(state, side);
+        narrowFor(state, side, guess, state.lastHint);
+
+        if (correct) {
+            // A win is provisional until the round closes, so the responder
+            // always gets the answering guess the opener just had.
+            if (state.pendingWin)
+                state.pendingWin = resolveTie(state, side, locked, candidates);
+            else {
+                state.pendingWin = side;
+                state.pendingWinLocked = locked;
+                state.pendingWinCandidates = candidates;
+            }
+        } else if (locked) {
+            if (side === "host") state.skipHost = true;
+            else state.skipGuest = true;
         }
-    } else if (locked) {
-        // Staking the Lock and missing costs the next turn.
-        if (side === "host") state.skipHost = true;
-        else state.skipGuest = true;
-    }
 
-    markActed(state, side);
-    advanceTurn(state);
-
-    try {
-        writeState(roomId, state);
-    } catch (writeError) {
-        // A failed state write must not consume the turn forever. Roll the
-        // immutable claim back so the same player can retry after recovery.
-        deleteGroupQuietly(turnClaim);
-        return { ok: false, error: "write failed" };
-    }
-
-    return { ok: true, state: JSON.stringify(viewFor(state, currentPlayerId)) };
+        markActed(state, side);
+        advanceTurn(state);
+        return {
+            commit: true,
+            afterCommit: function (committed) {
+                return { ok: true, state: JSON.stringify(viewFor(committed, playerId)) };
+            },
+        };
+    });
 };
 
 // Closed-vocabulary quick chat. The wire carries an index into a table the
@@ -518,30 +658,32 @@ handlers.sendSignal = function (args, context) {
     if (!args || !args.roomId) return { ok: false, error: "missing roomId" };
 
     var roomId = String(args.roomId).toUpperCase().trim();
-    var signalId = args.signalId | 0;
-    if (signalId < 0 || signalId >= SIGNAL_COUNT) return { ok: false, error: "bad signal" };
+    var signalId = Number(args.signalId);
+    if (signalId !== Math.floor(signalId) || signalId < 0 || signalId >= SIGNAL_COUNT)
+        return { ok: false, error: "bad signal" };
 
-    var state = readState(roomId);
-    if (!state) return { ok: false, error: "room not found" };
+    var playerId = currentPlayerId;
+    return withRoomMutation(roomId, function (state) {
+        var side = sideForPlayer(state, playerId);
+        if (!side) return { result: { ok: false, error: "not a member" } };
+        if (state.phase !== "play" && state.phase !== "done")
+            return { result: { ok: false, error: "not in play" } };
 
-    var side = sideForPlayer(state, currentPlayerId);
-    if (!side) return { ok: false, error: "not a member" };
-    if (state.phase !== "play" && state.phase !== "done")
-        return { ok: false, error: "not in play" };
+        var countKey = side === "host" ? "hostSignalCount" : "guestSignalCount";
+        if ((state[countKey] | 0) >= SIGNAL_CAP_PER_SIDE)
+            return { result: { ok: false, error: "signal limit" } };
 
-    var countKey = side === "host" ? "hostSignalCount" : "guestSignalCount";
-    if ((state[countKey] | 0) >= SIGNAL_CAP_PER_SIDE)
-        return { ok: false, error: "signal limit" };
-
-    state[countKey] = (state[countKey] | 0) + 1;
-    state.signalBy = side;
-    state.signalId = signalId;
-    state.signalSeq = (state.signalSeq | 0) + 1;
-
-    try { writeState(roomId, state); }
-    catch (writeError) { return { ok: false, error: "write failed" }; }
-
-    return { ok: true, state: JSON.stringify(viewFor(state, currentPlayerId)) };
+        state[countKey] = (state[countKey] | 0) + 1;
+        state.signalBy = side;
+        state.signalId = signalId;
+        state.signalSeq = (state.signalSeq | 0) + 1;
+        return {
+            commit: true,
+            afterCommit: function (committed) {
+                return { ok: true, state: JSON.stringify(viewFor(committed, playerId)) };
+            },
+        };
+    });
 };
 
 // Rematch handshake: each side commits a fresh secret, and the next match is
@@ -554,83 +696,137 @@ handlers.requestRematch = function (args, context) {
     var secret = validSecret(args.secret);
     if (!secret) return { ok: false, error: "bad secret" };
 
-    var state = readState(roomId);
-    if (!state) return { ok: false, error: "room not found" };
+    var playerId = currentPlayerId;
+    return withRoomMutation(roomId, function (state) {
+        var side = sideForPlayer(state, playerId);
+        if (!side) return { result: { ok: false, error: "not a member" } };
+        if (state.phase !== "done")
+            return { result: { ok: false, error: "not done" } };
 
-    var side = sideForPlayer(state, currentPlayerId);
-    if (!side) return { ok: false, error: "not a member" };
-    if (state.phase !== "done") return { ok: false, error: "not done" };
+        var opponentGone = side === "host" ? state.leftGuest : state.leftHost;
+        if (opponentGone)
+            return { result: { ok: false, error: "opponent left" } };
 
-    var opponentGone = side === "host" ? state.leftGuest : state.leftHost;
-    if (opponentGone) return { ok: false, error: "opponent left" };
+        if (side === "host") state.rematchHost = secret;
+        else state.rematchGuest = secret;
 
-    if (side === "host") state.rematchHost = secret;
-    else state.rematchGuest = secret;
-
-    if (state.rematchHost && state.rematchGuest)
-        resetForRematch(roomId, state);
-
-    try { writeState(roomId, state); }
-    catch (writeError) { return { ok: false, error: "write failed" }; }
-
-    return { ok: true, state: JSON.stringify(viewFor(state, currentPlayerId)) };
+        if (state.rematchHost && state.rematchGuest) resetForRematch(state);
+        return {
+            commit: true,
+            afterCommit: function (committed) {
+                return { ok: true, state: JSON.stringify(viewFor(committed, playerId)) };
+            },
+        };
+    });
 };
 
 handlers.ackResult = function (args, context) {
     if (!args || !args.roomId) return { ok: false, error: "missing roomId" };
 
     var roomId = String(args.roomId).toUpperCase().trim();
-    var state = readState(roomId);
-    if (!state) return { ok: true, deleted: true };
-    if (state.phase !== "done") return { ok: false, error: "not done" };
+    var playerId = currentPlayerId;
+    var outcome = withRoomMutation(roomId, function (state) {
+        if (state.phase !== "done")
+            return { result: { ok: false, error: "not done" } };
 
-    var side = sideForPlayer(state, currentPlayerId);
-    if (!side) return { ok: false, error: "not a member" };
+        var side = sideForPlayer(state, playerId);
+        if (!side) return { result: { ok: false, error: "not a member" } };
 
-    // Each side claims an immutable acknowledgement group. This avoids the
-    // lost-update race that would occur if both clients toggled booleans in
-    // the same Shared Group state at nearly the same time.
-    try { server.CreateSharedGroup({ SharedGroupId: ackGroupId(roomId, side) }); }
-    catch (alreadyAcknowledged) { }
+        if (side === "host") state.ackedHost = true;
+        else state.ackedGuest = true;
+        if (state.ackedHost && state.ackedGuest)
+            return { remove: true, result: { ok: true, deleted: true } };
 
-    if (groupExists(ackGroupId(roomId, "host")) && groupExists(ackGroupId(roomId, "guest"))) {
-        deleteRoomArtifacts(roomId, state);
-        return { ok: true, deleted: true };
-    }
-
-    return { ok: true, deleted: false };
+        return { commit: true, result: { ok: true, deleted: false } };
+    });
+    return outcome && outcome.error === "room not found"
+        ? { ok: true, deleted: true }
+        : outcome;
 };
 
 handlers.leaveRoom = function (args, context) {
     if (!args || !args.roomId) return { ok: false, error: "missing roomId" };
 
     var roomId = String(args.roomId).toUpperCase().trim();
-    var state = readState(roomId);
-    if (!state) return { ok: true };
-    var side = sideForPlayer(state, currentPlayerId);
-    if (!side) return { ok: false, error: "not a member" };
+    var playerId = currentPlayerId;
+    var outcome = withRoomMutation(roomId, function (state) {
+        var side = sideForPlayer(state, playerId);
+        if (!side) return { result: { ok: false, error: "not a member" } };
 
-    // A finished room must survive until the opponent has observed the
-    // result: leaving after "done" counts as this side's acknowledgement,
-    // and artifacts are destroyed only once both sides have acked (here or
-    // in ackResult). Leaving mid-match still deletes immediately so the
-    // opponent's poll reports the departure.
-    if (state.phase === "done") {
-        try { server.CreateSharedGroup({ SharedGroupId: ackGroupId(roomId, side) }); }
-        catch (alreadyAcknowledged) { }
+        // A finished room survives until the opponent has observed the result.
+        // Leaving counts as this side's acknowledgement and closes rematch.
+        if (state.phase === "done") {
+            if (side === "host") {
+                state.ackedHost = true;
+                state.leftHost = true;
+                state.rematchHost = 0;
+            } else {
+                state.ackedGuest = true;
+                state.leftGuest = true;
+                state.rematchGuest = 0;
+            }
 
-        var otherAck = side === "host" ? "guest" : "host";
-        if (!groupExists(ackGroupId(roomId, otherAck))) {
-            // The opponent is still on the result screen, possibly waiting on a
-            // rematch that is never coming. Record the departure so their next
-            // poll can say so instead of offering a dead button.
-            if (side === "host") { state.leftHost = true; state.rematchHost = 0; }
-            else { state.leftGuest = true; state.rematchGuest = 0; }
-            try { writeState(roomId, state); } catch (writeError) { }
-            return { ok: true };
+            if (state.ackedHost && state.ackedGuest)
+                return { remove: true, result: { ok: true } };
+            return { commit: true, result: { ok: true } };
+        }
+
+        return { remove: true, result: { ok: true } };
+    });
+    return outcome && outcome.error === "room not found" ? { ok: true } : outcome;
+};
+
+// Scheduled every five minutes by tools/playfab/deploy-cloudscript.mjs. The
+// sharded registry makes cleanup discoverable without a database scan, and the
+// same mutation lock keeps expiry from deleting a room that is being updated.
+handlers.cleanupExpiredRooms = function (args, context) {
+    if (typeof currentPlayerId !== "undefined" && currentPlayerId)
+        return { ok: false, error: "not authorized" };
+
+    var now = nowMs();
+    var cleaned = 0;
+    var busy = 0;
+    var staleEntries = 0;
+
+    for (var shard = 0; shard < ROOM_REGISTRY_SHARDS && cleaned < ROOM_CLEANUP_LIMIT; shard++) {
+        var group;
+        try {
+            group = server.GetSharedGroupData({
+                SharedGroupId: "HOL-ROOM-REG-" + shard,
+                Keys: [],
+            });
+        } catch (missingRegistry) {
+            continue;
+        }
+
+        var data = group && group.Data ? group.Data : {};
+        for (var roomId in data) {
+            if (!Object.prototype.hasOwnProperty.call(data, roomId)) continue;
+            if (cleaned >= ROOM_CLEANUP_LIMIT) break;
+            if (Number(data[roomId].Value) > now) continue;
+
+            var outcome = withRoomMutation(roomId, function (state) {
+                if (Number(state.expiresAt) > now)
+                    return {
+                        result: {
+                            ok: true,
+                            deleted: false,
+                            refreshExpiresAt: Number(state.expiresAt),
+                        },
+                    };
+                return { remove: true, result: { ok: true, deleted: true } };
+            });
+            if (outcome && outcome.deleted) cleaned++;
+            else if (outcome && outcome.error === "room not found") {
+                unregisterRoom(roomId);
+                staleEntries++;
+            } else if (outcome && outcome.refreshExpiresAt > now) {
+                updateRegistry(roomId, outcome.refreshExpiresAt);
+                staleEntries++;
+            }
+            else if (outcome && outcome.error === "room busy") busy++;
         }
     }
 
-    deleteRoomArtifacts(roomId, state);
-    return { ok: true };
+    return { ok: true, cleaned: cleaned, busy: busy, staleEntries: staleEntries };
 };

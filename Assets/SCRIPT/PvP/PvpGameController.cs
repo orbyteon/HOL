@@ -6,11 +6,11 @@ using TMPro;
 // top of PvpBackend — no edits to the single-player scripts.
 //
 // PlayFab hints and result counts come from the server-authoritative room
-// view. The Firebase fallback still fills the same RoomState locally.
+// view; no client-writable fallback participates in the match.
 public class PvpGameController : MonoBehaviour
 {
     [Header("Wiring")]
-    [Tooltip("Drag in either a PvpClient (Firebase) or PlayFabPvpClient (Azure PlayFab)")]
+    [Tooltip("Drag in the server-authoritative PlayFab PvP client")]
     public PvpBackend client;
 
     [Header("Panels")]
@@ -42,8 +42,8 @@ public class PvpGameController : MonoBehaviour
 
     [Header("Duel rules UI")]
     // How far the player has narrowed the opponent's number, plus the Lock.
-    // Both are optional: the Firebase development fallback does not adjudicate
-    // the Lock, so PvpRuntimeUI leaves the control hidden there.
+    // Both are optional and are shown only when the server-authoritative backend
+    // exposes the corresponding controls.
     public TMP_Text rangeText;
     public GameObject lockButton;
     public TMP_Text lockButtonLabel;
@@ -524,13 +524,6 @@ public class PvpGameController : MonoBehaviour
             bool guessWasMine = (s.lastBy == me);
             string who = guessWasMine ? L10n.Get("you") : opponentName;
             string hint = LocalizedHint(s.lastHint);
-            if (string.IsNullOrEmpty(hint))
-            {
-                int targetSecret = s.lastBy == "host" ? s.guestSecret : s.hostSecret;
-                if (targetSecret > 0)
-                    hint = s.lastGuess == targetSecret ? L10n.Get("correct") + "!"
-                        : (s.lastGuess < targetSecret ? L10n.Get("higher") : L10n.Get("lower"));
-            }
             if (s.lastLocked) who += " [" + L10n.Get("lock_armed") + "]";
             historyText.text = who + ": " + s.lastGuess + "  →  " + hint;
 
@@ -563,9 +556,7 @@ public class PvpGameController : MonoBehaviour
             if (guessInFlight && s.lastBy == me)
                 localCount++;
             int myGuessCount = authoritativeGuessCount > 0 ? authoritativeGuessCount : localCount;
-            int huntedSecret = s.revealedSecret > 0
-                ? s.revealedSecret
-                : (client.IsHost ? s.guestSecret : s.hostSecret);
+            int huntedSecret = s.revealedSecret;
 
             if (isDraw)
                 resultText.text = L10n.Get("you_draw") + "\n" +

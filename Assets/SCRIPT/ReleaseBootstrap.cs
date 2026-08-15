@@ -26,7 +26,6 @@ public static class ReleaseBootstrap
             return;
         }
 
-        pvp.usePlayFab = true;
         pvp.playFabTitleId = ReleaseConfig.PlayFabTitleId;
     }
 }

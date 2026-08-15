@@ -4,9 +4,9 @@
 
 A mobile **"Higher or Lower" number-guessing duel** built in Unity for Android.
 
-You and an opponent each pick a secret number between **1 and 100**, then take turns guessing each other's number. After every guess you're told whether to go *higher* or *lower*. The first to correctly guess the other's number wins.
+You and an opponent each pick a secret number between **1 and 100**, then take turns guessing each other's number. After every guess you're told whether to go *higher* or *lower*. A round gives both sides one guess, so an opening correct guess can still be answered before the result is decided.
 
-Under the hood the game is single-player against a lightweight AI, but it's presented as an online match — complete with a "searching for opponent" screen and a randomly assigned opponent name.
+HOL includes a solo mode against a lightweight on-device AI and a live PlayFab PvP mode for room-code duels with a friend.
 
 ## Features
 
@@ -17,7 +17,7 @@ Under the hood the game is single-player against a lightweight AI, but it's pres
   next turn if you are wrong
 - **Signals** — a fixed set of six quick messages in PvP, sent by index and
   read in each player's own language (no free-form chat, so nothing to moderate)
-- **Real PvP duels** with room-code invites (Firebase RTDB or PlayFab backend, both REST, no SDK)
+- **Server-authoritative PvP duels** with room-code invites through PlayFab
 - **Converging Light design** (`design/philosophy.md`) — indigo depth gradients, drifting number fields, a cyan→magenta seam, gold reserved for primary actions; animated splash with logo bloom and a loading hairline
 - **English + native Greek** localization with live language switching; first launch follows the device language
 - **Difficulty modes** — Easy / Normal / Hard / Adaptive (the AI tunes itself to your recent win rate), selectable in Settings
@@ -59,7 +59,7 @@ The AI narrows its range with a midpoint (binary-search) strategy, guessing rand
 ## Tech stack
 
 - **Engine:** Unity `2022.3.62f3` (LTS)
-- **Target platform:** Android
+- **Target platform:** Android (target API 36)
 - **UI:** Unity UGUI + TextMesh Pro
 - **Ads:** Unity LevelPlay (ironSource) `9.5.0` — interstitial ads
 - **Persistence:** `PlayerPrefs` (player name, music setting)
@@ -102,7 +102,6 @@ HOL/
 │   ├── MUSIC/         # Audio
 │   ├── Plugins/       # Native / plugin libraries
 │   ├── LevelPlay/     # Ads SDK integration
-│   ├── MobileDependencyResolver/
 │   └── TextMesh Pro/
 ├── Packages/          # Unity package manifest
 └── ProjectSettings/   # Unity project configuration
@@ -136,8 +135,7 @@ The game uses only two scenes. All gameplay (menu, settings, matchmaking, and th
 | `SmartHooks/DailyStreak.cs` | Daily-play streak counter |
 | `SmartHooks/Haptics.cs` | Win/lose haptic feedback |
 | `PvP/PvpBackend.cs` | Abstract PvP room transport |
-| `PvP/PvpClient.cs` | Firebase RTDB REST backend |
-| `PvP/PlayFabPvpClient.cs` | PlayFab REST + CloudScript backend |
+| `PvP/PlayFabPvpClient.cs` | PlayFab REST client; all room mutations are adjudicated by CloudScript |
 | `PvP/PvpGameController.cs` | PvP UI orchestration on top of `PvpBackend` |
 | `RuntimeUI/RuntimeUI.cs` | Code-only UI factory (labels, buttons, inputs) |
 | `RuntimeUI/PvpRuntimeUI.cs` | Builds the whole PvP interface at runtime + entry button |
@@ -167,13 +165,13 @@ Replace these with your own LevelPlay credentials before publishing.
 
 ### PvP backend setup
 
-PvP uses **PlayFab** by default (`usePlayFab` on the `PvpRuntimeUI` object in `MainMenu`). One-time setup (free):
+PvP uses **PlayFab exclusively**. One-time setup:
 
 1. developer.playfab.com → create a Studio + Title, copy the **Title ID** (4–6 hex chars).
-2. Game Manager → **Automation → CloudScript (Legacy) → Revisions**: paste `playfab/cloudscript.js`, Save, **Deploy**. The client expects the current revision (atomic `joinRoom`) — an old deployed revision breaks joining.
+2. Configure the production environment described in `docs/release-checklist.md`, then run **Deploy PlayFab Production** from `main`. The workflow publishes and verifies `playfab/cloudscript.js`, enforces the Shared Group API deny policy, and creates or updates the five-minute expired-room cleanup task.
 3. Paste the Title ID into `PvpRuntimeUI.playFabTitleId` (Inspector on the `PvpRuntimeUI` object — it's copied onto the backend component created at startup).
 
-The **Firebase RTDB** backend (`PvpClient`) is the fallback: untick `usePlayFab` and set `PvpRuntimeUI.firebaseDatabaseUrl` (setup steps in the `PvpClient.cs` header). Firebase joins are last-write-wins under a two-guest race; PlayFab joins are atomic via CloudScript.
+Every room mutation uses a revision-fenced server lock. Brief contention is retried by the client; abandoned waiting, active, and completed rooms expire after 30 minutes, six hours, and 15 minutes respectively, then the scheduled cleanup removes them.
 
 ### Ads consent
 
