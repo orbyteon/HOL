@@ -28,6 +28,7 @@ jobs:
           node --check tools/release/write-release-config.mjs
           node --check services/provisioner/src/index.js
           node --check services/provisioner/src/security.js
+          node --check services/provisioner/src/privacy.js
 
       - name: Enforce server-authoritative PlayFab client
         shell: bash
@@ -74,6 +75,15 @@ jobs:
             }
           }
           NODE
+
+      - name: Privacy policy copies must not drift
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmp docs/privacy.html services/provisioner/static/privacy.html || {
+            echo "::error::services/provisioner/static/privacy.html must be a byte-copy of docs/privacy.html (the Function App serves it at /api/privacy)"
+            exit 1
+          }
 
       - name: Enforce production provisioning boundary
         shell: bash
