@@ -235,7 +235,7 @@ public sealed class HolDuelBoardLayout : MonoBehaviour
     {
         keypadRoot = RuntimeUI.CreateObject("NumberKeypad", board);
         var rootRect = (RectTransform)keypadRoot.transform;
-        CenterRoot(rootRect, new Vector2(660f, 620f), new Vector2(-180f, -285f));
+        CenterRoot(rootRect, new Vector2(660f, 620f), new Vector2(-196f, -285f));
 
         string[] keys = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "×", "0", "⌫" };
         for (int i = 0; i < keys.Length; i++)
