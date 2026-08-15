@@ -169,6 +169,7 @@ public class PvpRuntimeUI : MonoBehaviour
         lockLabel.fontSize = 26;
 
         var signalsRoot = RuntimeUI.CreateObject("Signals", matchPanel.transform);
+        RuntimeUI.Stretch(signalsRoot);
         var signalButtons = new Button[Signals.Count];
         for (int i = 0; i < Signals.Count; i++)
         {
