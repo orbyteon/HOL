@@ -333,9 +333,12 @@ network/platform consent requirement.
 
 ## 7. Privacy policy hosting
 
-Host `docs/privacy.html` at a stable public HTTPS URL before publishing.
+The provisioning Function App serves the policy itself: `GET /api/privacy` on
+the same host as `/api/provision` returns `services/provisioner/static/privacy.html`,
+a byte-copy of `docs/privacy.html` that CI and the provisioner tests both verify.
+Deploying the provisioner publishes policy updates.
 
-- [ ] open the policy URL without authentication/incognito
+- [ ] open `https://<function-app-host>/api/privacy` without authentication/incognito
 - [ ] link that exact URL in Play Console
 - [ ] re-read the policy after final Azure, PlayFab, Play Integrity, LevelPlay,
       and CMP configuration; update it if actual handling differs

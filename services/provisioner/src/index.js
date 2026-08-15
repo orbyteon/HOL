@@ -5,6 +5,7 @@ import {
   createFixedWindowRateLimiter,
   validateIntegrityPayload,
 } from "./security.js";
+import { privacyResponse } from "./privacy.js";
 
 const WINDOW_MS = 60_000;
 const MAX_REQUESTS_PER_WINDOW = 12;
@@ -84,6 +85,14 @@ async function provisionPlayFab(titleId, secretKey, customId, appVersion) {
 function json(status, body) {
   return { status, jsonBody: body, headers: { "Cache-Control": "no-store" } };
 }
+
+// Read-only, static, no player data: the policy page Play Console links to.
+app.http("privacy", {
+  route: "privacy",
+  methods: ["GET"],
+  authLevel: "anonymous",
+  handler: async () => privacyResponse(),
+});
 
 app.http("provision", {
   route: "provision",

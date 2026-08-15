@@ -173,3 +173,18 @@ test("licensing can be disabled explicitly for controlled non-Play testing", () 
   payload.accountDetails.appLicensingVerdict = "UNEVALUATED";
   assert.equal(validateIntegrityPayload(payload, { ...options, requireLicensed: false }).ok, true);
 });
+
+test("privacy page is the committed policy, byte for byte", async () => {
+  const { privacyHtml, privacyResponse } = await import("../src/privacy.js");
+  const { readFileSync } = await import("node:fs");
+  const canonical = readFileSync(new URL("../../../docs/privacy.html", import.meta.url), "utf8");
+
+  // The served copy ships inside the deployment package; CI also compares the
+  // two files, so drift fails twice — here and in static integrity.
+  assert.equal(privacyHtml(), canonical);
+
+  const response = privacyResponse();
+  assert.equal(response.status, 200);
+  assert.match(response.headers["Content-Type"], /text\/html/);
+  assert.match(response.body, /Gameplay analytics/);
+});
