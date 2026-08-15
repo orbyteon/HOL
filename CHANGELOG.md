@@ -7,6 +7,12 @@ Play Console versionName in `ProjectSettings.asset`.
 
 ### Changed
 
+- The privacy policy's contact address is now `support@orbyteon.com` —
+  a role mailbox owned by the publisher instead of a personal one. Both
+  committed copies (the canonical `docs/privacy.html` and the byte-identical
+  copy the provisioner serves at `/api/privacy`) change together; the live
+  page updates on the next provisioner deploy.
+
 - Every runtime-built label now renders through TextMesh Pro instead of
   legacy `UnityEngine.UI.Text`. The board was split between the two stacks
   — TMP in the scene and the input fields, legacy Arial in every label
