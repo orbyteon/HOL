@@ -13,6 +13,6 @@
   },
   "dependencies": {
     "@azure/functions": "4.16.2",
-    "google-auth-library": "10.9.1"
+    "google-auth-library": "11.0.1"
   }
 }
