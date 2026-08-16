@@ -114,6 +114,11 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
             StyleText(canvas.transform);
         }
 
+        ApplyCharacterCards();
+
+        foreach (var canvas in FindObjectsOfType<Canvas>())
+            ApplyScreenLayouts(canvas.transform);
+
         var menu = FindObjectOfType<MenuManager>();
         if (menu != null && menu.mainMenuPanel != null)
             BuildMainMenu(menu.mainMenuPanel.transform);
@@ -208,7 +213,6 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
         RuntimeUI.Stretch(profileText.gameObject);
 
         AddConfetti(root);
-        ApplyCharacterCards();
 
         var play = FindButton("ButtonPlay");
         if (play != null)
@@ -289,6 +293,199 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
         }
     }
 
+    void ApplyScreenLayouts(Transform root)
+    {
+        LayoutPvpMenu(DeepFind(root, "PvPMenuPanel"));
+        LayoutCreateRoom(DeepFind(root, "PvPCreatePanel"));
+        LayoutJoinRoom(DeepFind(root, "PvPJoinPanel"));
+        LayoutPvpMatch(DeepFind(root, "PvPMatchPanel"));
+        LayoutDailyHunt(DeepFind(root, "DailyHuntPanel"));
+        LayoutSearching(DeepFind(root, "PanelSearching"));
+        LayoutSimpleScreen(DeepFind(root, "PanelPlay"), "ExactPlayLogo");
+        LayoutSimpleScreen(DeepFind(root, "PanelSettings"), "ExactSettingsLogo");
+        LayoutSimpleScreen(DeepFind(root, "PanelGAME"), "ExactSoloLogo");
+        LayoutDialog(DeepFind(root, "ConsentPanel"), false);
+        LayoutDialog(DeepFind(root, "ForceUpdatePanel"), true);
+    }
+
+    void LayoutPvpMenu(Transform panel)
+    {
+        if (panel == null) return;
+
+        AddExactImage(panel, "ExactPvpMenuLogo", logo,
+            new Vector2(0f, 690f), new Vector2(440f, 290f));
+        AddExactImage(panel, "ExactPvpMenuSeven", mascotSeven,
+            new Vector2(-400f, 80f), new Vector2(210f, 260f));
+        AddExactImage(panel, "ExactPvpMenuThree", mascotThree,
+            new Vector2(400f, 80f), new Vector2(210f, 260f));
+
+        PlaceNamed(panel, "Title", new Vector2(0f, 390f), new Vector2(850f, 110f));
+        PlaceNamed(panel, "CreateButton", new Vector2(0f, 130f), new Vector2(620f, 120f));
+        PlaceNamed(panel, "JoinButton", new Vector2(0f, -30f), new Vector2(620f, 120f));
+        PlaceNamed(panel, "CloseButton", new Vector2(0f, -250f), new Vector2(330f, 84f));
+    }
+
+    void LayoutCreateRoom(Transform panel)
+    {
+        if (panel == null) return;
+
+        AddExactImage(panel, "ExactCreateLogo", logo,
+            new Vector2(0f, 800f), new Vector2(330f, 215f));
+        AddExactImage(panel, "ExactCreateSeven", mascotSeven,
+            new Vector2(-430f, 0f), new Vector2(150f, 190f));
+        AddExactImage(panel, "ExactCreateThree", mascotThree,
+            new Vector2(430f, 0f), new Vector2(150f, 190f));
+
+        PlaceNamed(panel, "Title", new Vector2(0f, 605f), new Vector2(850f, 90f));
+        PlaceNamed(panel, "SecretInput", new Vector2(0f, 430f), new Vector2(500f, 92f));
+        PlaceNamed(panel, "ConfirmCreateButton", new Vector2(0f, 305f), new Vector2(500f, 92f));
+        PlaceNamed(panel, "RoomCodeFrame", new Vector2(0f, 55f), new Vector2(760f, 280f));
+        PlaceNamed(panel, "CopyButton", new Vector2(0f, -170f), new Vector2(500f, 92f));
+        PlaceNamed(panel, "StatusFrame", new Vector2(0f, -345f), new Vector2(860f, 150f));
+        PlaceNamed(panel, "BackButton", new Vector2(0f, -560f), new Vector2(330f, 84f));
+    }
+
+    void LayoutJoinRoom(Transform panel)
+    {
+        if (panel == null) return;
+
+        AddExactImage(panel, "ExactJoinLogo", logo,
+            new Vector2(0f, 760f), new Vector2(360f, 235f));
+        AddExactImage(panel, "ExactJoinPlayer", playerPortrait,
+            new Vector2(-365f, 70f), new Vector2(250f, 285f));
+        AddExactImage(panel, "ExactJoinOpponent", opponentPortrait,
+            new Vector2(365f, 70f), new Vector2(250f, 285f));
+
+        PlaceNamed(panel, "Title", new Vector2(0f, 520f), new Vector2(850f, 100f));
+        PlaceNamed(panel, "JoinCard", new Vector2(0f, 90f), new Vector2(650f, 440f));
+        PlaceNamed(panel, "CodeInput", new Vector2(0f, 250f), new Vector2(480f, 92f));
+        PlaceNamed(panel, "SecretInput", new Vector2(0f, 115f), new Vector2(480f, 92f));
+        PlaceNamed(panel, "ConfirmJoinButton", new Vector2(0f, -25f), new Vector2(480f, 92f));
+        PlaceNamed(panel, "Status", new Vector2(0f, -235f), new Vector2(900f, 120f));
+        PlaceNamed(panel, "BackButton", new Vector2(0f, -430f), new Vector2(330f, 84f));
+    }
+
+    void LayoutPvpMatch(Transform panel)
+    {
+        if (panel == null) return;
+
+        AddExactImage(panel, "ExactMatchLogo", logo,
+            new Vector2(0f, 865f), new Vector2(340f, 220f));
+        AddExactImage(panel, "ExactMatchSeven", mascotSeven,
+            new Vector2(-450f, 405f), new Vector2(105f, 135f));
+        AddExactImage(panel, "ExactMatchThree", mascotThree,
+            new Vector2(450f, 405f), new Vector2(105f, 135f));
+
+        var playerCard = DeepFind(panel, "PlayerCard");
+        var opponentCard = DeepFind(panel, "OpponentCard");
+        if (playerCard != null)
+        {
+            Place((RectTransform)playerCard, new Vector2(-255f, 650f), new Vector2(460f, 350f));
+            PlaceNamed(playerCard, "Caption", new Vector2(0f, 145f), new Vector2(420f, 42f));
+            PlaceNamed(playerCard, "Name", new Vector2(0f, -132f), new Vector2(420f, 68f));
+        }
+        if (opponentCard != null)
+        {
+            Place((RectTransform)opponentCard, new Vector2(255f, 650f), new Vector2(460f, 350f));
+            PlaceNamed(opponentCard, "Opponent", new Vector2(0f, -128f), new Vector2(420f, 82f));
+        }
+
+        PlaceNamed(panel, "VsBadge", new Vector2(0f, 650f), new Vector2(120f, 90f));
+        PlaceNamed(panel, "PromptBanner", new Vector2(0f, 410f), new Vector2(900f, 170f));
+        PlaceNamed(panel, "GuessCard", new Vector2(-255f, -160f), new Vector2(540f, 900f));
+        PlaceNamed(panel, "SignalBubble", new Vector2(285f, 250f), new Vector2(470f, 170f));
+        PlaceNamed(panel, "HistoryCard", new Vector2(285f, -35f), new Vector2(470f, 320f));
+        PlaceNamed(panel, "TipCard", new Vector2(285f, -390f), new Vector2(470f, 320f));
+
+        var playerImage = playerCard == null ? null : DeepFind(playerCard, "ExactPlayerPortrait");
+        if (playerImage != null)
+            Place((RectTransform)playerImage, new Vector2(0f, 15f), new Vector2(255f, 255f));
+        var opponentImage = opponentCard == null ? null : DeepFind(opponentCard, "ExactOpponentPortrait");
+        if (opponentImage != null)
+            Place((RectTransform)opponentImage, new Vector2(0f, 15f), new Vector2(255f, 255f));
+    }
+
+    void LayoutDailyHunt(Transform panel)
+    {
+        if (panel == null) return;
+
+        AddExactImage(panel, "ExactDailyLogo", logo,
+            new Vector2(0f, 790f), new Vector2(360f, 235f));
+        AddExactImage(panel, "ExactDailySeven", mascotSeven,
+            new Vector2(-375f, 200f), new Vector2(190f, 240f));
+        AddExactImage(panel, "ExactDailyThree", mascotThree,
+            new Vector2(375f, 200f), new Vector2(190f, 240f));
+
+        PlaceNamed(panel, "Card", new Vector2(0f, -10f), new Vector2(920f, 1460f));
+        PlaceNamed(panel, "Title", new Vector2(0f, 590f), new Vector2(780f, 80f));
+        PlaceNamed(panel, "Status", new Vector2(0f, 420f), new Vector2(720f, 150f));
+        PlaceNamed(panel, "Trail", new Vector2(0f, 220f), new Vector2(760f, 90f));
+    }
+
+    void LayoutSearching(Transform panel)
+    {
+        if (panel == null) return;
+
+        AddExactImage(panel, "ExactSearchingLogo", logo,
+            new Vector2(0f, 700f), new Vector2(440f, 290f));
+        AddExactImage(panel, "ExactSearchingPlayer", playerPortrait,
+            new Vector2(-280f, 170f), new Vector2(380f, 440f));
+        AddExactImage(panel, "ExactSearchingOpponent", opponentPortrait,
+            new Vector2(280f, 170f), new Vector2(380f, 440f));
+        var vs = EnsureText(panel, "ExactSearchingVs");
+        vs.text = "VS";
+        vs.fontSize = 72f;
+        vs.fontStyle = FontStyles.Bold;
+        vs.color = Gold;
+        vs.alignment = TextAlignmentOptions.Center;
+        Place(vs.rectTransform, new Vector2(0f, 175f), new Vector2(150f, 100f));
+    }
+
+    void LayoutSimpleScreen(Transform panel, string imageName)
+    {
+        if (panel == null) return;
+        AddExactImage(panel, imageName, logo,
+            new Vector2(0f, 800f), new Vector2(330f, 215f));
+    }
+
+    void LayoutDialog(Transform panel, bool blockingUpdate)
+    {
+        if (panel == null) return;
+        var card = DeepFind(panel, "Card");
+        if (card == null) return;
+
+        Place((RectTransform)card, Vector2.zero,
+            blockingUpdate ? new Vector2(700f, 700f) : new Vector2(680f, 590f));
+        AddExactImage(card, blockingUpdate ? "ExactUpdateLogo" : "ExactConsentLogo", logo,
+            new Vector2(0f, blockingUpdate ? 260f : 210f), new Vector2(270f, 175f));
+        PlaceNamed(card, "Message", new Vector2(0f, blockingUpdate ? 70f : 25f),
+            new Vector2(590f, blockingUpdate ? 190f : 170f));
+        PlaceNamed(card, blockingUpdate ? "ConfirmUpdateButton" : "YesButton",
+            new Vector2(0f, blockingUpdate ? -130f : -130f), new Vector2(460f, 96f));
+        PlaceNamed(card, blockingUpdate ? "QuitButton" : "NoButton",
+            new Vector2(0f, blockingUpdate ? -245f : -235f), new Vector2(460f, 96f));
+    }
+
+    void AddExactImage(Transform parent, string name, Sprite sprite, Vector2 position, Vector2 size)
+    {
+        if (parent == null || sprite == null) return;
+        var image = EnsureImage(parent, name);
+        image.sprite = sprite;
+        image.color = Color.white;
+        image.preserveAspect = true;
+        image.raycastTarget = false;
+        Place(image.rectTransform, position, size);
+    }
+
+    static void PlaceNamed(Transform root, string name, Vector2 position, Vector2 size)
+    {
+        if (root == null) return;
+        var found = DeepFind(root, name);
+        var rect = found as RectTransform;
+        if (rect != null)
+            Place(rect, position, size);
+    }
+
     static void AddConfetti(Transform root)
     {
         if (DirectChild(root, "ExactConfetti") != null) return;
@@ -317,12 +514,7 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
         foreach (var image in root.GetComponentsInChildren<Image>(true))
         {
             string name = image.transform.name;
-            if (name == "ExactReferenceBackdrop" || name == "ExactHOLLogo" ||
-                name == "ExactPlayerHero" || name == "ExactOpponentHero" ||
-                name == "ExactPlayerPortrait" || name == "ExactOpponentPortrait" ||
-                name == "ExactMascotSeven" || name == "ExactMascotThree" ||
-                name == "ExactDailyMascot" ||
-                name.StartsWith("Confetti") || name == "ExactPlayerChip")
+            if (name.StartsWith("Exact") || name.StartsWith("Confetti"))
                 continue;
 
             bool fullPanel = name.IndexOf("Panel", System.StringComparison.OrdinalIgnoreCase) >= 0 &&
