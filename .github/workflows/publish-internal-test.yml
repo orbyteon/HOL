@@ -1,0 +1,275 @@
+name: Publish Google Play Internal Test
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/publish-internal-test.yml
+      - .github/internal-test-request.json
+      - services/provisioner/tools/publish-google-play.mjs
+  push:
+    branches: [main]
+    paths:
+      - .github/internal-test-request.json
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Public version, for example 0.4.0"
+        required: true
+        default: "0.4.0"
+        type: string
+      version_code:
+        description: "Fresh Google Play versionCode"
+        required: true
+        type: string
+      confirm:
+        description: "Type INTERNAL to build and publish to Google Play internal testing"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hol-google-play-internal
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Validate internal-test request
+    runs-on: ubuntu-latest
+    outputs:
+      should_publish: ${{ steps.request.outputs.should_publish }}
+      version: ${{ steps.request.outputs.version }}
+      version_code: ${{ steps.request.outputs.version_code }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Validate publisher syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check services/provisioner/tools/publish-google-play.mjs
+
+      - name: Resolve request
+        id: request
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_VERSION_CODE: ${{ inputs.version_code }}
+          INPUT_CONFIRM: ${{ inputs.confirm }}
+        run: |
+          set -euo pipefail
+
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            echo "should_publish=false" >> "$GITHUB_OUTPUT"
+            echo "version=0.4.0" >> "$GITHUB_OUTPUT"
+            echo "version_code=6" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            VERSION="$INPUT_VERSION"
+            VERSION_CODE="$INPUT_VERSION_CODE"
+            CONFIRM="$INPUT_CONFIRM"
+            ENABLED=true
+          else
+            eval "$(node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const request = JSON.parse(fs.readFileSync('.github/internal-test-request.json', 'utf8'));
+          const quote = value => `'${String(value).replaceAll("'", "'\\''")}'`;
+          console.log(`VERSION=${quote(request.version || '')}`);
+          console.log(`VERSION_CODE=${quote(request.versionCode || '')}`);
+          console.log(`CONFIRM=${quote(request.confirm || '')}`);
+          console.log(`ENABLED=${request.enabled === true ? 'true' : 'false'}`);
+          NODE
+            )"
+          fi
+
+          if [ "$ENABLED" != "true" ]; then
+            echo "Internal-test request is not armed; validation only."
+            echo "should_publish=false" >> "$GITHUB_OUTPUT"
+            echo "version=${VERSION:-0.4.0}" >> "$GITHUB_OUTPUT"
+            echo "version_code=${VERSION_CODE:-6}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          test "$GITHUB_REF" = "refs/heads/main" || {
+            echo "::error::Internal testing publish must run from main (got $GITHUB_REF)"
+            exit 1
+          }
+          test "$CONFIRM" = "INTERNAL" || {
+            echo "::error::Confirmation must be exactly INTERNAL"
+            exit 1
+          }
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]] || {
+            echo "::error::version must be a semantic version such as 0.4.0"
+            exit 1
+          }
+          [[ "$VERSION_CODE" =~ ^[1-9][0-9]*$ ]] || {
+            echo "::error::version_code must be a positive integer"
+            exit 1
+          }
+
+          echo "should_publish=true" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+
+  publish:
+    name: Signed AAB to Play internal
+    needs: prepare
+    if: needs.prepare.outputs.should_publish == 'true'
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 35
+    env:
+      PLAYFAB_TITLE_ID: ${{ vars.PLAYFAB_TITLE_ID }}
+      PROVISIONING_URL: ${{ vars.PROVISIONING_URL }}
+      GOOGLE_CLOUD_PROJECT_NUMBER: ${{ vars.GOOGLE_CLOUD_PROJECT_NUMBER }}
+      GOOGLE_PLAY_PACKAGE_NAME: ${{ vars.GOOGLE_PLAY_PACKAGE_NAME }}
+      PUBLIC_VERSION: ${{ needs.prepare.outputs.version }}
+      EXPECTED_VERSION_CODE: ${{ needs.prepare.outputs.version_code }}
+    steps:
+      - name: Enforce source and credentials
+        shell: bash
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASS }}
+          ANDROID_KEYALIAS_NAME: ${{ secrets.ANDROID_KEYALIAS_NAME }}
+          ANDROID_KEYALIAS_PASS: ${{ secrets.ANDROID_KEYALIAS_PASS }}
+          GOOGLE_SERVICE_ACCOUNT_JSON_B64: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON_B64 }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/main" || {
+            echo "::error::Google Play internal publish must run from main (got $GITHUB_REF)"
+            exit 1
+          }
+          test "$GOOGLE_PLAY_PACKAGE_NAME" = "com.Orbyteon.HOL" || {
+            echo "::error::GOOGLE_PLAY_PACKAGE_NAME must be com.Orbyteon.HOL"
+            exit 1
+          }
+          for name in PLAYFAB_TITLE_ID PROVISIONING_URL GOOGLE_CLOUD_PROJECT_NUMBER GOOGLE_PLAY_PACKAGE_NAME \
+                      UNITY_LICENSE UNITY_EMAIL UNITY_PASSWORD \
+                      ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASS \
+                      ANDROID_KEYALIAS_NAME ANDROID_KEYALIAS_PASS \
+                      GOOGLE_SERVICE_ACCOUNT_JSON_B64; do
+            test -n "${!name:-}" || { echo "::error::$name is missing"; exit 1; }
+          done
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node 22
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
+      - name: Inject and validate public release config
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check tools/release/write-release-config.mjs
+          node tools/release/write-release-config.mjs
+          git diff --check -- Assets/Resources/HOLReleaseConfig.json
+
+          mapfile -t dirty < <(git status --porcelain --untracked-files=all)
+          if [ "${#dirty[@]}" -ne 1 ] || [ "${dirty[0]}" != " M Assets/Resources/HOLReleaseConfig.json" ]; then
+            echo "::error::Release workspace must differ from main only by injected HOLReleaseConfig.json"
+            printf '%s\n' "${dirty[@]}"
+            exit 1
+          fi
+
+      - name: Free runner disk for Unity Android image
+        shell: bash
+        run: |
+          set -euxo pipefail
+          df -h /
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/lib/android
+          docker system prune -af || true
+          sudo apt-get clean
+          df -h /
+
+      - name: Cache Library
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: Library
+          key: Library-PlayInternal-Android-${{ hashFiles('Packages/manifest.json', 'Packages/packages-lock.json') }}
+          restore-keys: |
+            Library-PlayInternal-Android-
+            Library-Release-Android-
+            Library-Android-
+            Library-
+
+      - name: Build signed Android App Bundle
+        uses: game-ci/unity-builder@d829bfc901f2347c8fe18898f06712b66916ef42 # v5.0.0
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          targetPlatform: Android
+          androidExportType: androidAppBundle
+          versioning: Custom
+          version: ${{ needs.prepare.outputs.version }}
+          androidVersionCode: ${{ needs.prepare.outputs.version_code }}
+          androidKeystoreName: hol-release.keystore
+          androidKeystoreBase64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          androidKeystorePass: ${{ secrets.ANDROID_KEYSTORE_PASS }}
+          androidKeyaliasName: ${{ secrets.ANDROID_KEYALIAS_NAME }}
+          androidKeyaliasPass: ${{ secrets.ANDROID_KEYALIAS_PASS }}
+          customParameters: -holReleaseBuild
+          allowDirtyBuild: true
+
+      - name: Verify bundle signature and checksum
+        id: bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo chown -R "$(id -u):$(id -g)" build
+          mapfile -t bundles < <(find build/Android -type f -name '*.aab' -print)
+          test "${#bundles[@]}" -eq 1 || {
+            echo "::error::Expected exactly one AAB, found ${#bundles[@]}"
+            exit 1
+          }
+          jarsigner -verify -verbose -certs "${bundles[0]}" > build/Android/JARSIGNER_VERIFY.txt
+          grep -q '^jar verified\.$' build/Android/JARSIGNER_VERIFY.txt || {
+            echo "::error::AAB signature verification did not report 'jar verified.'"
+            exit 1
+          }
+          sha256sum "${bundles[0]}" | tee build/Android/SHA256SUMS
+          echo "aab=${bundles[0]}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload signed candidate artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hol-android-internal-${{ needs.prepare.outputs.version }}-${{ needs.prepare.outputs.version_code }}
+          path: build/Android
+          retention-days: 14
+
+      - name: Install Google publisher dependency
+        working-directory: services/provisioner
+        run: npm ci --no-audit --no-fund
+
+      - name: Publish to Google Play internal testing
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON_B64: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON_B64 }}
+          AAB_PATH: ${{ steps.bundle.outputs.aab }}
+        run: node services/provisioner/tools/publish-google-play.mjs
+
+      - name: Publish summary
+        if: success()
+        shell: bash
+        run: |
+          {
+            echo "## HOL Google Play internal test"
+            echo "- Commit: \`${GITHUB_SHA}\`"
+            echo "- Version: \`${PUBLIC_VERSION}\`"
+            echo "- versionCode: \`${EXPECTED_VERSION_CODE}\`"
+            echo "- Package: \`${GOOGLE_PLAY_PACKAGE_NAME}\`"
+            echo "- Track: \`internal\`"
+            echo "- Signed AAB verified and committed through the Android Publisher API"
+          } >> "$GITHUB_STEP_SUMMARY"
