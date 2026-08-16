@@ -30,10 +30,10 @@ public class ExactReferenceAssetsTests
 
         try
         {
-            var legacy = legacyObject.AddComponent<DesignRuntimeWiring>();
+            var legacy = (Behaviour)legacyObject.AddComponent(RuntimeType("DesignRuntimeWiring"));
             Assert.IsTrue(legacy.enabled);
 
-            canvasObject.AddComponent<ExactReferenceVisuals>();
+            canvasObject.AddComponent(RuntimeType("ExactReferenceVisuals"));
 
             Assert.IsFalse(legacy.enabled,
                 "The discarded scene presentation must be disabled before its Start method.");
@@ -57,8 +57,8 @@ public class ExactReferenceAssetsTests
             var oldLogo = new GameObject("Image", typeof(RectTransform), typeof(Image));
             oldLogo.transform.SetParent(canvasObject.transform, false);
 
-            canvasObject.AddComponent<ExactReferenceVisuals>();
-            var splash = canvasObject.AddComponent<SplashDesign>();
+            canvasObject.AddComponent(RuntimeType("ExactReferenceVisuals"));
+            var splash = canvasObject.AddComponent(RuntimeType("SplashDesign"));
             splash.SendMessage("Start");
 
             Assert.IsNotNull(canvasObject.transform.Find("ProgressTrack"),
@@ -72,5 +72,12 @@ public class ExactReferenceAssetsTests
         {
             Object.DestroyImmediate(canvasObject);
         }
+    }
+
+    static System.Type RuntimeType(string name)
+    {
+        var type = System.Type.GetType(name + ", Assembly-CSharp");
+        Assert.IsNotNull(type, "Missing runtime component: " + name);
+        return type;
     }
 }
