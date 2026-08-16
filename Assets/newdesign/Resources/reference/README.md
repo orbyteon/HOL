@@ -8,6 +8,8 @@ visual source for the live HOL skin, not a new concept or a loose reinterpretati
 - `mascot_7_exact.png` and `mascot_3_exact.png`: the approved number mascots.
 - Runtime paths use `Resources.Load<Sprite>("reference/<asset>")`.
 - `ExactReferenceAssetsTests` keeps every runtime import path release-blocking in Unity CI.
+- `SplashScene` replaces its legacy logo and effects with the same approved
+  wordmark, deep-purple field, and confetti used by the live visual layer.
 
 The exact square app icon from the approved reference set lives at
 `Assets/newdesign/branding/hol_app_icon_exact.png` and is wired into every

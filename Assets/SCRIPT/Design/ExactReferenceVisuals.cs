@@ -295,6 +295,7 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
 
     void ApplyScreenLayouts(Transform root)
     {
+        LayoutSplash(root);
         LayoutPvpMenu(DeepFind(root, "PvPMenuPanel"));
         LayoutCreateRoom(DeepFind(root, "PvPCreatePanel"));
         LayoutJoinRoom(DeepFind(root, "PvPJoinPanel"));
@@ -306,6 +307,35 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
         LayoutSimpleScreen(DeepFind(root, "PanelGAME"), "ExactSoloLogo");
         LayoutDialog(DeepFind(root, "ConsentPanel"), false);
         LayoutDialog(DeepFind(root, "ForceUpdatePanel"), true);
+    }
+
+    void LayoutSplash(Transform root)
+    {
+        if (root == null || FindObjectOfType<SplashLoader>() == null) return;
+
+        // The approved square reference is a clean logo, confetti and deep
+        // purple field. Suppress the older number-field and seam treatment
+        // while leaving SplashLoader and its gold progress line untouched.
+        var oldBackground = DirectChild(root, "Panel");
+        if (oldBackground != null)
+        {
+            var image = oldBackground.GetComponent<Image>();
+            if (image != null) image.enabled = false;
+        }
+
+        string[] superseded =
+        {
+            "Image", "NumberField", "SeamBloom", "Seam", "Tagline"
+        };
+        for (int i = 0; i < superseded.Length; i++)
+        {
+            var item = DirectChild(root, superseded[i]);
+            if (item != null) item.gameObject.SetActive(false);
+        }
+
+        AddConfetti(root);
+        AddExactImage(root, "ExactSplashLogo", logo,
+            new Vector2(0f, 70f), new Vector2(820f, 540f));
     }
 
     void LayoutPvpMenu(Transform panel)
@@ -491,7 +521,10 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
         if (DirectChild(root, "ExactConfetti") != null) return;
         var field = RuntimeUI.CreateObject("ExactConfetti", root);
         RuntimeUI.Stretch(field);
-        field.transform.SetAsFirstSibling();
+        var backdrop = DirectChild(root, "ExactReferenceBackdrop");
+        field.transform.SetSiblingIndex(backdrop == null
+            ? 0
+            : Mathf.Min(backdrop.GetSiblingIndex() + 1, root.childCount - 1));
 
         Color[] colors = { Cyan, Pink, Gold, Violet, NearWhite };
         var rng = new System.Random(47031);
