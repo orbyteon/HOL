@@ -63,8 +63,7 @@ public sealed class AttachmentReskinPolishPlayModeTests
         var pvp = Object.FindObjectOfType(RuntimeType("PvpGameController")) as Component;
         Assert.That(pvp, Is.Not.Null);
         pvp.SendMessage("OpenPvpMenu", SendMessageOptions.RequireReceiver);
-        for (int i = 0; i < 4; i++)
-            yield return null;
+        yield return new WaitForSecondsRealtime(0.35f);
 
         Assert.That(Find(canvas.transform, "BoardCreatePlusVector"), Is.Not.Null);
         Assert.That(Find(canvas.transform, "BoardJoinDoorVector"), Is.Not.Null);
@@ -78,8 +77,7 @@ public sealed class AttachmentReskinPolishPlayModeTests
         var searchingPanel = searchingField.GetValue(menu) as GameObject;
         Assert.That(searchingPanel, Is.Not.Null);
         searchingPanel.SetActive(true);
-        for (int i = 0; i < 4; i++)
-            yield return null;
+        yield return new WaitForSecondsRealtime(0.35f);
 
         Assert.That(Find(searchingPanel.transform, "BoardSearchRocketVector"), Is.Not.Null);
         Assert.That(Find(searchingPanel.transform, "BoardVsBurstVector"), Is.Not.Null);
