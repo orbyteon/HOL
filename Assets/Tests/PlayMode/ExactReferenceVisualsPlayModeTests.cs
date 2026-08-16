@@ -1,8 +1,6 @@
-using System;
 using System.Collections;
 using System.Reflection;
 using NUnit.Framework;
-using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
@@ -65,20 +63,23 @@ public sealed class ExactReferenceVisualsPlayModeTests
         Assert.That(setLanguage, Is.Not.Null);
 
         object originalLanguage = currentLanguage.GetValue(null, null);
-        object greek = Enum.Parse(languageType, "Greek");
+        object greek = System.Enum.Parse(languageType, "Greek");
         setLanguage.Invoke(null, new[] { greek });
         yield return null;
 
-        TMP_Text profileText = null;
-        foreach (var text in ownedCanvas.GetComponentsInChildren<TMP_Text>(true))
+        var tmpTextType = System.Type.GetType("TMPro.TMP_Text, Unity.TextMeshPro");
+        Assert.That(tmpTextType, Is.Not.Null, "Missing TextMesh Pro runtime assembly.");
+        Component profileText = null;
+        foreach (var component in ownedCanvas.GetComponentsInChildren(tmpTextType, true))
         {
-            if (text.name != "ExactPlayerChipText") continue;
-            profileText = text;
+            if (component.name != "ExactPlayerChipText") continue;
+            profileText = component;
             break;
         }
         Assert.That(profileText, Is.Not.Null);
-        Assert.That(profileText.text, Does.Contain("ΣΕΡΙ"));
-        Assert.That(profileText.text, Does.Not.Contain("STREAK"));
+        string profileCopy = (string)tmpTextType.GetProperty("text").GetValue(profileText, null);
+        Assert.That(profileCopy, Does.Contain("ΣΕΡΙ"));
+        Assert.That(profileCopy, Does.Not.Contain("STREAK"));
         setLanguage.Invoke(null, new[] { originalLanguage });
 
         // A separate world-space canvas represents SDK/debug/3D UI. The exact
@@ -104,9 +105,9 @@ public sealed class ExactReferenceVisualsPlayModeTests
         Object.Destroy(cardProbe);
     }
 
-    static Type RuntimeType(string name)
+    static System.Type RuntimeType(string name)
     {
-        var type = Type.GetType(name + ", Assembly-CSharp");
+        var type = System.Type.GetType(name + ", Assembly-CSharp");
         Assert.That(type, Is.Not.Null, "Missing runtime component: " + name);
         return type;
     }
