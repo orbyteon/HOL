@@ -1,3 +1,4 @@
+using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.UI;
@@ -33,7 +34,8 @@ public class ExactReferenceAssetsTests
             var legacy = (Behaviour)legacyObject.AddComponent(RuntimeType("DesignRuntimeWiring"));
             Assert.IsTrue(legacy.enabled);
 
-            canvasObject.AddComponent(RuntimeType("ExactReferenceVisuals"));
+            var exact = canvasObject.AddComponent(RuntimeType("ExactReferenceVisuals"));
+            InvokePrivate(exact, "Awake");
 
             Assert.IsFalse(legacy.enabled,
                 "The discarded scene presentation must be disabled before its Start method.");
@@ -52,26 +54,58 @@ public class ExactReferenceAssetsTests
 
         try
         {
-            var panel = new GameObject("Panel", typeof(RectTransform), typeof(Image));
-            panel.transform.SetParent(canvasObject.transform, false);
-            var oldLogo = new GameObject("Image", typeof(RectTransform), typeof(Image));
-            oldLogo.transform.SetParent(canvasObject.transform, false);
+            var panel = ChildWithImage(canvasObject.transform, "Panel");
+            var oldLogo = ChildWithImage(canvasObject.transform, "Image");
+            var numberField = Child(canvasObject.transform, "NumberField");
+            var seam = Child(canvasObject.transform, "Seam");
+            var seamBloom = Child(canvasObject.transform, "SeamBloom");
+            var tagline = Child(canvasObject.transform, "Tagline");
+            var progressTrack = Child(canvasObject.transform, "ProgressTrack");
 
-            canvasObject.AddComponent(RuntimeType("ExactReferenceVisuals"));
-            var splash = canvasObject.AddComponent(RuntimeType("SplashDesign"));
-            splash.SendMessage("Start");
+            canvasObject.AddComponent(RuntimeType("SplashLoader"));
+            var exact = canvasObject.AddComponent(RuntimeType("ExactReferenceVisuals"));
+            InvokePrivate(exact, "Awake");
+            InvokePrivate(exact, "LayoutSplash", canvasObject.transform);
 
-            Assert.IsNotNull(canvasObject.transform.Find("ProgressTrack"),
+            Assert.IsFalse(panel.GetComponent<Image>().enabled,
+                "The legacy splash background must be hidden.");
+            Assert.IsFalse(oldLogo.activeSelf,
+                "The legacy splash logo must be hidden.");
+            Assert.IsFalse(numberField.activeSelf);
+            Assert.IsFalse(seam.activeSelf);
+            Assert.IsFalse(seamBloom.activeSelf);
+            Assert.IsFalse(tagline.activeSelf);
+            Assert.IsTrue(progressTrack.activeSelf,
                 "The existing loading line must remain available.");
-            Assert.IsNull(canvasObject.transform.Find("NumberField"));
-            Assert.IsNull(canvasObject.transform.Find("Seam"));
-            Assert.IsNull(canvasObject.transform.Find("SeamBloom"));
-            Assert.IsNull(canvasObject.transform.Find("Tagline"));
+            Assert.IsNotNull(canvasObject.transform.Find("ExactSplashLogo"),
+                "The approved HOL logo should replace the legacy splash artwork.");
         }
         finally
         {
             Object.DestroyImmediate(canvasObject);
         }
+    }
+
+    static GameObject Child(Transform parent, string name)
+    {
+        var child = new GameObject(name, typeof(RectTransform));
+        child.transform.SetParent(parent, false);
+        return child;
+    }
+
+    static GameObject ChildWithImage(Transform parent, string name)
+    {
+        var child = new GameObject(name, typeof(RectTransform), typeof(Image));
+        child.transform.SetParent(parent, false);
+        return child;
+    }
+
+    static void InvokePrivate(Component component, string methodName, params object[] arguments)
+    {
+        var method = component.GetType().GetMethod(
+            methodName, BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.IsNotNull(method, "Missing private method: " + methodName);
+        method.Invoke(component, arguments);
     }
 
     static System.Type RuntimeType(string name)
