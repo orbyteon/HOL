@@ -10,6 +10,10 @@ visual source for the live HOL skin, not a new concept or a loose reinterpretati
 - `ExactReferenceAssetsTests` keeps every runtime import path release-blocking in Unity CI.
 - `SplashScene` replaces its legacy logo and effects with the same approved
   wordmark, deep-purple field, and confetti used by the live visual layer.
+- The older Converging Light scene pass is disabled before its `Start` method,
+  and the splash fallback builds only its loading line when the approved layer
+  is active. Legacy drifting numbers, seam, tagline, and surface sprites cannot
+  flash underneath the approved presentation.
 - English and Greek copy share the same approved geometry. TextMesh Pro
   auto-sizing prevents longer localized labels from escaping their controls.
 

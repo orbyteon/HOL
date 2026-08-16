@@ -22,6 +22,7 @@ public class SplashDesign : MonoBehaviour
     float elapsed;
     float entranceT;
     bool ready;
+    bool animateLegacyLogo;
 
     void Start()
     {
@@ -34,6 +35,15 @@ public class SplashDesign : MonoBehaviour
         Transform panelT = canvas.transform.Find("Panel");
         Transform logoT = canvas.transform.Find("Image");
         if (panelT == null || logoT == null) return;
+
+        // ExactReferenceVisuals owns the approved splash. Retain only the
+        // existing loading behavior, with none of this legacy presentation.
+        if (FindObjectOfType<ExactReferenceVisuals>() != null)
+        {
+            BuildProgress(canvas.transform);
+            ready = true;
+            return;
+        }
 
         // 1. Indigo depth instead of flat black.
         var bg = panelT.GetComponent<Image>();
@@ -71,6 +81,7 @@ public class SplashDesign : MonoBehaviour
         // 6. Gold loading hairline — the one scarce metal, at the destination.
         BuildProgress(canvas.transform);
 
+        animateLegacyLogo = true;
         ready = true;
     }
 
@@ -125,19 +136,23 @@ public class SplashDesign : MonoBehaviour
     {
         if (!ready) return;
 
-        // Logo: ease-out entrance, then a quiet breathing pulse.
-        if (entranceT < 1f)
+        // Logo animation is a fallback for projects without the approved
+        // reference layer. Exact mode never exposes the legacy logo.
+        if (animateLegacyLogo)
         {
-            entranceT = Mathf.Min(1f, entranceT + Time.unscaledDeltaTime / EntranceDuration);
-            float e = 1f - Mathf.Pow(1f - entranceT, 3f);
-            logoGroup.alpha = e;
-            float s = Mathf.Lerp(0.86f, 1f, e);
-            logoRect.localScale = new Vector3(s, s, 1f);
-        }
-        else
-        {
-            float breathe = 1f + Mathf.Sin(Time.unscaledTime * 1.6f) * 0.012f;
-            logoRect.localScale = new Vector3(breathe, breathe, 1f);
+            if (entranceT < 1f)
+            {
+                entranceT = Mathf.Min(1f, entranceT + Time.unscaledDeltaTime / EntranceDuration);
+                float e = 1f - Mathf.Pow(1f - entranceT, 3f);
+                logoGroup.alpha = e;
+                float s = Mathf.Lerp(0.86f, 1f, e);
+                logoRect.localScale = new Vector3(s, s, 1f);
+            }
+            else
+            {
+                float breathe = 1f + Mathf.Sin(Time.unscaledTime * 1.6f) * 0.012f;
+                logoRect.localScale = new Vector3(breathe, breathe, 1f);
+            }
         }
 
         elapsed += Time.unscaledDeltaTime;

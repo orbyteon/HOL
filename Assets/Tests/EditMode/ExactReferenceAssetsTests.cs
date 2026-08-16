@@ -1,5 +1,6 @@
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class ExactReferenceAssetsTests
 {
@@ -19,5 +20,57 @@ public class ExactReferenceAssetsTests
     {
         Assert.IsNotNull(Resources.Load<Sprite>(path),
             "The approved portrait must import as a Sprite at Resources/" + path + ".");
+    }
+
+    [Test]
+    public void ApprovedLayerDisablesLegacyScenePresentation()
+    {
+        var legacyObject = new GameObject("LegacyDesign");
+        var canvasObject = new GameObject("ExactCanvas", typeof(RectTransform), typeof(Canvas));
+
+        try
+        {
+            var legacy = legacyObject.AddComponent<DesignRuntimeWiring>();
+            Assert.IsTrue(legacy.enabled);
+
+            canvasObject.AddComponent<ExactReferenceVisuals>();
+
+            Assert.IsFalse(legacy.enabled,
+                "The discarded scene presentation must be disabled before its Start method.");
+        }
+        finally
+        {
+            Object.DestroyImmediate(canvasObject);
+            Object.DestroyImmediate(legacyObject);
+        }
+    }
+
+    [Test]
+    public void ApprovedSplashDoesNotBuildLegacyVisuals()
+    {
+        var canvasObject = new GameObject("ExactSplashCanvas", typeof(RectTransform), typeof(Canvas));
+
+        try
+        {
+            var panel = new GameObject("Panel", typeof(RectTransform), typeof(Image));
+            panel.transform.SetParent(canvasObject.transform, false);
+            var oldLogo = new GameObject("Image", typeof(RectTransform), typeof(Image));
+            oldLogo.transform.SetParent(canvasObject.transform, false);
+
+            canvasObject.AddComponent<ExactReferenceVisuals>();
+            var splash = canvasObject.AddComponent<SplashDesign>();
+            splash.SendMessage("Start");
+
+            Assert.IsNotNull(canvasObject.transform.Find("ProgressTrack"),
+                "The existing loading line must remain available.");
+            Assert.IsNull(canvasObject.transform.Find("NumberField"));
+            Assert.IsNull(canvasObject.transform.Find("Seam"));
+            Assert.IsNull(canvasObject.transform.Find("SeamBloom"));
+            Assert.IsNull(canvasObject.transform.Find("Tagline"));
+        }
+        finally
+        {
+            Object.DestroyImmediate(canvasObject);
+        }
     }
 }

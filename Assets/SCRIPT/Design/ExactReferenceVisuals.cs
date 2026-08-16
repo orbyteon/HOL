@@ -51,6 +51,12 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
 
     void Awake()
     {
+        // The earlier Converging Light pass is still scene-authored in the
+        // existing project. Stop it before Start so its drifting numbers and
+        // legacy surface sprites cannot appear underneath this approved skin.
+        foreach (var legacy in FindObjectsOfType<DesignRuntimeWiring>())
+            legacy.enabled = false;
+
         logo = Resources.Load<Sprite>(LogoResource);
         playerPortrait = Resources.Load<Sprite>(PlayerResource);
         opponentPortrait = Resources.Load<Sprite>(OpponentResource);
@@ -77,6 +83,10 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
 
     IEnumerator Start()
     {
+        // Apply once before the first rendered frame. The repeated passes below
+        // still pick up UI surfaces that other Start methods build at runtime.
+        ApplyAll();
+
         // Runtime-built PvP and Daily Hunt surfaces appear after their own
         // Start methods. Reapply through the first second, then only when the
         // hierarchy gains or loses buttons.
@@ -126,6 +136,9 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
 
     void ApplyBackdrop(Transform canvasRoot)
     {
+        DisableDirectChild(canvasRoot, "BackdropDepth");
+        DisableDirectChild(canvasRoot, "BackdropNumbers");
+
         var existing = DirectChild(canvasRoot, "ExactReferenceBackdrop");
         if (existing == null)
         {
@@ -141,6 +154,11 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
 
     void BuildMainMenu(Transform root)
     {
+        // BACKROUND is the menu container as well as the legacy image. Keep its
+        // children and navigation intact, but reveal the exact canvas backdrop.
+        var legacyBackground = root.GetComponent<Image>();
+        if (legacyBackground != null) legacyBackground.enabled = false;
+
         if (logo != null)
         {
             var logoImage = EnsureImage(root, "ExactHOLLogo");
@@ -546,6 +564,11 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
 
     static void StylePanels(Transform root)
     {
+        var exactBackdrop = DirectChild(root, "ExactReferenceBackdrop");
+        var exactBackdropImage = exactBackdrop == null
+            ? null
+            : exactBackdrop.GetComponent<Image>();
+
         foreach (var image in root.GetComponentsInChildren<Image>(true))
         {
             string name = image.transform.name;
@@ -558,7 +581,19 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
                         name.IndexOf("Frame", System.StringComparison.OrdinalIgnoreCase) >= 0;
 
             if (fullPanel)
-                image.color = Depth;
+            {
+                // RuntimeUI may have inherited a legacy scene sprite. Replace
+                // it rather than tinting it, so none of the discarded visual
+                // concept can remain visible on any full-screen surface.
+                if (exactBackdropImage != null)
+                {
+                    image.sprite = exactBackdropImage.sprite;
+                    image.type = Image.Type.Simple;
+                    image.color = Color.white;
+                }
+                else
+                    image.color = Depth;
+            }
             else if (card)
             {
                 image.sprite = RuntimeUI.RoundedRectSprite;
@@ -774,6 +809,12 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
         for (int i = 0; i < parent.childCount; i++)
             if (parent.GetChild(i).name == name) return parent.GetChild(i);
         return null;
+    }
+
+    static void DisableDirectChild(Transform parent, string name)
+    {
+        var child = DirectChild(parent, name);
+        if (child != null) child.gameObject.SetActive(false);
     }
 
     static Transform DeepFind(Transform root, string name)
