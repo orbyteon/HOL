@@ -54,13 +54,30 @@ public sealed class ExactReferenceVisualsPlayModeTests
         Assert.That(cardProbe.GetComponent<Outline>(), Is.Not.Null,
             "A newly-added non-button card should trigger exact visual styling.");
 
+        // A screen can swap active panels without changing any component counts.
+        // The signature must still change so the next refresh can restyle it.
+        var visualSignature = exactType.GetMethod(
+            "VisualSignature", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.That(visualSignature, Is.Not.Null);
+        var activationProbe = new GameObject("ActivationSignatureProbe",
+            typeof(RectTransform), typeof(Image));
+        activationProbe.transform.SetParent(ownedCanvas.transform, false);
+        activationProbe.SetActive(false);
+        int inactiveSignature = (int)visualSignature.Invoke(mainMenuVisuals, null);
+        activationProbe.SetActive(true);
+        int activeSignature = (int)visualSignature.Invoke(mainMenuVisuals, null);
+        Assert.That(activeSignature, Is.Not.EqualTo(inactiveSignature),
+            "Active-state screen swaps must change the visual hierarchy signature.");
+
         var l10nType = RuntimeType("L10n");
         var languageType = l10nType.GetNestedType("Language", BindingFlags.Public);
         var currentLanguage = l10nType.GetProperty("Current", BindingFlags.Static | BindingFlags.Public);
         var setLanguage = l10nType.GetMethod("SetLanguage", BindingFlags.Static | BindingFlags.Public);
+        var getCopy = l10nType.GetMethod("Get", BindingFlags.Static | BindingFlags.Public);
         Assert.That(languageType, Is.Not.Null);
         Assert.That(currentLanguage, Is.Not.Null);
         Assert.That(setLanguage, Is.Not.Null);
+        Assert.That(getCopy, Is.Not.Null);
 
         object originalLanguage = currentLanguage.GetValue(null, null);
         object greek = System.Enum.Parse(languageType, "Greek");
@@ -78,7 +95,8 @@ public sealed class ExactReferenceVisualsPlayModeTests
         }
         Assert.That(profileText, Is.Not.Null);
         string profileCopy = (string)tmpTextType.GetProperty("text").GetValue(profileText, null);
-        Assert.That(profileCopy, Does.Contain("ΣΕΡΙ"));
+        string localizedStreak = (string)getCopy.Invoke(null, new object[] { "stats_streak" });
+        Assert.That(profileCopy, Does.Contain(localizedStreak.ToUpperInvariant()));
         Assert.That(profileCopy, Does.Not.Contain("STREAK"));
         setLanguage.Invoke(null, new[] { originalLanguage });
 
@@ -102,6 +120,7 @@ public sealed class ExactReferenceVisualsPlayModeTests
             "Unrelated canvases must not receive exact visual components.");
 
         Object.Destroy(unrelated);
+        Object.Destroy(activationProbe);
         Object.Destroy(cardProbe);
     }
 
