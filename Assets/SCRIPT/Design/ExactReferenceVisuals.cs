@@ -1,6 +1,7 @@
 using System.Collections;
 using TMPro;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 // Applies the approved reference artwork as the literal presentation baseline.
@@ -34,28 +35,83 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
     Sprite mascotSeven;
     Sprite mascotThree;
     float nextRefresh;
-    int lastButtonCount = -1;
+    int lastVisualSignature = int.MinValue;
 
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     static void Install()
     {
-        foreach (var canvas in FindObjectsOfType<Canvas>())
+        // Static scene callbacks survive the destruction caused by LoadScene(Single).
+        // Re-register defensively so domain-reload-disabled play sessions cannot
+        // accumulate duplicate callbacks.
+        SceneManager.sceneLoaded -= OnSceneLoaded;
+        SceneManager.sceneLoaded += OnSceneLoaded;
+    }
+
+    static void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        InstallForScene(scene);
+    }
+
+    static void InstallForScene(Scene scene)
+    {
+        if (!scene.IsValid() || !scene.isLoaded) return;
+
+        // Prefer the canvas that owns the menu controller's panel. This avoids
+        // styling unrelated SDK/debug/world-space canvases that may exist in the
+        // same scene. Splash and other scenes fall back to their first root,
+        // screen-space canvas.
+        Canvas canvas = null;
+        var menu = FindInScene<MenuManager>(scene);
+        if (menu != null && menu.mainMenuPanel != null)
+            canvas = menu.mainMenuPanel.GetComponentInParent<Canvas>();
+
+        if (!IsOwnedCanvas(canvas, scene))
         {
-            if (canvas.GetComponent<ExactReferenceVisuals>() == null)
+            canvas = null;
+            foreach (var root in scene.GetRootGameObjects())
             {
-                canvas.gameObject.AddComponent<ExactReferenceVisuals>();
-                return;
+                foreach (var candidate in root.GetComponentsInChildren<Canvas>(true))
+                {
+                    if (!IsOwnedCanvas(candidate, scene)) continue;
+                    canvas = candidate;
+                    break;
+                }
+                if (canvas != null) break;
             }
         }
+
+        if (canvas != null && canvas.GetComponent<ExactReferenceVisuals>() == null)
+            canvas.gameObject.AddComponent<ExactReferenceVisuals>();
+    }
+
+    static bool IsOwnedCanvas(Canvas canvas, Scene scene)
+    {
+        return canvas != null &&
+               canvas.gameObject.scene == scene &&
+               canvas.isRootCanvas &&
+               canvas.renderMode != RenderMode.WorldSpace;
+    }
+
+    static T FindInScene<T>(Scene scene) where T : Component
+    {
+        if (!scene.IsValid() || !scene.isLoaded) return null;
+        foreach (var root in scene.GetRootGameObjects())
+        {
+            var found = root.GetComponentInChildren<T>(true);
+            if (found != null) return found;
+        }
+        return null;
     }
 
     void Awake()
     {
         // The earlier Converging Light pass is still scene-authored in the
-        // existing project. Stop it before Start so its drifting numbers and
-        // legacy surface sprites cannot appear underneath this approved skin.
-        foreach (var legacy in FindObjectsOfType<DesignRuntimeWiring>())
-            legacy.enabled = false;
+        // existing project. Stop only the copy in this scene before Start so
+        // unrelated additive scenes/canvases are never modified.
+        var scene = gameObject.scene;
+        foreach (var root in scene.GetRootGameObjects())
+            foreach (var legacy in root.GetComponentsInChildren<DesignRuntimeWiring>(true))
+                legacy.enabled = false;
 
         logo = Resources.Load<Sprite>(LogoResource);
         playerPortrait = Resources.Load<Sprite>(PlayerResource);
@@ -88,13 +144,14 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
         ApplyAll();
 
         // Runtime-built PvP and Daily Hunt surfaces appear after their own
-        // Start methods. Reapply through the first second, then only when the
-        // hierarchy gains or loses buttons.
+        // Start methods. Reapply through the first few frames, then refresh only
+        // when this canvas' visual hierarchy changes.
         for (int i = 0; i < 4; i++)
         {
             yield return null;
             ApplyAll();
         }
+        lastVisualSignature = VisualSignature();
     }
 
     void Update()
@@ -102,35 +159,46 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
         if (Time.unscaledTime < nextRefresh) return;
         nextRefresh = Time.unscaledTime + 0.5f;
 
-        int count = 0;
-        foreach (var canvas in FindObjectsOfType<Canvas>())
-            count += canvas.GetComponentsInChildren<Button>(true).Length;
+        int signature = VisualSignature();
+        if (signature == lastVisualSignature) return;
 
-        if (count != lastButtonCount)
+        ApplyAll();
+        // ApplyAll may itself create exact-reference children. Record the final
+        // hierarchy so those intentional additions do not trigger another pass.
+        lastVisualSignature = VisualSignature();
+    }
+
+    int VisualSignature()
+    {
+        unchecked
         {
-            lastButtonCount = count;
-            ApplyAll();
+            int signature = 17;
+            signature = signature * 31 + GetComponentsInChildren<Transform>(true).Length;
+            signature = signature * 31 + GetComponentsInChildren<Image>(true).Length;
+            signature = signature * 31 + GetComponentsInChildren<Button>(true).Length;
+            signature = signature * 31 + GetComponentsInChildren<TMP_Text>(true).Length;
+            signature = signature * 31 + GetComponentsInChildren<TMP_InputField>(true).Length;
+            return signature;
         }
     }
 
     void ApplyAll()
     {
-        foreach (var canvas in FindObjectsOfType<Canvas>())
-        {
-            ApplyBackdrop(canvas.transform);
-            StylePanels(canvas.transform);
-            StyleInputs(canvas.transform);
-            StyleButtons(canvas.transform);
-            StyleText(canvas.transform);
-        }
+        // ExactReferenceVisuals owns exactly one root canvas. Keep all name-based
+        // styling underneath that canvas instead of mutating every Canvas in the
+        // process, which protects SDK overlays, debug UI, and world-space UI.
+        var root = transform;
+        ApplyBackdrop(root);
+        StylePanels(root);
+        StyleInputs(root);
+        StyleButtons(root);
+        StyleText(root);
+        ApplyCharacterCards(root);
+        ApplyScreenLayouts(root);
 
-        ApplyCharacterCards();
-
-        foreach (var canvas in FindObjectsOfType<Canvas>())
-            ApplyScreenLayouts(canvas.transform);
-
-        var menu = FindObjectOfType<MenuManager>();
-        if (menu != null && menu.mainMenuPanel != null)
+        var menu = FindInScene<MenuManager>(gameObject.scene);
+        if (menu != null && menu.mainMenuPanel != null &&
+            menu.mainMenuPanel.GetComponentInParent<Canvas>() == GetComponent<Canvas>())
             BuildMainMenu(menu.mainMenuPanel.transform);
     }
 
@@ -225,7 +293,8 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
 
         var profileText = EnsureText(profile.transform, "ExactPlayerChipText");
         string player = PlayerPrefs.GetString("PlayerName", L10n.Get("player_default"));
-        profileText.text = player.ToUpperInvariant() + "   STREAK " + GameStats.CurrentStreak;
+        string streak = L10n.Get("stats_streak").ToUpperInvariant();
+        profileText.text = player.ToUpperInvariant() + "   " + streak + " " + GameStats.CurrentStreak;
         profileText.fontSize = 31f;
         profileText.fontStyle = FontStyles.Bold;
         profileText.color = NearWhite;
@@ -285,31 +354,28 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
         if (oldStats != null) oldStats.gameObject.SetActive(false);
     }
 
-    void ApplyCharacterCards()
+    void ApplyCharacterCards(Transform root)
     {
-        foreach (var canvas in FindObjectsOfType<Canvas>())
+        var playerCard = DeepFind(root, "PlayerCard");
+        if (playerCard != null && playerPortrait != null)
         {
-            var playerCard = DeepFind(canvas.transform, "PlayerCard");
-            if (playerCard != null && playerPortrait != null)
-            {
-                var image = EnsureImage(playerCard, "ExactPlayerPortrait");
-                image.sprite = playerPortrait;
-                image.preserveAspect = true;
-                image.raycastTarget = false;
-                Place(image.rectTransform, Vector2.zero, new Vector2(250f, 250f));
-                image.transform.SetAsFirstSibling();
-            }
+            var image = EnsureImage(playerCard, "ExactPlayerPortrait");
+            image.sprite = playerPortrait;
+            image.preserveAspect = true;
+            image.raycastTarget = false;
+            Place(image.rectTransform, Vector2.zero, new Vector2(250f, 250f));
+            image.transform.SetAsFirstSibling();
+        }
 
-            var opponentCard = DeepFind(canvas.transform, "OpponentCard");
-            if (opponentCard != null && opponentPortrait != null)
-            {
-                var image = EnsureImage(opponentCard, "ExactOpponentPortrait");
-                image.sprite = opponentPortrait;
-                image.preserveAspect = true;
-                image.raycastTarget = false;
-                Place(image.rectTransform, Vector2.zero, new Vector2(250f, 250f));
-                image.transform.SetAsFirstSibling();
-            }
+        var opponentCard = DeepFind(root, "OpponentCard");
+        if (opponentCard != null && opponentPortrait != null)
+        {
+            var image = EnsureImage(opponentCard, "ExactOpponentPortrait");
+            image.sprite = opponentPortrait;
+            image.preserveAspect = true;
+            image.raycastTarget = false;
+            Place(image.rectTransform, Vector2.zero, new Vector2(250f, 250f));
+            image.transform.SetAsFirstSibling();
         }
     }
 
@@ -331,7 +397,7 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
 
     void LayoutSplash(Transform root)
     {
-        if (root == null || FindObjectOfType<SplashLoader>() == null) return;
+        if (root == null || FindInScene<SplashLoader>(gameObject.scene) == null) return;
 
         // The approved square reference is a clean logo, confetti and deep
         // purple field. Suppress the older number-field and seam treatment
@@ -794,14 +860,10 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
         rect.anchoredPosition = position;
     }
 
-    static Button FindButton(string name)
+    Button FindButton(string name)
     {
-        foreach (var canvas in FindObjectsOfType<Canvas>())
-        {
-            var hit = DeepFind(canvas.transform, name);
-            if (hit != null) return hit.GetComponent<Button>();
-        }
-        return null;
+        var hit = DeepFind(transform, name);
+        return hit == null ? null : hit.GetComponent<Button>();
     }
 
     static Transform DirectChild(Transform parent, string name)
