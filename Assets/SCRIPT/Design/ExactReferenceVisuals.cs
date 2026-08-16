@@ -160,6 +160,7 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
         tagline.color = NearWhite;
         tagline.alignment = TextAlignmentOptions.Center;
         Place(tagline.rectTransform, new Vector2(0f, 322f), new Vector2(900f, 90f));
+        ConfigureResponsiveText(tagline, 30f);
 
         if (playerPortrait != null)
         {
@@ -211,6 +212,7 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
         profileText.fontStyle = FontStyles.Bold;
         profileText.color = NearWhite;
         RuntimeUI.Stretch(profileText.gameObject);
+        ConfigureResponsiveText(profileText, 18f);
 
         AddConfetti(root);
 
@@ -583,9 +585,14 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
             {
                 input.textComponent.color = NearWhite;
                 input.textComponent.fontStyle = FontStyles.Bold;
+                ConfigureResponsiveText(input.textComponent, 20f);
             }
             var placeholder = input.placeholder as TMP_Text;
-            if (placeholder != null) placeholder.color = Muted;
+            if (placeholder != null)
+            {
+                placeholder.color = Muted;
+                ConfigureResponsiveText(placeholder, 18f);
+            }
         }
     }
 
@@ -643,6 +650,7 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
         {
             text.color = labelColor;
             text.fontStyle = FontStyles.Bold;
+            ConfigureResponsiveText(text, 16f);
         }
     }
 
@@ -655,6 +663,7 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
                 continue;
             if (text.transform.name.StartsWith("Exact")) continue;
             text.color = NearWhite;
+            ConfigureResponsiveText(text, 16f);
         }
     }
 
@@ -670,6 +679,7 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
             rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
             rect.sizeDelta = new Vector2(760f, 64f);
             rect.anchoredPosition = new Vector2(0f, 23f);
+            ConfigureResponsiveText(label, 22f);
         }
 
         var sub = EnsureText(button.transform, "ExactButtonSubtitle");
@@ -679,6 +689,26 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
         sub.color = button.transform.name == "ButtonPlay" ? Ink : NearWhite;
         sub.alignment = TextAlignmentOptions.Center;
         Place(sub.rectTransform, new Vector2(0f, -34f), new Vector2(760f, 42f));
+        ConfigureResponsiveText(sub, 16f);
+    }
+
+    static void ConfigureResponsiveText(TMP_Text text, float minimumSize)
+    {
+        if (text == null) return;
+
+        // Greek copy is often wider than its English equivalent. Preserve the
+        // approved geometry and hierarchy, then let TMP reduce only the font
+        // size needed to keep either language inside the same control.
+        if (!text.enableAutoSizing)
+        {
+            float configuredSize = Mathf.Max(text.fontSize, minimumSize);
+            text.enableAutoSizing = true;
+            text.fontSizeMax = configuredSize;
+            text.fontSizeMin = Mathf.Min(configuredSize,
+                Mathf.Max(minimumSize, configuredSize * 0.55f));
+        }
+        text.enableWordWrapping = true;
+        text.overflowMode = TextOverflowModes.Ellipsis;
     }
 
     static TMP_Text EnsureText(Transform parent, string name)
