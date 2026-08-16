@@ -1,7 +1,7 @@
 {
-  "enabled": true,
+  "enabled": false,
   "version": "0.4.0",
   "versionCode": 6,
-  "confirm": "INTERNAL",
+  "confirm": "HOLD",
   "purpose": "Exact attachment reskin internal device test"
 }
