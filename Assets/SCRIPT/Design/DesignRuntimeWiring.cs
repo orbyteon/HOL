@@ -35,11 +35,35 @@ public class DesignRuntimeWiring : MonoBehaviour
 
     void Awake()
     {
+        // A scene reference can silently come back null (a stale GUID resolves
+        // to nothing, with no error anywhere) — which is exactly how vc5
+        // shipped with the old menu art. The Resources path cannot break that
+        // way and is pinned green by DesignSurfaceTests, so it backstops the
+        // scene wiring instead of trusting it. If both routes fail, the error
+        // below is the loud signal the old silence never gave: players still
+        // get fallback visuals instead of a crash, but the failure is in
+        // logcat and the Editor console where a release check can see it.
+        backgroundSprite = RequireSurface("design/background_deep", backgroundSprite);
+        panelSprite = RequireSurface("design/panel_surface", panelSprite);
+        primaryButtonSprite = RequireSurface("design/button_primary", primaryButtonSprite);
+        secondaryButtonSprite = RequireSurface("design/button_secondary", secondaryButtonSprite);
+
         // Publish the assigned assets before any runtime-built PvP UI is created.
         BackgroundAsset = backgroundSprite;
         PanelSurfaceAsset = panelSprite;
         PrimaryButtonAsset = primaryButtonSprite;
         SecondaryButtonAsset = secondaryButtonSprite;
+    }
+
+    static Sprite RequireSurface(string resourcePath, Sprite sceneReference)
+    {
+        if (sceneReference != null) return sceneReference;
+        var loaded = Resources.Load<Sprite>(resourcePath);
+        if (loaded == null)
+            Debug.LogError("[Design] Required surface '" + resourcePath + "' is missing: " +
+                "the scene reference is null and Resources.Load found nothing. " +
+                "Screens will fall back to flat visuals — fix the asset before shipping.");
+        return loaded;
     }
 
     void Start()
