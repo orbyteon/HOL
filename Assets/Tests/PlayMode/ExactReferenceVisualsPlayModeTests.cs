@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Reflection;
 using NUnit.Framework;
@@ -12,9 +13,11 @@ public sealed class ExactReferenceVisualsPlayModeTests
     [UnityTest]
     public IEnumerator ExactVisualsSurviveSceneTransitionRefreshNonButtonUiLocalizeAndStayScoped()
     {
+        var exactType = RuntimeType("ExactReferenceVisuals");
+
         // Invoke the runtime bootstrap explicitly so this regression remains
         // deterministic inside the Unity Test Runner as well as in a player.
-        var install = typeof(ExactReferenceVisuals).GetMethod(
+        var install = exactType.GetMethod(
             "Install", BindingFlags.Static | BindingFlags.NonPublic);
         Assert.That(install, Is.Not.Null);
         install.Invoke(null, null);
@@ -22,11 +25,11 @@ public sealed class ExactReferenceVisualsPlayModeTests
         yield return SceneManager.LoadSceneAsync("SplashScene", LoadSceneMode.Single);
         yield return null;
 
-        var splashVisuals = Object.FindObjectOfType<ExactReferenceVisuals>();
+        var splashVisuals = Object.FindObjectOfType(exactType) as Component;
         Assert.That(splashVisuals, Is.Not.Null,
             "SplashScene should receive the approved visuals owner.");
 
-        var splashLoader = Object.FindObjectOfType<SplashLoader>();
+        var splashLoader = Object.FindObjectOfType(RuntimeType("SplashLoader")) as Component;
         Assert.That(splashLoader, Is.Not.Null);
         splashLoader.SendMessage("LoadMenu", SendMessageOptions.RequireReceiver);
 
@@ -34,7 +37,7 @@ public sealed class ExactReferenceVisualsPlayModeTests
             yield return null;
         yield return null;
 
-        var mainMenuVisuals = Object.FindObjectOfType<ExactReferenceVisuals>();
+        var mainMenuVisuals = Object.FindObjectOfType(exactType) as Component;
         Assert.That(mainMenuVisuals, Is.Not.Null,
             "ExactReferenceVisuals must be reinstalled after LoadScene(Single).");
         Assert.That(mainMenuVisuals.gameObject.scene.name, Is.EqualTo("MainMenu"));
@@ -53,8 +56,17 @@ public sealed class ExactReferenceVisualsPlayModeTests
         Assert.That(cardProbe.GetComponent<Outline>(), Is.Not.Null,
             "A newly-added non-button card should trigger exact visual styling.");
 
-        var originalLanguage = L10n.Current;
-        L10n.SetLanguage(L10n.Language.Greek);
+        var l10nType = RuntimeType("L10n");
+        var languageType = l10nType.GetNestedType("Language", BindingFlags.Public);
+        var currentLanguage = l10nType.GetProperty("Current", BindingFlags.Static | BindingFlags.Public);
+        var setLanguage = l10nType.GetMethod("SetLanguage", BindingFlags.Static | BindingFlags.Public);
+        Assert.That(languageType, Is.Not.Null);
+        Assert.That(currentLanguage, Is.Not.Null);
+        Assert.That(setLanguage, Is.Not.Null);
+
+        object originalLanguage = currentLanguage.GetValue(null, null);
+        object greek = Enum.Parse(languageType, "Greek");
+        setLanguage.Invoke(null, new[] { greek });
         yield return null;
 
         TMP_Text profileText = null;
@@ -67,7 +79,7 @@ public sealed class ExactReferenceVisualsPlayModeTests
         Assert.That(profileText, Is.Not.Null);
         Assert.That(profileText.text, Does.Contain("ΣΕΡΙ"));
         Assert.That(profileText.text, Does.Not.Contain("STREAK"));
-        L10n.SetLanguage(originalLanguage);
+        setLanguage.Invoke(null, new[] { originalLanguage });
 
         // A separate world-space canvas represents SDK/debug/3D UI. The exact
         // layer must not style it just because names resemble game UI.
@@ -90,5 +102,12 @@ public sealed class ExactReferenceVisualsPlayModeTests
 
         Object.Destroy(unrelated);
         Object.Destroy(cardProbe);
+    }
+
+    static Type RuntimeType(string name)
+    {
+        var type = Type.GetType(name + ", Assembly-CSharp");
+        Assert.That(type, Is.Not.Null, "Missing runtime component: " + name);
+        return type;
     }
 }
