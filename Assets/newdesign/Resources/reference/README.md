@@ -9,5 +9,9 @@ visual source for the live HOL skin, not a new concept or a loose reinterpretati
 - Runtime paths use `Resources.Load<Sprite>("reference/<asset>")`.
 - `ExactReferenceAssetsTests` keeps every runtime import path release-blocking in Unity CI.
 
+The exact square app icon from the approved reference set lives at
+`Assets/newdesign/branding/hol_app_icon_exact.png` and is wired into every
+configured application and Android icon slot in `ProjectSettings.asset`.
+
 Gameplay and real data remain authoritative. Reference-only coins, ranks, or
 matchmaking claims are not enabled by the visual skin.
