@@ -14,20 +14,28 @@ public sealed class AttachmentReskinPolishPlayModeTests
         var exactType = RuntimeType("ExactReferenceVisuals");
         var reskinType = RuntimeType("AttachmentReskinVisuals");
         var polishType = RuntimeType("AttachmentReskinPolish");
+        var bindingsType = RuntimeType("AttachmentReskinCanvasBindings");
 
         InvokeInstaller(exactType);
         InvokeInstaller(reskinType);
         InvokeInstaller(polishType);
+        InvokeInstaller(bindingsType);
 
         yield return SceneManager.LoadSceneAsync("MainMenu", LoadSceneMode.Single);
-        for (int i = 0; i < 10; i++)
+        for (int i = 0; i < 12; i++)
             yield return null;
+        yield return new WaitForSecondsRealtime(0.35f);
 
         var polish = Object.FindObjectOfType(polishType) as Component;
         Assert.That(polish, Is.Not.Null,
             "The reference-board polish should be installed on MainMenu.");
         var canvas = polish.GetComponent<Canvas>();
         Assert.That(canvas, Is.Not.Null);
+
+        var bindings = Object.FindObjectOfType(bindingsType) as Component;
+        Assert.That(bindings, Is.Not.Null,
+            "Runtime-injected main-menu controls should receive canvas-scoped reskin bindings.");
+        Assert.That(bindings.GetComponent<Canvas>(), Is.SameAs(canvas));
 
         var baseline = Object.FindObjectOfType(exactType) as Behaviour;
         Assert.That(baseline, Is.Not.Null);
@@ -50,8 +58,10 @@ public sealed class AttachmentReskinPolishPlayModeTests
 
         Assert.That(Find(canvas.transform, "BoardHomeLogo"), Is.Not.Null);
         Assert.That(Find(canvas.transform, "BoardHomeTipCard"), Is.Not.Null);
-        Assert.That(Find(canvas.transform, "BoardFriendVector"), Is.Not.Null);
-        Assert.That(Find(canvas.transform, "BoardDailyVector"), Is.Not.Null);
+        Assert.That(Find(canvas.transform, "BoardFriendVector"), Is.Not.Null,
+            "The real runtime-injected PvP button should receive the friend artwork.");
+        Assert.That(Find(canvas.transform, "BoardDailyVector"), Is.Not.Null,
+            "The real runtime-injected Daily Hunt button should receive the lightning artwork.");
 
         var exactLogo = Find(canvas.transform, "ExactHOLLogo");
         if (exactLogo != null)
