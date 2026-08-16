@@ -83,19 +83,29 @@ public sealed class AttachmentReskinPolishPlayModeTests
         Assert.That(Find(pvpMenuPanel.transform, "BoardCreatePlusVector"), Is.Not.Null);
         Assert.That(Find(pvpMenuPanel.transform, "BoardJoinDoorVector"), Is.Not.Null);
 
-        // Activate the existing searching panel so the reference rocket/VS
-        // treatment is exercised without inventing a new pre-match state.
+        // Exercise the existing solo-search flow rather than activating the
+        // nested searching child in isolation. PanelSearching lives under
+        // PanelPlay, so MenuManager.OnPlayPressed must open its parent first.
         var menu = Object.FindObjectOfType(RuntimeType("MenuManager")) as Component;
         Assert.That(menu, Is.Not.Null);
+        menu.SendMessage("OnPlayPressed", SendMessageOptions.RequireReceiver);
+        yield return null;
+
+        var matchmaking = Object.FindObjectOfType(RuntimeType("FakeMatchmaking")) as Component;
+        Assert.That(matchmaking, Is.Not.Null);
+        matchmaking.SendMessage("StartSearch", SendMessageOptions.RequireReceiver);
+        yield return new WaitForSecondsRealtime(0.35f);
+
         var searchingField = menu.GetType().GetField("panelSearching", BindingFlags.Instance | BindingFlags.Public);
         Assert.That(searchingField, Is.Not.Null);
         var searchingPanel = searchingField.GetValue(menu) as GameObject;
         Assert.That(searchingPanel, Is.Not.Null);
-        searchingPanel.SetActive(true);
-        yield return new WaitForSecondsRealtime(0.35f);
+        Assert.That(searchingPanel.activeInHierarchy, Is.True,
+            "The real StartSearch flow should make PanelSearching visible.");
 
         Assert.That(Find(searchingPanel.transform, "BoardSearchRocketVector"), Is.Not.Null);
         Assert.That(Find(searchingPanel.transform, "BoardVsBurstVector"), Is.Not.Null);
+        matchmaking.SendMessage("CancelSearch", SendMessageOptions.RequireReceiver);
 
         // Presentation-only contract: every Button must still be a controller/
         // scene button. Board-prefixed objects are decoration and text only.
