@@ -9,6 +9,8 @@ using UnityEngine.UI;
 public sealed class ExactReferenceVisuals : MonoBehaviour
 {
     const string LogoResource = "reference/hol_logo_exact";
+    const string PlayerResource = "reference/player_cyan_exact";
+    const string OpponentResource = "reference/opponent_purple_exact";
 
     static readonly Color Depth = Hex(0x08, 0x06, 0x25);
     static readonly Color Surface = Hex(0x18, 0x0B, 0x48);
@@ -25,6 +27,8 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
     static readonly Color Ink = Hex(0x16, 0x0D, 0x24);
 
     Sprite logo;
+    Sprite playerPortrait;
+    Sprite opponentPortrait;
     float nextRefresh;
     int lastButtonCount = -1;
 
@@ -44,9 +48,13 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
     void Awake()
     {
         logo = Resources.Load<Sprite>(LogoResource);
+        playerPortrait = Resources.Load<Sprite>(PlayerResource);
+        opponentPortrait = Resources.Load<Sprite>(OpponentResource);
         if (logo == null)
             Debug.LogError("[ExactReferenceVisuals] Missing Resources/" + LogoResource +
                 ". The approved HOL logo cannot render.");
+        if (playerPortrait == null || opponentPortrait == null)
+            Debug.LogError("[ExactReferenceVisuals] Approved character portraits are missing.");
     }
 
     void OnEnable()
@@ -140,6 +148,24 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
         tagline.alignment = TextAlignmentOptions.Center;
         Place(tagline.rectTransform, new Vector2(0f, 322f), new Vector2(900f, 90f));
 
+        if (playerPortrait != null)
+        {
+            var playerHero = EnsureImage(root, "ExactPlayerHero");
+            playerHero.sprite = playerPortrait;
+            playerHero.preserveAspect = true;
+            playerHero.raycastTarget = false;
+            Place(playerHero.rectTransform, new Vector2(-335f, 205f), new Vector2(320f, 320f));
+        }
+
+        if (opponentPortrait != null)
+        {
+            var opponentHero = EnsureImage(root, "ExactOpponentHero");
+            opponentHero.sprite = opponentPortrait;
+            opponentHero.preserveAspect = true;
+            opponentHero.raycastTarget = false;
+            Place(opponentHero.rectTransform, new Vector2(335f, 205f), new Vector2(320f, 320f));
+        }
+
         var profile = EnsureImage(root, "ExactPlayerChip");
         profile.sprite = RuntimeUI.RoundedRectSprite;
         profile.type = Image.Type.Sliced;
@@ -149,13 +175,14 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
 
         var profileText = EnsureText(profile.transform, "ExactPlayerChipText");
         string player = PlayerPrefs.GetString("PlayerName", L10n.Get("player_default"));
-        profileText.text = player.ToUpperInvariant() + "   🔥 " + GameStats.CurrentStreak;
+        profileText.text = player.ToUpperInvariant() + "   STREAK " + GameStats.CurrentStreak;
         profileText.fontSize = 31f;
         profileText.fontStyle = FontStyles.Bold;
         profileText.color = NearWhite;
         RuntimeUI.Stretch(profileText.gameObject);
 
         AddConfetti(root);
+        ApplyCharacterCards();
 
         var play = FindButton("ButtonPlay");
         if (play != null)
@@ -200,6 +227,34 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
         if (oldStats != null) oldStats.gameObject.SetActive(false);
     }
 
+    void ApplyCharacterCards()
+    {
+        foreach (var canvas in FindObjectsOfType<Canvas>())
+        {
+            var playerCard = DeepFind(canvas.transform, "PlayerCard");
+            if (playerCard != null && playerPortrait != null)
+            {
+                var image = EnsureImage(playerCard, "ExactPlayerPortrait");
+                image.sprite = playerPortrait;
+                image.preserveAspect = true;
+                image.raycastTarget = false;
+                Place(image.rectTransform, Vector2.zero, new Vector2(250f, 250f));
+                image.transform.SetAsFirstSibling();
+            }
+
+            var opponentCard = DeepFind(canvas.transform, "OpponentCard");
+            if (opponentCard != null && opponentPortrait != null)
+            {
+                var image = EnsureImage(opponentCard, "ExactOpponentPortrait");
+                image.sprite = opponentPortrait;
+                image.preserveAspect = true;
+                image.raycastTarget = false;
+                Place(image.rectTransform, Vector2.zero, new Vector2(250f, 250f));
+                image.transform.SetAsFirstSibling();
+            }
+        }
+    }
+
     static void AddConfetti(Transform root)
     {
         if (DirectChild(root, "ExactConfetti") != null) return;
@@ -229,6 +284,8 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
         {
             string name = image.transform.name;
             if (name == "ExactReferenceBackdrop" || name == "ExactHOLLogo" ||
+                name == "ExactPlayerHero" || name == "ExactOpponentHero" ||
+                name == "ExactPlayerPortrait" || name == "ExactOpponentPortrait" ||
                 name.StartsWith("Confetti") || name == "ExactPlayerChip")
                 continue;
 
