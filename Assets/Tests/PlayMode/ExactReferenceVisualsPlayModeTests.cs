@@ -73,11 +73,9 @@ public sealed class ExactReferenceVisualsPlayModeTests
         var languageType = l10nType.GetNestedType("Language", BindingFlags.Public);
         var currentLanguage = l10nType.GetProperty("Current", BindingFlags.Static | BindingFlags.Public);
         var setLanguage = l10nType.GetMethod("SetLanguage", BindingFlags.Static | BindingFlags.Public);
-        var getCopy = l10nType.GetMethod("Get", BindingFlags.Static | BindingFlags.Public);
         Assert.That(languageType, Is.Not.Null);
         Assert.That(currentLanguage, Is.Not.Null);
         Assert.That(setLanguage, Is.Not.Null);
-        Assert.That(getCopy, Is.Not.Null);
 
         object originalLanguage = currentLanguage.GetValue(null, null);
         object greek = System.Enum.Parse(languageType, "Greek");
@@ -95,7 +93,7 @@ public sealed class ExactReferenceVisualsPlayModeTests
         }
         Assert.That(profileText, Is.Not.Null);
         string profileCopy = (string)tmpTextType.GetProperty("text").GetValue(profileText, null);
-        string localizedStreak = (string)getCopy.Invoke(null, new object[] { "stats_streak" });
+        string localizedStreak = LocalizedCopy(l10nType, "stats_streak");
         Assert.That(profileCopy, Does.Contain(localizedStreak.ToUpperInvariant()));
         Assert.That(profileCopy, Does.Not.Contain("STREAK"));
         setLanguage.Invoke(null, new[] { originalLanguage });
@@ -122,6 +120,37 @@ public sealed class ExactReferenceVisualsPlayModeTests
         Object.Destroy(unrelated);
         Object.Destroy(activationProbe);
         Object.Destroy(cardProbe);
+    }
+
+    static string LocalizedCopy(System.Type l10nType, string key)
+    {
+        foreach (var method in l10nType.GetMethods(BindingFlags.Static | BindingFlags.Public))
+        {
+            if (method.Name != "Get" || method.ReturnType != typeof(string)) continue;
+            var parameters = method.GetParameters();
+            if (parameters.Length == 0 || parameters[0].ParameterType != typeof(string)) continue;
+
+            var arguments = new object[parameters.Length];
+            arguments[0] = key;
+            bool compatible = true;
+            for (int i = 1; i < parameters.Length; i++)
+            {
+                if (parameters[i].ParameterType == typeof(object[]))
+                    arguments[i] = new object[0];
+                else if (parameters[i].HasDefaultValue)
+                    arguments[i] = parameters[i].DefaultValue;
+                else
+                {
+                    compatible = false;
+                    break;
+                }
+            }
+            if (compatible)
+                return (string)method.Invoke(null, arguments);
+        }
+
+        Assert.Fail("Missing compatible L10n.Get(string, ...) overload.");
+        return null;
     }
 
     static System.Type RuntimeType(string name)
