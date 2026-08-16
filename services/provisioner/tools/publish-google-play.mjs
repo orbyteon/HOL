@@ -1,4 +1,5 @@
 import fs from 'node:fs/promises';
+import { pathToFileURL } from 'node:url';
 import { GoogleAuth } from 'google-auth-library';
 
 const ANDROID_PUBLISHER_SCOPE = 'https://www.googleapis.com/auth/androidpublisher';
@@ -139,7 +140,8 @@ export async function publishInternal() {
   console.log(`Published ${packageName} ${version} (${expectedVersionCode}) to the Google Play internal track.`);
 }
 
-if (import.meta.url === new URL(`file://${process.argv[1]}`).href) {
+const entrypoint = process.argv[1] ? pathToFileURL(process.argv[1]).href : '';
+if (import.meta.url === entrypoint) {
   publishInternal().catch(error => {
     console.error(`::error::${error.message}`);
     process.exit(1);
