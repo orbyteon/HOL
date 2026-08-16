@@ -21,10 +21,9 @@ jobs:
     environment: production
     timeout-minutes: 10
     env:
-      GOOGLE_CLOUD_PROJECT_NUMBER: ${{ vars.GOOGLE_CLOUD_PROJECT_NUMBER }}
-      EXPECTED_PROJECT_NUMBER: "112109012903"
+      TARGET_PROJECT_NUMBER: "112109012903"
     steps:
-      - name: Enforce production project
+      - name: Enforce production source and target
         shell: bash
         run: |
           set -euo pipefail
@@ -32,8 +31,8 @@ jobs:
             echo "::error::API enablement must run from main (got $GITHUB_REF)"
             exit 1
           }
-          test "$GOOGLE_CLOUD_PROJECT_NUMBER" = "$EXPECTED_PROJECT_NUMBER" || {
-            echo "::error::Refusing to enable an API in unexpected project $GOOGLE_CLOUD_PROJECT_NUMBER"
+          test "$TARGET_PROJECT_NUMBER" = "112109012903" || {
+            echo "::error::Refusing to enable an API in unexpected project $TARGET_PROJECT_NUMBER"
             exit 1
           }
 
@@ -59,10 +58,9 @@ jobs:
           node --input-type=module <<'NODE'
           import { GoogleAuth } from 'google-auth-library';
 
-          const project = (process.env.GOOGLE_CLOUD_PROJECT_NUMBER || '').trim();
-          const expected = (process.env.EXPECTED_PROJECT_NUMBER || '').trim();
+          const project = (process.env.TARGET_PROJECT_NUMBER || '').trim();
           const encoded = (process.env.GOOGLE_SERVICE_ACCOUNT_JSON_B64 || '').trim();
-          if (!project || project !== expected) throw new Error(`Unexpected Google Cloud project ${project || '(missing)'}`);
+          if (project !== '112109012903') throw new Error(`Unexpected Google Cloud project ${project || '(missing)'}`);
           if (!encoded) throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON_B64 is missing');
 
           let credentials;
