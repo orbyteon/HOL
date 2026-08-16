@@ -11,6 +11,8 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
     const string LogoResource = "reference/hol_logo_exact";
     const string PlayerResource = "reference/player_cyan_exact";
     const string OpponentResource = "reference/opponent_purple_exact";
+    const string MascotSevenResource = "reference/mascot_7_exact";
+    const string MascotThreeResource = "reference/mascot_3_exact";
 
     static readonly Color Depth = Hex(0x08, 0x06, 0x25);
     static readonly Color Surface = Hex(0x18, 0x0B, 0x48);
@@ -29,6 +31,8 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
     Sprite logo;
     Sprite playerPortrait;
     Sprite opponentPortrait;
+    Sprite mascotSeven;
+    Sprite mascotThree;
     float nextRefresh;
     int lastButtonCount = -1;
 
@@ -50,11 +54,15 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
         logo = Resources.Load<Sprite>(LogoResource);
         playerPortrait = Resources.Load<Sprite>(PlayerResource);
         opponentPortrait = Resources.Load<Sprite>(OpponentResource);
+        mascotSeven = Resources.Load<Sprite>(MascotSevenResource);
+        mascotThree = Resources.Load<Sprite>(MascotThreeResource);
         if (logo == null)
             Debug.LogError("[ExactReferenceVisuals] Missing Resources/" + LogoResource +
                 ". The approved HOL logo cannot render.");
         if (playerPortrait == null || opponentPortrait == null)
             Debug.LogError("[ExactReferenceVisuals] Approved character portraits are missing.");
+        if (mascotSeven == null || mascotThree == null)
+            Debug.LogError("[ExactReferenceVisuals] Approved number mascots are missing.");
     }
 
     void OnEnable()
@@ -166,6 +174,24 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
             Place(opponentHero.rectTransform, new Vector2(335f, 205f), new Vector2(320f, 320f));
         }
 
+        if (mascotSeven != null)
+        {
+            var seven = EnsureImage(root, "ExactMascotSeven");
+            seven.sprite = mascotSeven;
+            seven.preserveAspect = true;
+            seven.raycastTarget = false;
+            Place(seven.rectTransform, new Vector2(-142f, 188f), new Vector2(150f, 185f));
+        }
+
+        if (mascotThree != null)
+        {
+            var three = EnsureImage(root, "ExactMascotThree");
+            three.sprite = mascotThree;
+            three.preserveAspect = true;
+            three.raycastTarget = false;
+            Place(three.rectTransform, new Vector2(142f, 188f), new Vector2(150f, 185f));
+        }
+
         var profile = EnsureImage(root, "ExactPlayerChip");
         profile.sprite = RuntimeUI.RoundedRectSprite;
         profile.type = Image.Type.Sliced;
@@ -212,6 +238,14 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
             SetButtonCopy(daily,
                 IsGreek ? "ΚΑΘΗΜΕΡΙΝΟ ΚΥΝΗΓΙ" : "DAILY HUNT",
                 IsGreek ? "Ένας κοινός αριθμός κάθε μέρα" : "One shared number every day");
+            if (mascotSeven != null)
+            {
+                var image = EnsureImage(daily.transform, "ExactDailyMascot");
+                image.sprite = mascotSeven;
+                image.preserveAspect = true;
+                image.raycastTarget = false;
+                Place(image.rectTransform, new Vector2(335f, 0f), new Vector2(145f, 145f));
+            }
         }
 
         var settings = FindButton("Buttonsettings");
@@ -286,6 +320,8 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
             if (name == "ExactReferenceBackdrop" || name == "ExactHOLLogo" ||
                 name == "ExactPlayerHero" || name == "ExactOpponentHero" ||
                 name == "ExactPlayerPortrait" || name == "ExactOpponentPortrait" ||
+                name == "ExactMascotSeven" || name == "ExactMascotThree" ||
+                name == "ExactDailyMascot" ||
                 name.StartsWith("Confetti") || name == "ExactPlayerChip")
                 continue;
 

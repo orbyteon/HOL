@@ -13,6 +13,8 @@ public class ExactReferenceAssetsTests
 
     [TestCase("reference/player_cyan_exact")]
     [TestCase("reference/opponent_purple_exact")]
+    [TestCase("reference/mascot_7_exact")]
+    [TestCase("reference/mascot_3_exact")]
     public void ApprovedCharacterPortraitLoadsAsSprite(string path)
     {
         Assert.IsNotNull(Resources.Load<Sprite>(path),
