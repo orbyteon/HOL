@@ -12,13 +12,19 @@ public sealed class ExactReferenceVisualsPlayModeTests
     public IEnumerator ExactVisualsSurviveSceneTransitionRefreshNonButtonUiLocalizeAndStayScoped()
     {
         var exactType = RuntimeType("ExactReferenceVisuals");
+        var boardReskinType = RuntimeType("AttachmentReskinVisuals");
 
-        // Invoke the runtime bootstrap explicitly so this regression remains
+        // Invoke both runtime bootstraps explicitly so this regression remains
         // deterministic inside the Unity Test Runner as well as in a player.
         var install = exactType.GetMethod(
             "Install", BindingFlags.Static | BindingFlags.NonPublic);
         Assert.That(install, Is.Not.Null);
         install.Invoke(null, null);
+
+        var installBoardReskin = boardReskinType.GetMethod(
+            "Install", BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.That(installBoardReskin, Is.Not.Null);
+        installBoardReskin.Invoke(null, null);
 
         yield return SceneManager.LoadSceneAsync("SplashScene", LoadSceneMode.Single);
         yield return null;
@@ -26,6 +32,9 @@ public sealed class ExactReferenceVisualsPlayModeTests
         var splashVisuals = Object.FindObjectOfType(exactType) as Component;
         Assert.That(splashVisuals, Is.Not.Null,
             "SplashScene should receive the approved visuals owner.");
+        var splashBoardReskin = Object.FindObjectOfType(boardReskinType) as Component;
+        Assert.That(splashBoardReskin, Is.Not.Null,
+            "SplashScene should receive the attachment reskin layer.");
 
         var splashLoader = Object.FindObjectOfType(RuntimeType("SplashLoader")) as Component;
         Assert.That(splashLoader, Is.Not.Null);
@@ -33,7 +42,8 @@ public sealed class ExactReferenceVisualsPlayModeTests
 
         while (SceneManager.GetActiveScene().name != "MainMenu")
             yield return null;
-        yield return null;
+        for (int i = 0; i < 6; i++)
+            yield return null;
 
         var mainMenuVisuals = Object.FindObjectOfType(exactType) as Component;
         Assert.That(mainMenuVisuals, Is.Not.Null,
@@ -42,6 +52,24 @@ public sealed class ExactReferenceVisualsPlayModeTests
         var ownedCanvas = mainMenuVisuals.GetComponent<Canvas>();
         Assert.That(ownedCanvas, Is.Not.Null,
             "The visuals owner should stay attached to its primary canvas.");
+
+        var mainMenuBoardReskin = Object.FindObjectOfType(boardReskinType) as Component;
+        Assert.That(mainMenuBoardReskin, Is.Not.Null,
+            "The attachment reskin must survive the SplashScene to MainMenu transition.");
+        Assert.That(mainMenuBoardReskin.GetComponent<Canvas>(), Is.SameAs(ownedCanvas));
+
+        Assert.That(FindByName(ownedCanvas.transform, "BoardHomeLogo"), Is.Not.Null,
+            "The existing main menu should receive the reference-board home composition.");
+        Assert.That(FindByName(ownedCanvas.transform, "BoardHomeTipCard"), Is.Not.Null);
+
+        // This is a reskin, not a feature pass. It may add images/text but it
+        // must not create new interactive buttons, Store screens or Profile
+        // screens that do not already exist in the product flow.
+        foreach (var button in ownedCanvas.GetComponentsInChildren<Button>(true))
+            Assert.That(button.name.StartsWith("Board"), Is.False,
+                "AttachmentReskinVisuals must not invent a new interactive control: " + button.name);
+        Assert.That(FindByName(ownedCanvas.transform, "BoardStorePanel"), Is.Null);
+        Assert.That(FindByName(ownedCanvas.transform, "BoardProfilePanel"), Is.Null);
 
         // Runtime additions that contain no buttons still have to trigger a pass.
         // The previous button-count heuristic missed this case completely.
@@ -120,6 +148,18 @@ public sealed class ExactReferenceVisualsPlayModeTests
         Object.Destroy(unrelated);
         Object.Destroy(activationProbe);
         Object.Destroy(cardProbe);
+    }
+
+    static Transform FindByName(Transform root, string name)
+    {
+        if (root == null) return null;
+        if (root.name == name) return root;
+        for (int i = 0; i < root.childCount; i++)
+        {
+            var found = FindByName(root.GetChild(i), name);
+            if (found != null) return found;
+        }
+        return null;
     }
 
     static string LocalizedCopy(System.Type l10nType, string key)
