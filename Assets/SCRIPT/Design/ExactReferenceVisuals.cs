@@ -173,7 +173,11 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
         unchecked
         {
             int signature = 17;
-            signature = signature * 31 + GetComponentsInChildren<Transform>(true).Length;
+            foreach (var child in GetComponentsInChildren<Transform>(true))
+            {
+                signature = signature * 31 + child.GetInstanceID();
+                signature = signature * 31 + (child.gameObject.activeSelf ? 1 : 0);
+            }
             signature = signature * 31 + GetComponentsInChildren<Image>(true).Length;
             signature = signature * 31 + GetComponentsInChildren<Button>(true).Length;
             signature = signature * 31 + GetComponentsInChildren<TMP_Text>(true).Length;
