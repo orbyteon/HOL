@@ -69,14 +69,19 @@ public sealed class AttachmentReskinPolishPlayModeTests
                 "The earlier logo decoration must not sit under the board logo.");
 
         // Open the existing PvP menu. This is the real controller flow, not a
-        // test-only or reskin-created screen.
+        // test-only or reskin-created screen. PvP owns a separate runtime Canvas,
+        // so assertions below are scoped to the controller's real menu panel.
         var pvp = Object.FindObjectOfType(RuntimeType("PvpGameController")) as Component;
         Assert.That(pvp, Is.Not.Null);
         pvp.SendMessage("OpenPvpMenu", SendMessageOptions.RequireReceiver);
         yield return new WaitForSecondsRealtime(0.35f);
 
-        Assert.That(Find(canvas.transform, "BoardCreatePlusVector"), Is.Not.Null);
-        Assert.That(Find(canvas.transform, "BoardJoinDoorVector"), Is.Not.Null);
+        var pvpMenuField = pvp.GetType().GetField("pvpMenuPanel", BindingFlags.Instance | BindingFlags.Public);
+        Assert.That(pvpMenuField, Is.Not.Null);
+        var pvpMenuPanel = pvpMenuField.GetValue(pvp) as GameObject;
+        Assert.That(pvpMenuPanel, Is.Not.Null);
+        Assert.That(Find(pvpMenuPanel.transform, "BoardCreatePlusVector"), Is.Not.Null);
+        Assert.That(Find(pvpMenuPanel.transform, "BoardJoinDoorVector"), Is.Not.Null);
 
         // Activate the existing searching panel so the reference rocket/VS
         // treatment is exercised without inventing a new pre-match state.
@@ -97,6 +102,10 @@ public sealed class AttachmentReskinPolishPlayModeTests
         foreach (var button in canvas.GetComponentsInChildren<Button>(true))
             Assert.That(button.name.StartsWith("Board"), Is.False,
                 "The reskin must not invent an interactive control: " + button.name);
+
+        foreach (var button in pvpMenuPanel.GetComponentsInChildren<Button>(true))
+            Assert.That(button.name.StartsWith("Board"), Is.False,
+                "The PvP reskin must not invent an interactive control: " + button.name);
 
         Assert.That(Find(canvas.transform, "BoardStorePanel"), Is.Null,
             "Store is reference-only and must not be added by a reskin.");
