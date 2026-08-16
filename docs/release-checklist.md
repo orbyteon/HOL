@@ -172,6 +172,13 @@ and uploads the artifact with `JARSIGNER_VERIFY.txt` plus `SHA256SUMS`.
 - [ ] bundle targets Android API 36 (`AndroidTargetSdkVersion: 36`)
 - [ ] upload key/keystore is backed up offline; it is never committed to git
 
+### Play Store visual assets
+
+- [ ] `docs/store/icon-512.png` is the exact approved square HOL icon at 512 × 512
+- [ ] `docs/store/feature-graphic-1024x500.png` is the approved promotional design adapted only to the required 1024 × 500 crop
+- [ ] Play Console listing copy describes the approved smiling logo, 7 and 3 mascots, cyan/pink rivals, confetti, and trophy treatment
+- [ ] No legacy Converging Light icon, seam, number field, or tagline remains in the active listing
+
 ## 5. Smoke-test the intended release build
 
 Use the signed candidate (or a Play internal-testing build made from that exact
@@ -211,8 +218,8 @@ the file.
 
 ### Splash
 
-- [ ] Indigo gradient background, faint drifting digits
-- [ ] Logo blooms/breathes; cyan→magenta seam + tagline
+- [ ] Deep-purple background and reference confetti match the approved artwork
+- [ ] The exact approved smiling HOL wordmark replaces the legacy seam, digit field, and tagline
 - [ ] Gold loading hairline fills; tap skips splash
 
 ### Main menu / solo
@@ -222,6 +229,9 @@ the file.
 - [ ] Choose **Yes** → ads initialize; Settings → Ads privacy can withdraw permission
 - [ ] Reopen Ads privacy after switching EN/EL → dialog follows current language
 - [ ] First launch on a Greek-language device starts in Greek
+- [ ] Main Menu shows the exact approved logo, cyan player, purple opponent, and 7 and 3 mascots
+- [ ] Settings, Solo, Searching, PvP, Daily Hunt, Consent, and Force Update retain the same approved visual system
+- [ ] English and Greek copy stays inside the same approved control geometry
 - [ ] Blank player name uses the localized default
 - [ ] Difficulty buttons highlight the active choice in gold
 - [ ] Stats label shows wins/losses/streak/best/fastest win

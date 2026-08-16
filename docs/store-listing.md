@@ -39,10 +39,10 @@ YOUR GAME, YOUR WAY
 • Stats that persist: wins, streaks, best runs
 • Daily streaks, haptics, confetti, and a design worth staring at
 
-A CONVERGING LIGHT
-HOL is wrapped in a bespoke nocturnal aesthetic — deep indigo, a single
-cyan-to-magenta seam of light, and gold reserved for the moments that
-matter.
+A NEON NUMBER PARTY
+HOL uses the approved smiling wordmark, deep-purple arcade surfaces,
+bright cyan and pink rivals, the 7 and 3 number mascots, confetti, and
+gold trophy moments throughout every screen.
 
 Fair play notes: solo opponents are simulated on-device and never send
 data anywhere. Ads appear only between matches, never during a duel.
@@ -75,10 +75,10 @@ Download HOL and trust your interval.
 • Στατιστικά που μένουν: νίκες, σερί, ρεκόρ
 • Καθημερινό σερί, δόνηση, κομφετί και σχεδιασμός που ξεχωρίζει
 
-CONVERGING LIGHT
-Το HOL τυλίγεται σε μια μοναδική νυχτερινή αισθητική — βαθύ ινδικό,
-μια γραμμή φωτός από κυανό σε ματζέντα, και χρυσό μόνο για τις στιγμές
-που μετράνε.
+ΝΕΟΝ ΠΑΡΤΙ ΑΡΙΘΜΩΝ
+Το HOL χρησιμοποιεί το εγκεκριμένο χαμογελαστό λογότυπο, βαθιές μωβ
+arcade επιφάνειες, φωτεινούς κυανούς και ροζ αντιπάλους, τις μασκότ
+7 και 3, κομφετί και χρυσές στιγμές τροπαίων σε κάθε οθόνη.
 
 Σημειώσεις δίκαιου παιχνιδιού: οι αντίπαλοι στο σόλο προσομοιώνονται
 στη συσκευή και δεν στέλνουν δεδομένα πουθενά. Οι διαφημίσεις
