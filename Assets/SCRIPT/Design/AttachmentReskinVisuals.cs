@@ -126,7 +126,25 @@ public sealed class AttachmentReskinVisuals : MonoBehaviour
                 value = value * 31 + child.GetInstanceID();
                 value = value * 31 + (child.gameObject.activeSelf ? 1 : 0);
             }
+            var pvp = FindInScene<PvpGameController>(gameObject.scene);
+            if (pvp != null)
+            {
+                value = PanelSignature(value, pvp.pvpMenuPanel);
+                value = PanelSignature(value, pvp.createPanel);
+                value = PanelSignature(value, pvp.joinPanel);
+                value = PanelSignature(value, pvp.matchPanel);
+            }
             return value;
+        }
+    }
+
+    static int PanelSignature(int value, GameObject panel)
+    {
+        unchecked
+        {
+            if (panel == null) return value * 31;
+            value = value * 31 + panel.GetInstanceID();
+            return value * 31 + (panel.activeInHierarchy ? 1 : 0);
         }
     }
 
