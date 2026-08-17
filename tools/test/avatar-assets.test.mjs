@@ -88,6 +88,10 @@ test("main menu sprite contract", () => {
   assertSprite("Assets/newdesign/Resources/mainmenu/player_cyan_exact.png", 1037, 970);
 });
 
+test("human avatars 01-10", () => {
+  assertAvatarRange("humans", "avatar_human", 1, 10);
+});
+
 test("every Unity GUID is unique", () => {
   const seen = new Map();
   for (const path of walk(file("Assets").pathname).filter((name) => name.endsWith(".meta"))) {
