@@ -193,21 +193,22 @@ public sealed class MainMenuAuthoritativeVisualsPlayModeTests
             Assert.That(primaryGloss.offsetMax, Is.EqualTo(Vector2.zero));
             Assert.That(primaryGloss.GetComponent<Image>().raycastTarget, Is.False);
 
+            RectTransform playRect = (RectTransform)playButton.transform;
             RectTransform privateRect = (RectTransform)styledButtons[2].transform;
             RectTransform dailyRect = (RectTransform)styledButtons[3].transform;
-            RectTransform secondaryGloss = RequiredRect(safeArea, "HomeSecondaryGlossRow");
-            Assert.That(secondaryGloss.sizeDelta, Is.EqualTo(new Vector2(1000f, 320f)));
-            Assert.That(secondaryGloss.GetComponent<Image>().raycastTarget, Is.False);
-            Assert.That(privateRect.sizeDelta, Is.EqualTo(new Vector2(450f, 165f)));
-            Assert.That(dailyRect.sizeDelta, Is.EqualTo(new Vector2(450f, 165f)));
-            Assert.That(privateRect.anchoredPosition.y,
-                Is.EqualTo(secondaryGloss.anchoredPosition.y).Within(0.01f));
-            Assert.That(dailyRect.anchoredPosition.y,
-                Is.EqualTo(secondaryGloss.anchoredPosition.y).Within(0.01f));
-            Assert.That(privateRect.anchoredPosition.x,
-                Is.EqualTo(secondaryGloss.anchoredPosition.x - 245f).Within(0.01f));
-            Assert.That(dailyRect.anchoredPosition.x,
-                Is.EqualTo(secondaryGloss.anchoredPosition.x + 245f).Within(0.01f));
+            Vector2 stackedCta = new Vector2(900f, 156f);
+            Assert.That(playRect.sizeDelta, Is.EqualTo(stackedCta));
+            Assert.That(privateRect.sizeDelta, Is.EqualTo(stackedCta));
+            Assert.That(dailyRect.sizeDelta, Is.EqualTo(stackedCta));
+            Assert.That(playRect.anchoredPosition, Is.EqualTo(new Vector2(0f, 90f)));
+            Assert.That(privateRect.anchoredPosition, Is.EqualTo(new Vector2(0f, -90f)));
+            Assert.That(dailyRect.anchoredPosition, Is.EqualTo(new Vector2(0f, -270f)));
+            AssertStackedCtaCopy(playButton.transform, "HomeSolo");
+            AssertStackedCtaCopy(styledButtons[2].transform, "HomePrivate");
+            AssertStackedCtaCopy(styledButtons[3].transform, "HomeDaily");
+            AssertHiddenIfPresent(safeArea, "HomeSecondaryGlossRow");
+            AssertHiddenIfPresent(safeArea, "HomeSecondaryGlow");
+            Assert.That(Find(safeArea, "HomeTipMascot"), Is.Not.Null);
 
             AssertLocalizedHome(safeArea, l10nType);
             setLanguage.Invoke(null, new[] { greek });
@@ -282,8 +283,7 @@ public sealed class MainMenuAuthoritativeVisualsPlayModeTests
                       " MainCanvas=" + mainCanvas.GetInstanceID() +
                       " PvPCanvas=" + pvpCanvas.GetInstanceID() +
                       " ConsentCanvas=" + consentCanvas.GetInstanceID());
-            Debug.Log("[MainMenu checkpoint] GLOSS primaryParent=" + playButton.GetInstanceID() +
-                      " secondary=(1000x320 @ 0,-150; arcs @ -245,+245)");
+            Debug.Log("[MainMenu checkpoint] STACKED CTAs 900x156 @ 90,-90,-270 magenta Daily");
         }
         finally
         {
@@ -356,8 +356,39 @@ public sealed class MainMenuAuthoritativeVisualsPlayModeTests
 
         AssertButtonSprite(safeArea, "ButtonPlay", "mainmenu_cta_gold_9s");
         AssertButtonSprite(safeArea, "ButtonPvP", "mainmenu_cta_blue_9s");
-        AssertButtonSprite(safeArea, "DailyHuntButton", "mainmenu_daily_hunt_frame_9s");
+        AssertButtonSprite(safeArea, "DailyHuntButton", "mainmenu_cta_magenta_9s");
         AssertButtonSprite(safeArea, "Buttonsettings", "mainmenu_gear_glossy");
+    }
+
+    static void AssertStackedCtaCopy(Transform button, string prefix)
+    {
+        var tmpType = System.Type.GetType("TMPro.TMP_Text, Unity.TextMeshPro");
+        Assert.That(tmpType, Is.Not.Null);
+
+        var title = Find(button, prefix + "Title");
+        var subtitle = Find(button, prefix + "Subtitle");
+        var chevron = Find(button, prefix + "Chevron");
+        Assert.That(title, Is.Not.Null, prefix + "Title missing on stacked CTA.");
+        Assert.That(subtitle, Is.Not.Null, prefix + "Subtitle missing on stacked CTA.");
+        Assert.That(chevron, Is.Not.Null, prefix + "Chevron missing on stacked CTA.");
+
+        object titleAlign = title.GetComponent(tmpType).GetType()
+            .GetProperty("alignment").GetValue(title.GetComponent(tmpType), null);
+        object subtitleAlign = subtitle.GetComponent(tmpType).GetType()
+            .GetProperty("alignment").GetValue(subtitle.GetComponent(tmpType), null);
+        Assert.That(titleAlign.ToString(), Does.Contain("Left"));
+        Assert.That(subtitleAlign.ToString(), Does.Contain("Left"));
+        Assert.That(TextValue(chevron.GetComponent(tmpType)), Is.EqualTo("›"));
+        Assert.That(chevron.GetComponent(tmpType).GetType()
+            .GetProperty("raycastTarget").GetValue(chevron.GetComponent(tmpType), null),
+            Is.False);
+    }
+
+    static void AssertHiddenIfPresent(Transform root, string name)
+    {
+        Transform found = Find(root, name);
+        if (found != null)
+            Assert.That(found.gameObject.activeSelf, Is.False, name + " must stay hidden on stacked Home.");
     }
 
     static void AssertButtonSprite(Transform root, string buttonName, string resourceName)
@@ -403,10 +434,10 @@ public sealed class MainMenuAuthoritativeVisualsPlayModeTests
             { "HomeSoloSubtitle", LocalizedCopy(l10nType, "mainmenu_play_subtitle") },
             { "HomePrivateTitle", LocalizedCopy(l10nType, "mainmenu_private_title") },
             { "HomePrivateSubtitle", LocalizedCopy(l10nType, "mainmenu_private_subtitle") },
-            { "HomeDailyTitle", LocalizedCopy(l10nType, "daily_hunt").ToUpperInvariant() },
+            { "HomeDailyTitle", LocalizedCopy(l10nType, "mainmenu_daily_title") },
             { "HomeDailySubtitle", LocalizedCopy(l10nType, "mainmenu_daily_subtitle") },
-            { "HomeTipTitle", LocalizedCopy(l10nType, "hud_tip").ToUpperInvariant() },
-            { "HomeTipBody", LocalizedCopy(l10nType, "simulated_opponents") }
+            { "HomeTipTitle", LocalizedCopy(l10nType, "hud_tip").ToUpperInvariant() + ":" },
+            { "HomeTipBody", LocalizedCopy(l10nType, "mainmenu_tip_body") }
         };
 
         var tmpType = System.Type.GetType("TMPro.TMP_Text, Unity.TextMeshPro");
@@ -414,8 +445,9 @@ public sealed class MainMenuAuthoritativeVisualsPlayModeTests
         foreach (var component in safeArea.GetComponentsInChildren(tmpType, true))
         {
             var text = component as Component;
-            if (text != null && text.gameObject.activeInHierarchy)
-                liveTexts.Add(text);
+            if (text == null || !text.gameObject.activeInHierarchy) continue;
+            if (text.name.EndsWith("Chevron")) continue;
+            liveTexts.Add(text);
         }
 
         Assert.That(liveTexts, Has.Count.EqualTo(expected.Count + 1),
@@ -438,7 +470,7 @@ public sealed class MainMenuAuthoritativeVisualsPlayModeTests
         Debug.Log("[MainMenu checkpoint] L10N " +
                   LocalizedCopy(l10nType, "mainmenu_play_title") + " | " +
                   LocalizedCopy(l10nType, "mainmenu_private_title") + " | " +
-                  LocalizedCopy(l10nType, "daily_hunt"));
+                  LocalizedCopy(l10nType, "mainmenu_daily_title"));
     }
 
     static string TextValue(Component component)

@@ -37,7 +37,7 @@ public sealed class MainMenuAuthoritativeVisuals : MonoBehaviour
     Sprite tipFrame;
     Sprite ctaGold;
     Sprite ctaBlue;
-    Sprite dailyFrame;
+    Sprite ctaMagenta;
     Sprite gear;
     Sprite soloIcon;
     Sprite privateIcon;
@@ -45,9 +45,7 @@ public sealed class MainMenuAuthoritativeVisuals : MonoBehaviour
     Sprite tipIcon;
     Sprite streakIcon;
     Sprite primaryGlow;
-    Sprite secondaryGlow;
     Sprite primaryGloss;
-    Sprite secondaryGloss;
 
     public bool IsReady { get; private set; }
 
@@ -232,28 +230,23 @@ public sealed class MainMenuAuthoritativeVisuals : MonoBehaviour
         AddImage("HomeLogoGlow", logoGlow,
             new Vector2(0f, 650f), new Vector2(800f, 450f), true);
         AddImage("HomePrimaryGlow", primaryGlow,
-            new Vector2(0f, 80f), new Vector2(780f, 330f), true);
-        AddImage("HomeSecondaryGlow", secondaryGlow,
-            new Vector2(0f, -150f), new Vector2(1000f, 320f), true);
+            new Vector2(0f, -90f), new Vector2(1000f, 560f), true);
 
         AddImage("HomePlayerHero", playerHero,
-            new Vector2(-155f, 390f), new Vector2(300f, 300f), true);
+            new Vector2(-155f, 400f), new Vector2(300f, 300f), true);
         AddImage("HomeOpponentHero", opponentHero,
-            new Vector2(155f, 390f), new Vector2(300f, 300f), true);
+            new Vector2(155f, 400f), new Vector2(300f, 300f), true);
         AddImage("HomeMascotSeven", mascotSeven,
-            new Vector2(-405f, 260f), new Vector2(210f, 280f), true);
+            new Vector2(-405f, 280f), new Vector2(210f, 280f), true);
         AddImage("HomeMascotThree", mascotThree,
-            new Vector2(405f, 260f), new Vector2(210f, 280f), true);
+            new Vector2(405f, 280f), new Vector2(210f, 280f), true);
         AddImage("HomeLogo", logo,
             new Vector2(0f, 650f), new Vector2(610f, 320f), true);
 
         BuildPlayerChip();
         BuildTipPanel();
-
-        var gloss = AddImage("HomeSecondaryGlossRow", secondaryGloss,
-            new Vector2(0f, -150f), new Vector2(1000f, 320f), false);
-        if (gloss != null)
-            gloss.transform.SetAsLastSibling();
+        HideNamed(safeAreaRoot, "HomeSecondaryGlow");
+        HideNamed(safeAreaRoot, "HomeSecondaryGlossRow");
     }
 
     void BuildPlayerChip()
@@ -275,7 +268,7 @@ public sealed class MainMenuAuthoritativeVisuals : MonoBehaviour
     void BuildTipPanel()
     {
         var tip = AddImage("HomeTipFrame", tipFrame,
-            new Vector2(0f, -430f), new Vector2(930f, 260f), false);
+            new Vector2(0f, -560f), new Vector2(930f, 240f), false);
         if (tip == null) return;
         tip.type = Image.Type.Sliced;
 
@@ -289,9 +282,12 @@ public sealed class MainMenuAuthoritativeVisuals : MonoBehaviour
         ConfigureText(title, 20f);
 
         var body = EnsureText(tip.transform, "HomeTipBody", 25f, NearWhite);
-        Place(body.rectTransform, new Vector2(-20f, -34f), new Vector2(710f, 125f));
+        Place(body.rectTransform, new Vector2(-95f, -34f), new Vector2(560f, 125f));
         body.alignment = TextAlignmentOptions.Left;
         ConfigureText(body, 16f);
+
+        AddImage(tip.transform, "HomeTipMascot", mascotSeven,
+            new Vector2(340f, -8f), new Vector2(180f, 220f), true);
     }
 
     bool BindExistingButtons()
@@ -307,14 +303,15 @@ public sealed class MainMenuAuthoritativeVisuals : MonoBehaviour
 
         // SetParent is the only ownership change. Button and ButtonClickedEvent
         // instances remain untouched.
-        Reparent(play, new Vector2(0f, 80f), new Vector2(600f, 185f));
+        Vector2 stacked = new Vector2(900f, 156f);
+        Reparent(play, new Vector2(0f, 90f), stacked);
         Reparent(settings, new Vector2(-455f, 820f), new Vector2(82f, 82f));
-        Reparent(privateRoom, new Vector2(-245f, -150f), new Vector2(450f, 165f));
-        Reparent(daily, new Vector2(245f, -150f), new Vector2(450f, 165f));
+        Reparent(privateRoom, new Vector2(0f, -90f), stacked);
+        Reparent(daily, new Vector2(0f, -270f), stacked);
 
         StyleButtonImage(play, ctaGold, Image.Type.Sliced);
         StyleButtonImage(privateRoom, ctaBlue, Image.Type.Sliced);
-        StyleButtonImage(daily, dailyFrame, Image.Type.Sliced);
+        StyleButtonImage(daily, ctaMagenta, Image.Type.Sliced);
         StyleButtonImage(settings, gear, Image.Type.Simple);
         var settingsGraphic = settings.GetComponent<Image>();
         if (settingsGraphic != null)
@@ -325,12 +322,12 @@ public sealed class MainMenuAuthoritativeVisuals : MonoBehaviour
         HideLegacyButtonCopy(daily);
         HideLegacyButtonCopy(settings);
 
-        BuildButtonCopy(play, "HomeSoloTitle", "HomeSoloSubtitle", soloIcon,
-            44f, 24f, Ink, new Vector2(-222f, 0f), new Vector2(82f, 82f));
-        BuildButtonCopy(privateRoom, "HomePrivateTitle", "HomePrivateSubtitle", privateIcon,
-            30f, 21f, NearWhite, new Vector2(-170f, 0f), new Vector2(78f, 78f));
-        BuildButtonCopy(daily, "HomeDailyTitle", "HomeDailySubtitle", dailyIcon,
-            29f, 21f, NearWhite, new Vector2(-170f, 0f), new Vector2(78f, 78f));
+        BuildStackedCtaCopy(play, "HomeSoloTitle", "HomeSoloSubtitle", "HomeSoloChevron",
+            soloIcon, 40f, 22f, Ink);
+        BuildStackedCtaCopy(privateRoom, "HomePrivateTitle", "HomePrivateSubtitle",
+            "HomePrivateChevron", privateIcon, 32f, 20f, NearWhite);
+        BuildStackedCtaCopy(daily, "HomeDailyTitle", "HomeDailySubtitle", "HomeDailyChevron",
+            dailyIcon, 32f, 20f, NearWhite);
 
         var settingsIcon = AddImage(settings.transform, "HomeSettingsIcon", gear,
             Vector2.zero, new Vector2(82f, 82f), true);
@@ -344,10 +341,6 @@ public sealed class MainMenuAuthoritativeVisuals : MonoBehaviour
             Stretch(primary.rectTransform);
             primary.transform.SetAsFirstSibling();
         }
-
-        var secondary = DirectChild(safeAreaRoot, "HomeSecondaryGlossRow");
-        if (secondary != null)
-            secondary.SetAsLastSibling();
 
         ApplyLocalization();
         return ButtonsAreFinal(play, settings, privateRoom, daily);
@@ -376,28 +369,36 @@ public sealed class MainMenuAuthoritativeVisuals : MonoBehaviour
         button.targetGraphic = image;
     }
 
-    void BuildButtonCopy(Button button, string titleName, string subtitleName, Sprite icon,
-        float titleSize, float subtitleSize, Color color, Vector2 iconPosition, Vector2 iconSize)
+    void BuildStackedCtaCopy(Button button, string titleName, string subtitleName,
+        string chevronName, Sprite icon, float titleSize, float subtitleSize, Color color)
     {
         string iconName = titleName.EndsWith("Title")
             ? titleName.Substring(0, titleName.Length - "Title".Length) + "Icon"
             : titleName + "Icon";
         AddImage(button.transform, iconName, icon,
-            iconPosition, iconSize, true);
+            new Vector2(-360f, 0f), new Vector2(82f, 82f), true);
 
         var title = EnsureText(button.transform, titleName, titleSize, color);
-        Place(title.rectTransform, new Vector2(38f, 25f),
-            new Vector2(((RectTransform)button.transform).sizeDelta.x - 150f, 64f));
+        Place(title.rectTransform, new Vector2(-40f, 24f), new Vector2(520f, 56f));
         title.fontStyle = FontStyles.Bold;
-        title.alignment = TextAlignmentOptions.Center;
+        title.alignment = TextAlignmentOptions.Left;
         ConfigureText(title, 18f);
 
         var subtitle = EnsureText(button.transform, subtitleName, subtitleSize, color);
-        Place(subtitle.rectTransform, new Vector2(38f, -38f),
-            new Vector2(((RectTransform)button.transform).sizeDelta.x - 150f, 44f));
+        Place(subtitle.rectTransform, new Vector2(-40f, -28f), new Vector2(520f, 48f));
         subtitle.fontStyle = FontStyles.Bold;
-        subtitle.alignment = TextAlignmentOptions.Center;
+        subtitle.alignment = TextAlignmentOptions.Left;
         ConfigureText(subtitle, 14f);
+
+        var chevron = EnsureText(button.transform, chevronName, 72f, NearWhite);
+        Place(chevron.rectTransform, new Vector2(390f, 0f), new Vector2(64f, 110f));
+        chevron.text = "›";
+        chevron.fontStyle = FontStyles.Bold;
+        chevron.alignment = TextAlignmentOptions.Center;
+        chevron.enableAutoSizing = false;
+        chevron.enableWordWrapping = false;
+        chevron.overflowMode = TextOverflowModes.Overflow;
+        chevron.raycastTarget = false;
     }
 
     static void HideLegacyButtonCopy(Button button)
@@ -417,7 +418,7 @@ public sealed class MainMenuAuthoritativeVisuals : MonoBehaviour
         return IsFinalButton(play, ctaGold) &&
                IsFinalButton(settings, gear) &&
                IsFinalButton(privateRoom, ctaBlue) &&
-               IsFinalButton(daily, dailyFrame) &&
+               IsFinalButton(daily, ctaMagenta) &&
                Find(safeAreaRoot, "HomeSoloTitle") != null &&
                Find(safeAreaRoot, "HomePrivateTitle") != null &&
                Find(safeAreaRoot, "HomeDailyTitle") != null;
@@ -438,10 +439,10 @@ public sealed class MainMenuAuthoritativeVisuals : MonoBehaviour
         SetText("HomeSoloSubtitle", L10n.Get("mainmenu_play_subtitle"));
         SetText("HomePrivateTitle", L10n.Get("mainmenu_private_title"));
         SetText("HomePrivateSubtitle", L10n.Get("mainmenu_private_subtitle"));
-        SetText("HomeDailyTitle", L10n.Get("daily_hunt").ToUpperInvariant());
+        SetText("HomeDailyTitle", L10n.Get("mainmenu_daily_title"));
         SetText("HomeDailySubtitle", L10n.Get("mainmenu_daily_subtitle"));
-        SetText("HomeTipTitle", L10n.Get("hud_tip").ToUpperInvariant());
-        SetText("HomeTipBody", L10n.Get("simulated_opponents"));
+        SetText("HomeTipTitle", L10n.Get("hud_tip").ToUpperInvariant() + ":");
+        SetText("HomeTipBody", L10n.Get("mainmenu_tip_body"));
 
         string playerName = PlayerPrefs.GetString("PlayerName", "");
         if (string.IsNullOrWhiteSpace(playerName))
@@ -515,7 +516,7 @@ public sealed class MainMenuAuthoritativeVisuals : MonoBehaviour
         tipFrame = Load("mainmenu_tip_frame_9s");
         ctaGold = Load("mainmenu_cta_gold_9s");
         ctaBlue = Load("mainmenu_cta_blue_9s");
-        dailyFrame = Load("mainmenu_daily_hunt_frame_9s");
+        ctaMagenta = Load("mainmenu_cta_magenta_9s");
         gear = Load("mainmenu_gear_glossy");
         soloIcon = Load("mainmenu_icon_solo");
         privateIcon = Load("mainmenu_icon_private_room");
@@ -523,9 +524,7 @@ public sealed class MainMenuAuthoritativeVisuals : MonoBehaviour
         tipIcon = Load("mainmenu_icon_tip_bulb");
         streakIcon = Load("mainmenu_icon_streak");
         primaryGlow = Load("mainmenu_glow_primary");
-        secondaryGlow = Load("mainmenu_glow_secondary_row");
         primaryGloss = Load("mainmenu_gloss_primary_row");
-        secondaryGloss = Load("mainmenu_gloss_secondary_row");
     }
 
     static Sprite Load(string name)

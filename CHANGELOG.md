@@ -19,8 +19,12 @@ Play Console versionName in `ProjectSettings.asset`.
   existing `/Canvas`. The serialized `BACKROUND` object becomes `MainMenuRoot`
   with one `SafeAreaRoot`; the four real Home buttons are reparented, not
   replaced; production art loads only from `Resources/mainmenu/`; copy stays
-  live TMP through `L10n` in EN and EL. Private Room remains create/join.
-  Dormant 1V1 assets stay unwired.
+  live TMP through `L10n` in EN and EL. Home uses three stacked full-width
+  CTAs (Solo / Private Room / Daily Hunt) with left-aligned copy and
+  chevrons; Daily Hunt uses the magenta 9-slice; the tip is the bigger-
+  numbers line, not the AI-disclosure sentence. Private Room remains
+  create/join. Dormant 1V1 assets stay unwired. The player chip still
+  shows the real streak, not a mock trophy count.
 
 ### Fixed
 

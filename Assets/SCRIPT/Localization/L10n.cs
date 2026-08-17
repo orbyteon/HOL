@@ -61,7 +61,9 @@ public static class L10n
         { "mainmenu_play_subtitle",   new[] { "FIND CHALLENGER", "ΒΡΕΣ ΑΝΤΙΠΑΛΟ" } },
         { "mainmenu_private_title",   new[] { "PRIVATE ROOM", "ΙΔΙΩΤΙΚΟ ΔΩΜΑΤΙΟ" } },
         { "mainmenu_private_subtitle",new[] { "PLAY WITH FRIEND", "ΠΑΙΞΕ ΜΕ ΦΙΛΟ" } },
-        { "mainmenu_daily_subtitle",  new[] { "SPECIAL EVENT", "ΕΙΔΙΚΗ ΑΠΟΣΤΟΛΗ" } },
+        { "mainmenu_daily_title",     new[] { "DAILY HUNT", "ΚΥΝΗΓΙ ΗΜΕΡΑΣ" } },
+        { "mainmenu_daily_subtitle",  new[] { "SPECIAL EVENT", "ΕΙΔΙΚΟ EVENT" } },
+        { "mainmenu_tip_body",        new[] { "Bigger numbers are always better!", "Οι μεγαλύτεροι αριθμοί είναι πάντα καλύτεροι!" } },
 
         // matchmaking
         { "find_challenger",         new[] { "Find challenger", "Βρες αντίπαλο" } },
