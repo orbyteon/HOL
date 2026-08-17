@@ -46,6 +46,16 @@ function assertAvatarRange(directory, prefix, first, last) {
   }
 }
 
+function avatarRoster(directory, idPrefix, resourcePrefix, first, last) {
+  return Array.from({ length: last - first + 1 }, (_, offset) => {
+    const suffix = String(first + offset).padStart(2, "0");
+    return {
+      id: `${idPrefix}_${suffix}`,
+      resource: `avatars/${directory}/${resourcePrefix}_${suffix}`,
+    };
+  });
+}
+
 function walk(directory) {
   return readdirSync(directory).flatMap((name) => {
     const path = join(directory, name);
@@ -110,6 +120,36 @@ test("group avatars 01-08", () => {
 
 test("number avatars 0-9", () => {
   assertAvatarRange("numbers", "avatar_number", 0, 9);
+});
+
+test("avatar manifest contract", () => {
+  const manifest = JSON.parse(readFileSync(
+    file("Assets/newdesign/Resources/avatars/manifest.json"),
+    "utf8"));
+  const expected = {
+    humans: avatarRoster("humans", "human", "avatar_human", 1, 40),
+    groups: avatarRoster("groups", "group", "avatar_group", 1, 8),
+    numbers: avatarRoster("numbers", "number", "avatar_number", 0, 9),
+  };
+
+  assert.deepEqual(Object.keys(manifest), ["humans", "groups", "numbers"]);
+  assert.equal(manifest.humans.length, 40);
+  assert.equal(manifest.groups.length, 8);
+  assert.equal(manifest.numbers.length, 10);
+
+  const entries = [...manifest.humans, ...manifest.groups, ...manifest.numbers];
+  assert.equal(new Set(entries.map((entry) => entry.id)).size, entries.length,
+    "manifest IDs must be unique");
+  assert.equal(new Set(entries.map((entry) => entry.resource)).size, entries.length,
+    "manifest resource paths must be unique");
+
+  for (const [category, expectedEntries] of Object.entries(expected)) {
+    assert.deepEqual(manifest[category], expectedEntries);
+    for (const entry of manifest[category]) {
+      const png = `Assets/newdesign/Resources/${entry.resource}.png`;
+      pngHeader(png);
+    }
+  }
 });
 
 test("every Unity GUID is unique", () => {
