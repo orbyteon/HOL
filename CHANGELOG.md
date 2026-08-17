@@ -54,6 +54,9 @@ Play Console versionName in `ProjectSettings.asset`.
   mobile-scale icons. Approved logo and character art remains byte-identical
   to its reference source, and a Node integrity harness now locks sprite
   dimensions, alpha format, import borders, and repository-wide GUID uniqueness.
+  The completed gate includes a dormant 1V1 icon without inventing an online
+  callback, and keeps the TIP frame's decorative caps inside fixed 9-slice
+  regions.
 - The privacy policy's contact address is now `support@orbyteon.com` —
   a role mailbox owned by the publisher instead of a personal one. Both
   committed copies (the canonical `docs/privacy.html` and the byte-identical
