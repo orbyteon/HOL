@@ -71,6 +71,11 @@ public sealed class SplashAuthoritativeVisualsPlayModeTests
         var progressTrack = DirectChild(safeRoot, "SplashProgressTrack");
         Assert.That(progressTrack, Is.Not.Null);
         AssertDirectChildren(progressTrack, "SplashProgressFill");
+        var progressFill = DirectChild(progressTrack, "SplashProgressFill").GetComponent<Image>();
+        Assert.That(progressFill, Is.Not.Null);
+        Assert.That(progressFill.sprite, Is.Not.Null,
+            "A filled Image needs a sprite for fillAmount to affect its mesh.");
+        Assert.That(progressFill.type, Is.EqualTo(Image.Type.Filled));
 
         var expectedLayout = new[]
         {
