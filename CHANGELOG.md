@@ -28,6 +28,12 @@ Play Console versionName in `ProjectSettings.asset`.
 
 ### Added
 
+- A production-ready, text-free Main Menu layer pack and canonical 58-avatar
+  resource roster: 40 individual people, eight groups, and number mascots 0–9.
+  Every avatar is a transparent 1024×1024 Sprite with a stable manifest ID and
+  `Resources.Load` path; Unity and Node integrity tests lock the roster and
+  import contract. This is an asset-only addition with no profile, Settings,
+  persistence, network, selection-UI, or runtime-wiring changes.
 - **Daily Hunt** — the parked product-pass draft's one unshipped idea (#6),
   ported onto the Consumer First board. One date-seeded secret number
   shared by every player per UTC day, seven guesses, an emoji-trail result
