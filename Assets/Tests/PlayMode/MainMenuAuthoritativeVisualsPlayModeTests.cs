@@ -38,7 +38,6 @@ public sealed class MainMenuAuthoritativeVisualsPlayModeTests
         InvokeInstaller(reskinType);
         InvokeInstaller(polishType);
         InvokeInstaller(bindingsType);
-        UnsubscribeSceneLoaded(ownerType);
 
         var languageType = l10nType.GetNestedType("Language", BindingFlags.Public);
         var currentLanguage = l10nType.GetProperty("Current", BindingFlags.Static | BindingFlags.Public);
@@ -49,11 +48,10 @@ public sealed class MainMenuAuthoritativeVisualsPlayModeTests
         object originalLanguage = currentLanguage.GetValue(null, null);
         object english = System.Enum.Parse(languageType, "English");
         object greek = System.Enum.Parse(languageType, "Greek");
-
-        bool hadPlayerName = PlayerPrefs.HasKey("PlayerName");
-        string originalPlayerName = PlayerPrefs.GetString("PlayerName", "");
+        var prefs = SnapshotPlayerPrefs();
         try
         {
+            UnsubscribeSceneLoaded(ownerType);
             PlayerPrefs.SetString("PlayerName", "");
             setLanguage.Invoke(null, new[] { english });
 
@@ -290,11 +288,7 @@ public sealed class MainMenuAuthoritativeVisualsPlayModeTests
         finally
         {
             setLanguage.Invoke(null, new[] { originalLanguage });
-            if (hadPlayerName)
-                PlayerPrefs.SetString("PlayerName", originalPlayerName);
-            else
-                PlayerPrefs.DeleteKey("PlayerName");
-            PlayerPrefs.Save();
+            RestorePlayerPrefs(prefs);
             InvokeInstaller(ownerType);
         }
     }
@@ -570,6 +564,77 @@ public sealed class MainMenuAuthoritativeVisualsPlayModeTests
             if (found != null) return found;
         }
         return null;
+    }
+
+    static readonly string[] SnapshotIntKeys =
+    {
+        "DailyHuntDay",
+        "DailyHuntUsed",
+        "DailyHuntDone",
+        "DailyHuntFound",
+        "DailyHuntRevived",
+        "DailyHuntMin",
+        "DailyHuntMax",
+        "DailyHuntStreak",
+        "DailyHuntLastFound",
+        "DailyHuntPendingRevive",
+        "PendingRewardEarned"
+    };
+
+    static readonly string[] SnapshotStringKeys =
+    {
+        "PlayerName",
+        "DailyHuntTrail"
+    };
+
+    struct PrefSnapshot
+    {
+        public bool had;
+        public bool isString;
+        public string key;
+        public string stringValue;
+        public int intValue;
+    }
+
+    static PrefSnapshot[] SnapshotPlayerPrefs()
+    {
+        var snapshots = new PrefSnapshot[SnapshotIntKeys.Length + SnapshotStringKeys.Length];
+        int index = 0;
+        foreach (string key in SnapshotIntKeys)
+        {
+            snapshots[index++] = new PrefSnapshot
+            {
+                key = key,
+                had = PlayerPrefs.HasKey(key),
+                isString = false,
+                intValue = PlayerPrefs.GetInt(key, 0)
+            };
+        }
+        foreach (string key in SnapshotStringKeys)
+        {
+            snapshots[index++] = new PrefSnapshot
+            {
+                key = key,
+                had = PlayerPrefs.HasKey(key),
+                isString = true,
+                stringValue = PlayerPrefs.GetString(key, "")
+            };
+        }
+        return snapshots;
+    }
+
+    static void RestorePlayerPrefs(PrefSnapshot[] snapshots)
+    {
+        foreach (var snapshot in snapshots)
+        {
+            if (!snapshot.had)
+                PlayerPrefs.DeleteKey(snapshot.key);
+            else if (snapshot.isString)
+                PlayerPrefs.SetString(snapshot.key, snapshot.stringValue);
+            else
+                PlayerPrefs.SetInt(snapshot.key, snapshot.intValue);
+        }
+        PlayerPrefs.Save();
     }
 
     static void InvokeInstaller(System.Type type)
