@@ -128,8 +128,9 @@ public sealed class SplashDesign : MonoBehaviour
         Place(track.rectTransform, new Vector2(0f, -770f), new Vector2(480f, 8f));
 
         progressFill = EnsureImage(track.transform, "SplashProgressFill");
-        ConfigureImage(progressFill, null, false);
-        progressFill.color = new Color(1f, 0.78f, 0.34f, 1f);
+        var gold = new Color(1f, 0.78f, 0.34f, 1f);
+        ConfigureImage(progressFill, ConvergingLight.VerticalGradient(gold, gold, 4), false);
+        progressFill.color = Color.white;
         progressFill.type = Image.Type.Filled;
         progressFill.fillMethod = Image.FillMethod.Horizontal;
         progressFill.fillOrigin = 0;
