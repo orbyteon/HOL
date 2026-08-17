@@ -1,0 +1,32 @@
+using NUnit.Framework;
+using UnityEngine;
+
+public sealed class SplashProductionAssetsTests
+{
+    [TestCase("reference/hol_logo_exact")]
+    [TestCase("reference/mascot_6_exact")]
+    [TestCase("reference/mascot_7_exact")]
+    [TestCase("splash/splash_bg_neon_arcade")]
+    [TestCase("splash/splash_logo_glow")]
+    public void SplashSpriteLoads(string path)
+    {
+        Assert.That(Resources.Load<Sprite>(path), Is.Not.Null,
+            "Missing Resources/" + path);
+    }
+
+    [Test]
+    public void BackgroundIsNativePortraitResolution()
+    {
+        Sprite sprite = Resources.Load<Sprite>("splash/splash_bg_neon_arcade");
+        Assert.That(sprite.texture.width, Is.EqualTo(1080));
+        Assert.That(sprite.texture.height, Is.EqualTo(1920));
+    }
+
+    [Test]
+    public void MascotSixIsSquareReferenceArt()
+    {
+        Sprite sprite = Resources.Load<Sprite>("reference/mascot_6_exact");
+        Assert.That(sprite.texture.width, Is.EqualTo(1024));
+        Assert.That(sprite.texture.height, Is.EqualTo(1024));
+    }
+}
