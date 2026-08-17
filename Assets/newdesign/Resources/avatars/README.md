@@ -6,7 +6,8 @@ Sprite. Resource paths below omit the file extension, as required by
 `Resources.Load`.
 
 `manifest.json` is the canonical machine-readable roster. IDs and resource
-paths are stable contracts for future consumers.
+paths are stable contracts for future consumers. Runtime consumers load it as
+`Resources.Load<TextAsset>("avatars/manifest")`.
 
 ## Human avatars
 
