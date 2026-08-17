@@ -75,33 +75,12 @@ public sealed class MainMenuCapturePlayModeTests
     public IEnumerator ReadyMarkerWaitsForReadyOwnedHomeAndUsesExactLanguage()
     {
         var ownerType = RuntimeType("MainMenuAuthoritativeVisuals");
-        yield return SceneManager.LoadSceneAsync("MainMenu", LoadSceneMode.Single);
-
-        Component owner = null;
         PropertyInfo isReady = ownerType.GetProperty("IsReady",
             BindingFlags.Instance | BindingFlags.Public);
         PropertyInfo ownsHome = ownerType.GetProperty("OwnsHome",
             BindingFlags.Instance | BindingFlags.Public);
         Assert.That(isReady, Is.Not.Null);
         Assert.That(ownsHome, Is.Not.Null);
-
-        for (int frame = 0; frame < 30; frame++)
-        {
-            owner = FindComponent(ownerType);
-            if (owner != null && (bool)isReady.GetValue(owner, null))
-                break;
-            yield return null;
-        }
-
-        Assert.That(owner, Is.Not.Null);
-        Assert.That((bool)isReady.GetValue(owner, null), Is.True);
-        Assert.That((bool)ownsHome.GetValue(owner, null), Is.True);
-
-        var rootField = ownerType.GetField("mainMenuRoot",
-            BindingFlags.Instance | BindingFlags.NonPublic);
-        Assert.That(rootField, Is.Not.Null);
-        var home = rootField.GetValue(owner) as RectTransform;
-        Assert.That(home, Is.Not.Null);
 
         var wait = CaptureType().GetMethod("WaitForReady",
             BindingFlags.Static | BindingFlags.NonPublic);
@@ -117,15 +96,48 @@ public sealed class MainMenuCapturePlayModeTests
                 markerCount++;
         };
 
-        home.gameObject.SetActive(false);
+        GameObject unreadyObject = new GameObject("UnreadyMainMenuOwner");
+        var unreadyOwner = unreadyObject.AddComponent(ownerType) as Component;
+        Assert.That(unreadyOwner, Is.Not.Null);
+        Assert.That((bool)isReady.GetValue(unreadyOwner, null), Is.False);
+
+        RectTransform home = null;
         Application.logMessageReceived += captureLog;
         try
         {
             Assert.That(routine.MoveNext(), Is.True);
             yield return routine.Current;
             Assert.That(markerCount, Is.Zero,
-                "Capture must not report ready while Home is not owned.");
+                "Capture must not report ready while its owner is not ready.");
 
+            Object.Destroy(unreadyObject);
+            yield return null;
+            yield return SceneManager.LoadSceneAsync("MainMenu", LoadSceneMode.Single);
+
+            Component owner = null;
+            for (int frame = 0; frame < 30; frame++)
+            {
+                owner = FindComponent(ownerType);
+                if (owner != null && (bool)isReady.GetValue(owner, null))
+                    break;
+                yield return null;
+            }
+
+            Assert.That(owner, Is.Not.Null);
+            Assert.That((bool)isReady.GetValue(owner, null), Is.True);
+            Assert.That((bool)ownsHome.GetValue(owner, null), Is.True);
+
+            var rootField = ownerType.GetField("mainMenuRoot",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(rootField, Is.Not.Null);
+            home = rootField.GetValue(owner) as RectTransform;
+            Assert.That(home, Is.Not.Null);
+
+            home.gameObject.SetActive(false);
+            Assert.That(routine.MoveNext(), Is.True);
+            yield return routine.Current;
+            Assert.That(markerCount, Is.Zero,
+                "Capture must not report ready while Home is not owned.");
             home.gameObject.SetActive(true);
             for (int frame = 0; frame < 30 && routine.MoveNext(); frame++)
                 yield return routine.Current;
@@ -137,6 +149,8 @@ public sealed class MainMenuCapturePlayModeTests
             Application.logMessageReceived -= captureLog;
             if (home != null)
                 home.gameObject.SetActive(true);
+            if (unreadyObject != null)
+                Object.Destroy(unreadyObject);
         }
     }
 
