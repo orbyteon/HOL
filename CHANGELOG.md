@@ -24,7 +24,10 @@ Play Console versionName in `ProjectSettings.asset`.
   chevrons; Daily Hunt uses the magenta 9-slice; the tip is the bigger-
   numbers line, not the AI-disclosure sentence. Private Room remains
   create/join. Dormant 1V1 assets stay unwired. The player chip still
-  shows the real streak, not a mock trophy count.
+  shows the real streak, not a mock trophy count. Missing mockup art is
+  now in the Home pack: girl opponent, smiling star, chat bubbles,
+  target-plus-calendar, circular blue settings, gold trophy, and a
+  festive night-arcade background.
 
 ### Fixed
 

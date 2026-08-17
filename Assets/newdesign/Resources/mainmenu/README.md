@@ -14,11 +14,12 @@ These files are byte-for-byte copies from `Resources/reference/`:
 
 ## Generated chrome and decor
 
-- Deep-indigo night-arcade background
-- Confetti, horizon-light, lightning, floating-number, and star overlays
+- Festive indigo night-arcade background with confetti and stars
+- Confetti and star overlays (horizon/lightning/number overlays stay in the pack but Home no longer shows them)
 - Gold, cyan, violet, and magenta pill controls
 - Daily Hunt, player-chip, and tip frames
-- Settings, solo, dormant 1V1, private-room, Daily Hunt, streak, and tip icons
+- Circular blue settings, smiling-star Solo, chat-bubble Private Room,
+  target-plus-calendar Daily Hunt, gold trophy, dormant 1V1, and tip icons
 - Logo, primary-action, and secondary-row glow/highlight layers
 
 All generated layers use clean alpha edges. Unity L/B/R/T 9-slice borders are

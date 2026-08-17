@@ -22,9 +22,6 @@ public sealed class MainMenuAuthoritativeVisuals : MonoBehaviour
     float nextPoll;
 
     Sprite background;
-    Sprite horizon;
-    Sprite lightning;
-    Sprite numbers;
     Sprite stars;
     Sprite confetti;
     Sprite logoGlow;
@@ -221,11 +218,11 @@ public sealed class MainMenuAuthoritativeVisuals : MonoBehaviour
         Stretch(bg.rectTransform);
         bg.transform.SetAsFirstSibling();
 
-        AddStretchedImage("HomeHorizon", horizon);
         AddStretchedImage("HomeStars", stars);
-        AddStretchedImage("HomeNumbers", numbers);
-        AddStretchedImage("HomeLightning", lightning);
         AddStretchedImage("HomeConfetti", confetti);
+        HideNamed(safeAreaRoot, "HomeHorizon");
+        HideNamed(safeAreaRoot, "HomeLightning");
+        HideNamed(safeAreaRoot, "HomeNumbers");
 
         AddImage("HomeLogoGlow", logoGlow,
             new Vector2(0f, 650f), new Vector2(800f, 450f), true);
@@ -256,10 +253,12 @@ public sealed class MainMenuAuthoritativeVisuals : MonoBehaviour
         if (chip == null) return;
         chip.type = Image.Type.Sliced;
 
+        AddImage(chip.transform, "HomeChipAvatar", playerHero,
+            new Vector2(-148f, 0f), new Vector2(64f, 64f), true);
         AddImage(chip.transform, "HomeStreakIcon", streakIcon,
-            new Vector2(-150f, 0f), new Vector2(58f, 58f), true);
+            new Vector2(-92f, 0f), new Vector2(42f, 42f), true);
         var text = EnsureText(chip.transform, "HomePlayerChipText", 25f, NearWhite);
-        Place(text.rectTransform, new Vector2(35f, 0f), new Vector2(285f, 74f));
+        Place(text.rectTransform, new Vector2(48f, 0f), new Vector2(240f, 74f));
         text.fontStyle = FontStyles.Bold;
         text.alignment = TextAlignmentOptions.Center;
         ConfigureText(text, 15f);
@@ -305,7 +304,7 @@ public sealed class MainMenuAuthoritativeVisuals : MonoBehaviour
         // instances remain untouched.
         Vector2 stacked = new Vector2(900f, 156f);
         Reparent(play, new Vector2(0f, 90f), stacked);
-        Reparent(settings, new Vector2(-455f, 820f), new Vector2(82f, 82f));
+        Reparent(settings, new Vector2(-455f, 820f), new Vector2(96f, 96f));
         Reparent(privateRoom, new Vector2(0f, -90f), stacked);
         Reparent(daily, new Vector2(0f, -270f), stacked);
 
@@ -313,9 +312,6 @@ public sealed class MainMenuAuthoritativeVisuals : MonoBehaviour
         StyleButtonImage(privateRoom, ctaBlue, Image.Type.Sliced);
         StyleButtonImage(daily, ctaMagenta, Image.Type.Sliced);
         StyleButtonImage(settings, gear, Image.Type.Simple);
-        var settingsGraphic = settings.GetComponent<Image>();
-        if (settingsGraphic != null)
-            settingsGraphic.color = new Color(1f, 1f, 1f, 0.001f);
 
         HideLegacyButtonCopy(play);
         HideLegacyButtonCopy(privateRoom);
@@ -329,10 +325,7 @@ public sealed class MainMenuAuthoritativeVisuals : MonoBehaviour
         BuildStackedCtaCopy(daily, "HomeDailyTitle", "HomeDailySubtitle", "HomeDailyChevron",
             dailyIcon, 32f, 20f, NearWhite);
 
-        var settingsIcon = AddImage(settings.transform, "HomeSettingsIcon", gear,
-            Vector2.zero, new Vector2(82f, 82f), true);
-        if (settingsIcon != null)
-            settingsIcon.transform.SetAsLastSibling();
+        HideNamed(settings.transform, "HomeSettingsIcon");
 
         var primary = AddImage(play.transform, "HomePrimaryGloss", primaryGloss,
             Vector2.zero, Vector2.zero, false);
@@ -501,9 +494,6 @@ public sealed class MainMenuAuthoritativeVisuals : MonoBehaviour
     void LoadProductionSprites()
     {
         background = Load("mainmenu_bg_night_arcade");
-        horizon = Load("mainmenu_deco_horizon_overlay");
-        lightning = Load("mainmenu_deco_lightning_overlay");
-        numbers = Load("mainmenu_deco_numbers_overlay");
         stars = Load("mainmenu_deco_stars_overlay");
         confetti = Load("mainmenu_deco_confetti_overlay");
         logoGlow = Load("mainmenu_glow_logo");
