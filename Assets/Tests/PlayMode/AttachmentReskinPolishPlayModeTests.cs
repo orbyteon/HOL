@@ -87,7 +87,8 @@ public sealed class AttachmentReskinPolishPlayModeTests
         var pvp = Object.FindObjectOfType(RuntimeType("PvpGameController")) as Component;
         Assert.That(pvp, Is.Not.Null);
         pvp.SendMessage("OpenPvpMenu", SendMessageOptions.RequireReceiver);
-        mainMenuPanel.SetActive(false);
+        Assert.That(mainMenuPanel.activeInHierarchy, Is.True,
+            "Production PvP overlay must leave Home active.");
         yield return new WaitForSecondsRealtime(0.35f);
 
         var pvpMenuField = pvp.GetType().GetField("pvpMenuPanel", BindingFlags.Instance | BindingFlags.Public);
@@ -97,7 +98,6 @@ public sealed class AttachmentReskinPolishPlayModeTests
         Assert.That(Find(pvpMenuPanel.transform, "BoardCreatePlusVector"), Is.Not.Null);
         Assert.That(Find(pvpMenuPanel.transform, "BoardJoinDoorVector"), Is.Not.Null);
         pvp.SendMessage("ClosePvpMenu", SendMessageOptions.RequireReceiver);
-        mainMenuPanel.SetActive(true);
         yield return new WaitForSecondsRealtime(0.35f);
 
         // Exercise the existing solo-search flow rather than activating the

@@ -128,7 +128,8 @@ public sealed class MainMenuAuthoritativeVisuals : MonoBehaviour
             ownedCanvas = GetComponent<Canvas>();
 
         bool ownsHome = OwnsHome;
-        SuppressCompetingPresentation(ownsHome);
+        bool homeExclusive = ownsHome && !NonHomeOverlayVisible();
+        SuppressCompetingPresentation(homeExclusive);
         if (!ownsHome) return;
 
         PrepareHierarchy();
@@ -139,14 +140,33 @@ public sealed class MainMenuAuthoritativeVisuals : MonoBehaviour
             ApplyLocalization();
     }
 
-    void SuppressCompetingPresentation(bool homeActive)
+    bool NonHomeOverlayVisible()
+    {
+        var pvp = FindInScene<PvpGameController>(gameObject.scene);
+        if (pvp != null &&
+            (Visible(pvp.pvpMenuPanel) ||
+             Visible(pvp.createPanel) ||
+             Visible(pvp.joinPanel) ||
+             Visible(pvp.matchPanel)))
+            return true;
+
+        var daily = FindInScene<DailyHunt>(gameObject.scene);
+        return daily != null && Visible(daily.gameObject);
+    }
+
+    static bool Visible(GameObject panel)
+    {
+        return panel != null && panel.activeInHierarchy;
+    }
+
+    void SuppressCompetingPresentation(bool homeExclusive)
     {
         if (ownedCanvas != null)
         {
             SetEnabled(ownedCanvas.GetComponent<ExactReferenceVisuals>(), false);
-            SetEnabled(ownedCanvas.GetComponent<AttachmentReskinVisuals>(), !homeActive);
-            SetEnabled(ownedCanvas.GetComponent<AttachmentReskinPolish>(), !homeActive);
-            SetEnabled(ownedCanvas.GetComponent<AttachmentReskinCanvasBindings>(), !homeActive);
+            SetEnabled(ownedCanvas.GetComponent<AttachmentReskinVisuals>(), !homeExclusive);
+            SetEnabled(ownedCanvas.GetComponent<AttachmentReskinPolish>(), !homeExclusive);
+            SetEnabled(ownedCanvas.GetComponent<AttachmentReskinCanvasBindings>(), !homeExclusive);
         }
 
         // DesignRuntimeWiring is scene-authored outside the Canvas. It must

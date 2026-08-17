@@ -132,12 +132,16 @@ public sealed class AttachmentReskinVisuals : MonoBehaviour
 
     void ApplyNow()
     {
-        ApplyCanvasBackdrop();
+        var owner = GetComponent<MainMenuAuthoritativeVisuals>();
+        bool authoritativeHome = owner != null && owner.OwnsHome;
+        if (!authoritativeHome)
+            ApplyCanvasBackdrop();
 
         var menu = FindInScene<MenuManager>(gameObject.scene);
         if (menu != null)
         {
-            ApplyHome(menu);
+            if (!authoritativeHome)
+                ApplyHome(menu);
             ApplySimplePanel(menu.settingsPanel == null ? null : menu.settingsPanel.transform);
             ApplySimplePanel(menu.panelPlay == null ? null : menu.panelPlay.transform);
             ApplySearching(menu.panelSearching == null ? null : menu.panelSearching.transform);

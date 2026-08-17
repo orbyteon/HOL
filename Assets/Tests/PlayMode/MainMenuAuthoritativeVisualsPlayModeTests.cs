@@ -38,7 +38,7 @@ public sealed class MainMenuAuthoritativeVisualsPlayModeTests
         InvokeInstaller(reskinType);
         InvokeInstaller(polishType);
         InvokeInstaller(bindingsType);
-        InvokeInstaller(ownerType);
+        UnsubscribeSceneLoaded(ownerType);
 
         var languageType = l10nType.GetNestedType("Language", BindingFlags.Public);
         var currentLanguage = l10nType.GetProperty("Current", BindingFlags.Static | BindingFlags.Public);
@@ -52,210 +52,256 @@ public sealed class MainMenuAuthoritativeVisualsPlayModeTests
 
         bool hadPlayerName = PlayerPrefs.HasKey("PlayerName");
         string originalPlayerName = PlayerPrefs.GetString("PlayerName", "");
-        PlayerPrefs.SetString("PlayerName", "");
-        setLanguage.Invoke(null, new[] { english });
-
-        yield return SceneManager.LoadSceneAsync("MainMenu", LoadSceneMode.Single);
-        Scene scene = SceneManager.GetActiveScene();
-
-        // Capture the four real controls as soon as the existing runtime
-        // builders have produced them, before the authoritative owner's
-        // quarter-second late-button pass is allowed to settle.
-        Button[] originalButtons = null;
-        for (int frame = 0; frame < 20 && originalButtons == null; frame++)
+        try
         {
-            yield return null;
-            originalButtons = FindButtons(scene, HomeButtonNames);
-        }
-        Assert.That(originalButtons, Is.Not.Null,
-            "The scene/runtime builders must provide all four existing Home controls.");
+            PlayerPrefs.SetString("PlayerName", "");
+            setLanguage.Invoke(null, new[] { english });
 
-        var originalEvents = new UnityEvent[originalButtons.Length];
-        var originalPersistentCounts = new int[originalButtons.Length];
-        for (int i = 0; i < originalButtons.Length; i++)
-        {
-            originalEvents[i] = originalButtons[i].onClick;
-            originalPersistentCounts[i] = originalButtons[i].onClick.GetPersistentEventCount();
-            Debug.Log("[MainMenu checkpoint] BEFORE " + ListenerEvidence(originalButtons[i]));
-        }
+            yield return SceneManager.LoadSceneAsync("MainMenu", LoadSceneMode.Single);
+            Scene scene = SceneManager.GetActiveScene();
 
-        yield return new WaitForSecondsRealtime(0.45f);
-        yield return null;
-
-        var owner = FindInScene(scene, ownerType) as Component;
-        Assert.That(owner, Is.Not.Null,
-            "MainMenu must install its authoritative Home owner.");
-        Assert.That((bool)ownerType.GetProperty("IsReady").GetValue(owner, null), Is.True);
-        Assert.That((bool)ownerType.GetProperty("OwnsHome").GetValue(owner, null), Is.True);
-
-        var menu = FindInScene(scene, menuType) as Component;
-        Assert.That(menu, Is.Not.Null);
-        GameObject mainMenuRoot = FieldGameObject(menu, "mainMenuPanel");
-        GameObject settingsPanel = FieldGameObject(menu, "settingsPanel");
-        GameObject playPanel = FieldGameObject(menu, "panelPlay");
-        Assert.That(mainMenuRoot, Is.Not.Null);
-        Assert.That(mainMenuRoot.name, Is.EqualTo("MainMenuRoot"),
-            "The serialized BACKROUND object must be renamed, not replaced.");
-
-        var mainCanvas = mainMenuRoot.GetComponentInParent<Canvas>();
-        Assert.That(mainCanvas, Is.Not.Null);
-        Assert.That(owner.GetComponent<Canvas>(), Is.SameAs(mainCanvas),
-            "The owner must install only on the root canvas containing mainMenuPanel.");
-
-        Transform safeArea = DirectChild(mainMenuRoot.transform, "SafeAreaRoot");
-        Assert.That(safeArea, Is.Not.Null);
-        Assert.That(mainMenuRoot.transform.childCount, Is.EqualTo(1),
-            "MainMenuRoot must have SafeAreaRoot as its sole direct child.");
-        Assert.That(safeArea.GetComponentsInChildren<Button>(true), Has.Length.EqualTo(4),
-            "SafeAreaRoot must contain exactly the four real Home controls.");
-
-        Button[] styledButtons = FindButtons(scene, HomeButtonNames);
-        Assert.That(styledButtons, Is.Not.Null);
-        for (int i = 0; i < styledButtons.Length; i++)
-        {
-            Assert.That(styledButtons[i], Is.SameAs(originalButtons[i]),
-                HomeButtonNames[i] + " was recreated instead of reparented.");
-            Assert.That(styledButtons[i].transform.parent, Is.SameAs(safeArea));
-            Assert.That(styledButtons[i].onClick, Is.SameAs(originalEvents[i]),
-                HomeButtonNames[i] + " received a replacement UnityEvent.");
-            Assert.That(styledButtons[i].onClick.GetPersistentEventCount(),
-                Is.EqualTo(originalPersistentCounts[i]));
-        }
-
-        var pvpRuntime = FindInScene(scene, pvpRuntimeType) as Component;
-        var consent = FindInScene(scene, consentType) as Component;
-        Assert.That(pvpRuntime, Is.Not.Null);
-        Assert.That(consent, Is.Not.Null);
-        Canvas pvpCanvas = pvpRuntime.GetComponent<Canvas>();
-        Canvas consentCanvas = consent.GetComponent<Canvas>();
-        Assert.That(pvpCanvas, Is.Not.Null);
-        Assert.That(consentCanvas, Is.Not.Null);
-
-        var screenCanvases = RootScreenCanvases(scene);
-        Assert.That(screenCanvases, Has.Count.EqualTo(3),
-            "MainMenu, PvP, and Consent are the only root screen-space canvases.");
-        CollectionAssert.AreEquivalent(
-            new[] { mainCanvas.GetInstanceID(), pvpCanvas.GetInstanceID(), consentCanvas.GetInstanceID() },
-            new[]
+            Button[] originalButtons = null;
+            for (int frame = 0; frame < 20 && originalButtons == null; frame++)
             {
-                screenCanvases[0].GetInstanceID(),
-                screenCanvases[1].GetInstanceID(),
-                screenCanvases[2].GetInstanceID()
-            });
+                yield return null;
+                originalButtons = FindButtons(scene, HomeButtonNames);
+            }
+            Assert.That(originalButtons, Is.Not.Null,
+                "The scene/runtime builders must provide all four existing Home controls.");
+            Assert.That(FindInScene(scene, ownerType), Is.Null,
+                "The callback baseline must be captured before the authoritative owner runs.");
 
-        AssertProductionImages(safeArea);
-        AssertNoDormantOneVersusOne(safeArea);
+            var menu = FindInScene(scene, menuType) as Component;
+            Assert.That(menu, Is.Not.Null);
+            GameObject mainMenuRoot = FieldGameObject(menu, "mainMenuPanel");
+            GameObject settingsPanel = FieldGameObject(menu, "settingsPanel");
+            GameObject playPanel = FieldGameObject(menu, "panelPlay");
+            Assert.That(mainMenuRoot, Is.Not.Null);
+            var mainCanvas = mainMenuRoot.GetComponentInParent<Canvas>();
+            Assert.That(mainCanvas, Is.Not.Null);
 
-        var playerHero = RequiredRect(safeArea, "HomePlayerHero");
-        var opponentHero = RequiredRect(safeArea, "HomeOpponentHero");
-        Assert.That(playerHero.sizeDelta, Is.EqualTo(opponentHero.sizeDelta));
-        Assert.That(Mathf.Abs(playerHero.anchoredPosition.x),
-            Is.EqualTo(Mathf.Abs(opponentHero.anchoredPosition.x)).Within(0.01f));
-        Assert.That(playerHero.anchoredPosition.x,
-            Is.EqualTo(-opponentHero.anchoredPosition.x).Within(0.01f));
-        Assert.That(Find(safeArea, "HomeMascotSeven"), Is.Not.Null);
-        Assert.That(Find(safeArea, "HomeMascotThree"), Is.Not.Null);
+            var pvpController = FindInScene(scene, pvpControllerType) as Component;
+            Assert.That(pvpController, Is.Not.Null);
+            GameObject pvpMenuPanel = FieldGameObject(pvpController, "pvpMenuPanel");
+            Transform dailyPanel = Find(mainCanvas.transform, "DailyHuntPanel");
+            Assert.That(dailyPanel, Is.Not.Null);
+            var daily = dailyPanel.GetComponent(dailyType) as Component;
+            Assert.That(daily, Is.Not.Null);
 
-        var playButton = styledButtons[0];
-        RectTransform primaryGloss = RequiredRect(playButton.transform, "HomePrimaryGloss");
-        Assert.That(primaryGloss.parent, Is.SameAs(playButton.transform));
-        Assert.That(primaryGloss.anchorMin, Is.EqualTo(Vector2.zero));
-        Assert.That(primaryGloss.anchorMax, Is.EqualTo(Vector2.one));
-        Assert.That(primaryGloss.offsetMin, Is.EqualTo(Vector2.zero));
-        Assert.That(primaryGloss.offsetMax, Is.EqualTo(Vector2.zero));
-        Assert.That(primaryGloss.GetComponent<Image>().raycastTarget, Is.False);
+            var originalIds = new int[originalButtons.Length];
+            var originalEvents = new UnityEvent[originalButtons.Length];
+            var originalPersistentCounts = new int[originalButtons.Length];
+            for (int i = 0; i < originalButtons.Length; i++)
+            {
+                originalIds[i] = originalButtons[i].GetInstanceID();
+                originalEvents[i] = originalButtons[i].onClick;
+                originalPersistentCounts[i] = originalButtons[i].onClick.GetPersistentEventCount();
+                Debug.Log("[MainMenu checkpoint] BEFORE " + ListenerEvidence(originalButtons[i]));
+            }
 
-        RectTransform privateRect = (RectTransform)styledButtons[2].transform;
-        RectTransform dailyRect = (RectTransform)styledButtons[3].transform;
-        RectTransform secondaryGloss = RequiredRect(safeArea, "HomeSecondaryGlossRow");
-        Assert.That(secondaryGloss.sizeDelta, Is.EqualTo(new Vector2(1000f, 320f)));
-        Assert.That(secondaryGloss.GetComponent<Image>().raycastTarget, Is.False);
-        Assert.That(privateRect.sizeDelta, Is.EqualTo(new Vector2(450f, 165f)));
-        Assert.That(dailyRect.sizeDelta, Is.EqualTo(new Vector2(450f, 165f)));
-        Assert.That(privateRect.anchoredPosition.y,
-            Is.EqualTo(secondaryGloss.anchoredPosition.y).Within(0.01f));
-        Assert.That(dailyRect.anchoredPosition.y,
-            Is.EqualTo(secondaryGloss.anchoredPosition.y).Within(0.01f));
-        Assert.That(privateRect.anchoredPosition.x,
-            Is.EqualTo(secondaryGloss.anchoredPosition.x - 245f).Within(0.01f));
-        Assert.That(dailyRect.anchoredPosition.x,
-            Is.EqualTo(secondaryGloss.anchoredPosition.x + 245f).Within(0.01f));
+            // Prove the captured controls reach their real destinations before
+            // the authoritative presentation owner is added.
+            originalButtons[0].onClick.Invoke();
+            Assert.That(playPanel.activeSelf, Is.True, "Pre-owner Solo must open PanelPlay.");
+            menu.SendMessage("BackToMenu", SendMessageOptions.RequireReceiver);
+            originalButtons[1].onClick.Invoke();
+            Assert.That(settingsPanel.activeSelf, Is.True,
+                "Pre-owner Settings must open PanelSettings.");
+            menu.SendMessage("BackToMenu", SendMessageOptions.RequireReceiver);
+            originalButtons[2].onClick.Invoke();
+            Assert.That(pvpMenuPanel.activeSelf, Is.True,
+                "Pre-owner Private Room must open the existing PvPMenuPanel.");
+            pvpController.SendMessage("ClosePvpMenu", SendMessageOptions.RequireReceiver);
+            originalButtons[3].onClick.Invoke();
+            Assert.That(dailyPanel.gameObject.activeSelf, Is.True,
+                "Pre-owner Daily Hunt must open the existing DailyHuntPanel.");
+            daily.SendMessage("Close", SendMessageOptions.RequireReceiver);
+            Assert.That(mainMenuRoot.activeInHierarchy, Is.True);
 
-        AssertLocalizedHome(safeArea, l10nType);
-        setLanguage.Invoke(null, new[] { greek });
-        yield return null;
-        AssertLocalizedHome(safeArea, l10nType);
+            var owner = mainCanvas.gameObject.AddComponent(ownerType) as Component;
+            Assert.That(owner, Is.Not.Null);
+            for (int frame = 0;
+                 frame < 30 && !(bool)ownerType.GetProperty("IsReady").GetValue(owner, null);
+                 frame++)
+                yield return null;
+            Assert.That((bool)ownerType.GetProperty("IsReady").GetValue(owner, null), Is.True);
+            Assert.That((bool)ownerType.GetProperty("OwnsHome").GetValue(owner, null), Is.True);
+            Assert.That(mainMenuRoot.name, Is.EqualTo("MainMenuRoot"),
+                "The serialized BACKROUND object must be renamed, not replaced.");
+            Assert.That(owner.GetComponent<Canvas>(), Is.SameAs(mainCanvas),
+                "The owner must install only on the root canvas containing mainMenuPanel.");
 
-        // Invoke each preserved UnityEvent and prove it still reaches the
-        // controller-owned destination that existed before this presentation.
-        playButton.onClick.Invoke();
-        Assert.That(playPanel.activeSelf, Is.True, "Solo must open PanelPlay.");
-        menu.SendMessage("BackToMenu", SendMessageOptions.RequireReceiver);
+            Transform safeArea = DirectChild(mainMenuRoot.transform, "SafeAreaRoot");
+            Assert.That(safeArea, Is.Not.Null);
+            Assert.That(mainMenuRoot.transform.childCount, Is.EqualTo(1),
+                "MainMenuRoot must have SafeAreaRoot as its sole direct child.");
+            Assert.That(safeArea.GetComponentsInChildren<Button>(true), Has.Length.EqualTo(4),
+                "SafeAreaRoot must contain exactly the four real Home controls.");
 
-        int rootId = mainMenuRoot.GetInstanceID();
-        int safeAreaId = safeArea.GetInstanceID();
-        styledButtons[1].onClick.Invoke();
-        Assert.That(settingsPanel.activeSelf, Is.True, "Settings must open PanelSettings.");
-        yield return new WaitForSecondsRealtime(0.3f);
-        Assert.That((bool)ownerType.GetProperty("OwnsHome").GetValue(owner, null), Is.False);
-        AssertLegacyOwnerStates(mainCanvas, exactType, reskinType, polishType,
-            bindingsType, designType, false);
+            Button[] styledButtons = FindButtons(scene, HomeButtonNames);
+            Assert.That(styledButtons, Is.Not.Null);
+            for (int i = 0; i < styledButtons.Length; i++)
+            {
+                Assert.That(styledButtons[i].GetInstanceID(), Is.EqualTo(originalIds[i]),
+                    HomeButtonNames[i] + " was recreated instead of reparented.");
+                Assert.That(styledButtons[i], Is.SameAs(originalButtons[i]));
+                Assert.That(styledButtons[i].transform.parent, Is.SameAs(safeArea));
+                Assert.That(styledButtons[i].onClick, Is.SameAs(originalEvents[i]),
+                    HomeButtonNames[i] + " received a replacement UnityEvent.");
+                Assert.That(styledButtons[i].onClick.GetPersistentEventCount(),
+                    Is.EqualTo(originalPersistentCounts[i]));
+            }
 
-        menu.SendMessage("BackToMenu", SendMessageOptions.RequireReceiver);
-        yield return new WaitForSecondsRealtime(0.3f);
-        Assert.That((bool)ownerType.GetProperty("OwnsHome").GetValue(owner, null), Is.True);
-        Assert.That(FieldGameObject(menu, "mainMenuPanel").GetInstanceID(), Is.EqualTo(rootId));
-        Assert.That(DirectChild(mainMenuRoot.transform, "SafeAreaRoot").GetInstanceID(),
-            Is.EqualTo(safeAreaId));
-        Assert.That(mainMenuRoot.transform.childCount, Is.EqualTo(1));
-        Assert.That(CountNamed(scene, "MainMenuRoot"), Is.EqualTo(1));
-        Assert.That(CountNamed(scene, "SafeAreaRoot"), Is.EqualTo(1));
-        AssertUniqueHomeNames(safeArea);
-        AssertLegacyOwnerStates(mainCanvas, exactType, reskinType, polishType,
-            bindingsType, designType, true);
+            var pvpRuntime = FindInScene(scene, pvpRuntimeType) as Component;
+            var consent = FindInScene(scene, consentType) as Component;
+            Assert.That(pvpRuntime, Is.Not.Null);
+            Assert.That(consent, Is.Not.Null);
+            Canvas pvpCanvas = pvpRuntime.GetComponent<Canvas>();
+            Canvas consentCanvas = consent.GetComponent<Canvas>();
+            Assert.That(pvpCanvas, Is.Not.Null);
+            Assert.That(consentCanvas, Is.Not.Null);
 
-        var pvpController = FindInScene(scene, pvpControllerType) as Component;
-        Assert.That(pvpController, Is.Not.Null);
-        GameObject pvpMenuPanel = FieldGameObject(pvpController, "pvpMenuPanel");
-        styledButtons[2].onClick.Invoke();
-        Assert.That(pvpMenuPanel.activeSelf, Is.True,
-            "Private Room must open the existing PvPMenuPanel.");
-        pvpController.SendMessage("ClosePvpMenu", SendMessageOptions.RequireReceiver);
+            var screenCanvases = RootScreenCanvases(scene);
+            Assert.That(screenCanvases, Has.Count.EqualTo(3),
+                "MainMenu, PvP, and Consent are the only root screen-space canvases.");
+            CollectionAssert.AreEquivalent(
+                new[] { mainCanvas.GetInstanceID(), pvpCanvas.GetInstanceID(), consentCanvas.GetInstanceID() },
+                new[]
+                {
+                    screenCanvases[0].GetInstanceID(),
+                    screenCanvases[1].GetInstanceID(),
+                    screenCanvases[2].GetInstanceID()
+                });
 
-        Transform dailyPanel = Find(mainCanvas.transform, "DailyHuntPanel");
-        Assert.That(dailyPanel, Is.Not.Null);
-        styledButtons[3].onClick.Invoke();
-        Assert.That(dailyPanel.gameObject.activeSelf, Is.True,
-            "Daily Hunt must open the existing DailyHuntPanel.");
-        var daily = dailyPanel.GetComponent(dailyType) as Component;
-        Assert.That(daily, Is.Not.Null);
-        daily.SendMessage("Close", SendMessageOptions.RequireReceiver);
+            AssertProductionImages(safeArea);
+            AssertNoDormantOneVersusOne(safeArea);
 
-        for (int i = 0; i < styledButtons.Length; i++)
-        {
-            Assert.That(styledButtons[i], Is.SameAs(originalButtons[i]));
-            Assert.That(styledButtons[i].onClick, Is.SameAs(originalEvents[i]));
-            Debug.Log("[MainMenu checkpoint] AFTER " + ListenerEvidence(styledButtons[i]));
+            var playerHero = RequiredRect(safeArea, "HomePlayerHero");
+            var opponentHero = RequiredRect(safeArea, "HomeOpponentHero");
+            Assert.That(playerHero.sizeDelta, Is.EqualTo(opponentHero.sizeDelta));
+            Assert.That(Mathf.Abs(playerHero.anchoredPosition.x),
+                Is.EqualTo(Mathf.Abs(opponentHero.anchoredPosition.x)).Within(0.01f));
+            Assert.That(playerHero.anchoredPosition.x,
+                Is.EqualTo(-opponentHero.anchoredPosition.x).Within(0.01f));
+            Assert.That(Find(safeArea, "HomeMascotSeven"), Is.Not.Null);
+            Assert.That(Find(safeArea, "HomeMascotThree"), Is.Not.Null);
+
+            var playButton = styledButtons[0];
+            RectTransform primaryGloss = RequiredRect(playButton.transform, "HomePrimaryGloss");
+            Assert.That(primaryGloss.parent, Is.SameAs(playButton.transform));
+            Assert.That(primaryGloss.anchorMin, Is.EqualTo(Vector2.zero));
+            Assert.That(primaryGloss.anchorMax, Is.EqualTo(Vector2.one));
+            Assert.That(primaryGloss.offsetMin, Is.EqualTo(Vector2.zero));
+            Assert.That(primaryGloss.offsetMax, Is.EqualTo(Vector2.zero));
+            Assert.That(primaryGloss.GetComponent<Image>().raycastTarget, Is.False);
+
+            RectTransform privateRect = (RectTransform)styledButtons[2].transform;
+            RectTransform dailyRect = (RectTransform)styledButtons[3].transform;
+            RectTransform secondaryGloss = RequiredRect(safeArea, "HomeSecondaryGlossRow");
+            Assert.That(secondaryGloss.sizeDelta, Is.EqualTo(new Vector2(1000f, 320f)));
+            Assert.That(secondaryGloss.GetComponent<Image>().raycastTarget, Is.False);
+            Assert.That(privateRect.sizeDelta, Is.EqualTo(new Vector2(450f, 165f)));
+            Assert.That(dailyRect.sizeDelta, Is.EqualTo(new Vector2(450f, 165f)));
+            Assert.That(privateRect.anchoredPosition.y,
+                Is.EqualTo(secondaryGloss.anchoredPosition.y).Within(0.01f));
+            Assert.That(dailyRect.anchoredPosition.y,
+                Is.EqualTo(secondaryGloss.anchoredPosition.y).Within(0.01f));
+            Assert.That(privateRect.anchoredPosition.x,
+                Is.EqualTo(secondaryGloss.anchoredPosition.x - 245f).Within(0.01f));
+            Assert.That(dailyRect.anchoredPosition.x,
+                Is.EqualTo(secondaryGloss.anchoredPosition.x + 245f).Within(0.01f));
+
+            AssertLocalizedHome(safeArea, l10nType);
+            setLanguage.Invoke(null, new[] { greek });
+            yield return null;
+            AssertLocalizedHome(safeArea, l10nType);
+
+            // Invoke the same preserved UnityEvents again after ownership.
+            playButton.onClick.Invoke();
+            Assert.That(playPanel.activeSelf, Is.True, "Solo must open PanelPlay.");
+            menu.SendMessage("BackToMenu", SendMessageOptions.RequireReceiver);
+
+            int rootId = mainMenuRoot.GetInstanceID();
+            int safeAreaId = safeArea.GetInstanceID();
+            styledButtons[1].onClick.Invoke();
+            Assert.That(settingsPanel.activeSelf, Is.True, "Settings must open PanelSettings.");
+            yield return new WaitForSecondsRealtime(0.3f);
+            Assert.That((bool)ownerType.GetProperty("OwnsHome").GetValue(owner, null), Is.False);
+            AssertOwnerStates(mainCanvas, exactType, reskinType, polishType,
+                bindingsType, designType, true);
+
+            menu.SendMessage("BackToMenu", SendMessageOptions.RequireReceiver);
+            yield return new WaitForSecondsRealtime(0.3f);
+            Assert.That((bool)ownerType.GetProperty("OwnsHome").GetValue(owner, null), Is.True);
+            Assert.That(FieldGameObject(menu, "mainMenuPanel").GetInstanceID(), Is.EqualTo(rootId));
+            Assert.That(DirectChild(mainMenuRoot.transform, "SafeAreaRoot").GetInstanceID(),
+                Is.EqualTo(safeAreaId));
+            Assert.That(mainMenuRoot.transform.childCount, Is.EqualTo(1));
+            Assert.That(CountNamed(scene, "MainMenuRoot"), Is.EqualTo(1));
+            Assert.That(CountNamed(scene, "SafeAreaRoot"), Is.EqualTo(1));
+            AssertUniqueHomeNames(safeArea);
+            AssertOwnerStates(mainCanvas, exactType, reskinType, polishType,
+                bindingsType, designType, false);
+
+            styledButtons[2].onClick.Invoke();
+            Assert.That(pvpMenuPanel.activeSelf, Is.True,
+                "Private Room must open the existing PvPMenuPanel.");
+            Assert.That(mainMenuRoot.activeInHierarchy, Is.True,
+                "Private Room must not deactivate Home.");
+            yield return new WaitForSecondsRealtime(0.55f);
+            Assert.That((bool)ownerType.GetProperty("OwnsHome").GetValue(owner, null), Is.True);
+            AssertOwnerStates(mainCanvas, exactType, reskinType, polishType,
+                bindingsType, designType, true);
+            Assert.That(Find(pvpMenuPanel.transform, "BoardCreatePlusVector"), Is.Not.Null);
+            Assert.That(Find(pvpMenuPanel.transform, "BoardJoinDoorVector"), Is.Not.Null);
+            AssertProductionImages(safeArea);
+            pvpController.SendMessage("ClosePvpMenu", SendMessageOptions.RequireReceiver);
+            yield return new WaitForSecondsRealtime(0.3f);
+            AssertOwnerStates(mainCanvas, exactType, reskinType, polishType,
+                bindingsType, designType, false);
+
+            styledButtons[3].onClick.Invoke();
+            Assert.That(dailyPanel.gameObject.activeSelf, Is.True,
+                "Daily Hunt must open the existing DailyHuntPanel.");
+            Assert.That(mainMenuRoot.activeInHierarchy, Is.True,
+                "Daily Hunt must not deactivate Home.");
+            yield return new WaitForSecondsRealtime(0.55f);
+            Assert.That((bool)ownerType.GetProperty("OwnsHome").GetValue(owner, null), Is.True);
+            AssertOwnerStates(mainCanvas, exactType, reskinType, polishType,
+                bindingsType, designType, true);
+            AssertAttachmentButtonStyled(dailyPanel, "CloseButton");
+            AssertProductionImages(safeArea);
+            daily.SendMessage("Close", SendMessageOptions.RequireReceiver);
+
+            for (int i = 0; i < styledButtons.Length; i++)
+            {
+                Assert.That(styledButtons[i], Is.SameAs(originalButtons[i]));
+                Assert.That(styledButtons[i].onClick, Is.SameAs(originalEvents[i]));
+                Debug.Log("[MainMenu checkpoint] AFTER " + ListenerEvidence(styledButtons[i]));
+            }
+            Debug.Log("[MainMenu checkpoint] ROOT MainMenuRoot=" + rootId +
+                      " SafeAreaRoot=" + safeAreaId +
+                      " MainCanvas=" + mainCanvas.GetInstanceID() +
+                      " PvPCanvas=" + pvpCanvas.GetInstanceID() +
+                      " ConsentCanvas=" + consentCanvas.GetInstanceID());
+            Debug.Log("[MainMenu checkpoint] GLOSS primaryParent=" + playButton.GetInstanceID() +
+                      " secondary=(1000x320 @ 0,-150; arcs @ -245,+245)");
         }
-        Debug.Log("[MainMenu checkpoint] ROOT MainMenuRoot=" + rootId +
-                  " SafeAreaRoot=" + safeAreaId +
-                  " MainCanvas=" + mainCanvas.GetInstanceID() +
-                  " PvPCanvas=" + pvpCanvas.GetInstanceID() +
-                  " ConsentCanvas=" + consentCanvas.GetInstanceID());
-        Debug.Log("[MainMenu checkpoint] GLOSS primaryParent=" + playButton.GetInstanceID() +
-                  " secondary=(1000x320 @ 0,-150; arcs @ -245,+245)");
-
-        setLanguage.Invoke(null, new[] { originalLanguage });
-        if (hadPlayerName)
-            PlayerPrefs.SetString("PlayerName", originalPlayerName);
-        else
-            PlayerPrefs.DeleteKey("PlayerName");
-        PlayerPrefs.Save();
+        finally
+        {
+            setLanguage.Invoke(null, new[] { originalLanguage });
+            if (hadPlayerName)
+                PlayerPrefs.SetString("PlayerName", originalPlayerName);
+            else
+                PlayerPrefs.DeleteKey("PlayerName");
+            PlayerPrefs.Save();
+            InvokeInstaller(ownerType);
+        }
     }
 
-    static void AssertLegacyOwnerStates(Canvas canvas, System.Type exactType,
+    static void AssertOwnerStates(Canvas canvas, System.Type exactType,
         System.Type reskinType, System.Type polishType, System.Type bindingsType,
-        System.Type designType, bool homeActive)
+        System.Type designType, bool attachmentEnabled)
     {
         var exact = canvas.GetComponent(exactType) as Behaviour;
         var reskin = canvas.GetComponent(reskinType) as Behaviour;
@@ -266,15 +312,29 @@ public sealed class MainMenuAuthoritativeVisualsPlayModeTests
         Assert.That(polish, Is.Not.Null);
         Assert.That(bindings, Is.Not.Null);
         Assert.That(exact.enabled, Is.False);
-        Assert.That(reskin.enabled, Is.EqualTo(!homeActive));
-        Assert.That(polish.enabled, Is.EqualTo(!homeActive));
-        Assert.That(bindings.enabled, Is.EqualTo(!homeActive));
+        Assert.That(reskin.enabled, Is.EqualTo(attachmentEnabled));
+        Assert.That(polish.enabled, Is.EqualTo(attachmentEnabled));
+        Assert.That(bindings.enabled, Is.EqualTo(attachmentEnabled));
 
         foreach (var root in canvas.gameObject.scene.GetRootGameObjects())
         {
             foreach (var component in root.GetComponentsInChildren(designType, true))
                 Assert.That(((Behaviour)component).enabled, Is.False);
         }
+    }
+
+    static void AssertAttachmentButtonStyled(Transform root, string buttonName)
+    {
+        var found = Find(root, buttonName);
+        Assert.That(found, Is.Not.Null);
+        var button = found.GetComponent<Button>();
+        Assert.That(button, Is.Not.Null);
+        var image = button.GetComponent<Image>();
+        Assert.That(image, Is.Not.Null);
+        Assert.That(image.sprite, Is.Not.Null);
+        Assert.That(image.type, Is.EqualTo(Image.Type.Sliced));
+        Assert.That(button.GetComponent<Outline>(), Is.Not.Null,
+            buttonName + " did not receive attachment reskin treatment.");
     }
 
     static void AssertProductionImages(Transform safeArea)
@@ -517,6 +577,18 @@ public sealed class MainMenuAuthoritativeVisualsPlayModeTests
         var install = type.GetMethod("Install", BindingFlags.Static | BindingFlags.NonPublic);
         Assert.That(install, Is.Not.Null, "Missing runtime installer on " + type.Name);
         install.Invoke(null, null);
+    }
+
+    static void UnsubscribeSceneLoaded(System.Type type)
+    {
+        var callback = type.GetMethod("OnSceneLoaded",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        var sceneLoaded = typeof(SceneManager).GetEvent("sceneLoaded",
+            BindingFlags.Static | BindingFlags.Public);
+        Assert.That(callback, Is.Not.Null, "Missing sceneLoaded callback on " + type.Name);
+        Assert.That(sceneLoaded, Is.Not.Null);
+        var handler = System.Delegate.CreateDelegate(sceneLoaded.EventHandlerType, callback);
+        sceneLoaded.RemoveEventHandler(null, handler);
     }
 
     static System.Type RuntimeType(string name)

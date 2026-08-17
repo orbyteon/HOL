@@ -122,8 +122,14 @@ public sealed class AttachmentReskinPolish : MonoBehaviour
         var menu = FindInScene<MenuManager>(gameObject.scene);
         if (menu == null) return;
 
-        StyleRuntimeCards(transform);
-        PolishHome(menu);
+        var owner = GetComponent<MainMenuAuthoritativeVisuals>();
+        bool authoritativeHome = owner != null && owner.OwnsHome;
+        StyleRuntimeCards(transform,
+            authoritativeHome && menu.mainMenuPanel != null
+                ? menu.mainMenuPanel.transform
+                : null);
+        if (!authoritativeHome)
+            PolishHome(menu);
         PolishSearching(menu);
         PolishSoloResult();
         PolishPvp();
@@ -271,11 +277,12 @@ public sealed class AttachmentReskinPolish : MonoBehaviour
         if (vector != null) vector.transform.SetAsLastSibling();
     }
 
-    static void StyleRuntimeCards(Transform root)
+    static void StyleRuntimeCards(Transform root, Transform excludedRoot)
     {
         if (root == null) return;
         foreach (var image in root.GetComponentsInChildren<Image>(true))
         {
+            if (Within(image.transform, excludedRoot)) continue;
             string name = image.transform.name;
             if (name.StartsWith("Board") || name.StartsWith("Exact")) continue;
             if (!Contains(name, "Card") && !Contains(name, "Frame")) continue;
@@ -286,6 +293,14 @@ public sealed class AttachmentReskinPolish : MonoBehaviour
             image.color = Panel;
             EnsureOutline(image.gameObject, Purple, 2f);
         }
+    }
+
+    static bool Within(Transform item, Transform root)
+    {
+        if (root == null) return false;
+        for (var current = item; current != null; current = current.parent)
+            if (current == root) return true;
+        return false;
     }
 
     static Image AddImage(Transform parent, string name, Sprite sprite,
