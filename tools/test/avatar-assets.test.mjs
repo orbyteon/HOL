@@ -92,6 +92,10 @@ test("human avatars 01-10", () => {
   assertAvatarRange("humans", "avatar_human", 1, 10);
 });
 
+test("human avatars 11-20", () => {
+  assertAvatarRange("humans", "avatar_human", 11, 20);
+});
+
 test("every Unity GUID is unique", () => {
   const seen = new Map();
   for (const path of walk(file("Assets").pathname).filter((name) => name.endsWith(".meta"))) {
