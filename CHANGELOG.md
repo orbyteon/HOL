@@ -43,6 +43,11 @@ Play Console versionName in `ProjectSettings.asset`.
 
 ### Changed
 
+- The provisional Main Menu PNG chrome is replaced by a coherent text-free
+  neon-cartoon layer pack with transparent decor, polished controls, and
+  mobile-scale icons. Approved logo and character art remains byte-identical
+  to its reference source, and a Node integrity harness now locks sprite
+  dimensions, alpha format, import borders, and repository-wide GUID uniqueness.
 - The privacy policy's contact address is now `support@orbyteon.com` —
   a role mailbox owned by the publisher instead of a personal one. Both
   committed copies (the canonical `docs/privacy.html` and the byte-identical

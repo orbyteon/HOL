@@ -1,20 +1,33 @@
-# HOL Main Menu production layers (regenerated)
+# HOL Main Menu neon-cartoon layer pack
 
-Text-free PNG layers for Checkpoint 1 Main Menu reskin.
+Text-free production PNG layers for the Main Menu reskin.
 
-## Exact cast (copied from `Resources/reference/`)
+## Exact reference art
+
+These files are byte-for-byte copies from `Resources/reference/`:
+
 - `hol_logo_exact.png`
-- `mascot_7_exact.png`
 - `mascot_3_exact.png`
+- `mascot_7_exact.png`
+- `opponent_purple_exact.png`
 - `player_cyan_exact.png`
 
-## Generated chrome / decor
-Night-arcade background, decoration overlays, glossy 9-slice CTA/frames,
-icons, and glow/gloss rows. 9-slice borders are encoded in each `.meta`
-`spriteBorder` (Unity L/B/R/T).
+## Generated chrome and decor
 
-## Notes
-- All user-facing copy stays live TMP (EN/EL) — nothing baked into these PNGs.
-- `mainmenu_cta_violet_9s.png` is included as **dormant** (no 1V1 ONLINE button).
-- These generated chrome layers approximate the approved 2.5D night-arcade language
-  for integration; swap any file 1:1 if you later recover original hand-painted exports.
+- Deep-indigo night-arcade background
+- Confetti, horizon-light, lightning, floating-number, and star overlays
+- Gold, cyan, violet, and magenta pill controls
+- Daily Hunt, player-chip, and tip frames
+- Settings, solo, private-room, target, streak, and tip icons
+- Logo, primary-action, and secondary-row glow/highlight layers
+
+All generated layers use clean alpha edges. Unity L/B/R/T 9-slice borders are
+encoded in each applicable `.meta` file.
+
+## Runtime text
+
+All labels remain live TextMesh Pro (TMP) content with EN/EL localization.
+No user-facing copy is baked into this image pack.
+
+`mainmenu_cta_violet_9s.png` remains dormant; it does not add a 1V1 ONLINE
+button or any other interaction.
