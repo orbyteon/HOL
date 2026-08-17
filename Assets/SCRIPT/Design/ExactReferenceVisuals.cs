@@ -59,7 +59,7 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
 
         // Prefer the canvas that owns the menu controller's panel. This avoids
         // styling unrelated SDK/debug/world-space canvases that may exist in the
-        // same scene. Splash and other scenes fall back to their first root,
+        // same scene. Other eligible scenes fall back to their first root,
         // screen-space canvas.
         Canvas canvas = null;
         var menu = FindInScene<MenuManager>(scene);

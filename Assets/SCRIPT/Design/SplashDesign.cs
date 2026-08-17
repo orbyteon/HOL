@@ -89,7 +89,7 @@ public sealed class SplashDesign : MonoBehaviour
         if (loader != null && loader.waitTime > 0f)
             waitTime = loader.waitTime;
 
-        IsReady = true;
+        ApplyRequiredArtReadiness(background, glow, logo, mascotSix, mascotSeven);
     }
 
     void Update()
@@ -186,6 +186,23 @@ public sealed class SplashDesign : MonoBehaviour
     static void SetScale(RectTransform rect, float scale)
     {
         if (rect != null) rect.localScale = new Vector3(scale, scale, 1f);
+    }
+
+    void ApplyRequiredArtReadiness(
+        Sprite background, Sprite glow, Sprite logo, Sprite mascotSix, Sprite mascotSeven)
+    {
+        IsReady = RequiredArtReady(background, glow, logo, mascotSix, mascotSeven);
+        if (!IsReady) IsSettled = false;
+    }
+
+    static bool RequiredArtReady(
+        Sprite background, Sprite glow, Sprite logo, Sprite mascotSix, Sprite mascotSeven)
+    {
+        return background != null &&
+               glow != null &&
+               logo != null &&
+               mascotSix != null &&
+               mascotSeven != null;
     }
 
     static Rect NormalizedSafeArea(Rect safe, float width, float height)
