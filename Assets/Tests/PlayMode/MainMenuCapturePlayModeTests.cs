@@ -96,6 +96,14 @@ public sealed class MainMenuCapturePlayModeTests
                 markerCount++;
         };
 
+        Component previousOwner = FindComponent(ownerType);
+        GameObject previousOwnerObject =
+            previousOwner == null ? null : previousOwner.gameObject;
+        bool previousOwnerWasActive =
+            previousOwnerObject != null && previousOwnerObject.activeSelf;
+        if (previousOwnerObject != null)
+            previousOwnerObject.SetActive(false);
+
         GameObject unreadyObject = new GameObject("UnreadyMainMenuOwner");
         var unreadyOwner = unreadyObject.AddComponent(ownerType) as Component;
         Assert.That(unreadyOwner, Is.Not.Null);
@@ -151,6 +159,8 @@ public sealed class MainMenuCapturePlayModeTests
                 home.gameObject.SetActive(true);
             if (unreadyObject != null)
                 Object.Destroy(unreadyObject);
+            if (previousOwnerObject != null)
+                previousOwnerObject.SetActive(previousOwnerWasActive);
         }
     }
 
