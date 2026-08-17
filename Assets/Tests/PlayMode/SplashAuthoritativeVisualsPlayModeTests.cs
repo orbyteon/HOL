@@ -136,6 +136,62 @@ public sealed class SplashAuthoritativeVisualsPlayModeTests
         Assert.That((bool)settled.GetValue(splashDesign, null), Is.True);
     }
 
+    [Test]
+    public void RequiredArtReadyNeedsAllFiveApprovedSprites()
+    {
+        var sprites = RequiredSprites();
+        for (int i = 0; i < sprites.Length; i++)
+            Assert.That(sprites[i], Is.Not.Null, "Missing production test Sprite at index " + i);
+
+        var predicate = RuntimeType("SplashDesign").GetMethod(
+            "RequiredArtReady", BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.That(predicate, Is.Not.Null);
+        Assert.That((bool)predicate.Invoke(null, sprites), Is.True);
+
+        for (int i = 0; i < sprites.Length; i++)
+        {
+            var missingOne = (object[])sprites.Clone();
+            missingOne[i] = null;
+            Assert.That((bool)predicate.Invoke(null, missingOne), Is.False,
+                "Readiness must reject a missing required Sprite at index " + i);
+        }
+    }
+
+    [UnityTest]
+    public IEnumerator MissingRequiredArtNeverSettlesAndDoesNotBlockSplashLoader()
+    {
+        yield return SceneManager.LoadSceneAsync("SplashScene", LoadSceneMode.Single);
+        yield return null;
+
+        var scene = SceneManager.GetActiveScene();
+        var splashDesign = FindInScene(scene, RuntimeType("SplashDesign"));
+        Assert.That(splashDesign, Is.Not.Null);
+
+        var sprites = RequiredSprites();
+        sprites[0] = null;
+        var applyReadiness = splashDesign.GetType().GetMethod(
+            "ApplyRequiredArtReadiness", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.That(applyReadiness, Is.Not.Null);
+        applyReadiness.Invoke(splashDesign, sprites);
+
+        var ready = splashDesign.GetType().GetProperty(
+            "IsReady", BindingFlags.Instance | BindingFlags.Public);
+        var settled = splashDesign.GetType().GetProperty(
+            "IsSettled", BindingFlags.Instance | BindingFlags.Public);
+        Assert.That((bool)ready.GetValue(splashDesign, null), Is.False);
+        Assert.That((bool)settled.GetValue(splashDesign, null), Is.False);
+
+        yield return new WaitForSecondsRealtime(0.75f);
+        Assert.That((bool)settled.GetValue(splashDesign, null), Is.False,
+            "Missing required art must prevent the presentation from settling.");
+
+        var loader = FindInScene(scene, RuntimeType("SplashLoader"));
+        Assert.That(loader, Is.Not.Null);
+        loader.SendMessage("LoadMenu", SendMessageOptions.RequireReceiver);
+        while (SceneManager.GetActiveScene().name != "MainMenu")
+            yield return null;
+    }
+
     [TestCase(0f, 0f, 1080f, 1920f, 0f, 0f, 1f, 1f)]
     [TestCase(0f, 80f, 1080f, 1760f, 0f, 0.0416667f, 1f, 0.9583333f)]
     [TestCase(60f, 0f, 1020f, 1920f, 0.0555556f, 0f, 1f, 1f)]
@@ -169,6 +225,18 @@ public sealed class SplashAuthoritativeVisualsPlayModeTests
             "Install", BindingFlags.Static | BindingFlags.NonPublic);
         Assert.That(install, Is.Not.Null, "Missing runtime installer for " + typeName);
         install.Invoke(null, null);
+    }
+
+    static object[] RequiredSprites()
+    {
+        return new object[]
+        {
+            Resources.Load<Sprite>("splash/splash_bg_neon_arcade"),
+            Resources.Load<Sprite>("splash/splash_logo_glow"),
+            Resources.Load<Sprite>("reference/hol_logo_exact"),
+            Resources.Load<Sprite>("reference/mascot_6_exact"),
+            Resources.Load<Sprite>("reference/mascot_7_exact")
+        };
     }
 
     static Rect InvokeNormalizedSafeArea(Rect safe, float width, float height)
