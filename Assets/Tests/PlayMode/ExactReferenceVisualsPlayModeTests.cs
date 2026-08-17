@@ -50,6 +50,7 @@ public sealed class ExactReferenceVisualsPlayModeTests
             yield return null;
         for (int i = 0; i < 6; i++)
             yield return null;
+        yield return new WaitForSecondsRealtime(0.35f);
 
         var mainMenuVisuals = Object.FindObjectOfType(exactType) as Component;
         Assert.That(mainMenuVisuals, Is.Not.Null,
