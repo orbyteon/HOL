@@ -104,6 +104,13 @@ jobs:
           name: mainmenu-preview-apk-transfer
           path: build/Android
 
+      - name: Enable KVM acceleration
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -e /dev/kvm
+          sudo chmod 0666 /dev/kvm
+
       - name: Boot API 35 x86_64 emulator and capture Main Menu
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
@@ -111,6 +118,7 @@ jobs:
           arch: x86_64
           target: google_apis
           profile: pixel_2
+          emulator-boot-timeout: 1200
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: |
