@@ -11,6 +11,7 @@ public sealed class ExactReferenceVisualsPlayModeTests
     [UnityTest]
     public IEnumerator ExactVisualsSurviveSceneTransitionRefreshNonButtonUiLocalizeAndStayScoped()
     {
+        var ownerType = RuntimeType("MainMenuAuthoritativeVisuals");
         var exactType = RuntimeType("ExactReferenceVisuals");
         var boardReskinType = RuntimeType("AttachmentReskinVisuals");
 
@@ -25,6 +26,11 @@ public sealed class ExactReferenceVisualsPlayModeTests
             "Install", BindingFlags.Static | BindingFlags.NonPublic);
         Assert.That(installBoardReskin, Is.Not.Null);
         installBoardReskin.Invoke(null, null);
+
+        var installOwner = ownerType.GetMethod(
+            "Install", BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.That(installOwner, Is.Not.Null);
+        installOwner.Invoke(null, null);
 
         yield return SceneManager.LoadSceneAsync("SplashScene", LoadSceneMode.Single);
         yield return null;
@@ -52,15 +58,24 @@ public sealed class ExactReferenceVisualsPlayModeTests
         var ownedCanvas = mainMenuVisuals.GetComponent<Canvas>();
         Assert.That(ownedCanvas, Is.Not.Null,
             "The visuals owner should stay attached to its primary canvas.");
+        var homeOwner = Object.FindObjectOfType(ownerType) as Component;
+        Assert.That(homeOwner, Is.Not.Null,
+            "MainMenu should install the authoritative Home owner after the scene transition.");
+        Assert.That(homeOwner.GetComponent<Canvas>(), Is.SameAs(ownedCanvas));
+        Assert.That((bool)ownerType.GetProperty("IsReady").GetValue(homeOwner, null), Is.True);
+        Assert.That(((Behaviour)mainMenuVisuals).enabled, Is.False,
+            "ExactReferenceVisuals must yield MainMenu Home presentation.");
 
         var mainMenuBoardReskin = Object.FindObjectOfType(boardReskinType) as Component;
         Assert.That(mainMenuBoardReskin, Is.Not.Null,
             "The attachment reskin must survive the SplashScene to MainMenu transition.");
         Assert.That(mainMenuBoardReskin.GetComponent<Canvas>(), Is.SameAs(ownedCanvas));
+        Assert.That(((Behaviour)mainMenuBoardReskin).enabled, Is.False,
+            "AttachmentReskinVisuals must yield while Home is active.");
 
-        Assert.That(FindByName(ownedCanvas.transform, "BoardHomeLogo"), Is.Not.Null,
-            "The existing main menu should receive the reference-board home composition.");
-        Assert.That(FindByName(ownedCanvas.transform, "BoardHomeTipCard"), Is.Not.Null);
+        Assert.That(FindByName(ownedCanvas.transform, "HomeLogo"), Is.Not.Null,
+            "The existing main menu should receive the production Home composition.");
+        Assert.That(FindByName(ownedCanvas.transform, "HomeTipFrame"), Is.Not.Null);
 
         // This is a reskin, not a feature pass. It may add images/text but it
         // must not create new interactive buttons, Store screens or Profile
@@ -79,8 +94,8 @@ public sealed class ExactReferenceVisualsPlayModeTests
         Assert.That(cardProbe.GetComponent<Outline>(), Is.Null);
 
         yield return new WaitForSecondsRealtime(0.6f);
-        Assert.That(cardProbe.GetComponent<Outline>(), Is.Not.Null,
-            "A newly-added non-button card should trigger exact visual styling.");
+        Assert.That(cardProbe.GetComponent<Outline>(), Is.Null,
+            "The disabled exact pass must not retake authoritative Home presentation.");
 
         // A screen can swap active panels without changing any component counts.
         // The signature must still change so the next refresh can restyle it.
@@ -115,7 +130,7 @@ public sealed class ExactReferenceVisualsPlayModeTests
         Component profileText = null;
         foreach (var component in ownedCanvas.GetComponentsInChildren(tmpTextType, true))
         {
-            if (component.name != "ExactPlayerChipText") continue;
+            if (component.name != "HomePlayerChipText") continue;
             profileText = component;
             break;
         }

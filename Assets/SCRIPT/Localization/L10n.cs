@@ -57,6 +57,11 @@ public static class L10n
         { "music",                   new[] { "Music", "Μουσική" } },
         { "player_name",             new[] { "Your name", "Το όνομά σου" } },
         { "player_default",          new[] { "Player", "Παίκτης" } },
+        { "mainmenu_play_title",      new[] { "PLAY SOLO", "ΠΑΙΞΕ SOLO" } },
+        { "mainmenu_play_subtitle",   new[] { "FIND CHALLENGER", "ΒΡΕΣ ΑΝΤΙΠΑΛΟ" } },
+        { "mainmenu_private_title",   new[] { "PRIVATE ROOM", "ΙΔΙΩΤΙΚΟ ΔΩΜΑΤΙΟ" } },
+        { "mainmenu_private_subtitle",new[] { "PLAY WITH FRIEND", "ΠΑΙΞΕ ΜΕ ΦΙΛΟ" } },
+        { "mainmenu_daily_subtitle",  new[] { "SPECIAL EVENT", "ΕΙΔΙΚΗ ΑΠΟΣΤΟΛΗ" } },
 
         // matchmaking
         { "find_challenger",         new[] { "Find challenger", "Βρες αντίπαλο" } },

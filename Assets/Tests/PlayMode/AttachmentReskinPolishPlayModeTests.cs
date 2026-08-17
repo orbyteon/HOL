@@ -11,6 +11,7 @@ public sealed class AttachmentReskinPolishPlayModeTests
     [UnityTest]
     public IEnumerator ReferenceBoardReskinsExistingFlowsWithoutAddingFeatures()
     {
+        var ownerType = RuntimeType("MainMenuAuthoritativeVisuals");
         var exactType = RuntimeType("ExactReferenceVisuals");
         var reskinType = RuntimeType("AttachmentReskinVisuals");
         var polishType = RuntimeType("AttachmentReskinPolish");
@@ -20,27 +21,31 @@ public sealed class AttachmentReskinPolishPlayModeTests
         InvokeInstaller(reskinType);
         InvokeInstaller(polishType);
         InvokeInstaller(bindingsType);
+        InvokeInstaller(ownerType);
 
         yield return SceneManager.LoadSceneAsync("MainMenu", LoadSceneMode.Single);
         for (int i = 0; i < 12; i++)
             yield return null;
         yield return new WaitForSecondsRealtime(0.35f);
 
-        var polish = Object.FindObjectOfType(polishType) as Component;
-        Assert.That(polish, Is.Not.Null,
-            "The reference-board polish should be installed on MainMenu.");
-        var canvas = polish.GetComponent<Canvas>();
+        var owner = Object.FindObjectOfType(ownerType) as Component;
+        Assert.That(owner, Is.Not.Null,
+            "The authoritative Home owner should be installed on MainMenu.");
+        var canvas = owner.GetComponent<Canvas>();
         Assert.That(canvas, Is.Not.Null);
+        Assert.That((bool)ownerType.GetProperty("IsReady").GetValue(owner, null), Is.True);
 
         var bindings = Object.FindObjectOfType(bindingsType) as Component;
         Assert.That(bindings, Is.Not.Null,
             "Runtime-injected main-menu controls should receive canvas-scoped reskin bindings.");
         Assert.That(bindings.GetComponent<Canvas>(), Is.SameAs(canvas));
+        Assert.That(((Behaviour)bindings).enabled, Is.False,
+            "The attachment layer must yield Home ownership while MainMenuRoot is active.");
 
         var baseline = Object.FindObjectOfType(exactType) as Behaviour;
         Assert.That(baseline, Is.Not.Null);
         Assert.That(baseline.enabled, Is.False,
-            "Only the board reskin should own MainMenu presentation after bootstrap.");
+            "The superseded exact pass must not compete with the authoritative Home.");
 
         string[] resources =
         {
@@ -56,11 +61,11 @@ public sealed class AttachmentReskinPolishPlayModeTests
             Assert.That(Resources.Load<Sprite>(resource), Is.Not.Null,
                 "Missing reference-board sprite: " + resource);
 
-        Assert.That(Find(canvas.transform, "BoardHomeLogo"), Is.Not.Null);
-        Assert.That(Find(canvas.transform, "BoardHomeTipCard"), Is.Not.Null);
-        Assert.That(Find(canvas.transform, "BoardFriendVector"), Is.Not.Null,
+        Assert.That(Find(canvas.transform, "HomeLogo"), Is.Not.Null);
+        Assert.That(Find(canvas.transform, "HomeTipFrame"), Is.Not.Null);
+        Assert.That(Find(canvas.transform, "HomePrivateIcon"), Is.Not.Null,
             "The real runtime-injected PvP button should receive the friend artwork.");
-        Assert.That(Find(canvas.transform, "BoardDailyVector"), Is.Not.Null,
+        Assert.That(Find(canvas.transform, "HomeDailyIcon"), Is.Not.Null,
             "The real runtime-injected Daily Hunt button should receive the lightning artwork.");
 
         var exactLogo = Find(canvas.transform, "ExactHOLLogo");
@@ -68,12 +73,21 @@ public sealed class AttachmentReskinPolishPlayModeTests
             Assert.That(exactLogo.gameObject.activeSelf, Is.False,
                 "The earlier logo decoration must not sit under the board logo.");
 
+        var menu = Object.FindObjectOfType(RuntimeType("MenuManager")) as Component;
+        Assert.That(menu, Is.Not.Null);
+        var mainMenuField = menu.GetType().GetField(
+            "mainMenuPanel", BindingFlags.Instance | BindingFlags.Public);
+        Assert.That(mainMenuField, Is.Not.Null);
+        var mainMenuPanel = mainMenuField.GetValue(menu) as GameObject;
+        Assert.That(mainMenuPanel, Is.Not.Null);
+
         // Open the existing PvP menu. This is the real controller flow, not a
         // test-only or reskin-created screen. PvP owns a separate runtime Canvas,
         // so assertions below are scoped to the controller's real menu panel.
         var pvp = Object.FindObjectOfType(RuntimeType("PvpGameController")) as Component;
         Assert.That(pvp, Is.Not.Null);
         pvp.SendMessage("OpenPvpMenu", SendMessageOptions.RequireReceiver);
+        mainMenuPanel.SetActive(false);
         yield return new WaitForSecondsRealtime(0.35f);
 
         var pvpMenuField = pvp.GetType().GetField("pvpMenuPanel", BindingFlags.Instance | BindingFlags.Public);
@@ -82,12 +96,13 @@ public sealed class AttachmentReskinPolishPlayModeTests
         Assert.That(pvpMenuPanel, Is.Not.Null);
         Assert.That(Find(pvpMenuPanel.transform, "BoardCreatePlusVector"), Is.Not.Null);
         Assert.That(Find(pvpMenuPanel.transform, "BoardJoinDoorVector"), Is.Not.Null);
+        pvp.SendMessage("ClosePvpMenu", SendMessageOptions.RequireReceiver);
+        mainMenuPanel.SetActive(true);
+        yield return new WaitForSecondsRealtime(0.35f);
 
         // Exercise the existing solo-search flow rather than activating the
         // nested searching child in isolation. PanelSearching lives under
         // PanelPlay, so MenuManager.OnPlayPressed must open its parent first.
-        var menu = Object.FindObjectOfType(RuntimeType("MenuManager")) as Component;
-        Assert.That(menu, Is.Not.Null);
         menu.SendMessage("OnPlayPressed", SendMessageOptions.RequireReceiver);
         yield return null;
 
