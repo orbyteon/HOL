@@ -23,6 +23,14 @@ public sealed class SplashProductionAssetsTests
     }
 
     [Test]
+    public void LogoGlowIsNativeOverlayResolution()
+    {
+        Sprite sprite = Resources.Load<Sprite>("splash/splash_logo_glow");
+        Assert.That(sprite.texture.width, Is.EqualTo(960));
+        Assert.That(sprite.texture.height, Is.EqualTo(620));
+    }
+
+    [Test]
     public void MascotSixIsSquareReferenceArt()
     {
         Sprite sprite = Resources.Load<Sprite>("reference/mascot_6_exact");
