@@ -5,6 +5,23 @@ Play Console versionName in `ProjectSettings.asset`.
 
 ## [Unreleased]
 
+### Added
+
+- A non-production Main Menu Android preview workflow. It builds a Development
+  x86_64 APK of `MainMenu` only, launches it with `hol_capture_language=en|el`,
+  and uploads 1080×1920 EN/EL screenshots plus the APK as
+  `hol-mainmenu-android-preview`. It does not use the production environment
+  and does not change versionCode.
+
+### Changed
+
+- Main Menu Home is now presented by `MainMenuAuthoritativeVisuals` on the
+  existing `/Canvas`. The serialized `BACKROUND` object becomes `MainMenuRoot`
+  with one `SafeAreaRoot`; the four real Home buttons are reparented, not
+  replaced; production art loads only from `Resources/mainmenu/`; copy stays
+  live TMP through `L10n` in EN and EL. Private Room remains create/join.
+  Dormant 1V1 assets stay unwired.
+
 ### Fixed
 
 - The Consumer First art actually renders. All 25 hand-authored design
