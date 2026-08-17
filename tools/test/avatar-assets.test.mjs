@@ -94,12 +94,13 @@ test("main menu sprite contract", () => {
   assertSprite("Assets/newdesign/Resources/mainmenu/mainmenu_glow_primary.png", 980, 380);
   assertSprite("Assets/newdesign/Resources/mainmenu/mainmenu_glow_secondary_row.png", 1000, 320);
   assertSprite("Assets/newdesign/Resources/mainmenu/mainmenu_icon_daily_hunt.png", 192, 192);
+  assertSprite("Assets/newdesign/Resources/mainmenu/mainmenu_icon_1v1.png", 192, 192);
   assertSprite("Assets/newdesign/Resources/mainmenu/mainmenu_icon_private_room.png", 192, 192);
   assertSprite("Assets/newdesign/Resources/mainmenu/mainmenu_icon_solo.png", 192, 192);
   assertSprite("Assets/newdesign/Resources/mainmenu/mainmenu_icon_streak.png", 128, 128);
   assertSprite("Assets/newdesign/Resources/mainmenu/mainmenu_icon_tip_bulb.png", 160, 160);
   assertSprite("Assets/newdesign/Resources/mainmenu/mainmenu_player_chip_frame_9s.png", 420, 136, [48, 40, 48, 40]);
-  assertSprite("Assets/newdesign/Resources/mainmenu/mainmenu_tip_frame_9s.png", 960, 300, [80, 72, 80, 72]);
+  assertSprite("Assets/newdesign/Resources/mainmenu/mainmenu_tip_frame_9s.png", 960, 300, [130, 140, 130, 155]);
   assertSprite("Assets/newdesign/Resources/mainmenu/mascot_3_exact.png", 987, 1019);
   assertSprite("Assets/newdesign/Resources/mainmenu/mascot_7_exact.png", 973, 1034);
   assertSprite("Assets/newdesign/Resources/mainmenu/opponent_purple_exact.png",
