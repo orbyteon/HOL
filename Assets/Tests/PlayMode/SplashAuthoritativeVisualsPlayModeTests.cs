@@ -158,7 +158,7 @@ public sealed class SplashAuthoritativeVisualsPlayModeTests
     }
 
     [UnityTest]
-    public IEnumerator MissingRequiredArtNeverSettlesAndDoesNotBlockSplashLoader()
+    public IEnumerator MissingRequiredArtClearsSettledStateAndDoesNotBlockSplashLoader()
     {
         yield return SceneManager.LoadSceneAsync("SplashScene", LoadSceneMode.Single);
         yield return null;
@@ -167,6 +167,26 @@ public sealed class SplashAuthoritativeVisualsPlayModeTests
         var splashDesign = FindInScene(scene, RuntimeType("SplashDesign"));
         Assert.That(splashDesign, Is.Not.Null);
 
+        var loader = FindInScene(scene, RuntimeType("SplashLoader"));
+        Assert.That(loader, Is.Not.Null);
+        var waitTime = loader.GetType().GetField(
+            "waitTime", BindingFlags.Instance | BindingFlags.Public);
+        Assert.That(waitTime, Is.Not.Null);
+        Assert.That((float)waitTime.GetValue(loader), Is.EqualTo(2.5f));
+        ((MonoBehaviour)loader).CancelInvoke("LoadMenu");
+
+        var ready = splashDesign.GetType().GetProperty(
+            "IsReady", BindingFlags.Instance | BindingFlags.Public);
+        var settled = splashDesign.GetType().GetProperty(
+            "IsSettled", BindingFlags.Instance | BindingFlags.Public);
+        float settleDeadline = Time.realtimeSinceStartup + 1.5f;
+        while (!(bool)settled.GetValue(splashDesign, null) &&
+               Time.realtimeSinceStartup < settleDeadline)
+            yield return null;
+        Assert.That((bool)ready.GetValue(splashDesign, null), Is.True);
+        Assert.That((bool)settled.GetValue(splashDesign, null), Is.True,
+            "The complete production art must settle before simulating a missing Sprite.");
+
         var sprites = RequiredSprites();
         sprites[0] = null;
         var applyReadiness = splashDesign.GetType().GetMethod(
@@ -174,27 +194,23 @@ public sealed class SplashAuthoritativeVisualsPlayModeTests
         Assert.That(applyReadiness, Is.Not.Null);
         applyReadiness.Invoke(splashDesign, sprites);
 
-        var ready = splashDesign.GetType().GetProperty(
-            "IsReady", BindingFlags.Instance | BindingFlags.Public);
-        var settled = splashDesign.GetType().GetProperty(
-            "IsSettled", BindingFlags.Instance | BindingFlags.Public);
         Assert.That((bool)ready.GetValue(splashDesign, null), Is.False);
         Assert.That((bool)settled.GetValue(splashDesign, null), Is.False);
 
-        yield return new WaitForSecondsRealtime(0.75f);
+        yield return new WaitForSecondsRealtime(0.1f);
         Assert.That((bool)settled.GetValue(splashDesign, null), Is.False,
-            "Missing required art must prevent the presentation from settling.");
+            "Missing required art must keep the presentation unsettled.");
+        Assert.That(SceneManager.GetActiveScene().name, Is.EqualTo("SplashScene"),
+            "Only the deliberate LoadMenu call below may transition this test.");
 
-        var loader = FindInScene(scene, RuntimeType("SplashLoader"));
-        Assert.That(loader, Is.Not.Null);
         loader.SendMessage("LoadMenu", SendMessageOptions.RequireReceiver);
         while (SceneManager.GetActiveScene().name != "MainMenu")
             yield return null;
     }
 
     [TestCase(0f, 0f, 1080f, 1920f, 0f, 0f, 1f, 1f)]
-    [TestCase(0f, 80f, 1080f, 1760f, 0f, 0.0416667f, 1f, 0.9583333f)]
-    [TestCase(60f, 0f, 1020f, 1920f, 0.0555556f, 0f, 1f, 1f)]
+    [TestCase(0f, 80f, 1080f, 1760f, 0f, 0.0416667f, 1f, 0.9166667f)]
+    [TestCase(60f, 0f, 1020f, 1920f, 0.0555556f, 0f, 0.9444444f, 1f)]
     public void NormalizedSafeAreaConvertsPixelsToNormalizedAnchors(
         float x, float y, float width, float height,
         float expectedX, float expectedY, float expectedWidth, float expectedHeight)

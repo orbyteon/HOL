@@ -296,8 +296,8 @@ Invoke `NormalizedSafeArea` through reflection:
 
 ```csharp
 [TestCase(0, 0, 1080, 1920, 0, 0, 1, 1)]
-[TestCase(0, 80, 1080, 1760, 0, 0.0416667f, 1, 0.9583333f)]
-[TestCase(60, 0, 1020, 1920, 0.0555556f, 0, 1, 1)]
+[TestCase(0, 80, 1080, 1760, 0, 0.0416667f, 1, 0.9166667f)]
+[TestCase(60, 0, 1020, 1920, 0.0555556f, 0, 0.9444444f, 1)]
 ```
 
 Assert the returned `Rect` values within `0.0001f` and zero-width/height inputs
