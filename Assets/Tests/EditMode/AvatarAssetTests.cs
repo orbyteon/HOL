@@ -2,6 +2,7 @@ using System;
 using NUnit.Framework;
 using UnityEngine;
 
+// Regression coverage for the manifest-to-Resources Sprite import contract.
 public class AvatarAssetTests
 {
     [Serializable]
@@ -23,18 +24,21 @@ public class AvatarAssetTests
     public void EveryProfileAvatarImportsAsSprite()
     {
         var text = Resources.Load<TextAsset>("avatars/manifest");
-        Assert.IsNotNull(text);
+        Assert.IsNotNull(text,
+            "Avatar manifest TextAsset is missing at Resources path avatars/manifest.");
         var manifest = JsonUtility.FromJson<Manifest>(text.text);
-        AssertEntries(manifest.humans, 40);
-        AssertEntries(manifest.groups, 8);
-        AssertEntries(manifest.numbers, 10);
+        AssertEntries(manifest.humans, 40, "human");
+        AssertEntries(manifest.groups, 8, "group");
+        AssertEntries(manifest.numbers, 10, "number");
     }
 
-    static void AssertEntries(Entry[] entries, int expectedCount)
+    static void AssertEntries(Entry[] entries, int expectedCount, string category)
     {
-        Assert.AreEqual(expectedCount, entries.Length);
+        Assert.IsNotNull(entries, category + " avatar manifest entries must not be null.");
+        Assert.AreEqual(expectedCount, entries.Length,
+            category + " avatar manifest entry count is incorrect.");
         foreach (var entry in entries)
             Assert.IsNotNull(Resources.Load<Sprite>(entry.resource),
-                entry.resource + " did not import as a Sprite.");
+                category + " avatar " + entry.resource + " did not import as a Sprite.");
     }
 }

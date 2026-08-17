@@ -1,3 +1,4 @@
+// Regression contract for the generated avatar roster, PNGs, and Unity importers.
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
@@ -54,6 +55,14 @@ function avatarRoster(directory, idPrefix, resourcePrefix, first, last) {
       resource: `avatars/${directory}/${resourcePrefix}_${suffix}`,
     };
   });
+}
+
+function expectedAvatarPngs() {
+  return [
+    ...avatarRoster("humans", "human", "avatar_human", 1, 40),
+    ...avatarRoster("groups", "group", "avatar_group", 1, 8),
+    ...avatarRoster("numbers", "number", "avatar_number", 0, 9),
+  ].map((entry) => `Assets/newdesign/Resources/${entry.resource}.png`);
 }
 
 function walk(directory) {
@@ -122,6 +131,32 @@ test("number avatars 0-9", () => {
   assertAvatarRange("numbers", "avatar_number", 0, 9);
 });
 
+test("all and only avatar sprites use the Android mipmap override", () => {
+  const expectedMetas = expectedAvatarPngs().map((path) => file(path + ".meta").pathname).sort();
+  const actualMetas = walk(file("Assets/newdesign/Resources/avatars").pathname)
+    .filter((path) => path.endsWith(".png.meta"))
+    .sort();
+  assert.deepEqual(actualMetas, expectedMetas,
+    "Android importer contract must cover exactly the 58 manifest avatar sprites");
+
+  for (const path of actualMetas) {
+    const meta = readFileSync(path, "utf8");
+    assert.match(meta, /^\s*enableMipMap: 1$/m, `${path} must enable mipmaps`);
+
+    const marker = "  - serializedVersion: 3\n    buildTarget: Android\n";
+    assert.equal(meta.split(marker).length - 1, 1,
+      `${path} must contain exactly one Android platform override`);
+    const start = meta.indexOf(marker);
+    const end = meta.indexOf("  spriteSheet:", start);
+    assert.ok(end > start, `${path} Android platform override must precede spriteSheet`);
+    const android = meta.slice(start, end);
+    assert.match(android, /^\s*maxTextureSize: 256$/m,
+      `${path} Android maxTextureSize must be 256`);
+    assert.match(android, /^\s*overridden: 1$/m,
+      `${path} Android override must be enabled`);
+  }
+});
+
 test("avatar manifest contract", () => {
   const manifest = JSON.parse(readFileSync(
     file("Assets/newdesign/Resources/avatars/manifest.json"),
@@ -133,9 +168,9 @@ test("avatar manifest contract", () => {
   };
 
   assert.deepEqual(Object.keys(manifest), ["humans", "groups", "numbers"]);
-  assert.equal(manifest.humans.length, 40);
-  assert.equal(manifest.groups.length, 8);
-  assert.equal(manifest.numbers.length, 10);
+  assert.equal(manifest.humans.length, 40, "manifest humans must contain 40 entries");
+  assert.equal(manifest.groups.length, 8, "manifest groups must contain 8 entries");
+  assert.equal(manifest.numbers.length, 10, "manifest numbers must contain 10 entries");
 
   const entries = [...manifest.humans, ...manifest.groups, ...manifest.numbers];
   assert.equal(new Set(entries.map((entry) => entry.id)).size, entries.length,
