@@ -75,7 +75,7 @@ jobs:
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
           targetPlatform: Android
-          customMethod: MainMenuPreviewBuild.Build
+          buildMethod: MainMenuPreviewBuild.Build
 
       - name: Require exact APK output
         shell: bash
