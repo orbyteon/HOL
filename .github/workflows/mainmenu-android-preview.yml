@@ -128,6 +128,8 @@ jobs:
           trap 'adb logcat -d -v threadtime >> artifacts/mainmenu-preview/logcat.txt || true' EXIT
 
           adb wait-for-device
+          adb shell input keyevent KEYCODE_WAKEUP
+          adb shell wm dismiss-keyguard
           adb shell wm size 1080x1920
           adb shell settings put secure immersive_mode_confirmations confirmed
           adb install -r "$apk"
