@@ -111,6 +111,102 @@ jobs:
           test -e /dev/kvm
           sudo chmod 0666 /dev/kvm
 
+      - name: Prepare capture script
+        shell: bash
+        run: |
+          cat > "$RUNNER_TEMP/mainmenu-capture.sh" <<'CAPTURE_SCRIPT'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          package="com.Orbyteon.HOL"
+          activity="com.unity3d.player.UnityPlayerActivity"
+          apk="build/Android/HOL-mainmenu-debug.apk"
+          output="artifacts/mainmenu-preview"
+          mkdir -p "$output"
+          test -f "$apk"
+          cp "$apk" "$output/HOL-mainmenu-debug.apk"
+          : > "$output/logcat.txt"
+          trap 'adb logcat -d -v threadtime >> artifacts/mainmenu-preview/logcat.txt || true' EXIT
+
+          adb wait-for-device
+          adb shell wm size 1080x1920
+          adb install -r "$apk"
+
+          aapt_path="$(ls "$ANDROID_HOME"/build-tools/*/aapt | sort -V | tail -n 1)"
+          {
+            "$aapt_path" dump badging "$apk"
+            echo
+            adb shell wm size
+            adb shell wm density
+            adb shell pm path "$package"
+            adb shell dumpsys package "$package"
+          } > "$output/package-metadata.txt"
+
+          validate_png() {
+            python3 - "$1" <<'PY'
+          import struct
+          import sys
+
+          path = sys.argv[1]
+          with open(path, "rb") as image:
+              header = image.read(24)
+          if header[:8] != b"\x89PNG\r\n\x1a\n" or header[12:16] != b"IHDR":
+              raise SystemExit(f"{path}: invalid PNG IHDR")
+          width, height = struct.unpack(">II", header[16:24])
+          if (width, height) != (1080, 1920):
+              raise SystemExit(
+                  f"{path}: expected 1080x1920, got {width}x{height}")
+          print(f"{path}: {width}x{height}")
+          PY
+          }
+
+          capture_language() {
+            language="$1"
+            marker="HOL_MAINMENU_CAPTURE_READY:$language"
+            screenshot="$output/mainmenu-$language.png"
+
+            adb shell am force-stop "$package"
+            adb logcat -c
+            adb shell am start -W \
+              -n "$package/$activity" \
+              --es hol_capture_language "$language"
+
+            ready=0
+            for attempt in $(seq 1 90); do
+              adb logcat -d -v brief > /tmp/hol-mainmenu-logcat.txt
+              if grep -Fq "$marker" /tmp/hol-mainmenu-logcat.txt; then
+                ready=1
+                break
+              fi
+              sleep 2
+            done
+
+            {
+              echo "===== $language ====="
+              adb logcat -d -v threadtime
+            } >> "$output/logcat.txt"
+            if [ "$ready" -ne 1 ]; then
+              echo "::error::Timed out waiting for $marker"
+              return 1
+            fi
+
+            adb exec-out screencap -p > "$screenshot"
+            validate_png "$screenshot"
+          }
+
+          capture_language en
+          capture_language el
+          adb shell am force-stop "$package"
+
+          (
+            cd "$output"
+            sha256sum \
+              HOL-mainmenu-debug.apk \
+              mainmenu-en.png \
+              mainmenu-el.png > SHA256SUMS.txt
+          )
+          CAPTURE_SCRIPT
+          chmod +x "$RUNNER_TEMP/mainmenu-capture.sh"
+
       - name: Boot API 35 x86_64 emulator and capture Main Menu
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
@@ -121,95 +217,7 @@ jobs:
           emulator-boot-timeout: 1200
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
-          script: |
-            set -eu
-            package="com.Orbyteon.HOL"
-            activity="com.unity3d.player.UnityPlayerActivity"
-            apk="build/Android/HOL-mainmenu-debug.apk"
-            output="artifacts/mainmenu-preview"
-            mkdir -p "$output"
-            test -f "$apk"
-            cp "$apk" "$output/HOL-mainmenu-debug.apk"
-            : > "$output/logcat.txt"
-            trap 'adb logcat -d -v threadtime >> artifacts/mainmenu-preview/logcat.txt || true' EXIT
-
-            adb wait-for-device
-            adb shell wm size 1080x1920
-            adb install -r "$apk"
-
-            aapt_path="$(ls "$ANDROID_HOME"/build-tools/*/aapt | sort -V | tail -n 1)"
-            {
-              "$aapt_path" dump badging "$apk"
-              echo
-              adb shell wm size
-              adb shell wm density
-              adb shell pm path "$package"
-              adb shell dumpsys package "$package"
-            } > "$output/package-metadata.txt"
-
-            validate_png() {
-              python3 - "$1" <<'PY'
-            import struct
-            import sys
-
-            path = sys.argv[1]
-            with open(path, "rb") as image:
-                header = image.read(24)
-            if header[:8] != b"\x89PNG\r\n\x1a\n" or header[12:16] != b"IHDR":
-                raise SystemExit(f"{path}: invalid PNG IHDR")
-            width, height = struct.unpack(">II", header[16:24])
-            if (width, height) != (1080, 1920):
-                raise SystemExit(
-                    f"{path}: expected 1080x1920, got {width}x{height}")
-            print(f"{path}: {width}x{height}")
-            PY
-            }
-
-            capture_language() {
-              language="$1"
-              marker="HOL_MAINMENU_CAPTURE_READY:$language"
-              screenshot="$output/mainmenu-$language.png"
-
-              adb shell am force-stop "$package"
-              adb logcat -c
-              adb shell am start -W \
-                -n "$package/$activity" \
-                --es hol_capture_language "$language"
-
-              ready=0
-              for attempt in $(seq 1 90); do
-                adb logcat -d -v brief > /tmp/hol-mainmenu-logcat.txt
-                if grep -Fq "$marker" /tmp/hol-mainmenu-logcat.txt; then
-                  ready=1
-                  break
-                fi
-                sleep 2
-              done
-
-              {
-                echo "===== $language ====="
-                adb logcat -d -v threadtime
-              } >> "$output/logcat.txt"
-              if [ "$ready" -ne 1 ]; then
-                echo "::error::Timed out waiting for $marker"
-                return 1
-              fi
-
-              adb exec-out screencap -p > "$screenshot"
-              validate_png "$screenshot"
-            }
-
-            capture_language en
-            capture_language el
-            adb shell am force-stop "$package"
-
-            (
-              cd "$output"
-              sha256sum \
-                HOL-mainmenu-debug.apk \
-                mainmenu-en.png \
-                mainmenu-el.png > SHA256SUMS.txt
-            )
+          script: ${{ runner.temp }}/mainmenu-capture.sh
 
       - name: Upload complete Main Menu preview artifact
         if: always()
