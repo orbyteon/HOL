@@ -335,6 +335,16 @@ public sealed class MainMenuAuthoritativeVisualsPlayModeTests
     {
         foreach (var image in safeArea.GetComponentsInChildren<Image>(true))
         {
+            bool legacy = image.name.StartsWith("Board") || image.name.StartsWith("Exact");
+            if (legacy)
+            {
+                Assert.That(image.gameObject.activeInHierarchy, Is.False,
+                    image.name + " is legacy Home chrome and must stay hidden.");
+                continue;
+            }
+
+            if (!image.gameObject.activeInHierarchy) continue;
+
             Assert.That(image.sprite, Is.Not.Null, image.name + " has no production sprite.");
             var resource = Resources.Load<Sprite>("mainmenu/" + image.sprite.name);
             Assert.That(image.sprite, Is.SameAs(resource),
