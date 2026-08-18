@@ -48,14 +48,20 @@ export const decodeRgbaPng = png => {
   const width = ihdr.readUInt32BE(0);
   const height = ihdr.readUInt32BE(4);
   requireCondition(
+    width === expectedWidth && height === expectedHeight,
+    `Expected ${expectedWidth}x${expectedHeight}, got ${width}x${height}`);
+  requireCondition(
     [...ihdr.subarray(8, 13)].join(",") === "8,6,0,0,0",
     "Expected a non-interlaced 8-bit RGBA PNG");
 
   const bytesPerPixel = 4;
   const stride = width * bytesPerPixel;
-  const filtered = zlib.inflateSync(Buffer.concat(idat));
+  const expectedScanlineBytes = (stride + 1) * height;
+  const filtered = zlib.inflateSync(
+    Buffer.concat(idat),
+    { maxOutputLength: expectedScanlineBytes });
   requireCondition(
-    filtered.length === (stride + 1) * height,
+    filtered.length === expectedScanlineBytes,
     "Screenshot PNG decompressed to an unexpected size");
   const rgba = Buffer.allocUnsafe(stride * height);
 
@@ -86,9 +92,6 @@ export const decodeRgbaPng = png => {
 
 export const validateSplashPng = png => {
   const { width, height, rgba } = decodeRgbaPng(png);
-  requireCondition(
-    width === expectedWidth && height === expectedHeight,
-    `Expected ${expectedWidth}x${expectedHeight}, got ${width}x${height}`);
 
   const pixelCount = width * height;
   const sampleStep = Math.max(1, Math.floor(pixelCount / targetSampleCount));
