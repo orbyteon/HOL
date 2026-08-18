@@ -25,7 +25,8 @@ public static class SplashPreviewBuild
         {
             PlayerSettings.SetScriptingBackend(
                 group, ScriptingImplementation.IL2CPP);
-            PlayerSettings.Android.targetArchitectures = AndroidArchitecture.X86_64;
+            PlayerSettings.Android.targetArchitectures =
+                AndroidArchitecture.ARM64 | AndroidArchitecture.X86_64;
             EditorUserBuildSettings.buildAppBundle = false;
             PlayerSettings.Android.useCustomKeystore = false;
 
