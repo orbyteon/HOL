@@ -52,10 +52,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  capture:
-    name: Build and capture Splash
+  build:
+    name: Build development x86_64 APK
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 40
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -80,7 +80,7 @@ jobs:
         run: |
           set -euxo pipefail
           df -h /
-          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/lib/android
           docker system prune -af || true
           sudo apt-get clean
           df -h /
@@ -106,128 +106,155 @@ jobs:
           buildMethod: SplashPreviewBuild.Build
           versioning: None
 
-      - name: Take ownership and verify exact APK
+      - name: Require exact APK output
         shell: bash
         run: |
           set -euo pipefail
           sudo chown -R "$(id -u):$(id -g)" build
           test -f build/Android/HOL-splash-debug.apk
-          mkdir -p build/Android/preview
 
-      - name: Install API 35 emulator image
+      - name: Transfer APK to emulator job
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: splash-preview-apk-transfer
+          path: build/Android/HOL-splash-debug.apk
+          if-no-files-found: error
+          retention-days: 1
+
+  capture:
+    name: Capture Splash at 1080x1920
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Download exact debug APK
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: splash-preview-apk-transfer
+          path: build/Android
+
+      - name: Enable KVM acceleration
         shell: bash
         run: |
           set -euo pipefail
-          yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager \
-            "platform-tools" \
-            "platforms;android-35" \
-            "build-tools;35.0.0" \
-            "emulator" \
-            "system-images;android-35;google_apis;x86_64"
-          echo no | avdmanager create avd \
-            --force \
-            --name hol-splash-api35 \
-            --package "system-images;android-35;google_apis;x86_64"
+          test -e /dev/kvm
+          sudo chmod 0666 /dev/kvm
 
-      - name: Boot 1080x1920 x86_64 emulator
+      - name: Prepare fail-safe Splash capture script
         shell: bash
         run: |
           set -euo pipefail
-          sudo chmod 666 /dev/kvm
-          nohup "$ANDROID_HOME/emulator/emulator" \
-            -avd hol-splash-api35 \
-            -no-window \
-            -no-snapshot \
-            -noaudio \
-            -no-boot-anim \
-            -gpu swiftshader_indirect \
-            > build/Android/preview/emulator.log 2>&1 &
-          echo "$!" > build/Android/preview/emulator.pid
+          mkdir -p artifacts/splash-android-preview
+          test -f build/Android/HOL-splash-debug.apk
+          cp build/Android/HOL-splash-debug.apk \
+            artifacts/splash-android-preview/HOL-splash-debug.apk
+          for diagnostic in \
+            logcat.txt \
+            display-size-density.txt \
+            display-metadata.txt \
+            activity-state.txt \
+            package-metadata.txt \
+            package-path.txt \
+            process-state.txt \
+            install.log \
+            start.log; do
+            echo "Capture script did not start." \
+              > "artifacts/splash-android-preview/$diagnostic"
+          done
 
-          adb wait-for-device
-          timeout 180 bash -c '
-            until [ "$(adb shell getprop sys.boot_completed | tr -d "\r")" = "1" ]; do
-              sleep 2
-            done
-          '
-          adb shell wm size 1080x1920
-          adb shell wm density 420
-          adb shell settings put global window_animation_scale 0
-          adb shell settings put global transition_animation_scale 0
-          adb shell settings put global animator_duration_scale 0
-
-      - name: Install, launch, and capture settled Splash
-        shell: bash
-        run: |
+          cat > "$RUNNER_TEMP/splash-capture.sh" <<'CAPTURE_SCRIPT'
+          #!/usr/bin/env bash
           set -euo pipefail
-          apk=build/Android/HOL-splash-debug.apk
-          preview=build/Android/preview
-          aapt="$ANDROID_HOME/build-tools/35.0.0/aapt"
+          apk="build/Android/HOL-splash-debug.apk"
+          output="artifacts/splash-android-preview"
+          aapt_path=
           package_name=
+          launch_activity=
 
           collect_diagnostics() {
             status=$?
             trap - EXIT
             set +e
-            mkdir -p "$preview"
+            mkdir -p "$output"
 
             if [ -z "${package_name:-}" ] &&
-               [ -x "$aapt" ] &&
+               [ -x "${aapt_path:-}" ] &&
                [ -f "$apk" ]; then
-              package_name=$("$aapt" dump badging "$apk" 2>/dev/null |
+              package_name=$("$aapt_path" dump badging "$apk" 2>/dev/null |
                 sed -n "s/^package: name='\([^']*\)'.*/\1/p")
             fi
 
-            if command -v adb >/dev/null 2>&1; then
-              adb logcat -d > "$preview/logcat.txt" 2>&1
+            if command -v adb >/dev/null 2>&1 &&
+               adb get-state >/dev/null 2>&1; then
+              adb logcat -d -v threadtime > "$output/logcat.txt" 2>&1
               {
                 adb shell wm size
                 adb shell wm density
-              } > "$preview/display-size-density.txt" 2>&1
-              adb shell dumpsys display > "$preview/display-metadata.txt" 2>&1
+              } > "$output/display-size-density.txt" 2>&1
+              adb shell dumpsys display > "$output/display-metadata.txt" 2>&1
               adb shell dumpsys activity activities \
-                > "$preview/activity-state.txt" 2>&1
+                > "$output/activity-state.txt" 2>&1
 
               if [ -n "${package_name:-}" ]; then
                 adb shell dumpsys package "$package_name" \
-                  > "$preview/package-metadata.txt" 2>&1
+                  > "$output/package-metadata.txt" 2>&1
                 adb shell pm path "$package_name" \
-                  > "$preview/package-path.txt" 2>&1
+                  > "$output/package-path.txt" 2>&1
                 {
                   adb shell pidof "$package_name"
                   adb shell ps -A
-                } > "$preview/process-state.txt" 2>&1
+                } > "$output/process-state.txt" 2>&1
               else
                 echo "Package name was not discoverable." \
-                  > "$preview/package-metadata.txt"
+                  > "$output/package-metadata.txt"
                 echo "Package name was not discoverable." \
-                  > "$preview/package-path.txt"
-                adb shell ps -A > "$preview/process-state.txt" 2>&1
+                  > "$output/package-path.txt"
+                adb shell ps -A > "$output/process-state.txt" 2>&1
               fi
             else
-              echo "adb is unavailable." > "$preview/logcat.txt"
-              echo "adb is unavailable." > "$preview/display-size-density.txt"
-              echo "adb is unavailable." > "$preview/display-metadata.txt"
-              echo "adb is unavailable." > "$preview/activity-state.txt"
-              echo "adb is unavailable." > "$preview/package-metadata.txt"
-              echo "adb is unavailable." > "$preview/package-path.txt"
-              echo "adb is unavailable." > "$preview/process-state.txt"
+              echo "adb or the emulator is unavailable." > "$output/logcat.txt"
+              echo "adb or the emulator is unavailable." \
+                > "$output/display-size-density.txt"
+              echo "adb or the emulator is unavailable." \
+                > "$output/display-metadata.txt"
+              echo "adb or the emulator is unavailable." \
+                > "$output/activity-state.txt"
+              echo "adb or the emulator is unavailable." \
+                > "$output/package-metadata.txt"
+              echo "adb or the emulator is unavailable." \
+                > "$output/package-path.txt"
+              echo "adb or the emulator is unavailable." \
+                > "$output/process-state.txt"
             fi
 
             exit "$status"
           }
           trap 'collect_diagnostics' EXIT
 
-          "$aapt" dump badging "$apk" | tee "$preview/aapt-badging.txt"
-          package_name=$("$aapt" dump badging "$apk" |
+          test -f "$apk"
+          aapt_path="$(ls "$ANDROID_HOME"/build-tools/*/aapt |
+            sort -V |
+            tail -n 1)"
+          test -x "$aapt_path"
+          "$aapt_path" dump badging "$apk" > "$output/aapt-badging.txt"
+          package_name=$("$aapt_path" dump badging "$apk" |
             sed -n "s/^package: name='\([^']*\)'.*/\1/p")
-          launch_activity=$("$aapt" dump badging "$apk" |
+          launch_activity=$("$aapt_path" dump badging "$apk" |
             sed -n "s/^launchable-activity: name='\([^']*\)'.*/\1/p")
           test -n "$package_name"
           test -n "$launch_activity"
 
-          if adb install -r "$apk" > "$preview/install.log" 2>&1; then
+          adb wait-for-device
+          adb shell input keyevent KEYCODE_WAKEUP
+          adb shell wm dismiss-keyguard
+          adb shell wm size 1080x1920
+          adb shell wm density 420
+          adb shell settings put secure immersive_mode_confirmations confirmed
+
+          if adb install -r "$apk" > "$output/install.log" 2>&1; then
             :
           else
             status=$?
@@ -238,7 +265,7 @@ jobs:
           if adb shell am start -W \
               -n "$package_name/$launch_activity" \
               --es hol_capture_screen splash \
-              > "$preview/start.log" 2>&1; then
+              > "$output/start.log" 2>&1; then
             :
           else
             status=$?
@@ -247,47 +274,69 @@ jobs:
 
           ready=0
           for attempt in $(seq 1 60); do
-            adb logcat -d > "$preview/logcat.txt"
-            if grep -Fq "HOL_SPLASH_CAPTURE_READY" "$preview/logcat.txt"; then
+            adb logcat -d -v brief > "$output/marker-logcat.txt"
+            if grep -Fq "HOL_SPLASH_CAPTURE_READY" \
+                "$output/marker-logcat.txt"; then
               ready=1
               break
             fi
             sleep 1
           done
-          test "$ready" -eq 1
-          test "$(grep -Fc "HOL_SPLASH_CAPTURE_READY" "$preview/logcat.txt")" -eq 1
+          if [ "$ready" -ne 1 ]; then
+            echo "::error::Timed out waiting for HOL_SPLASH_CAPTURE_READY"
+            exit 1
+          fi
+          marker_count=$(grep -Fc "HOL_SPLASH_CAPTURE_READY" \
+            "$output/marker-logcat.txt" || true)
+          if [ "$marker_count" -ne 1 ]; then
+            echo "::error::Expected exactly one HOL_SPLASH_CAPTURE_READY marker"
+            exit 1
+          fi
 
-          adb exec-out screencap -p > "$preview/splash.png"
+          adb exec-out screencap -p > "$output/splash.png"
 
-      - name: Validate capture and record hashes
-        shell: bash
-        run: |
-          set -euo pipefail
-          node <<'NODE'
-          const fs = require('fs');
-          const path = 'build/Android/preview/splash.png';
-          const png = fs.readFileSync(path);
-          const signature = '89504e470d0a1a0a';
-          if (png.subarray(0, 8).toString('hex') !== signature ||
-              png.subarray(12, 16).toString('ascii') !== 'IHDR') {
-            throw new Error('splash.png does not have a valid PNG IHDR');
-          }
-          const width = png.readUInt32BE(16);
-          const height = png.readUInt32BE(20);
-          if (width !== 1080 || height !== 1920) {
-            throw new Error(`Expected 1080x1920 PNG, got ${width}x${height}`);
-          }
-          console.log(`Validated ${width}x${height} PNG IHDR`);
-          NODE
-          sha256sum \
-            build/Android/HOL-splash-debug.apk \
-            build/Android/preview/splash.png \
-            | tee build/Android/preview/SHA256SUMS
+          python3 - "$output/splash.png" <<'PY'
+          import struct
+          import sys
 
-      - name: Upload Splash Android preview
+          path = sys.argv[1]
+          with open(path, "rb") as image:
+              header = image.read(24)
+          if header[:8] != b"\x89PNG\r\n\x1a\n" or header[12:16] != b"IHDR":
+              raise SystemExit(f"{path}: invalid PNG IHDR")
+          width, height = struct.unpack(">II", header[16:24])
+          if (width, height) != (1080, 1920):
+              raise SystemExit(
+                  f"{path}: expected 1080x1920, got {width}x{height}")
+          print(f"{path}: {width}x{height}")
+          PY
+
+          (
+            cd "$output"
+            sha256sum \
+              HOL-splash-debug.apk \
+              splash.png > SHA256SUMS
+          )
+          CAPTURE_SCRIPT
+          chmod +x "$RUNNER_TEMP/splash-capture.sh"
+
+      - name: Boot API 35 x86_64 emulator and capture Splash
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          profile: pixel_2
+          emulator-boot-timeout: 1200
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: ${{ runner.temp }}/splash-capture.sh
+
+      - name: Upload complete Splash Android preview artifact
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: hol-splash-android-preview
-          path: build/Android
+          path: artifacts/splash-android-preview
+          if-no-files-found: error
           retention-days: 7
