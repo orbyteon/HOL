@@ -73,7 +73,6 @@ public class PvpGameController : MonoBehaviour
     string shownGuessKey = "";
     bool matchOver;
     bool guessInFlight;
-    int localAcceptedGuessCount;
 
     // The player's own narrowing interval on the opponent's number. PvP used to
     // show no range at all while solo play did; it is also what tells us how
@@ -274,7 +273,6 @@ public class PvpGameController : MonoBehaviour
             guessInFlight = false;
             if (ok)
             {
-                localAcceptedGuessCount++;
                 lockArmed = false;
                 if (staked) LockIntro.MarkUsed();
                 NarrowMyRange(guess, lastState != null ? lastState.lastHint : "");
@@ -317,9 +315,7 @@ public class PvpGameController : MonoBehaviour
         if (!client.IsServerAuthoritative) return;
         if (signalsSent >= Signals.CapPerSide)
         {
-            string limit = L10n.Get("signal_limit");
-            if (signalFeedText != null) signalFeedText.text = limit;
-            if (resultSignalFeedText != null) resultSignalFeedText.text = limit;
+            SetSignalFeed(L10n.Get("signal_limit"));
             return;
         }
 
@@ -329,9 +325,16 @@ public class PvpGameController : MonoBehaviour
         // Show it locally straight away — the sender should never wait a poll
         // interval to see their own message land.
         ShowSignalLine(L10n.Get("you"), signalId);
+        int sentMatchIndex = lastState.matchIndex;
         client.SendSignal(signalId, ok =>
         {
-            if (!ok && signalsSent > 0) signalsSent--;
+            if (ok || lastState == null ||
+                lastState.matchIndex != sentMatchIndex)
+                return;
+
+            if (signalsSent > 0) signalsSent--;
+            SetSignalFeed(L10n.Get("pvp_network_error"));
+            RefreshSignalsAvailability();
         });
     }
 
@@ -412,7 +415,6 @@ public class PvpGameController : MonoBehaviour
     {
         matchOver = false;
         guessInFlight = false;
-        localAcceptedGuessCount = 0;
         shownGuessKey = "";
         silentPolls = 0;
         lastStateSignature = "";
@@ -430,6 +432,7 @@ public class PvpGameController : MonoBehaviour
         RefreshLockButton();
         RefreshSignalsAvailability();
         if (signalFeedText != null) signalFeedText.text = "";
+        if (resultSignalFeedText != null) resultSignalFeedText.text = "";
         client.OnRoomClosed = HandleRoomClosed;
         client.OnConnectionLost = HandleConnectionLost;
         client.StartPolling(OnState);
@@ -475,6 +478,7 @@ public class PvpGameController : MonoBehaviour
         lastState = s;
 
         string me = client.IsHost ? "host" : "guest";
+        string them = client.IsHost ? "guest" : "host";
         string signature = s.phase + "|" + s.turn + "|" + s.lastBy + "|" +
                            s.lastGuess + "|" + s.winner + "|" + s.hostGuessCount +
                            "|" + s.guestGuessCount + "|" + s.matchIndex + "|" +
@@ -567,17 +571,8 @@ public class PvpGameController : MonoBehaviour
 
             bool isDraw = s.winner == "draw";
             bool iWon = !isDraw && s.winner == me;
-            int authoritativeGuessCount = client.IsHost ? s.hostGuessCount : s.guestGuessCount;
-            // The poll can deliver the finished state before the winning
-            // submit's own response returns; that in-flight guess is mine and
-            // accepted (the state says so), so count it.
-            int localCount = localAcceptedGuessCount;
-            if (guessInFlight && s.lastBy == me)
-                localCount++;
-            int myGuessCount = authoritativeGuessCount > 0 ? authoritativeGuessCount : localCount;
-            int opponentGuessCount = client.IsHost
-                ? s.guestGuessCount
-                : s.hostGuessCount;
+            int myGuessCount = s.GuessCountFor(me);
+            int opponentGuessCount = s.GuessCountFor(them);
             int huntedSecret = s.revealedSecret;
 
             if (isDraw)
@@ -591,17 +586,6 @@ public class PvpGameController : MonoBehaviour
             turnText.text = "";
             lockArmed = false;
             RefreshLockButton();
-            if (resultPresentation != null)
-            {
-                string title = isDraw
-                    ? L10n.Get("result_draw_title")
-                    : iWon
-                        ? L10n.Get("result_win_title")
-                        : L10n.Get("result_loss_title");
-                resultPresentation.Show(title, myGuessCount,
-                    opponentGuessCount, huntedSecret);
-            }
-            RefreshSignalsAvailability();
 
             if (isDraw)
             {
@@ -624,6 +608,17 @@ public class PvpGameController : MonoBehaviour
                 Haptics.Error();
                 GameEvents.MatchCompleted(PvpOutcome(s, MatchOutcome.Result.Loss, myGuessCount));
             }
+            if (resultPresentation != null)
+            {
+                string title = isDraw
+                    ? L10n.Get("result_draw_title")
+                    : iWon
+                        ? L10n.Get("result_win_title")
+                        : L10n.Get("result_loss_title");
+                resultPresentation.Show(title, myGuessCount,
+                    opponentGuessCount, huntedSecret);
+            }
+            RefreshSignalsAvailability();
             if (audioSource != null && !isDraw)
             {
                 var clip = iWon ? winSound : loseSound;
@@ -756,7 +751,6 @@ public class PvpGameController : MonoBehaviour
         matchOver = false;
         guessInFlight = false;
         rematchInFlight = false;
-        localAcceptedGuessCount = 0;
         shownGuessKey = "";
         silentPolls = 0;
         donePolls = 0;
@@ -772,6 +766,7 @@ public class PvpGameController : MonoBehaviour
         if (resultText != null) resultText.text = "";
         if (historyText != null) historyText.text = "";
         if (signalFeedText != null) signalFeedText.text = "";
+        if (resultSignalFeedText != null) resultSignalFeedText.text = "";
         if (guessInput != null) guessInput.text = "";
 
         UpdateRangeText();
@@ -883,7 +878,11 @@ public class PvpGameController : MonoBehaviour
 
     void ShowSignalLine(string who, int signalId)
     {
-        string line = L10n.Get("signal_from", who, Signals.Text(signalId));
+        SetSignalFeed(L10n.Get("signal_from", who, Signals.Text(signalId)));
+    }
+
+    void SetSignalFeed(string line)
+    {
         if (signalFeedText != null) signalFeedText.text = line;
         if (resultSignalFeedText != null) resultSignalFeedText.text = line;
     }

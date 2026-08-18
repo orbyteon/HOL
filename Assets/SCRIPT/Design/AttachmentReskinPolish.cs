@@ -226,6 +226,12 @@ public sealed class AttachmentReskinPolish : MonoBehaviour
 
         if (pvp.matchPanel == null || !pvp.matchPanel.activeInHierarchy) return;
         var matchRoot = pvp.matchPanel.transform;
+        var approvedResult = DeepFind(matchRoot, "ResultVisualRoot");
+        if (approvedResult != null && approvedResult.gameObject.activeInHierarchy)
+        {
+            SetActive(DeepFind(matchRoot, "BoardPvpTrophyVector"), false);
+            return;
+        }
         EnsureVsBurst(matchRoot);
 
         bool result = pvp.resultText != null && !string.IsNullOrEmpty(pvp.resultText.text);

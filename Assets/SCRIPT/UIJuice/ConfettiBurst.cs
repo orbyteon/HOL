@@ -38,6 +38,8 @@ public class ConfettiBurst : MonoBehaviour
     readonly List<Piece> live = new List<Piece>();
     Coroutine secondaryRoutine;
     Coroutine popRoutine;
+    Vector3 popBaseScale = Vector3.one;
+    bool popBaseCaptured;
 
     public void Burst()
     {
@@ -47,9 +49,18 @@ public class ConfettiBurst : MonoBehaviour
         if (secondaryPieces > 0)
             secondaryRoutine = StartCoroutine(SecondaryBurst());
 
-        if (popRoutine != null) StopCoroutine(popRoutine);
+        if (popRoutine != null)
+        {
+            StopCoroutine(popRoutine);
+            if (popTarget != null && popBaseCaptured)
+                popTarget.localScale = popBaseScale;
+        }
         if (popTarget != null)
+        {
+            popBaseScale = popTarget.localScale;
+            popBaseCaptured = true;
             popRoutine = StartCoroutine(PopTarget());
+        }
     }
 
     void Spawn(int count, float forceScale)
@@ -96,8 +107,7 @@ public class ConfettiBurst : MonoBehaviour
 
     IEnumerator PopTarget()
     {
-        Vector3 baseScale = popTarget.localScale;
-        popTarget.localScale = baseScale * 0.76f;
+        popTarget.localScale = popBaseScale * 0.76f;
 
         const float rise = 0.14f;
         const float settle = 0.20f;
@@ -107,7 +117,7 @@ public class ConfettiBurst : MonoBehaviour
             elapsed += Time.unscaledDeltaTime;
             float t = Mathf.Clamp01(elapsed / rise);
             popTarget.localScale = Vector3.Lerp(
-                baseScale * 0.76f, baseScale * 1.12f, t);
+                popBaseScale * 0.76f, popBaseScale * 1.12f, t);
             yield return null;
         }
 
@@ -117,11 +127,11 @@ public class ConfettiBurst : MonoBehaviour
             elapsed += Time.unscaledDeltaTime;
             float t = Mathf.Clamp01(elapsed / settle);
             popTarget.localScale = Vector3.Lerp(
-                baseScale * 1.12f, baseScale, t);
+                popBaseScale * 1.12f, popBaseScale, t);
             yield return null;
         }
 
-        popTarget.localScale = baseScale;
+        popTarget.localScale = popBaseScale;
         popRoutine = null;
     }
 
@@ -130,6 +140,8 @@ public class ConfettiBurst : MonoBehaviour
         StopAllCoroutines();
         secondaryRoutine = null;
         popRoutine = null;
+        if (popTarget != null && popBaseCaptured)
+            popTarget.localScale = popBaseScale;
 
         for (int i = live.Count - 1; i >= 0; i--)
             if (live[i].rt != null)

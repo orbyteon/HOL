@@ -630,6 +630,15 @@ public sealed class AttachmentReskinVisuals : MonoBehaviour
     {
         var root = pvp.matchPanel.transform;
         bool result = pvp.resultText != null && !string.IsNullOrEmpty(pvp.resultText.text);
+        var approvedResult = DeepFind(root, "ResultVisualRoot");
+        if (result && approvedResult != null)
+        {
+            SetActive(DeepFind(root, "BoardPvpResultLogo"), false);
+            SetActive(DeepFind(root, "BoardPvpResultPlayer"), false);
+            SetActive(DeepFind(root, "BoardPvpResultStats"), false);
+            SetActive(DeepFind(root, "BoardPvpTrophyVector"), false);
+            return;
+        }
         if (result)
         {
             ApplyPvpResult(pvp, root);

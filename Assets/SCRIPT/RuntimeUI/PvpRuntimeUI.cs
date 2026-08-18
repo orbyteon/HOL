@@ -364,8 +364,7 @@ public class PvpRuntimeUI : MonoBehaviour
             // The drawn signal icons ship in Resources so no scene wiring is
             // needed; a missing or unimportable icon leaves the text button
             // exactly as it was. An EditMode test holds the load path green.
-            var icon = Resources.Load<Sprite>("design/" + Signals.Key(i));
-            if (icon != null)
+            if (Resources.Load<Sprite>("design/" + Signals.Key(i)) != null)
             {
                 var iconGo = RuntimeUI.CreateObject("Icon", signalBtn.transform);
                 ConvergingLight.Center(iconGo, new Vector2(-135f, 0f), new Vector2(40f, 40f));
@@ -621,7 +620,7 @@ public class PvpRuntimeUI : MonoBehaviour
             new Vector2(0f, 27f), new Vector2(760f, 64f));
         RuntimeUI.LocalizePlaceholder(rematchSecret, "rematch_prompt");
         var rematch = RuntimeUI.CreateButton(rematchCard.transform,
-            "ResultRematchButton", L10n.Get("rematch"),
+            "ResultConfirmRematchButton", L10n.Get("rematch"),
             new Vector2(-205f, -62f), new Vector2(370f, 72f),
             ConsumerTokens.Gold, DarkLabel);
         RuntimeUI.Localize(rematch, "rematch");

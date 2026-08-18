@@ -162,6 +162,62 @@ public class ExactReferenceAssetsTests
     }
 
     [Test]
+    public void ResultPresentationPaintsAuthoritativeValues()
+    {
+        var root = new GameObject("ResultPresentation", typeof(RectTransform));
+        try
+        {
+            var presentation = root.AddComponent(RuntimeType(
+                "PvpResultPresentation"));
+            var title = TmpText(root.transform, "Title");
+            var mine = TmpText(root.transform, "Mine");
+            var theirs = TmpText(root.transform, "Theirs");
+            var revealed = TmpText(root.transform, "Revealed");
+
+            SetPublicField(presentation, "titleText", title);
+            SetPublicField(presentation, "playerAttemptsText", mine);
+            SetPublicField(presentation, "opponentAttemptsText", theirs);
+            SetPublicField(presentation, "revealedNumberText", revealed);
+
+            InvokePublic(presentation, "Show", "WIN", 5, 7, 67);
+
+            Assert.AreEqual("WIN", TextOf(title));
+            Assert.AreEqual("5", TextOf(mine));
+            Assert.AreEqual("7", TextOf(theirs));
+            Assert.IsTrue(TextOf(revealed).Contains("67"));
+        }
+        finally
+        {
+            Object.DestroyImmediate(root);
+        }
+    }
+
+    [Test]
+    public void InterruptedVictoryPopRestoresTargetScale()
+    {
+        var root = new GameObject("Confetti", typeof(RectTransform));
+        var target = Child(root.transform, "PopTarget");
+        try
+        {
+            var confetti = root.AddComponent(RuntimeType("ConfettiBurst"));
+            var rect = (RectTransform)target.transform;
+            rect.localScale = new Vector3(0.82f, 0.82f, 0.82f);
+
+            SetPublicField(confetti, "popTarget", rect);
+            SetPrivateField(confetti, "popBaseScale", Vector3.one);
+            SetPrivateField(confetti, "popBaseCaptured", true);
+            InvokePrivate(confetti, "OnDisable");
+
+            Assert.AreEqual(1f, rect.localScale.x, 0.001f);
+            Assert.AreEqual(1f, rect.localScale.y, 0.001f);
+        }
+        finally
+        {
+            Object.DestroyImmediate(root);
+        }
+    }
+
+    [Test]
     public void ApprovedLayerDisablesLegacyScenePresentation()
     {
         var legacyObject = new GameObject("LegacyDesign");
@@ -254,6 +310,45 @@ public class ExactReferenceAssetsTests
             if (child.name == name)
                 count++;
         return count;
+    }
+
+    static Component TmpText(Transform parent, string name)
+    {
+        var type = System.Type.GetType(
+            "TMPro.TextMeshProUGUI, Unity.TextMeshPro");
+        Assert.IsNotNull(type);
+        var go = Child(parent, name);
+        return go.AddComponent(type);
+    }
+
+    static string TextOf(Component text)
+    {
+        return (string)text.GetType().GetProperty("text").GetValue(text, null);
+    }
+
+    static void SetPublicField(Component component, string name, object value)
+    {
+        var field = component.GetType().GetField(name,
+            BindingFlags.Public | BindingFlags.Instance);
+        Assert.IsNotNull(field, "Missing public field: " + name);
+        field.SetValue(component, value);
+    }
+
+    static void SetPrivateField(Component component, string name, object value)
+    {
+        var field = component.GetType().GetField(name,
+            BindingFlags.NonPublic | BindingFlags.Instance);
+        Assert.IsNotNull(field, "Missing private field: " + name);
+        field.SetValue(component, value);
+    }
+
+    static void InvokePublic(Component component, string methodName,
+        params object[] arguments)
+    {
+        var method = component.GetType().GetMethod(
+            methodName, BindingFlags.Instance | BindingFlags.Public);
+        Assert.IsNotNull(method, "Missing public method: " + methodName);
+        method.Invoke(component, arguments);
     }
 
     static void InvokePrivate(Component component, string methodName, params object[] arguments)
