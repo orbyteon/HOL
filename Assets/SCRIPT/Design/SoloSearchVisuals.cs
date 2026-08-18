@@ -43,6 +43,7 @@ public sealed class SoloSearchVisuals : MonoBehaviour
         if (rect == null) return;
         rect.anchoredPosition = new Vector2(0f, -680f);
         rect.sizeDelta = new Vector2(480f, 100f);
+        RuntimeUI.ClampToSafeArea(rect, rect.sizeDelta, rect.anchoredPosition);
     }
 
     void Build()

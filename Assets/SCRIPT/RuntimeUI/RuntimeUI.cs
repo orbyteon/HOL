@@ -127,6 +127,14 @@ public static class RuntimeUI
             Debug.LogWarning("HOL UI: page touch target below 48px: " + rect.name);
     }
 
+    // Public hook for presentation-only layout passes that reposition an
+    // already-built direct child after the initial construction clamp.
+    public static void ClampToSafeArea(RectTransform rect, Vector2 size,
+        Vector2 requested)
+    {
+        ClampPageChild(rect, size, requested);
+    }
+
     public static GameObject CreateObject(string name, Transform parent)
     {
         var go = new GameObject(name, typeof(RectTransform));

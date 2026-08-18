@@ -149,6 +149,7 @@ public sealed class SettingsVisuals : MonoBehaviour
         rect.anchorMax = new Vector2(0.5f, 0.5f);
         rect.anchoredPosition = position;
         rect.sizeDelta = size;
+        RuntimeUI.ClampToSafeArea(rect, size, position);
     }
 
     static T Find<T>(Transform parent, string name) where T : Component
