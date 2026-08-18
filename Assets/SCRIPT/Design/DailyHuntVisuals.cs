@@ -71,6 +71,11 @@ public sealed class DailyHuntVisuals : MonoBehaviour
         rect.sizeDelta = size;
     }
 
+    static void Place(Component target, Vector2 position, Vector2 size)
+    {
+        Place(target == null ? null : target.transform, position, size);
+    }
+
     static T Find<T>(Transform parent, string name) where T : Component
     {
         foreach (var item in parent.GetComponentsInChildren<T>(true))
