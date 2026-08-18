@@ -104,6 +104,12 @@ public class PvpRuntimeUI : MonoBehaviour
 
     void BuildPanels(PvpGameController controller)
     {
+        BuildPanelsLegacy(controller);
+        ReplacePrivateRoomPanels(controller);
+    }
+
+    void BuildPanelsLegacy(PvpGameController controller)
+    {
         // PvP menu: create or join.
         var menuPanel = RuntimeUI.FullscreenPanel(transform, "PvPMenuPanel", PanelColor);
         NeonBackdrop(menuPanel);
@@ -466,6 +472,189 @@ public class PvpRuntimeUI : MonoBehaviour
         createPanel.SetActive(false);
         joinPanel.SetActive(false);
         matchPanel.SetActive(false);
+    }
+
+    static Image AddSprite(Transform parent, string name, string resource,
+        Vector2 position, Vector2 size, float alpha = 1f)
+    {
+        var sprite = Resources.Load<Sprite>(resource);
+        if (sprite == null) return null;
+        var go = RuntimeUI.CreateObject(name, parent);
+        ConvergingLight.Center(go, position, size);
+        var image = go.AddComponent<Image>();
+        image.sprite = sprite;
+        image.preserveAspect = true;
+        image.color = new Color(1f, 1f, 1f, alpha);
+        image.raycastTarget = false;
+        return image;
+    }
+
+    static TextMeshProUGUI AddLocalizedText(Transform parent, string name,
+        string key, int fontSize, Vector2 position, Vector2 size, Color color)
+    {
+        var text = RuntimeUI.CreateText(parent, name, L10n.Get(key), fontSize,
+            position, size, color);
+        RuntimeUI.Localize(text, key);
+        return text;
+    }
+
+    static void AddRoomTip(Transform parent, Vector2 position)
+    {
+        var card = NeonFrame.Frame(parent, "TipCard", position,
+            new Vector2(860f, 190f), ConsumerTokens.Gold, 0.82f, true,
+            ConsumerTokens.Surface);
+        AddSprite(card.transform, "TipIcon", "design/signal_luck",
+            new Vector2(-330f, 0f), new Vector2(72f, 72f));
+        AddLocalizedText(card.transform, "TipText", "private_room_tip", 26,
+            new Vector2(90f, 0f), new Vector2(620f, 140f),
+            ConvergingLight.NearWhite);
+    }
+
+    void ReplacePrivateRoomPanels(PvpGameController controller)
+    {
+        if (controller.pvpMenuPanel != null) controller.pvpMenuPanel.SetActive(false);
+        if (controller.createPanel != null) controller.createPanel.SetActive(false);
+        if (controller.joinPanel != null) controller.joinPanel.SetActive(false);
+
+        var menu = BuildPortraitPanel(transform, "PvPMenuPanel");
+        AddLocalizedText(menu.transform, "PageTitle",
+            "private_room_title", 30, new Vector2(0f, 800f),
+            new Vector2(720f, 70f), ConvergingLight.NearWhite);
+        AddSprite(menu.transform, "Logo", "reference/hol_logo_exact",
+            new Vector2(0f, 620f), new Vector2(500f, 240f));
+        var ribbon = NeonFrame.Frame(menu.transform, "TitleRibbon",
+            new Vector2(0f, 365f), new Vector2(900f, 130f),
+            ConsumerTokens.Magenta, 0.92f, true, ConsumerTokens.CardPink);
+        AddLocalizedText(ribbon.transform, "Title", "private_room_title", 48,
+            Vector2.zero, new Vector2(860f, 110f), ConvergingLight.NearWhite);
+
+        var create = RuntimeUI.CreateButton(menu.transform, "CreateButton",
+            L10n.Get("pvp_create_room"), new Vector2(0f, 40f),
+            new Vector2(860f, 330f), ConsumerTokens.Cyan, DarkLabel);
+        ForceProceduralButton(create, ConsumerTokens.Cyan);
+        AddSprite(create.transform, "FriendArt", "reference/player_cyan_exact",
+            new Vector2(-255f, 22f), new Vector2(250f, 220f));
+        AddSprite(create.transform, "GirlArt", "reference/char_girl_exact",
+            new Vector2(-70f, 4f), new Vector2(190f, 180f));
+        AddLocalizedText(create.transform, "Hint", "private_room_create_hint", 25,
+            new Vector2(245f, 54f), new Vector2(300f, 84f),
+            ConvergingLight.NearWhite);
+        RuntimeUI.Localize(create, "pvp_create_room");
+
+        var join = RuntimeUI.CreateButton(menu.transform, "JoinButton",
+            L10n.Get("pvp_join_room"), new Vector2(0f, -315f),
+            new Vector2(860f, 330f), ConsumerTokens.Magenta, DarkLabel);
+        ForceProceduralButton(join, ConsumerTokens.Magenta);
+        AddSprite(join.transform, "DoorArt", "reference/board_join_exact",
+            new Vector2(-250f, 20f), new Vector2(220f, 190f));
+        AddLocalizedText(join.transform, "JoinTitle", "private_room_join_title", 30,
+            new Vector2(220f, 78f), new Vector2(400f, 72f),
+            ConvergingLight.NearWhite);
+        AddLocalizedText(join.transform, "CodeCaption", "pvp_enter_code", 22,
+            new Vector2(220f, -8f), new Vector2(360f, 48f),
+            ConvergingLight.WithAlpha(ConvergingLight.NearWhite, 0.75f));
+        RuntimeUI.Localize(join, "pvp_join_room");
+
+        var share = RuntimeUI.CreateButton(menu.transform, "ShareButton",
+            L10n.Get("private_room_share"), new Vector2(0f, -560f),
+            new Vector2(300f, 72f), ConsumerTokens.SurfaceElevated);
+        RuntimeUI.Localize(share, "private_room_share");
+        AddRoomTip(menu.transform, new Vector2(0f, -720f));
+        var back = RuntimeUI.CreateButton(menu.transform, L10n.Get("back"),
+            L10n.Get("back"), new Vector2(0f, -850f),
+            new Vector2(260f, 70f), ConsumerTokens.SurfaceElevated);
+        RuntimeUI.Localize(back, "back");
+
+        var createPanel = BuildPortraitPanel(transform, "PvPCreatePanel");
+        AddSprite(createPanel.transform, "Logo", "reference/hol_logo_exact",
+            new Vector2(0f, 690f), new Vector2(470f, 220f));
+        AddLocalizedText(createPanel.transform, "Title", "pvp_create_room", 48,
+            new Vector2(0f, 470f), new Vector2(820f, 90f),
+            ConvergingLight.NearWhite);
+        var createSecret = RuntimeUI.CreateInputField(createPanel.transform,
+            "SecretInput", L10n.Get("pvp_secret"), new Vector2(0f, 300f),
+            new Vector2(650f, 100f));
+        var createGo = RuntimeUI.CreateButton(createPanel.transform,
+            "ConfirmCreateButton", L10n.Get("confirm"), new Vector2(0f, 150f),
+            new Vector2(600f, 100f), ConsumerTokens.Gold, DarkLabel);
+        var codeFrame = NeonFrame.Frame(createPanel.transform, "RoomCodeFrame",
+            new Vector2(0f, -40f), new Vector2(850f, 250f),
+            ConsumerTokens.Cyan, 0.9f, true, ConsumerTokens.Surface);
+        AddLocalizedText(codeFrame.transform, "CodeCaption", "pvp_enter_code",
+            26, new Vector2(0f, 70f), new Vector2(760f, 50f),
+            ConvergingLight.WithAlpha(ConvergingLight.NearWhite, 0.75f));
+        var codeText = RuntimeUI.CreateText(codeFrame.transform, "RoomCode",
+            "-----", 84, new Vector2(0f, -22f), new Vector2(760f, 130f));
+        var copyBtn = RuntimeUI.CreateButton(createPanel.transform, "CopyButton",
+            L10n.Get("private_room_share"), new Vector2(0f, -220f),
+            new Vector2(400f, 84f), ConsumerTokens.Cyan, DarkLabel);
+        var createStatus = RuntimeUI.CreateText(createPanel.transform, "Status",
+            "", 28, new Vector2(0f, -365f), new Vector2(820f, 100f));
+        var createBack = RuntimeUI.CreateButton(createPanel.transform, "BackButton",
+            L10n.Get("back"), new Vector2(0f, -520f), new Vector2(260f, 70f),
+            ConsumerTokens.SurfaceElevated);
+        RuntimeUI.LocalizePlaceholder(createSecret, "pvp_secret");
+        RuntimeUI.Localize(createGo, "confirm");
+        RuntimeUI.Localize(copyBtn, "private_room_share");
+        RuntimeUI.Localize(createBack, "back");
+
+        var joinPanel = BuildPortraitPanel(transform, "PvPJoinPanel");
+        AddSprite(joinPanel.transform, "Logo", "reference/hol_logo_exact",
+            new Vector2(0f, 690f), new Vector2(470f, 220f));
+        AddLocalizedText(joinPanel.transform, "Title", "private_room_join_title", 48,
+            new Vector2(0f, 470f), new Vector2(820f, 90f),
+            ConvergingLight.NearWhite);
+        var joinCode = RuntimeUI.CreateInputField(joinPanel.transform, "CodeInput",
+            L10n.Get("pvp_enter_code"), new Vector2(0f, 290f),
+            new Vector2(650f, 110f), 5, TMP_InputField.ContentType.Standard);
+        joinCode.onValidateInput = (text, index, ch) => char.ToUpperInvariant(ch);
+        var joinSecret = RuntimeUI.CreateInputField(joinPanel.transform,
+            "SecretInput", L10n.Get("pvp_secret"), new Vector2(0f, 140f),
+            new Vector2(650f, 100f));
+        var joinGo = RuntimeUI.CreateButton(joinPanel.transform,
+            "ConfirmJoinButton", L10n.Get("confirm"), new Vector2(0f, -10f),
+            new Vector2(600f, 100f), ConsumerTokens.Gold, DarkLabel);
+        var joinStatus = RuntimeUI.CreateText(joinPanel.transform, "Status",
+            "", 28, new Vector2(0f, -185f), new Vector2(820f, 100f));
+        var joinBack = RuntimeUI.CreateButton(joinPanel.transform, "BackButton",
+            L10n.Get("back"), new Vector2(0f, -360f), new Vector2(260f, 70f),
+            ConsumerTokens.SurfaceElevated);
+        RuntimeUI.LocalizePlaceholder(joinCode, "pvp_enter_code");
+        RuntimeUI.LocalizePlaceholder(joinSecret, "pvp_secret");
+        RuntimeUI.Localize(joinGo, "confirm");
+        RuntimeUI.Localize(joinBack, "back");
+
+        controller.pvpMenuPanel = menu;
+        controller.createPanel = createPanel;
+        controller.joinPanel = joinPanel;
+        controller.createSecretInput = createSecret;
+        controller.roomCodeText = codeText;
+        controller.createStatusText = createStatus;
+        controller.joinCodeInput = joinCode;
+        controller.joinSecretInput = joinSecret;
+        controller.joinStatusText = joinStatus;
+
+        create.onClick.AddListener(() => ShowOnly(controller, createPanel));
+        join.onClick.AddListener(() => ShowOnly(controller, joinPanel));
+        back.onClick.AddListener(controller.ClosePvpMenu);
+        createGo.onClick.AddListener(controller.OnCreateRoomPressed);
+        copyBtn.onClick.AddListener(controller.OnCopyInvitePressed);
+        createBack.onClick.AddListener(controller.CancelRoomAndLeave);
+        joinGo.onClick.AddListener(controller.OnJoinRoomPressed);
+        joinBack.onClick.AddListener(controller.CancelRoomAndLeave);
+        createSecret.onSubmit.AddListener(_ => controller.OnCreateRoomPressed());
+        joinCode.onSubmit.AddListener(_ => controller.OnJoinRoomPressed());
+        joinSecret.onSubmit.AddListener(_ => controller.OnJoinRoomPressed());
+
+        menu.SetActive(false);
+        createPanel.SetActive(false);
+        joinPanel.SetActive(false);
+    }
+
+    static GameObject BuildPortraitPanel(Transform parent, string name)
+    {
+        var panel = RuntimeUI.FullscreenPanel(parent, name, PanelColor);
+        return panel;
     }
 
     void InjectEntryButton(PvpGameController controller)

@@ -118,6 +118,13 @@ public static class L10n
         { "pvp_guess",               new[] { "Guess", "Μάντεψε" } },
         { "pvp_leave",               new[] { "Leave match", "Έξοδος από τον αγώνα" } },
         { "pvp_copy",                new[] { "Copy invite", "Αντιγραφή πρόσκλησης" } },
+        { "private_room_title",      new[] { "Play with a friend", "Παίξε με φίλο" } },
+        { "private_room_create_hint",new[] { "Share the code with your friend", "Μοιράσου τον κωδικό με τον φίλο σου" } },
+        { "private_room_join_title", new[] { "Join a room", "Συμμετοχή σε δωμάτιο" } },
+        { "private_room_share",      new[] { "Share", "Μοιράσου" } },
+        { "private_room_tip",        new[] {
+            "Share the code with your friend to join the same room.",
+            "Μοιράσου τον κωδικό με τον φίλο σου για να μπείτε στο ίδιο δωμάτιο." } },
         { "pvp_creating",            new[] { "Creating room...", "Δημιουργία δωματίου..." } },
         { "pvp_joining",             new[] { "Joining...", "Σύνδεση..." } },
         { "pvp_sending",             new[] { "Sending...", "Αποστολή..." } },
