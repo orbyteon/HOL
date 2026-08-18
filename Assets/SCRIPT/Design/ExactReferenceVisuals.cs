@@ -394,7 +394,8 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
         LayoutPvpMatch(DeepFind(root, "PvPMatchPanel"));
         LayoutDailyHunt(DeepFind(root, "DailyHuntPanel"));
         LayoutSearching(DeepFind(root, "PanelSearching"));
-        LayoutSimpleScreen(DeepFind(root, "PanelPlay"), "ExactPlayLogo");
+        if (gameObject.scene.name != "MainMenu")
+            LayoutSimpleScreen(DeepFind(root, "PanelPlay"), "ExactPlayLogo");
         LayoutSimpleScreen(DeepFind(root, "PanelSettings"), "ExactSettingsLogo");
         LayoutSimpleScreen(DeepFind(root, "PanelGAME"), "ExactSoloLogo");
         LayoutDialog(DeepFind(root, "ConsentPanel"), false);
@@ -709,7 +710,8 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
         {
             string name = button.transform.name;
             if (name == "ButtonPlay" || name == "ButtonPvP" ||
-                name == "DailyHuntButton" || name == "Buttonsettings")
+                name == "DailyHuntButton" || name == "Buttonsettings" ||
+                name == "ButtonBack" || name == "ButtonChallenger")
                 continue;
 
             Color fill = SurfaceRaised;

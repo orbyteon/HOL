@@ -277,10 +277,10 @@ public sealed class AttachmentReskinPolish : MonoBehaviour
         if (root == null) return;
         foreach (var image in root.GetComponentsInChildren<Image>(true))
         {
-            if (IsUnderHomeVisualRoot(image.transform)) continue;
+            if (IsUnderOwnedVisualRoot(image.transform)) continue;
             string name = image.transform.name;
             if (name.StartsWith("Board") || name.StartsWith("Exact") ||
-                name.StartsWith("Home"))
+                name.StartsWith("Home") || name.StartsWith("Play"))
                 continue;
             if (!Contains(name, "Card") && !Contains(name, "Frame")) continue;
             if (image.GetComponent<Button>() != null) continue;
@@ -292,11 +292,12 @@ public sealed class AttachmentReskinPolish : MonoBehaviour
         }
     }
 
-    static bool IsUnderHomeVisualRoot(Transform transform)
+    static bool IsUnderOwnedVisualRoot(Transform transform)
     {
         while (transform != null)
         {
-            if (transform.name == MainMenuHomeVisuals.VisualRootName)
+            if (transform.name == MainMenuHomeVisuals.VisualRootName ||
+                transform.name == MainMenuPlayVisuals.VisualRootName)
                 return true;
             transform = transform.parent;
         }

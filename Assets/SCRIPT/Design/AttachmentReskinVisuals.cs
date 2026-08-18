@@ -140,7 +140,8 @@ public sealed class AttachmentReskinVisuals : MonoBehaviour
             if (gameObject.scene.name != "MainMenu")
                 ApplyHome(menu);
             ApplySimplePanel(menu.settingsPanel == null ? null : menu.settingsPanel.transform);
-            ApplySimplePanel(menu.panelPlay == null ? null : menu.panelPlay.transform);
+            if (gameObject.scene.name != "MainMenu")
+                ApplySimplePanel(menu.panelPlay == null ? null : menu.panelPlay.transform);
             ApplySearching(menu.panelSearching == null ? null : menu.panelSearching.transform);
         }
 
