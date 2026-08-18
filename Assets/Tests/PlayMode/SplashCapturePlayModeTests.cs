@@ -93,16 +93,9 @@ public sealed class SplashCapturePlayModeTests
         ResetCaptureState();
         SetCaptureRequested(true);
 
-        int markerCount = 0;
         Component design = null;
         Component bootstrap = null;
         PropertyInfo settled = null;
-        Application.LogCallback callback = (condition, stackTrace, type) =>
-        {
-            if (condition != "HOL_SPLASH_CAPTURE_READY") return;
-            markerCount++;
-        };
-        Application.logMessageReceived += callback;
 
         try
         {
@@ -127,7 +120,10 @@ public sealed class SplashCapturePlayModeTests
                 scene, RuntimeType("SplashCaptureBootstrap"));
             Assert.That(bootstraps, Has.Count.EqualTo(1));
             bootstrap = bootstraps[0];
-            Assert.That(markerCount, Is.EqualTo(0));
+            var markerLogged = bootstrap.GetType().GetField(
+                "markerLogged", StaticFlags);
+            Assert.That(markerLogged, Is.Not.Null);
+            Assert.That((bool)markerLogged.GetValue(null), Is.False);
 
             var bootstrapBehaviour = (MonoBehaviour)bootstrap;
             bootstrapBehaviour.StopAllCoroutines();
@@ -138,7 +134,7 @@ public sealed class SplashCapturePlayModeTests
                    Time.realtimeSinceStartup < settleDeadline)
                 yield return null;
             Assert.That((bool)settled.GetValue(design, null), Is.True);
-            Assert.That(markerCount, Is.EqualTo(0));
+            Assert.That((bool)markerLogged.GetValue(null), Is.False);
 
             var presentationBarriers = bootstrap.GetType().GetField(
                 "presentationBarriersPassed", InstanceFlags);
@@ -146,9 +142,6 @@ public sealed class SplashCapturePlayModeTests
             var waitStarted = bootstrap.GetType().GetField(
                 "presentationWaitStarted", InstanceFlags);
             Assert.That(waitStarted, Is.Not.Null);
-            var markerLogged = bootstrap.GetType().GetField(
-                "markerLogged", StaticFlags);
-            Assert.That(markerLogged, Is.Not.Null);
             var routineMethod = bootstrap.GetType().GetMethod(
                 "LogReadyAfterPresentation", InstanceFlags);
             Assert.That(routineMethod, Is.Not.Null);
@@ -158,10 +151,12 @@ public sealed class SplashCapturePlayModeTests
             var routine = (IEnumerator)routineMethod.Invoke(bootstrap, null);
             AssertEndOfFrame(routine, presentationBarriers, bootstrap, 0);
             AssertEndOfFrame(routine, presentationBarriers, bootstrap, 1);
+            Assert.That((bool)markerLogged.GetValue(null), Is.False);
+            LogAssert.Expect(LogType.Log, "HOL_SPLASH_CAPTURE_READY");
             Assert.That(routine.MoveNext(), Is.False);
             Assert.That((int)presentationBarriers.GetValue(bootstrap), Is.EqualTo(2));
-            Assert.That(markerCount, Is.EqualTo(1));
             Assert.That((bool)markerLogged.GetValue(null), Is.True);
+            LogAssert.NoUnexpectedReceived();
 
             var duplicateRoutine =
                 (IEnumerator)routineMethod.Invoke(bootstrap, null);
@@ -170,7 +165,8 @@ public sealed class SplashCapturePlayModeTests
             AssertEndOfFrame(
                 duplicateRoutine, presentationBarriers, bootstrap, 3);
             Assert.That(duplicateRoutine.MoveNext(), Is.False);
-            Assert.That(markerCount, Is.EqualTo(1));
+            Assert.That((bool)markerLogged.GetValue(null), Is.True);
+            LogAssert.NoUnexpectedReceived();
         }
         finally
         {
@@ -179,7 +175,6 @@ public sealed class SplashCapturePlayModeTests
                 ((MonoBehaviour)bootstrap).StopAllCoroutines();
                 ((MonoBehaviour)bootstrap).enabled = false;
             }
-            Application.logMessageReceived -= callback;
             ResetCaptureState();
         }
     }
