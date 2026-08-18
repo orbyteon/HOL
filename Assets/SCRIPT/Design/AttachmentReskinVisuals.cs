@@ -309,15 +309,24 @@ public sealed class AttachmentReskinVisuals : MonoBehaviour
         if (pvp.pvpMenuPanel != null && pvp.pvpMenuPanel.activeInHierarchy)
             ApplyPvpMenu(pvp.pvpMenuPanel.transform);
         if (pvp.createPanel != null && pvp.createPanel.activeInHierarchy)
-            ApplyCreatePanel(pvp);
+        {
+            if (DeepFind(pvp.createPanel.transform, "YouCard") == null)
+                ApplyCreatePanel(pvp);
+        }
         if (pvp.joinPanel != null && pvp.joinPanel.activeInHierarchy)
-            ApplyJoinPanel(pvp);
+        {
+            if (DeepFind(pvp.joinPanel.transform, "YouCard") == null)
+                ApplyJoinPanel(pvp);
+        }
         if (pvp.matchPanel != null && pvp.matchPanel.activeInHierarchy)
             ApplyPvpMatch(pvp);
     }
 
     void ApplyPvpMenu(Transform panelRoot)
     {
+        if (DeepFind(panelRoot, "TitleRibbon") != null)
+            return;
+
         AddImage(panelRoot, "BoardPvpLogo", logo,
             new Vector2(0f, 705f), new Vector2(500f, 265f), true);
 

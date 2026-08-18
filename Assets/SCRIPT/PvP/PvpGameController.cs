@@ -150,7 +150,6 @@ public class PvpGameController : MonoBehaviour
             joinCreateInFlight = false;
             if (gen != flowGeneration)
             {
-                client.DeleteRoom();
                 return;
             }
             if (!ok)
@@ -226,7 +225,6 @@ public class PvpGameController : MonoBehaviour
             joinCreateInFlight = false;
             if (gen != flowGeneration)
             {
-                client.DeleteRoom();
                 return;
             }
             if (!ok)

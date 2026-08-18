@@ -11,6 +11,7 @@ public class FakeMatchmaking : MonoBehaviour
 
     bool isSearching; // review #8: prevent overlapping searches
     Coroutine dotsAnimation;
+    int searchGeneration;
 
     public void StartSearch()
     {
@@ -34,10 +35,10 @@ public class FakeMatchmaking : MonoBehaviour
             searchingPanel.SetActive(false);
             return;
         }
-        StartCoroutine(FadeCancelled(canvasGroup));
+        StartCoroutine(FadeCancelled(canvasGroup, ++searchGeneration));
     }
 
-    IEnumerator FadeCancelled(CanvasGroup canvasGroup)
+    IEnumerator FadeCancelled(CanvasGroup canvasGroup, int generation)
     {
         float start = canvasGroup.alpha;
         float elapsed = 0f;
@@ -48,13 +49,17 @@ public class FakeMatchmaking : MonoBehaviour
                 Mathf.Clamp01(elapsed / 0.18f));
             yield return null;
         }
-        canvasGroup.alpha = 1f;
-        searchingPanel.SetActive(false);
+        if (generation == searchGeneration)
+        {
+            canvasGroup.alpha = 1f;
+            searchingPanel.SetActive(false);
+        }
     }
 
     IEnumerator SearchRoutine()
     {
         isSearching = true;
+        int generation = ++searchGeneration;
 
         searchingPanel.SetActive(true);
         var canvasGroup = searchingPanel.GetComponent<CanvasGroup>();
@@ -77,6 +82,7 @@ public class FakeMatchmaking : MonoBehaviour
             waitTime = 5f;
 
         yield return new WaitForSeconds(waitTime);
+        if (generation != searchGeneration) yield break;
 
         StopDotsAnimation();
 
@@ -131,5 +137,6 @@ public class FakeMatchmaking : MonoBehaviour
         // guard, so clear it here or StartSearch is dead after re-enabling.
         StopDotsAnimation();
         isSearching = false;
+        searchGeneration++;
     }
 }

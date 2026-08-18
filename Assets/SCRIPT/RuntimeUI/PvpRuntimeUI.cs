@@ -875,6 +875,7 @@ public class PvpRuntimeUI : MonoBehaviour
             L10n.Get("private_room_share"), new Vector2(0f, -560f),
             new Vector2(300f, 72f), ConsumerTokens.SurfaceElevated);
         RuntimeUI.Localize(share, "private_room_share");
+        share.gameObject.SetActive(false);
         AddRoomTip(menu.transform, new Vector2(0f, -720f));
         var back = RuntimeUI.CreateButton(menu.transform, L10n.Get("back"),
             L10n.Get("back"), new Vector2(0f, -850f),
