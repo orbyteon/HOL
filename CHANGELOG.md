@@ -51,6 +51,13 @@ Play Console versionName in `ProjectSettings.asset`.
   screenshot plus an ARM64-capable debug APK; that preview is not a store
   build.
 
+- **PanelPlay** (Play Solo → find challenger) uses the same stairs/clouds
+  bible as a quieter inner page: HOL logo, cyan Back, gold Find Challenger,
+  and the existing simulated-opponents disclosure. Searching, Settings,
+  PvP, Daily Hunt, and the board stay unchanged. Development Android QA
+  captures a 1080×1920 idle PanelPlay screenshot; that preview is not a
+  store build.
+
 - The privacy policy's contact address is now `support@orbyteon.com` —
   a role mailbox owned by the publisher instead of a personal one. Both
   committed copies (the canonical `docs/privacy.html` and the byte-identical
