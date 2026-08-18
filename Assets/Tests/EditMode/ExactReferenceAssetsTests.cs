@@ -308,6 +308,18 @@ public class ExactReferenceAssetsTests
     }
 
     [Test]
+    public void DailyHuntPresentationContractExists()
+    {
+        Assert.IsNotNull(RuntimeType("DailyHuntVisuals"));
+        Assert.IsNotNull(Resources.Load<Sprite>(
+            "reference/hol_logo_exact"));
+        Assert.IsNotNull(Resources.Load<Sprite>(
+            "reference/mascot_6_exact"));
+        Assert.IsNotNull(Resources.Load<Sprite>(
+            "reference/mascot_7_exact"));
+    }
+
+    [Test]
     public void ApprovedLayerDisablesLegacyScenePresentation()
     {
         var legacyObject = new GameObject("LegacyDesign");
