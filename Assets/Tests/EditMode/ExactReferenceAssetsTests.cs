@@ -15,12 +15,33 @@ public class ExactReferenceAssetsTests
 
     [TestCase("reference/player_cyan_exact")]
     [TestCase("reference/opponent_purple_exact")]
+    [TestCase("reference/mascot_6_exact")]
     [TestCase("reference/mascot_7_exact")]
-    [TestCase("reference/mascot_3_exact")]
+    [TestCase("reference/char_girl_exact")]
     public void ApprovedCharacterPortraitLoadsAsSprite(string path)
     {
         Assert.IsNotNull(Resources.Load<Sprite>(path),
             "The approved portrait must import as a Sprite at Resources/" + path + ".");
+    }
+
+    [Test]
+    public void PrivateRoomCopyHasEnglishAndGreekEntries()
+    {
+        var original = L10n.Current;
+        try
+        {
+            L10n.SetLanguage(L10n.Language.English);
+            Assert.AreNotEqual("private_room_title", L10n.Get("private_room_title"));
+            Assert.AreNotEqual("private_room_tip", L10n.Get("private_room_tip"));
+
+            L10n.SetLanguage(L10n.Language.Greek);
+            Assert.AreNotEqual("private_room_title", L10n.Get("private_room_title"));
+            Assert.AreNotEqual("private_room_tip", L10n.Get("private_room_tip"));
+        }
+        finally
+        {
+            L10n.SetLanguage(original);
+        }
     }
 
     [Test]
