@@ -3,6 +3,8 @@ using UnityEngine.SceneManagement;
 
 public class SplashLoader : MonoBehaviour
 {
+    const float CaptureTimeout = 30f;
+
     // Review #5: shortened from 5s. NOTE: if the scene's Inspector has its own
     // value for waitTime, the Inspector wins — update it there too.
     public float waitTime = 2.5f;
@@ -11,7 +13,9 @@ public class SplashLoader : MonoBehaviour
 
     void Start()
     {
-        Invoke(nameof(LoadMenu), waitTime);
+        float timeout = ResolveTimeout(
+            SplashCaptureBootstrap.CaptureRequested, waitTime);
+        Invoke(nameof(LoadMenu), timeout);
     }
 
     void Update()
@@ -28,5 +32,10 @@ public class SplashLoader : MonoBehaviour
 
         CancelInvoke();
         SceneManager.LoadScene("MainMenu");
+    }
+
+    static float ResolveTimeout(bool captureRequested, float normalTimeout)
+    {
+        return captureRequested ? CaptureTimeout : normalTimeout;
     }
 }
