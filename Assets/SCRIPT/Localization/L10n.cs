@@ -125,6 +125,16 @@ public static class L10n
         { "private_room_tip",        new[] {
             "Share the code with your friend to join the same room.",
             "Μοιράσου τον κωδικό με τον φίλο σου για να μπείτε στο ίδιο δωμάτιο." } },
+        { "prebattle_title",         new[] { "Before the battle", "Πριν τη μάχη" } },
+        { "prebattle_you",           new[] { "YOU", "ΕΣΥ" } },
+        { "prebattle_opponent",      new[] { "OPPONENT", "ΑΝΤΙΠΑΛΟΣ" } },
+        { "prebattle_rule_title",    new[] { "RULE", "ΚΑΝΟΝΑΣ" } },
+        { "prebattle_rule",          new[] {
+            "Guess the secret number 1–100 before your opponent.",
+            "Μάντεψε τον μυστικό αριθμό 1–100 πριν τον αντίπαλό σου." } },
+        { "prebattle_waiting",       new[] {
+            "WAITING FOR OPPONENT...",
+            "ΠΕΡΙΜΕΝΟΥΜΕ ΑΝΤΙΠΑΛΟ..." } },
         { "pvp_creating",            new[] { "Creating room...", "Δημιουργία δωματίου..." } },
         { "pvp_joining",             new[] { "Joining...", "Σύνδεση..." } },
         { "pvp_sending",             new[] { "Sending...", "Αποστολή..." } },

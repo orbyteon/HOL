@@ -21,6 +21,7 @@ public class PvpGameController : MonoBehaviour
 
     [Header("Create flow")]
     public TMP_InputField createSecretInput;
+    public GameObject createConfirmButton;
     public TMP_Text roomCodeText;
     public TMP_Text createStatusText;
     public AnimatedEllipsis createStatusEllipsis;
@@ -28,6 +29,7 @@ public class PvpGameController : MonoBehaviour
     [Header("Join flow")]
     public TMP_InputField joinCodeInput;
     public TMP_InputField joinSecretInput;
+    public GameObject joinConfirmButton;
     public TMP_Text joinStatusText;
 
     [Header("Match UI")]
@@ -109,6 +111,11 @@ public class PvpGameController : MonoBehaviour
 
     public void OpenPvpMenu()
     {
+        if (createSecretInput != null) createSecretInput.gameObject.SetActive(true);
+        if (createConfirmButton != null) createConfirmButton.SetActive(true);
+        if (joinCodeInput != null) joinCodeInput.gameObject.SetActive(true);
+        if (joinSecretInput != null) joinSecretInput.gameObject.SetActive(true);
+        if (joinConfirmButton != null) joinConfirmButton.SetActive(true);
         pvpMenuPanel.SetActive(true);
         createPanel.SetActive(false);
         joinPanel.SetActive(false);
@@ -149,7 +156,9 @@ public class PvpGameController : MonoBehaviour
                 return;
             }
             roomCodeText.text = codeOrError;
-            SetCreateStatus(L10n.Get("pvp_waiting"), true);
+            if (createSecretInput != null) createSecretInput.gameObject.SetActive(false);
+            if (createConfirmButton != null) createConfirmButton.SetActive(false);
+            SetCreateStatus(L10n.Get("prebattle_waiting"), true);
             BeginMatchPolling();
         });
     }
@@ -222,6 +231,10 @@ public class PvpGameController : MonoBehaviour
                 joinStatusText.text = error;
                 return;
             }
+            if (joinCodeInput != null) joinCodeInput.gameObject.SetActive(false);
+            if (joinSecretInput != null) joinSecretInput.gameObject.SetActive(false);
+            if (joinConfirmButton != null) joinConfirmButton.SetActive(false);
+            joinStatusText.text = L10n.Get("prebattle_waiting");
             BeginMatchPolling();
         });
     }
