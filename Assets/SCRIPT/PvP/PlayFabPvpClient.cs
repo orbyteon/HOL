@@ -138,11 +138,22 @@ public class PlayFabPvpClient : PvpBackend
 
     // ------------------------------------------------ create / join
 
+    int roomRequestEpoch;
+    string pendingRoomCode = "";
+
     public override void CreateRoom(string hostName, int hostSecret, Action<bool, string> done)
     {
+        int requestEpoch = ++roomRequestEpoch;
+        pendingRoomCode = "";
         EnsureLogin(ok =>
         {
-            if (!ok) { done?.Invoke(false, L10n.Get("pvp_network_error")); return; }
+            if (requestEpoch != roomRequestEpoch) return;
+            if (!ok)
+            {
+                if (requestEpoch == roomRequestEpoch) pendingRoomCode = "";
+                done?.Invoke(false, L10n.Get("pvp_network_error"));
+                return;
+            }
 
             string args = "{\"hostName\":\"" + EscapeJson(hostName) +
                           "\",\"hostSecret\":" + hostSecret + "}";
@@ -150,6 +161,8 @@ public class PlayFabPvpClient : PvpBackend
             {
                 if (!ok2 || !CloudOk(resp))
                 {
+                    if (requestEpoch == roomRequestEpoch)
+                        pendingRoomCode = "";
                     done?.Invoke(false, L10n.Get("pvp_network_error"));
                     return;
                 }
@@ -157,11 +170,19 @@ public class PlayFabPvpClient : PvpBackend
                 string code = ExtractString(resp, "roomId");
                 if (string.IsNullOrEmpty(code))
                 {
+                    if (requestEpoch == roomRequestEpoch)
+                        pendingRoomCode = "";
                     done?.Invoke(false, L10n.Get("pvp_network_error"));
                     return;
                 }
 
+                if (requestEpoch != roomRequestEpoch)
+                {
+                    LeaveExactRoom(code);
+                    return;
+                }
                 RoomCode = code;
+                pendingRoomCode = "";
                 IsHost = true;
                 done?.Invoke(true, code);
             });
@@ -171,9 +192,17 @@ public class PlayFabPvpClient : PvpBackend
     public override void JoinRoom(string code, string guestName, int guestSecret, Action<bool, string> done)
     {
         code = (code ?? "").Trim().ToUpperInvariant();
+        int requestEpoch = ++roomRequestEpoch;
+        pendingRoomCode = code;
         EnsureLogin(ok =>
         {
-            if (!ok) { done?.Invoke(false, L10n.Get("pvp_network_error")); return; }
+            if (requestEpoch != roomRequestEpoch) return;
+            if (!ok)
+            {
+                if (requestEpoch == roomRequestEpoch) pendingRoomCode = "";
+                done?.Invoke(false, L10n.Get("pvp_network_error"));
+                return;
+            }
 
             string args = "{\"roomId\":\"" + EscapeJson(code) +
                           "\",\"guestName\":\"" + EscapeJson(guestName) +
@@ -182,26 +211,41 @@ public class PlayFabPvpClient : PvpBackend
             {
                 if (!ok2)
                 {
+                    if (requestEpoch == roomRequestEpoch)
+                        pendingRoomCode = "";
                     done?.Invoke(false, L10n.Get("pvp_network_error"));
                     return;
                 }
                 if (HasCloudError(resp, "room full"))
                 {
+                    if (requestEpoch == roomRequestEpoch)
+                        pendingRoomCode = "";
                     done?.Invoke(false, L10n.Get("pvp_room_full"));
                     return;
                 }
                 if (HasCloudError(resp, "room not found") || HasCloudError(resp, "bad secret"))
                 {
+                    if (requestEpoch == roomRequestEpoch)
+                        pendingRoomCode = "";
                     done?.Invoke(false, L10n.Get("pvp_room_not_found"));
                     return;
                 }
                 if (!CloudOk(resp))
                 {
+                    if (requestEpoch == roomRequestEpoch)
+                        pendingRoomCode = "";
                     done?.Invoke(false, L10n.Get("pvp_network_error"));
                     return;
                 }
 
+                if (requestEpoch != roomRequestEpoch)
+                {
+                    if (pendingRoomCode != code)
+                        LeaveExactRoom(code);
+                    return;
+                }
                 RoomCode = code;
+                pendingRoomCode = "";
                 IsHost = false;
                 done?.Invoke(true, "");
             });
@@ -232,6 +276,12 @@ public class PlayFabPvpClient : PvpBackend
 
     public override void SendSignal(int signalId, Action<bool> done)
     {
+        SendSignal(signalId, -1, done);
+    }
+
+    public override void SendSignal(int signalId, int matchIndex,
+        Action<bool> done)
+    {
         if (string.IsNullOrEmpty(RoomCode) || !Signals.IsValid(signalId))
         {
             done?.Invoke(false);
@@ -239,7 +289,10 @@ public class PlayFabPvpClient : PvpBackend
         }
 
         string args = "{\"roomId\":\"" + EscapeJson(RoomCode) +
-                      "\",\"signalId\":" + signalId + "}";
+                      "\",\"signalId\":" + signalId +
+                      (matchIndex >= 0
+                          ? ",\"matchIndex\":" + matchIndex
+                          : "") + "}";
         ExecuteCloudScript("sendSignal", args, (ok, resp) => done?.Invoke(ok && CloudOk(resp)));
     }
 
@@ -270,13 +323,21 @@ public class PlayFabPvpClient : PvpBackend
 
     public override void DeleteRoom()
     {
+        roomRequestEpoch++;
+        pendingRoomCode = "";
         if (!string.IsNullOrEmpty(RoomCode))
         {
             string code = RoomCode;
-            string args = "{\"roomId\":\"" + EscapeJson(code) + "\"}";
-            ExecuteCloudScript("leaveRoom", args, (_, __) => { });
+            LeaveExactRoom(code);
         }
         RoomCode = "";
+    }
+
+    void LeaveExactRoom(string code)
+    {
+        if (string.IsNullOrEmpty(code)) return;
+        string args = "{\"roomId\":\"" + EscapeJson(code) + "\"}";
+        ExecuteCloudScript("leaveRoom", args, (_, __) => { });
     }
 
     public override void AcknowledgeResult()

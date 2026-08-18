@@ -468,6 +468,8 @@ function resetForRematch(state) {
     // a client that missed one does not replay it.
     state.hostSignalCount = 0;
     state.guestSignalCount = 0;
+    state.signalBy = "";
+    state.signalId = -1;
 }
 
 handlers.createRoom = function (args, context) {
@@ -668,6 +670,9 @@ handlers.sendSignal = function (args, context) {
         if (!side) return { result: { ok: false, error: "not a member" } };
         if (state.phase !== "play" && state.phase !== "done")
             return { result: { ok: false, error: "not in play" } };
+        if (args.matchIndex !== undefined &&
+            (Number(args.matchIndex) | 0) !== (state.matchIndex | 0))
+            return { result: { ok: false, error: "stale match" } };
 
         var countKey = side === "host" ? "hostSignalCount" : "guestSignalCount";
         if ((state[countKey] | 0) >= SIGNAL_CAP_PER_SIDE)

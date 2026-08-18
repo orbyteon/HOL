@@ -229,6 +229,11 @@ test("signals carry an index, are capped, and reject anything off the table", ()
   assert.equal(sent.signalBy, "host");
   assert.equal(sent.signalId, 3);
   assert.equal(sent.signalSeq, 1, "the sequence is what tells the client a signal is new");
+  const stale = cs.call("sendSignal", "HOST", {
+    roomId, signalId: 0, matchIndex: sent.matchIndex + 1,
+  });
+  assert.equal(stale.ok, false);
+  assert.equal(stale.error, "stale match");
 
   for (const bad of [-1, 1.5, 6, 99, undefined]) {
     const rejected = cs.call("sendSignal", "HOST", { roomId, signalId: bad });
@@ -367,6 +372,9 @@ test("scheduled cleanup bounds work and drains remaining rooms on the next run",
 
 test("a rematch deals a clean match, and its first guess is accepted", () => {
   const { cs, roomId } = matchWithOpener("host", { hostSecret: 42, guestSecret: 77 });
+  assert.equal(cs.call("sendSignal", "HOST", {
+    roomId, signalId: 5, matchIndex: 0,
+  }).ok, true);
   const finished = playToEnd(cs, roomId, cs.view(cs.call("getRoom", "HOST", { roomId })));
   assert.ok(finished.hostGuessCount > 0);
 
@@ -380,6 +388,13 @@ test("a rematch deals a clean match, and its first guess is accepted", () => {
   assert.equal(next.winner, "");
   assert.equal(next.pendingWin, "");
   assert.equal(next.revealedSecret, 0, "the previous secret is not still on show");
+  assert.equal(next.signalBy, "", "the previous match signal sender is cleared");
+  assert.equal(next.signalId, -1, "the previous match signal payload is cleared");
+  const staleSignal = cs.call("sendSignal", "HOST", {
+    roomId, signalId: 5, matchIndex: next.matchIndex - 1,
+  });
+  assert.equal(staleSignal.ok, false);
+  assert.equal(staleSignal.error, "stale match");
 
   // The real hazard: turn claims from the finished match must not block the new
   // one. Turn ids are never reused and the old window is swept on reset.
