@@ -208,8 +208,8 @@ public class ExactReferenceAssetsTests
             SetPrivateField(confetti, "popBaseCaptured", true);
             InvokePrivate(confetti, "OnDisable");
 
-            Assert.AreEqual(1f, rect.localScale.x, 0.001f);
-            Assert.AreEqual(1f, rect.localScale.y, 0.001f);
+            Assert.IsTrue(Mathf.Abs(rect.localScale.x - 1f) < 0.001f);
+            Assert.IsTrue(Mathf.Abs(rect.localScale.y - 1f) < 0.001f);
         }
         finally
         {
