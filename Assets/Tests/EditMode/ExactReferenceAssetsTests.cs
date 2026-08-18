@@ -25,6 +25,15 @@ public class ExactReferenceAssetsTests
             "The approved portrait must import as a Sprite at Resources/" + path + ".");
     }
 
+    [TestCase("reference/board_vs_burst")]
+    [TestCase("reference/board_rocket")]
+    public void PrebattleCompanionArtLoadsAsSprite(string path)
+    {
+        Assert.IsNotNull(Resources.Load<Sprite>(path),
+            "The pre-battle companion art must import as a Sprite at Resources/" +
+            path + ".");
+    }
+
     [Test]
     public void PrivateRoomCopyHasEnglishAndGreekEntries()
     {
@@ -33,7 +42,11 @@ public class ExactReferenceAssetsTests
         Assert.IsNotNull(field, "L10n.Table field not found — renamed?");
         var table = (IDictionary)field.GetValue(null);
 
-        foreach (var key in new[] { "private_room_title", "private_room_tip" })
+        foreach (var key in new[] {
+            "private_room_title", "private_room_tip", "prebattle_title",
+            "prebattle_you", "prebattle_opponent", "prebattle_rule_title",
+            "prebattle_rule", "prebattle_waiting"
+        })
         {
             Assert.IsTrue(table.Contains(key), "Missing L10n key: " + key);
             var pair = (string[])table[key];
