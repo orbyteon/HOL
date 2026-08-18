@@ -160,7 +160,10 @@ public sealed class SplashDesign : MonoBehaviour
     {
         var image = EnsureImage(safeRoot, name);
         ConfigureImage(image, sprite, false);
-        Stretch(image.rectTransform);
+        Place(
+            image.rectTransform,
+            Vector2.zero,
+            new Vector2(ReferenceWidth, ReferenceHeight));
     }
 
     void BuildProgress(Transform safeRoot)

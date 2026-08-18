@@ -85,6 +85,14 @@ public sealed class SplashAuthoritativeVisualsPlayModeTests
 
         var expectedLayout = new[]
         {
+            new LayoutExpectation("SplashDecoStars",
+                Vector2.zero, new Vector2(1080f, 1920f)),
+            new LayoutExpectation("SplashDecoLightning",
+                Vector2.zero, new Vector2(1080f, 1920f)),
+            new LayoutExpectation("SplashDecoConfetti",
+                Vector2.zero, new Vector2(1080f, 1920f)),
+            new LayoutExpectation("SplashDecoNumbers",
+                Vector2.zero, new Vector2(1080f, 1920f)),
             new LayoutExpectation("SplashLogoGlow",
                 new Vector2(0f, 280f), new Vector2(960f, 620f)),
             new LayoutExpectation("SplashLogo",
@@ -118,10 +126,10 @@ public sealed class SplashAuthoritativeVisualsPlayModeTests
         AssertPreservesAspect(safeRoot, "SplashMascotSix");
         AssertPreservesAspect(safeRoot, "SplashMascotSeven");
 
-        AssertStretchedDeco(safeRoot, "SplashDecoStars");
-        AssertStretchedDeco(safeRoot, "SplashDecoLightning");
-        AssertStretchedDeco(safeRoot, "SplashDecoConfetti");
-        AssertStretchedDeco(safeRoot, "SplashDecoNumbers");
+        AssertDecoUsesAuthoringBox(safeRoot, "SplashDecoStars");
+        AssertDecoUsesAuthoringBox(safeRoot, "SplashDecoLightning");
+        AssertDecoUsesAuthoringBox(safeRoot, "SplashDecoConfetti");
+        AssertDecoUsesAuthoringBox(safeRoot, "SplashDecoNumbers");
 
         AssertSprite(visualRoot, "SplashBackground", "splash/splash_bg_stairs_clouds");
         AssertSprite(safeRoot, "SplashDecoStars", "splash/splash_deco_stars");
@@ -198,13 +206,22 @@ public sealed class SplashAuthoritativeVisualsPlayModeTests
     }
 
     [UnityTest]
-    public IEnumerator SkipTransitionReachesMainMenuExactlyOnce()
+    public IEnumerator SharedLoadMenuSkipPathReachesMainMenuExactlyOnce()
     {
         yield return SceneManager.LoadSceneAsync("SplashScene", LoadSceneMode.Single);
         yield return null;
 
         var loader = FindInScene(SceneManager.GetActiveScene(), RuntimeType("SplashLoader"));
         Assert.That(loader, Is.Not.Null);
+        var update = loader.GetType().GetMethod(
+            "Update",
+            BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+        Assert.That(update, Is.Not.Null,
+            "SplashLoader.Update must remain the product tap-to-skip surface.");
+        var waitTime = loader.GetType().GetField(
+            "waitTime", BindingFlags.Instance | BindingFlags.Public);
+        Assert.That(waitTime, Is.Not.Null);
+        Assert.That((float)waitTime.GetValue(loader), Is.EqualTo(2.5f));
         ((MonoBehaviour)loader).CancelInvoke("LoadMenu");
 
         int mainMenuLoads = 0;
@@ -216,8 +233,12 @@ public sealed class SplashAuthoritativeVisualsPlayModeTests
         try
         {
             loader.SendMessage("LoadMenu", SendMessageOptions.RequireReceiver);
-            while (SceneManager.GetActiveScene().name != "MainMenu")
+            float deadline = Time.realtimeSinceStartup + 5f;
+            while (SceneManager.GetActiveScene().name != "MainMenu" &&
+                   Time.realtimeSinceStartup < deadline)
                 yield return null;
+            if (SceneManager.GetActiveScene().name != "MainMenu")
+                Assert.Fail("Shared SplashLoader.LoadMenu skip path did not reach MainMenu within 5 seconds.");
             yield return null;
             Assert.That(mainMenuLoads, Is.EqualTo(1));
         }
@@ -403,17 +424,19 @@ public sealed class SplashAuthoritativeVisualsPlayModeTests
         Assert.That(image.preserveAspect, Is.True, name + " must preserve aspect ratio.");
     }
 
-    static void AssertStretchedDeco(Transform root, string name)
+    static void AssertDecoUsesAuthoringBox(Transform root, string name)
     {
         var found = DirectChild(root, name) as RectTransform;
         Assert.That(found, Is.Not.Null);
-        AssertVector(found.anchorMin, Vector2.zero, name + " minimum anchor");
-        AssertVector(found.anchorMax, Vector2.one, name + " maximum anchor");
-        AssertVector(found.sizeDelta, Vector2.zero, name + " size");
+        AssertVector(found.anchoredPosition, Vector2.zero, name + " position");
+        AssertVector(found.sizeDelta, new Vector2(1080f, 1920f), name + " size");
+        AssertVector(found.anchorMin, new Vector2(0.5f, 0.5f), name + " minimum anchor");
+        AssertVector(found.anchorMax, new Vector2(0.5f, 0.5f), name + " maximum anchor");
 
         var image = found.GetComponent<Image>();
         Assert.That(image, Is.Not.Null);
         Assert.That(image.preserveAspect, Is.False);
+        Assert.That(image.raycastTarget, Is.False);
     }
 
     static void AssertSprite(Transform root, string name, string resourcePath)
