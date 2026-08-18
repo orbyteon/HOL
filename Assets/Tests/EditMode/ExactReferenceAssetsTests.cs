@@ -31,12 +31,12 @@ public class ExactReferenceAssetsTests
         try
         {
             L10n.SetLanguage(L10n.Language.English);
-            Assert.AreNotEqual("private_room_title", L10n.Get("private_room_title"));
-            Assert.AreNotEqual("private_room_tip", L10n.Get("private_room_tip"));
+            Assert.IsTrue(L10n.Get("private_room_title") != "private_room_title");
+            Assert.IsTrue(L10n.Get("private_room_tip") != "private_room_tip");
 
             L10n.SetLanguage(L10n.Language.Greek);
-            Assert.AreNotEqual("private_room_title", L10n.Get("private_room_title"));
-            Assert.AreNotEqual("private_room_tip", L10n.Get("private_room_tip"));
+            Assert.IsTrue(L10n.Get("private_room_title") != "private_room_title");
+            Assert.IsTrue(L10n.Get("private_room_tip") != "private_room_tip");
         }
         finally
         {
