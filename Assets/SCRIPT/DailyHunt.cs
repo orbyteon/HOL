@@ -80,6 +80,7 @@ public class DailyHunt : MonoBehaviour
         var hunt = panel.AddComponent<DailyHunt>();
         hunt.ads = adsManager;
         hunt.Build();
+        DailyHuntVisuals.Apply(panel.transform);
 
         panel.AddComponent<PanelAnimator>();
         panel.SetActive(false);
