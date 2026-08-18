@@ -28,6 +28,15 @@ Play Console versionName in `ProjectSettings.asset`.
 
 ### Added
 
+- **Portrait Private Room menu** — create/join and their waiting states now use
+  the approved Teen Polish cards, 6/7 cast, live code sharing, and the existing
+  PlayFab-authoritative callbacks.
+- **Portrait Settings and Solo Search** — existing name, language, music,
+  difficulty, ads-privacy, search, and cancel controls now share the same
+  safe-area-aware Teen Polish presentation; Solo Search adds an animated radar.
+- **Portrait Daily Hunt presentation** — the existing persisted daily challenge
+  now uses the approved logo/ribbon/card layout without changing its guess,
+  revive, or share rules.
 - **Portrait PvP result celebration** — win/loss/draw now opens the approved
   Teen Polish result overlay with authoritative attempt counts, revealed
   number, fresh-secret rematch, Exit, the six fixed Signals, and a one-shot
@@ -40,8 +49,9 @@ Play Console versionName in `ProjectSettings.asset`.
   shared by every player per UTC day, seven guesses, an emoji-trail result
   that copies to the clipboard for sharing, one rewarded-ad revive worth
   two extra guesses, and its own found-day streak. Pure client and fully
-  resumable: state persists after every guess, the secret is a keyed hash
-  of the day number (not a predictable seeded PRNG), a backwards clock
+  resumable: state persists after every guess, the answer uses a stable
+  domain-separated day hash (not a predictable seeded PRNG, but still
+  client-readable rather than cheat-resistant), a backwards clock
   cannot replay a revealed answer, and a missed day ends the streak the
   moment the panel opens rather than at the next win. Deliberately left
   for follow-ups so this ships without a server or package change: the

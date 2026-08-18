@@ -48,7 +48,9 @@ public class ExactReferenceAssetsTests
             "prebattle_rule_title", "prebattle_rule", "prebattle_waiting",
             "result_page_title", "result_attempts", "result_attempts_short",
             "result_rematch_heading", "result_reactions", "result_exit",
-            "result_win_title", "result_loss_title", "result_draw_title"
+            "result_win_title", "result_loss_title", "result_draw_title",
+            "prebattle_waiting_short", "versus", "settings_change",
+            "language_english", "language_greek", "solo_search_title"
         })
         {
             Assert.IsTrue(table.Contains(key), "Missing L10n key: " + key);
@@ -69,12 +71,22 @@ public class ExactReferenceAssetsTests
         {
             var ui = root.AddComponent(RuntimeType("PvpRuntimeUI"));
             var controller = root.AddComponent(RuntimeType("PvpGameController"));
-            InvokePrivate(ui, "ReplacePrivateRoomPanels", controller);
+            InvokePrivate(ui, "BuildPanels", controller);
 
             Assert.AreEqual(1, DirectChildCount(root.transform, "PvPCreatePanel"),
                 "Pre-battle must not leave an obsolete create panel behind.");
             Assert.AreEqual(1, DirectChildCount(root.transform, "PvPJoinPanel"),
                 "Pre-battle must not leave an obsolete join panel behind.");
+            var create = FindDescendant(root.transform, "PvPCreatePanel");
+            var join = FindDescendant(root.transform, "PvPJoinPanel");
+            Assert.AreEqual(1, DescendantCount(create, "EntryState"));
+            Assert.AreEqual(1, DescendantCount(create, "WaitingState"));
+            Assert.AreEqual(1, DescendantCount(join, "EntryState"));
+            Assert.AreEqual(1, DescendantCount(join, "WaitingState"));
+            Assert.AreEqual(0, DescendantCount(join, "ShareButton"),
+                "Join waiting must not expose an inert Share action.");
+            Assert.AreEqual(0, DescendantCount(join, "RoomCodeFrame"),
+                "Join waiting must not show a stale placeholder code.");
         }
         finally
         {
@@ -298,6 +310,30 @@ public class ExactReferenceAssetsTests
     }
 
     [Test]
+    public void LeavingInvalidatesPendingPlayFabRoomRequest()
+    {
+        var host = new GameObject("PlayFabRoomFence");
+        try
+        {
+            var client = host.AddComponent(RuntimeType(
+                "PlayFabPvpClient"));
+            var epoch = client.GetType().GetField("roomRequestEpoch",
+                BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.IsNotNull(epoch);
+            int before = (int)epoch.GetValue(client);
+
+            InvokePublic(client, "DeleteRoom");
+
+            Assert.AreEqual(before + 1, (int)epoch.GetValue(client),
+                "Cancel/leave must invalidate every in-flight create/join.");
+        }
+        finally
+        {
+            Object.DestroyImmediate(host);
+        }
+    }
+
+    [Test]
     public void SettingsPresentationContractExists()
     {
         Assert.IsNotNull(RuntimeType("SettingsVisuals"));
@@ -324,6 +360,58 @@ public class ExactReferenceAssetsTests
     {
         Assert.IsNotNull(RuntimeType("SoloSearchVisuals"));
         Assert.IsNotNull(RuntimeType("RadarScanner"));
+    }
+
+    [Test]
+    public void ModernPrebattleDefersLegacyReskin()
+    {
+        var host = new GameObject("PrebattleOwner");
+        try
+        {
+            var controller = host.AddComponent(RuntimeType(
+                "PvpGameController"));
+            var create = Child(host.transform, "PvPCreatePanel");
+            Child(create.transform, "YouCard");
+            controller.GetType().GetField("createPanel").SetValue(
+                controller, create);
+
+            var legacy = host.AddComponent(RuntimeType(
+                "AttachmentReskinVisuals"));
+            InvokePrivate(legacy, "Awake");
+            InvokePrivate(legacy, "ApplyPvp", controller);
+
+            Assert.AreEqual(0, DescendantCount(create.transform,
+                "BoardCreateLogo"));
+        }
+        finally
+        {
+            Object.DestroyImmediate(host);
+        }
+    }
+
+    [Test]
+    public void DailyCloseWaitsForInFlightReviveSettlement()
+    {
+        var host = new GameObject("DailyRevive");
+        try
+        {
+            var hunt = host.AddComponent(RuntimeType("DailyHunt"));
+            SetPrivateField(hunt, "done", false);
+            SetPrivateField(hunt, "used", 7);
+            SetPrivateField(hunt, "budget", 7);
+            SetPrivateField(hunt, "reviveInFlight", true);
+
+            InvokePublic(hunt, "Close");
+
+            var done = hunt.GetType().GetField("done",
+                BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.IsFalse((bool)done.GetValue(hunt),
+                "Closing must not finalize while a reward is settling.");
+        }
+        finally
+        {
+            Object.DestroyImmediate(host);
+        }
     }
 
     [Test]
