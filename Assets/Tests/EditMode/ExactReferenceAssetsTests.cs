@@ -45,7 +45,9 @@ public class ExactReferenceAssetsTests
         foreach (var key in new[] {
             "private_room_title", "private_room_tip", "prebattle_title",
             "prebattle_you", "prebattle_opponent", "prebattle_found",
-            "prebattle_rule_title", "prebattle_rule", "prebattle_waiting"
+            "prebattle_rule_title", "prebattle_rule", "prebattle_waiting",
+            "result_page_title", "result_attempts", "result_attempts_short",
+            "result_rematch_heading", "result_reactions"
         })
         {
             Assert.IsTrue(table.Contains(key), "Missing L10n key: " + key);
@@ -77,6 +79,21 @@ public class ExactReferenceAssetsTests
         {
             Object.DestroyImmediate(root);
         }
+    }
+
+    [Test]
+    public void ResultPresentationAndVictoryPopContractsExist()
+    {
+        Assert.IsNotNull(RuntimeType("PvpResultPresentation"),
+            "The portrait result overlay needs a focused presentation owner.");
+
+        var confetti = RuntimeType("ConfettiBurst");
+        Assert.IsNotNull(confetti.GetField("popTarget"),
+            "Victory confetti must expose the headline/trophy pop target.");
+        Assert.IsNotNull(confetti.GetField("radial"),
+            "Victory confetti must support the approved radial explosion.");
+        Assert.IsNotNull(confetti.GetField("secondaryPieces"),
+            "Victory confetti must support the approved secondary burst.");
     }
 
     [Test]
