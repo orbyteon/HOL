@@ -25,8 +25,8 @@ public class ExactReferenceAssetsTests
             "The approved portrait must import as a Sprite at Resources/" + path + ".");
     }
 
-    [TestCase("reference/board_vs_burst")]
-    [TestCase("reference/board_rocket")]
+    [TestCase("reference/board_vs_burst_exact")]
+    [TestCase("reference/board_rocket_exact")]
     public void PrebattleCompanionArtLoadsAsSprite(string path)
     {
         Assert.IsNotNull(Resources.Load<Sprite>(path),

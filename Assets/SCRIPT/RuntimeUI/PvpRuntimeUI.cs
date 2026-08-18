@@ -557,7 +557,7 @@ public class PvpRuntimeUI : MonoBehaviour
         AddLocalizedText(right.transform, "Status", "pvp_opponent_found", 26,
             new Vector2(0f, -160f), new Vector2(360f, 58f),
             ConvergingLight.NearWhite);
-        AddSprite(root, "VsBurst", "reference/board_vs_burst",
+        AddSprite(root, "VsBurst", "reference/board_vs_burst_exact",
             new Vector2(0f, 235f), new Vector2(180f, 180f));
 
         var rule = NeonFrame.Frame(root, "RuleCard",
@@ -569,7 +569,7 @@ public class PvpRuntimeUI : MonoBehaviour
         AddLocalizedText(rule.transform, "Rule", "prebattle_rule", 24,
             new Vector2(-125f, -30f), new Vector2(560f, 90f),
             ConvergingLight.NearWhite);
-        AddSprite(rule.transform, "Rocket", "reference/board_rocket",
+        AddSprite(rule.transform, "Rocket", "reference/board_rocket_exact",
             new Vector2(300f, 0f), new Vector2(170f, 170f));
 
         var code = NeonFrame.Frame(root, "RoomCodeFrame",
