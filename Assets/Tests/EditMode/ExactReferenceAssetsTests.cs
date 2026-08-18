@@ -98,6 +98,70 @@ public class ExactReferenceAssetsTests
     }
 
     [Test]
+    public void ResultOverlayBuildsOneRootAndSixSignals()
+    {
+        var host = new GameObject("ResultHost", typeof(RectTransform),
+            typeof(Canvas), typeof(GraphicRaycaster));
+        try
+        {
+            var ui = host.AddComponent(RuntimeType("PvpRuntimeUI"));
+            var controller = host.AddComponent(RuntimeType("PvpGameController"));
+            var match = Child(host.transform, "PvPMatchPanel");
+
+            InvokePrivate(ui, "BuildResultOverlay", controller, match);
+
+            Assert.AreEqual(1, DescendantCount(match.transform,
+                "ResultVisualRoot"));
+            for (int i = 0; i < 6; i++)
+                Assert.AreEqual(1, DescendantCount(match.transform,
+                    "ResultSignal" + i));
+        }
+        finally
+        {
+            Object.DestroyImmediate(host);
+        }
+    }
+
+    [Test]
+    public void ApprovedResultOverlaySuppressesLegacyPvpResultArt()
+    {
+        var host = new GameObject("ResultOwner", typeof(RectTransform),
+            typeof(Canvas), typeof(GraphicRaycaster));
+        try
+        {
+            var controller = host.AddComponent(RuntimeType("PvpGameController"));
+            var match = Child(host.transform, "PvPMatchPanel");
+            Child(match.transform, "ResultVisualRoot");
+
+            var textType = System.Type.GetType(
+                "TMPro.TextMeshProUGUI, Unity.TextMeshPro");
+            Assert.IsNotNull(textType);
+            var resultObject = new GameObject("Result", typeof(RectTransform));
+            resultObject.transform.SetParent(match.transform, false);
+            var result = resultObject.AddComponent(textType);
+            result.GetType().GetProperty("text").SetValue(result, "WIN", null);
+
+            controller.GetType().GetField("matchPanel").SetValue(
+                controller, match);
+            controller.GetType().GetField("resultText").SetValue(
+                controller, result);
+
+            var legacy = host.AddComponent(RuntimeType(
+                "AttachmentReskinVisuals"));
+            InvokePrivate(legacy, "Awake");
+            InvokePrivate(legacy, "ApplyPvpMatch", controller);
+
+            Assert.AreEqual(0, DescendantCount(match.transform,
+                "BoardPvpResultLogo"),
+                "The old result reskin must defer to ResultVisualRoot.");
+        }
+        finally
+        {
+            Object.DestroyImmediate(host);
+        }
+    }
+
+    [Test]
     public void ApprovedLayerDisablesLegacyScenePresentation()
     {
         var legacyObject = new GameObject("LegacyDesign");
@@ -179,6 +243,15 @@ public class ExactReferenceAssetsTests
         int count = 0;
         for (int i = 0; i < parent.childCount; i++)
             if (parent.GetChild(i).name == name)
+                count++;
+        return count;
+    }
+
+    static int DescendantCount(Transform parent, string name)
+    {
+        int count = 0;
+        foreach (var child in parent.GetComponentsInChildren<Transform>(true))
+            if (child.name == name)
                 count++;
         return count;
     }
