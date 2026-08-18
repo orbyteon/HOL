@@ -78,11 +78,20 @@ public sealed class MainMenuHomeVisualsPlayModeTests
         PlayerPrefs.SetString("PlayerName", "Andreas");
         PlayerPrefs.Save();
         ownerType.GetMethod("RefreshChip", InstanceFlags).Invoke(owner, null);
-        var chip = Find(canvas.transform, "HomePlayerChipText")
-            .GetComponent<TMPro.TMP_Text>();
-        Assert.That(chip.text, Does.Contain("7"));
-        Assert.That(chip.text, Does.Not.Contain("2450"));
-        Assert.That(chip.text, Does.Not.Contain("2,450"));
+        var tmpTextType = System.Type.GetType("TMPro.TMP_Text, Unity.TextMeshPro");
+        Assert.That(tmpTextType, Is.Not.Null);
+        Component chip = null;
+        foreach (var component in Find(canvas.transform, "HomePlayerChipText")
+                     .GetComponentsInChildren(tmpTextType, true))
+        {
+            chip = component;
+            break;
+        }
+        Assert.That(chip, Is.Not.Null);
+        string chipCopy = (string)tmpTextType.GetProperty("text").GetValue(chip, null);
+        Assert.That(chipCopy, Does.Contain("7"));
+        Assert.That(chipCopy, Does.Not.Contain("2450"));
+        Assert.That(chipCopy, Does.Not.Contain("2,450"));
         Assert.That(Find(canvas.transform, "HomePlayerChip").GetComponent<Image>().raycastTarget,
             Is.False);
         yield return new WaitForSecondsRealtime(0.35f);
