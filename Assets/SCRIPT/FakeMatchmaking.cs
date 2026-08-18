@@ -28,6 +28,27 @@ public class FakeMatchmaking : MonoBehaviour
 
         StopAllCoroutines();
         isSearching = false;
+        var canvasGroup = searchingPanel.GetComponent<CanvasGroup>();
+        if (canvasGroup == null)
+        {
+            searchingPanel.SetActive(false);
+            return;
+        }
+        StartCoroutine(FadeCancelled(canvasGroup));
+    }
+
+    IEnumerator FadeCancelled(CanvasGroup canvasGroup)
+    {
+        float start = canvasGroup.alpha;
+        float elapsed = 0f;
+        while (elapsed < 0.18f)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            canvasGroup.alpha = Mathf.Lerp(start, 0f,
+                Mathf.Clamp01(elapsed / 0.18f));
+            yield return null;
+        }
+        canvasGroup.alpha = 1f;
         searchingPanel.SetActive(false);
     }
 
@@ -36,6 +57,8 @@ public class FakeMatchmaking : MonoBehaviour
         isSearching = true;
 
         searchingPanel.SetActive(true);
+        var canvasGroup = searchingPanel.GetComponent<CanvasGroup>();
+        if (canvasGroup != null) canvasGroup.alpha = 1f;
 
         // Animate "Searching opponent" with cycling dots so the panel
         // doesn't look frozen.

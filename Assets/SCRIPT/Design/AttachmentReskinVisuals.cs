@@ -489,6 +489,16 @@ public sealed class AttachmentReskinVisuals : MonoBehaviour
     {
         if (root == null || !root.gameObject.activeInHierarchy) return;
 
+        if (DeepFind(root, "SoloSearchVisualRoot") != null)
+        {
+            SetActive(DeepFind(root, "BoardSearchLogo"), false);
+            SetActive(DeepFind(root, "BoardVsPlayerCard"), false);
+            SetActive(DeepFind(root, "BoardVsOpponentCard"), false);
+            SetActive(DeepFind(root, "BoardVsBadge"), false);
+            SetActive(DeepFind(root, "BoardSearchRule"), false);
+            return;
+        }
+
         AddImage(root, "BoardSearchLogo", logo,
             new Vector2(0f, 715f), new Vector2(440f, 235f), true);
         BuildVersusCards(root, new Vector2(0f, 220f), 390f, 470f);
@@ -503,14 +513,6 @@ public sealed class AttachmentReskinVisuals : MonoBehaviour
             Place(searching.searchingText.rectTransform, new Vector2(0f, -310f), new Vector2(800f, 120f));
             Responsive(searching.searchingText, 24f);
         }
-
-        var tip = EnsureText(root, "BoardSearchRule");
-        tip.text = L10n.Get("simulated_opponents");
-        tip.fontSize = 25f;
-        tip.color = White;
-        tip.alignment = TextAlignmentOptions.Center;
-        Place(tip.rectTransform, new Vector2(0f, -485f), new Vector2(780f, 120f));
-        Responsive(tip, 17f);
 
         SetActive(DeepFind(root, "ExactSearchingLogo"), false);
         SetActive(DeepFind(root, "ExactSearchingPlayer"), false);

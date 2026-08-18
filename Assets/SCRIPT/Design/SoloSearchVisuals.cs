@@ -48,6 +48,11 @@ public sealed class SoloSearchVisuals : MonoBehaviour
     void Build()
     {
         if (transform.Find("SoloSearchVisualRoot") != null) return;
+        var canvasGroup = GetComponent<CanvasGroup>();
+        if (canvasGroup == null) canvasGroup = gameObject.AddComponent<CanvasGroup>();
+        canvasGroup.alpha = 1f;
+        canvasGroup.interactable = true;
+        canvasGroup.blocksRaycasts = true;
 
         var root = RuntimeUI.CreateObject("SoloSearchVisualRoot", transform);
         RuntimeUI.Stretch(root);
@@ -62,8 +67,10 @@ public sealed class SoloSearchVisuals : MonoBehaviour
         var ribbon = NeonFrame.Frame(root.transform, "TitleRibbon",
             new Vector2(0f, 510f), new Vector2(860f, 120f),
             ConsumerTokens.Magenta, 0.90f, true, ConsumerTokens.CardPink);
-        RuntimeUI.CreateText(ribbon.transform, "Title", "ΒΡΕΣ ΑΝΤΙΠΑΛΟ",
-            44, Vector2.zero, new Vector2(800f, 95f));
+        var ribbonTitle = RuntimeUI.CreateText(ribbon.transform, "Title",
+            L10n.Get("solo_search_title"), 44, Vector2.zero,
+            new Vector2(800f, 95f));
+        RuntimeUI.Localize(ribbonTitle, "solo_search_title");
 
         var card = NeonFrame.Frame(root.transform, "SearchCard",
             new Vector2(0f, 100f), new Vector2(920f, 650f),
@@ -76,13 +83,19 @@ public sealed class SoloSearchVisuals : MonoBehaviour
             new Vector2(330f, 330f));
         for (int i = 0; i < 3; i++)
         {
-            var ring = radar.AddComponent<Image>();
+            var ringObject = RuntimeUI.CreateObject("Ring" + i,
+                radar.transform);
+            ConvergingLight.Center(ringObject, Vector2.zero,
+                new Vector2(300f - i * 70f, 300f - i * 70f));
+            var ring = ringObject.AddComponent<Image>();
             ring.sprite = RuntimeUI.RoundedRectSprite;
             ring.type = Image.Type.Sliced;
             ring.color = new Color(0.05f, 0.75f, 1f,
                 0.10f + i * 0.05f);
-            ring.rectTransform.sizeDelta =
-                new Vector2(300f - i * 70f, 300f - i * 70f);
+            var ringPulse = ringObject.AddComponent<RadarPulse>();
+            ringPulse.target = ringObject.GetComponent<RectTransform>();
+            ringPulse.image = ring;
+            ringPulse.phaseOffset = i * 0.7f;
         }
         var sweep = RuntimeUI.CreateObject("Sweep", radar.transform);
         ConvergingLight.Center(sweep, new Vector2(68f, 0f),
@@ -102,9 +115,8 @@ public sealed class SoloSearchVisuals : MonoBehaviour
         var pulse = dot.AddComponent<RadarPulse>();
         pulse.target = dot.GetComponent<RectTransform>();
 
-        var searchText = Find<TMP_Text>(transform, "Text");
-        if (searchText == null)
-            searchText = Find<TMP_Text>(transform, "SearchingText");
+        var matchmaking = Object.FindObjectOfType<FakeMatchmaking>();
+        var searchText = matchmaking == null ? null : matchmaking.searchingText;
         if (searchText != null)
         {
             searchText.fontSize = 38f;
@@ -159,6 +171,8 @@ public sealed class RadarScanner : MonoBehaviour
 public sealed class RadarPulse : MonoBehaviour
 {
     public RectTransform target;
+    public Image image;
+    public float phaseOffset;
     Vector3 baseScale = Vector3.one;
     float age;
 
@@ -171,7 +185,14 @@ public sealed class RadarPulse : MonoBehaviour
     {
         if (target == null) return;
         age += Time.unscaledDeltaTime;
-        float pulse = 1f + Mathf.Sin(age * 4.5f) * 0.10f;
+        float pulse = 1f + Mathf.Sin(age * 4.5f + phaseOffset) * 0.10f;
         target.localScale = baseScale * pulse;
+        if (image != null)
+        {
+            var color = image.color;
+            color.a = 0.10f + 0.08f *
+                (0.5f + 0.5f * Mathf.Sin(age * 4.5f + phaseOffset));
+            image.color = color;
+        }
     }
 }

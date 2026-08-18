@@ -61,6 +61,7 @@ public static class L10n
 
         // matchmaking
         { "find_challenger",         new[] { "Find challenger", "Βρες αντίπαλο" } },
+        { "solo_search_title",       new[] { "Find opponent", "Βρες αντίπαλο" } },
         { "searching",               new[] { "Searching opponent", "Αναζήτηση αντιπάλου" } },
         { "opponent_found",          new[] { "Opponent found!", "Βρέθηκε αντίπαλος!" } },
         { "opponent_not_found",      new[] { "Opponent not found. Try again.", "Δεν βρέθηκε αντίπαλος. Δοκίμασε ξανά." } },
