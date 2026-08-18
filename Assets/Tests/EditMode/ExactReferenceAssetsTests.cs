@@ -47,7 +47,8 @@ public class ExactReferenceAssetsTests
             "prebattle_you", "prebattle_opponent", "prebattle_found",
             "prebattle_rule_title", "prebattle_rule", "prebattle_waiting",
             "result_page_title", "result_attempts", "result_attempts_short",
-            "result_rematch_heading", "result_reactions"
+            "result_rematch_heading", "result_reactions", "result_exit",
+            "result_win_title", "result_loss_title", "result_draw_title"
         })
         {
             Assert.IsTrue(table.Contains(key), "Missing L10n key: " + key);

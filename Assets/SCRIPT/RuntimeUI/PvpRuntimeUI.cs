@@ -454,6 +454,8 @@ public class PvpRuntimeUI : MonoBehaviour
             signalButtons[i].onClick.AddListener(() => controller.OnSignalPressed(signalId));
         }
 
+        BuildResultOverlay(controller, matchPanel);
+
         // Soft-keyboard Done (Enter in the editor) submits the field's flow;
         // the handlers validate and give feedback, so a premature submit is
         // safe. The join-code field routes to join too — with the secret
@@ -508,6 +510,199 @@ public class PvpRuntimeUI : MonoBehaviour
         AddLocalizedText(card.transform, "TipText", "private_room_tip", 26,
             new Vector2(90f, 0f), new Vector2(620f, 140f),
             ConvergingLight.NearWhite);
+    }
+
+    void BuildResultOverlay(PvpGameController controller, GameObject matchPanel)
+    {
+        var root = RuntimeUI.CreateObject("ResultVisualRoot", matchPanel.transform);
+        RuntimeUI.Stretch(root);
+        var background = root.AddComponent<Image>();
+        background.sprite = ConvergingLight.VerticalGradient(
+            ConvergingLight.DepthTop, ConvergingLight.DepthBottom);
+        background.color = Color.white;
+        background.raycastTarget = true;
+
+        AddLocalizedText(root.transform, "PageTitle", "result_page_title", 28,
+            new Vector2(-345f, 825f), new Vector2(330f, 62f),
+            ConvergingLight.NearWhite);
+        AddSprite(root.transform, "Logo", "reference/hol_logo_exact",
+            new Vector2(0f, 690f), new Vector2(390f, 190f));
+
+        var chip = NeonFrame.Frame(root.transform, "PlayerChip",
+            new Vector2(350f, 825f), new Vector2(310f, 92f),
+            ConsumerTokens.Cyan, 0.84f, true, ConsumerTokens.Surface);
+        AddSprite(chip.transform, "Avatar", "reference/player_cyan_exact",
+            new Vector2(-105f, 0f), new Vector2(70f, 70f));
+        var chipText = RuntimeUI.CreateText(chip.transform, "Text", "", 20,
+            new Vector2(35f, 0f), new Vector2(190f, 64f));
+
+        var confettiGo = RuntimeUI.CreateObject(
+            "ResultConfettiLayer", root.transform);
+        ConvergingLight.Center(confettiGo, new Vector2(0f, 250f),
+            new Vector2(10f, 10f));
+        var confetti = confettiGo.AddComponent<ConfettiBurst>();
+        confetti.pieces = 48;
+        confetti.secondaryPieces = 16;
+        confetti.secondaryDelay = 0.12f;
+        confetti.force = 720f;
+        confetti.gravity = 1150f;
+        confetti.lifetime = 1.5f;
+        confetti.radial = true;
+
+        var pop = RuntimeUI.CreateObject("ResultPopTarget", root.transform);
+        ConvergingLight.Center(pop, new Vector2(0f, 260f),
+            new Vector2(1000f, 900f));
+        confetti.popTarget = (RectTransform)pop.transform;
+
+        var title = RuntimeUI.CreateText(pop.transform, "ResultTitle", "", 78,
+            new Vector2(0f, 320f), new Vector2(900f, 150f),
+            ConsumerTokens.Gold);
+        title.enableAutoSizing = true;
+        title.fontSizeMin = 42f;
+        title.fontSizeMax = 78f;
+
+        var hero = NeonFrame.Frame(pop.transform, "ResultHeroCard",
+            new Vector2(0f, -25f), new Vector2(940f, 560f),
+            ConsumerTokens.Cyan, 0.93f, true, ConsumerTokens.Surface);
+        AddSprite(hero.transform, "WinnerBoy", "reference/player_cyan_exact",
+            new Vector2(-290f, -15f), new Vector2(390f, 430f));
+        AddSprite(hero.transform, "Trophy", "reference/board_trophy_exact",
+            new Vector2(-80f, -45f), new Vector2(250f, 300f));
+
+        var attempts = NeonFrame.Frame(hero.transform, "AttemptsBoard",
+            new Vector2(255f, 35f), new Vector2(390f, 430f),
+            ConsumerTokens.Magenta, 0.72f, false, ConsumerTokens.Surface);
+        AddLocalizedText(attempts.transform, "Heading", "result_attempts", 24,
+            new Vector2(0f, 175f), new Vector2(350f, 50f),
+            ConvergingLight.NearWhite);
+
+        var playerColumn = NeonFrame.Frame(attempts.transform, "PlayerAttempts",
+            new Vector2(-92f, 0f), new Vector2(170f, 290f),
+            ConsumerTokens.Cyan, 0.78f, false, ConsumerTokens.CardBlue);
+        AddLocalizedText(playerColumn.transform, "Role", "you", 20,
+            new Vector2(0f, 105f), new Vector2(145f, 38f),
+            ConvergingLight.NearWhite);
+        var playerAttempts = RuntimeUI.CreateText(playerColumn.transform,
+            "Value", "0", 76, new Vector2(0f, 10f),
+            new Vector2(145f, 110f), ConsumerTokens.Cyan);
+        AddLocalizedText(playerColumn.transform, "Unit",
+            "result_attempts_short", 18, new Vector2(0f, -91f),
+            new Vector2(145f, 38f), ConsumerTokens.Cyan);
+
+        var opponentColumn = NeonFrame.Frame(attempts.transform,
+            "OpponentAttempts", new Vector2(92f, 0f),
+            new Vector2(170f, 290f), ConsumerTokens.Magenta, 0.78f,
+            false, ConsumerTokens.CardPink);
+        AddLocalizedText(opponentColumn.transform, "Role",
+            "prebattle_opponent", 18, new Vector2(0f, 105f),
+            new Vector2(155f, 38f), ConvergingLight.NearWhite);
+        var opponentAttempts = RuntimeUI.CreateText(opponentColumn.transform,
+            "Value", "0", 76, new Vector2(0f, 10f),
+            new Vector2(145f, 110f), ConsumerTokens.Magenta);
+        AddLocalizedText(opponentColumn.transform, "Unit",
+            "result_attempts_short", 18, new Vector2(0f, -91f),
+            new Vector2(145f, 38f), ConsumerTokens.Magenta);
+        AddSprite(opponentColumn.transform, "Girl",
+            "reference/char_girl_exact", new Vector2(42f, -95f),
+            new Vector2(80f, 80f));
+
+        var revealed = RuntimeUI.CreateText(attempts.transform,
+            "RevealedNumber", "", 22, new Vector2(0f, -185f),
+            new Vector2(350f, 52f), ConvergingLight.NearWhite);
+
+        var rematchCard = NeonFrame.Frame(root.transform, "RematchCard",
+            new Vector2(0f, -365f), new Vector2(850f, 230f),
+            ConsumerTokens.Magenta, 0.88f, true, ConsumerTokens.Surface);
+        AddLocalizedText(rematchCard.transform, "Heading",
+            "result_rematch_heading", 24, new Vector2(0f, 82f),
+            new Vector2(780f, 42f), ConvergingLight.NearWhite);
+        var rematchSecret = RuntimeUI.CreateInputField(rematchCard.transform,
+            "RematchSecret", L10n.Get("rematch_prompt"),
+            new Vector2(0f, 27f), new Vector2(760f, 64f));
+        RuntimeUI.LocalizePlaceholder(rematchSecret, "rematch_prompt");
+        var rematch = RuntimeUI.CreateButton(rematchCard.transform,
+            "ResultRematchButton", L10n.Get("rematch"),
+            new Vector2(-205f, -62f), new Vector2(370f, 72f),
+            ConsumerTokens.Gold, DarkLabel);
+        RuntimeUI.Localize(rematch, "rematch");
+        var exit = RuntimeUI.CreateButton(rematchCard.transform,
+            "ResultExitButton", L10n.Get("result_exit"),
+            new Vector2(205f, -62f), new Vector2(370f, 72f),
+            ConsumerTokens.Cyan, DarkLabel);
+        RuntimeUI.Localize(exit, "result_exit");
+        var rematchStatus = RuntimeUI.CreateText(root.transform,
+            "ResultRematchStatus", "", 20, new Vector2(0f, -505f),
+            new Vector2(780f, 42f), ConsumerTokens.TextSecondary);
+
+        var reactionCard = NeonFrame.Frame(root.transform, "ReactionCard",
+            new Vector2(0f, -690f), new Vector2(760f, 310f),
+            ConsumerTokens.Magenta, 0.82f, true, ConsumerTokens.Surface);
+        AddLocalizedText(reactionCard.transform, "Heading",
+            "result_reactions", 23, new Vector2(0f, 125f),
+            new Vector2(700f, 40f), ConvergingLight.NearWhite);
+        var resultSignalFeed = RuntimeUI.CreateText(reactionCard.transform,
+            "SignalFeed", "", 17, new Vector2(0f, 88f),
+            new Vector2(680f, 30f), ConsumerTokens.TextSecondary);
+        var resultSignals = RuntimeUI.CreateObject(
+            "ResultSignals", reactionCard.transform);
+        RuntimeUI.Stretch(resultSignals);
+        for (int i = 0; i < Signals.Count; i++)
+        {
+            int signalId = i;
+            float x = (i % 3 - 1) * 235f;
+            float y = i < 3 ? 35f : -55f;
+            var signal = RuntimeUI.CreateButton(resultSignals.transform,
+                "ResultSignal" + i, Signals.Text(i), new Vector2(x, y),
+                new Vector2(220f, 76f), ConsumerTokens.SurfaceElevated);
+            var label = signal.GetComponentInChildren<TMP_Text>();
+            if (label != null)
+            {
+                label.fontSize = 18f;
+                label.enableAutoSizing = true;
+                label.fontSizeMin = 13f;
+                label.fontSizeMax = 18f;
+            }
+            var icon = Resources.Load<Sprite>("design/" + Signals.Key(i));
+            if (icon != null)
+            {
+                var iconImage = AddSprite(signal.transform, "Icon",
+                    "design/" + Signals.Key(i), new Vector2(-78f, 0f),
+                    new Vector2(34f, 34f));
+                if (iconImage != null) iconImage.raycastTarget = false;
+            }
+            RuntimeUI.Localize(signal, Signals.Key(i));
+            signal.onClick.AddListener(
+                () => controller.OnSignalPressed(signalId));
+        }
+
+        AddSprite(root.transform, "MascotSix", "reference/mascot_6_exact",
+            new Vector2(-455f, -780f), new Vector2(170f, 185f));
+        AddSprite(root.transform, "MascotSeven", "reference/mascot_7_exact",
+            new Vector2(455f, -780f), new Vector2(170f, 185f));
+
+        var presentation = root.AddComponent<PvpResultPresentation>();
+        presentation.titleText = title;
+        presentation.playerAttemptsText = playerAttempts;
+        presentation.opponentAttemptsText = opponentAttempts;
+        presentation.revealedNumberText = revealed;
+        presentation.playerChipText = chipText;
+
+        controller.resultPresentation = presentation;
+        controller.resultSignalsRoot = resultSignals;
+        controller.resultSignalFeedText = resultSignalFeed;
+        controller.rematchButton = rematch.gameObject;
+        controller.rematchSecretInput = rematchSecret;
+        controller.rematchStatusText = rematchStatus;
+        controller.winConfetti = confetti;
+
+        rematch.onClick.AddListener(controller.OnRematchPressed);
+        rematchSecret.onSubmit.AddListener(_ => controller.OnRematchPressed());
+        exit.onClick.AddListener(controller.OnLeaveMatchPressed);
+
+        rematch.gameObject.SetActive(false);
+        rematchSecret.gameObject.SetActive(false);
+        resultSignals.SetActive(false);
+        root.SetActive(false);
     }
 
     sealed class PrebattleParts
