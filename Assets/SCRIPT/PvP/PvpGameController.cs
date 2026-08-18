@@ -325,17 +325,25 @@ public class PvpGameController : MonoBehaviour
         // Show it locally straight away — the sender should never wait a poll
         // interval to see their own message land.
         ShowSignalLine(L10n.Get("you"), signalId);
+        int sentGeneration = flowGeneration;
         int sentMatchIndex = lastState.matchIndex;
         client.SendSignal(signalId, ok =>
         {
-            if (ok || lastState == null ||
-                lastState.matchIndex != sentMatchIndex)
+            if (ok || !IsCurrentSignalCallback(
+                    sentGeneration, sentMatchIndex))
                 return;
 
             if (signalsSent > 0) signalsSent--;
             SetSignalFeed(L10n.Get("pvp_network_error"));
             RefreshSignalsAvailability();
         });
+    }
+
+    bool IsCurrentSignalCallback(int generation, int matchIndex)
+    {
+        return generation == flowGeneration &&
+               lastState != null &&
+               lastState.matchIndex == matchIndex;
     }
 
     // Commits a fresh secret for another match in this room. The server deals
@@ -478,7 +486,6 @@ public class PvpGameController : MonoBehaviour
         lastState = s;
 
         string me = client.IsHost ? "host" : "guest";
-        string them = client.IsHost ? "guest" : "host";
         string signature = s.phase + "|" + s.turn + "|" + s.lastBy + "|" +
                            s.lastGuess + "|" + s.winner + "|" + s.hostGuessCount +
                            "|" + s.guestGuessCount + "|" + s.matchIndex + "|" +
@@ -571,8 +578,10 @@ public class PvpGameController : MonoBehaviour
 
             bool isDraw = s.winner == "draw";
             bool iWon = !isDraw && s.winner == me;
-            int myGuessCount = s.GuessCountFor(me);
-            int opponentGuessCount = s.GuessCountFor(them);
+            int myGuessCount;
+            int opponentGuessCount;
+            ResultAttemptCounts(s, me, out myGuessCount,
+                out opponentGuessCount);
             int huntedSecret = s.revealedSecret;
 
             if (isDraw)
@@ -686,9 +695,16 @@ public class PvpGameController : MonoBehaviour
         turnText.text = myTurn ? L10n.Get("your_guess") : L10n.Get("opponent_thinking", opponentName);
     }
 
-    // The guess count is passed in rather than re-read: the caller has already
-    // reconciled the authoritative count against the local one for the case
-    // where the winning guess is still in flight when "done" arrives.
+    static void ResultAttemptCounts(PvpBackend.RoomState state, string playerSide,
+        out int playerAttempts, out int opponentAttempts)
+    {
+        string opponentSide = playerSide == "host" ? "guest" : "host";
+        playerAttempts = state.GuessCountFor(playerSide);
+        opponentAttempts = state.GuessCountFor(opponentSide);
+    }
+
+    // The guess count is passed in because the caller reads the completed room
+    // snapshot once and uses that same authoritative value for UI and analytics.
     MatchOutcome PvpOutcome(PvpBackend.RoomState s, MatchOutcome.Result result, int myGuessCount)
     {
         string me = client.IsHost ? "host" : "guest";

@@ -230,6 +230,7 @@ public sealed class AttachmentReskinPolish : MonoBehaviour
         if (approvedResult != null && approvedResult.gameObject.activeInHierarchy)
         {
             SetActive(DeepFind(matchRoot, "BoardPvpTrophyVector"), false);
+            approvedResult.SetAsLastSibling();
             return;
         }
         EnsureVsBurst(matchRoot);

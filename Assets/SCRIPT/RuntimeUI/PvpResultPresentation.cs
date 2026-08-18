@@ -17,6 +17,7 @@ public sealed class PvpResultPresentation : MonoBehaviour
     {
         if (!gameObject.activeSelf)
             gameObject.SetActive(true);
+        transform.SetAsLastSibling();
 
         if (titleText != null) titleText.text = title;
         if (playerAttemptsText != null)
