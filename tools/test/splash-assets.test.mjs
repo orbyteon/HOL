@@ -71,7 +71,7 @@ test("approved number six stays byte-exact", () => {
 
 test("Splash background is exact Android portrait size", () => {
   assert.deepEqual(
-    dimensions(read("Assets/newdesign/Resources/splash/splash_bg_neon_arcade.png")),
+    dimensions(read("Assets/newdesign/Resources/splash/splash_bg_stairs_clouds.png")),
     { width: 1080, height: 1920 });
 });
 
@@ -97,10 +97,35 @@ test("Splash logo glow has a fully transparent outer edge", () => {
   assert.ok(alpha(Math.floor(width / 2), Math.floor(height / 2)) < 160);
 });
 
-test("every Splash asset has a Unity meta", () => {
-  for (const path of [
-    "Assets/newdesign/Resources/reference/mascot_6_exact.png",
-    "Assets/newdesign/Resources/splash/splash_bg_neon_arcade.png",
-    "Assets/newdesign/Resources/splash/splash_logo_glow.png",
-  ]) assert.equal(fs.existsSync(new URL(path + ".meta", root)), true, path);
+const newSplashPngs = [
+  "splash_bg_stairs_clouds.png",
+  "splash_logo_glow.png",
+  "splash_deco_stars.png",
+  "splash_deco_lightning.png",
+  "splash_deco_confetti.png",
+  "splash_deco_numbers.png",
+  "splash_char_boy.png",
+  "splash_char_girl.png",
+];
+
+test("every cartoon Splash asset has a Unity meta", () => {
+  for (const filename of newSplashPngs) {
+    const path = "Assets/newdesign/Resources/splash/" + filename;
+    assert.equal(fs.existsSync(new URL(path, root)), true, path);
+    assert.equal(fs.existsSync(new URL(path + ".meta", root)), true, path + ".meta");
+  }
+});
+
+test("cartoon Splash art stays isolated from Main Menu resources", () => {
+  for (const filename of newSplashPngs) {
+    const path = "Assets/newdesign/Resources/mainmenu/" + filename;
+    assert.equal(fs.existsSync(new URL(path, root)), false, path);
+  }
+});
+
+test("rejected neon arcade Splash background is absent", () => {
+  for (const suffix of ["", ".meta"]) {
+    const path = "Assets/newdesign/Resources/splash/splash_bg_neon_arcade.png" + suffix;
+    assert.equal(fs.existsSync(new URL(path, root)), false, path);
+  }
 });
