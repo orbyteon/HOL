@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
@@ -27,20 +28,18 @@ public class ExactReferenceAssetsTests
     [Test]
     public void PrivateRoomCopyHasEnglishAndGreekEntries()
     {
-        var original = L10n.Current;
-        try
-        {
-            L10n.SetLanguage(L10n.Language.English);
-            Assert.IsTrue(L10n.Get("private_room_title") != "private_room_title");
-            Assert.IsTrue(L10n.Get("private_room_tip") != "private_room_tip");
+        var l10n = RuntimeType("L10n");
+        var field = l10n.GetField("Table", BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.IsNotNull(field, "L10n.Table field not found — renamed?");
+        var table = (IDictionary)field.GetValue(null);
 
-            L10n.SetLanguage(L10n.Language.Greek);
-            Assert.IsTrue(L10n.Get("private_room_title") != "private_room_title");
-            Assert.IsTrue(L10n.Get("private_room_tip") != "private_room_tip");
-        }
-        finally
+        foreach (var key in new[] { "private_room_title", "private_room_tip" })
         {
-            L10n.SetLanguage(original);
+            Assert.IsTrue(table.Contains(key), "Missing L10n key: " + key);
+            var pair = (string[])table[key];
+            Assert.AreEqual(2, pair.Length, key + " must have EN and EL entries.");
+            Assert.IsFalse(string.IsNullOrWhiteSpace(pair[0]), key + " English is empty.");
+            Assert.IsFalse(string.IsNullOrWhiteSpace(pair[1]), key + " Greek is empty.");
         }
     }
 
