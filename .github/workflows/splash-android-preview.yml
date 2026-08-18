@@ -39,6 +39,8 @@ on:
       - "Assets/Tests/PlayMode/SplashAuthoritativeVisualsPlayModeTests.cs.meta"
       - "Assets/Tests/EditMode/SplashProductionAssetsTests.cs"
       - "Assets/Tests/EditMode/SplashProductionAssetsTests.cs.meta"
+      - "tools/splash/validate-splash-screenshot.mjs"
+      - "tools/test/splash-screenshot-validator.test.mjs"
       - "Packages/manifest.json"
       - "Packages/packages-lock.json"
       - "ProjectSettings/ProjectVersion.txt"
@@ -294,22 +296,8 @@ jobs:
           fi
 
           adb exec-out screencap -p > "$output/splash.png"
-
-          python3 - "$output/splash.png" <<'PY'
-          import struct
-          import sys
-
-          path = sys.argv[1]
-          with open(path, "rb") as image:
-              header = image.read(24)
-          if header[:8] != b"\x89PNG\r\n\x1a\n" or header[12:16] != b"IHDR":
-              raise SystemExit(f"{path}: invalid PNG IHDR")
-          width, height = struct.unpack(">II", header[16:24])
-          if (width, height) != (1080, 1920):
-              raise SystemExit(
-                  f"{path}: expected 1080x1920, got {width}x{height}")
-          print(f"{path}: {width}x{height}")
-          PY
+          node tools/splash/validate-splash-screenshot.mjs \
+            "$output/splash.png"
 
           (
             cd "$output"
