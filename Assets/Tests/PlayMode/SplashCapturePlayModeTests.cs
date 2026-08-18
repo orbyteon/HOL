@@ -148,6 +148,10 @@ public sealed class SplashCapturePlayModeTests
 
             presentationBarriers.SetValue(bootstrap, 0);
             waitStarted.SetValue(bootstrap, false);
+            var designField = bootstrap.GetType().GetField(
+                "splashDesign", InstanceFlags);
+            Assert.That(designField, Is.Not.Null);
+            designField.SetValue(bootstrap, design);
             var routine = (IEnumerator)routineMethod.Invoke(bootstrap, null);
             AssertEndOfFrame(routine, presentationBarriers, bootstrap, 0);
             AssertEndOfFrame(routine, presentationBarriers, bootstrap, 1);
