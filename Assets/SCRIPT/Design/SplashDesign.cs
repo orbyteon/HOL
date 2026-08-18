@@ -49,8 +49,7 @@ public class SplashDesign : MonoBehaviour
         var bg = panelT.GetComponent<Image>();
         if (bg != null)
         {
-            bg.sprite = ConvergingLight.VerticalGradient(
-                ConvergingLight.DepthTop, ConvergingLight.DepthBottom);
+            bg.sprite = ConvergingLight.DepthGradientSprite;
             bg.color = Color.white;
             bg.type = Image.Type.Simple;
         }

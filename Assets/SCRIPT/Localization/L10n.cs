@@ -54,8 +54,11 @@ public static class L10n
         { "quit",                    new[] { "Quit", "Έξοδος" } },
         { "save",                    new[] { "Save", "Αποθήκευση" } },
         { "language",                new[] { "Language", "Γλώσσα" } },
+        { "language_english",        new[] { "English", "English" } },
+        { "language_greek",          new[] { "Ελληνικά", "Ελληνικά" } },
         { "music",                   new[] { "Music", "Μουσική" } },
         { "settings_title",          new[] { "Settings", "Ρυθμίσεις" } },
+        { "settings_change",         new[] { "Change", "Αλλαγή" } },
         { "player_name",             new[] { "Your name", "Το όνομά σου" } },
         { "player_default",          new[] { "Player", "Παίκτης" } },
 
@@ -140,7 +143,9 @@ public static class L10n
         { "prebattle_you",           new[] { "YOU", "ΕΣΥ" } },
         { "prebattle_opponent",      new[] { "OPPONENT", "ΑΝΤΙΠΑΛΟΣ" } },
         { "prebattle_found",         new[] { "FOUND", "ΒΡΕΘΗΚΕ" } },
+        { "prebattle_waiting_short", new[] { "WAITING...", "ΑΝΑΜΟΝΗ..." } },
         { "prebattle_rule_title",    new[] { "RULE", "ΚΑΝΟΝΑΣ" } },
+        { "versus",                  new[] { "VS", "VS" } },
         { "prebattle_rule",          new[] {
             "Guess the secret number 1–100 before your opponent.",
             "Μάντεψε τον μυστικό αριθμό 1–100 πριν τον αντίπαλό σου." } },

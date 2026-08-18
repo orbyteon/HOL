@@ -11,14 +11,17 @@ public sealed class DailyHuntVisuals : MonoBehaviour
         if (panel == null || panel.Find("DailyHuntVisualRoot") != null)
             return;
 
+        var backdropObject = RuntimeUI.CreateObject(
+            "DailyHuntBackdrop", panel);
+        RuntimeUI.Stretch(backdropObject);
+        backdropObject.transform.SetAsFirstSibling();
+        var backdrop = backdropObject.AddComponent<Image>();
+        backdrop.sprite = ConvergingLight.DepthGradientSprite;
+        backdrop.raycastTarget = false;
+
         var root = RuntimeUI.CreateObject("DailyHuntVisualRoot", panel);
         RuntimeUI.Stretch(root);
-        root.transform.SetAsFirstSibling();
-
-        var backdrop = root.AddComponent<Image>();
-        backdrop.sprite = ConvergingLight.VerticalGradient(
-            ConvergingLight.DepthTop, ConvergingLight.DepthBottom);
-        backdrop.raycastTarget = false;
+        root.transform.SetAsLastSibling();
 
         AddSprite(root.transform, "Logo", "reference/hol_logo_exact",
             new Vector2(0f, 725f), new Vector2(390f, 190f));
@@ -58,6 +61,9 @@ public sealed class DailyHuntVisuals : MonoBehaviour
             new Vector2(-420f, -790f), new Vector2(180f, 210f));
         AddSprite(panel, "MascotSeven", "reference/mascot_7_exact",
             new Vector2(420f, -790f), new Vector2(180f, 210f));
+        SetActive(Find<Transform>(panel, "ExactDailyLogo"), false);
+        SetActive(Find<Transform>(panel, "ExactDailySeven"), false);
+        SetActive(Find<Transform>(panel, "ExactDailyThree"), false);
     }
 
     static void Place(Transform target, Vector2 position, Vector2 size)
@@ -82,6 +88,11 @@ public sealed class DailyHuntVisuals : MonoBehaviour
         foreach (var item in parent.GetComponentsInChildren<T>(true))
             if (item.name == name) return item;
         return null;
+    }
+
+    static void SetActive(Transform target, bool active)
+    {
+        if (target != null) target.gameObject.SetActive(active);
     }
 
     static Image AddSprite(Transform parent, string name, string resource,

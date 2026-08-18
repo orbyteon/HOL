@@ -8,6 +8,7 @@ using TMPro;
 // only the radar and positions the existing searching/cancel controls.
 public sealed class SoloSearchVisuals : MonoBehaviour
 {
+    Button cancelButton;
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     static void Bootstrap()
     {
@@ -37,9 +38,10 @@ public sealed class SoloSearchVisuals : MonoBehaviour
 
     void LateUpdate()
     {
-        var cancel = Find<Button>(transform, "CancelButton");
-        if (cancel == null) return;
-        var rect = cancel.transform as RectTransform;
+        if (cancelButton == null)
+            cancelButton = Find<Button>(transform, "CancelButton");
+        if (cancelButton == null) return;
+        var rect = cancelButton.transform as RectTransform;
         if (rect == null) return;
         rect.anchoredPosition = new Vector2(0f, -680f);
         rect.sizeDelta = new Vector2(480f, 100f);
@@ -59,8 +61,7 @@ public sealed class SoloSearchVisuals : MonoBehaviour
         RuntimeUI.Stretch(root);
         root.transform.SetAsFirstSibling();
         var background = root.AddComponent<Image>();
-        background.sprite = ConvergingLight.VerticalGradient(
-            ConvergingLight.DepthTop, ConvergingLight.DepthBottom);
+        background.sprite = ConvergingLight.DepthGradientSprite;
         background.raycastTarget = false;
 
         AddSprite(root.transform, "Logo", "reference/hol_logo_exact",
@@ -93,6 +94,7 @@ public sealed class SoloSearchVisuals : MonoBehaviour
             ring.type = Image.Type.Sliced;
             ring.color = new Color(0.05f, 0.75f, 1f,
                 0.10f + i * 0.05f);
+            ring.raycastTarget = false;
             var ringPulse = ringObject.AddComponent<RadarPulse>();
             ringPulse.target = ringObject.GetComponent<RectTransform>();
             ringPulse.image = ring;
@@ -125,9 +127,9 @@ public sealed class SoloSearchVisuals : MonoBehaviour
             searchText.fontSizeMin = 26f;
             searchText.fontSizeMax = 38f;
             searchText.rectTransform.anchoredPosition =
-                new Vector2(285f, 95f);
+                new Vector2(225f, -190f);
             searchText.rectTransform.sizeDelta =
-                new Vector2(360f, 110f);
+                new Vector2(410f, 100f);
             searchText.alignment = TextAlignmentOptions.Center;
         }
 
@@ -135,6 +137,10 @@ public sealed class SoloSearchVisuals : MonoBehaviour
             new Vector2(-420f, -790f), new Vector2(180f, 210f));
         AddSprite(root.transform, "MascotSeven", "reference/mascot_7_exact",
             new Vector2(420f, -790f), new Vector2(180f, 210f));
+        SetActive(Find<Transform>(transform, "ExactSearchingLogo"), false);
+        SetActive(Find<Transform>(transform, "ExactSearchingPlayer"), false);
+        SetActive(Find<Transform>(transform, "ExactSearchingOpponent"), false);
+        SetActive(Find<Transform>(transform, "ExactSearchingVs"), false);
     }
 
     static T Find<T>(Transform parent, string name) where T : Component
@@ -142,6 +148,11 @@ public sealed class SoloSearchVisuals : MonoBehaviour
         foreach (var item in parent.GetComponentsInChildren<T>(true))
             if (item.name == name) return item;
         return null;
+    }
+
+    static void SetActive(Transform target, bool active)
+    {
+        if (target != null) target.gameObject.SetActive(active);
     }
 
     static Image AddSprite(Transform parent, string name, string resource,

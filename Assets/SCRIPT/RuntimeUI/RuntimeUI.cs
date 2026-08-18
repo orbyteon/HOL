@@ -85,25 +85,29 @@ public static class RuntimeUI
     // Runtime page roots use a 1080x1920 portrait reference canvas. Clamp
     // direct children of a full-screen page to Android's safe area while leaving
     // nested labels/children in their local card coordinates.
-    static bool IsPageChild(RectTransform rect)
+    static Canvas FindPageCanvas(RectTransform rect)
     {
-        if (rect == null || rect.parent == null) return false;
-        var parent = rect.parent as RectTransform;
-        if (parent == null) return false;
-        if (parent.GetComponent<Canvas>() != null) return true;
-        return parent.parent != null &&
-               parent.anchorMin == Vector2.zero &&
-               parent.anchorMax == Vector2.one &&
-               parent.parent.GetComponent<Canvas>() != null;
+        if (rect == null || rect.parent == null) return null;
+        Transform current = rect.parent;
+        while (current != null)
+        {
+            var canvas = current.GetComponent<Canvas>();
+            if (canvas != null) return canvas;
+
+            var page = current as RectTransform;
+            if (page == null ||
+                page.anchorMin != Vector2.zero ||
+                page.anchorMax != Vector2.one)
+                return null;
+            current = current.parent;
+        }
+        return null;
     }
 
     static void ClampPageChild(RectTransform rect, Vector2 size, Vector2 requested)
     {
-        if (!IsPageChild(rect)) return;
-
-        var canvas = rect.parent.GetComponent<Canvas>();
-        if (canvas == null && rect.parent.parent != null)
-            canvas = rect.parent.parent.GetComponent<Canvas>();
+        var canvas = FindPageCanvas(rect);
+        if (canvas == null) return;
         var canvasRect = canvas != null ? canvas.transform as RectTransform : null;
         Vector2 canvasSize = canvasRect != null && canvasRect.rect.size.sqrMagnitude > 0f
             ? canvasRect.rect.size

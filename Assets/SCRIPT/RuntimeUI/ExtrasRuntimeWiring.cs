@@ -317,14 +317,16 @@ public class ExtrasRuntimeWiring : MonoBehaviour
         RuntimeUI.Localize(languageLabel, "language");
 
         englishButton = RuntimeUI.CreateButton(menu.settingsPanel.transform,
-            "EnglishButton", "English",
+            "EnglishButton", L10n.Get("language_english"),
             new Vector2(-130f, -560f), new Vector2(220f, 80f), Neutral);
         englishButton.onClick.AddListener(selector.SetEnglish);
+        RuntimeUI.Localize(englishButton, "language_english");
 
         greekButton = RuntimeUI.CreateButton(menu.settingsPanel.transform,
-            "GreekButton", "Ελληνικά",
+            "GreekButton", L10n.Get("language_greek"),
             new Vector2(130f, -560f), new Vector2(220f, 80f), Neutral);
         greekButton.onClick.AddListener(selector.SetGreek);
+        RuntimeUI.Localize(greekButton, "language_greek");
 
         RefreshLanguageButtons();
         L10n.OnLanguageChanged += RefreshLanguageButtons;

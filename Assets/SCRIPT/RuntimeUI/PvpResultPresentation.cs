@@ -11,9 +11,16 @@ public sealed class PvpResultPresentation : MonoBehaviour
     public TMP_Text opponentAttemptsText;
     public TMP_Text revealedNumberText;
     public TMP_Text playerChipText;
+    public GameObject trophy;
 
     public void Show(string title, int playerAttempts, int opponentAttempts,
         int revealedNumber)
+    {
+        Show(title, playerAttempts, opponentAttempts, revealedNumber, true);
+    }
+
+    public void Show(string title, int playerAttempts, int opponentAttempts,
+        int revealedNumber, bool showTrophy)
     {
         if (!gameObject.activeSelf)
             gameObject.SetActive(true);
@@ -26,6 +33,7 @@ public sealed class PvpResultPresentation : MonoBehaviour
             opponentAttemptsText.text = Mathf.Max(0, opponentAttempts).ToString();
         if (revealedNumberText != null)
             revealedNumberText.text = L10n.Get("number_was", revealedNumber);
+        if (trophy != null) trophy.SetActive(showTrophy);
 
         if (playerChipText != null)
         {

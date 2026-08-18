@@ -331,7 +331,7 @@ public sealed class AttachmentReskinVisuals : MonoBehaviour
             new Vector2(0f, 705f), new Vector2(500f, 265f), true);
 
         var title = EnsureText(panelRoot, "BoardPvpTitle");
-        title.text = IsGreek ? "ΠΑΙΞΕ ΜΕ ΦΙΛΟ" : "PLAY WITH A FRIEND";
+        title.text = L10n.Get("private_room_title").ToUpperInvariant();
         title.fontSize = 43f;
         title.fontStyle = FontStyles.Bold;
         title.color = White;
@@ -798,7 +798,7 @@ public sealed class AttachmentReskinVisuals : MonoBehaviour
         AddImage(right.transform, "BoardVsOpponent", opponent,
             new Vector2(0f, 10f), new Vector2(cardWidth * 0.70f, cardHeight * 0.78f), true);
         var them = EnsureText(right.transform, "BoardVsThem");
-        them.text = IsGreek ? "ΑΝΤΙΠΑΛΟΣ" : "OPPONENT";
+        them.text = L10n.Get("prebattle_opponent").ToUpperInvariant();
         them.fontSize = 28f;
         them.fontStyle = FontStyles.Bold;
         them.color = White;
@@ -807,7 +807,7 @@ public sealed class AttachmentReskinVisuals : MonoBehaviour
 
         var vs = EnsureText(root, "BoardVsBadge");
         vs.gameObject.SetActive(true);
-        vs.text = "VS";
+        vs.text = L10n.Get("versus");
         vs.fontSize = 72f;
         vs.fontStyle = FontStyles.Bold;
         vs.color = Gold;
