@@ -88,15 +88,18 @@ public sealed class SplashCapturePlayModeTests
     }
 
     [UnityTest]
-    public IEnumerator CaptureMarkerIsLoggedOnceAndOnlyAfterDesignSettles()
+    public IEnumerator CaptureMarkerWaitsForTwoPresentedFramesAfterDesignSettles()
     {
         ResetCaptureState();
         SetCaptureRequested(true);
 
         int markerCount = 0;
         bool markerObservedBeforeSettled = false;
+        int presentationBarriersAtMarker = -1;
         Component design = null;
+        Component bootstrap = null;
         PropertyInfo settled = null;
+        FieldInfo presentationBarriers = null;
         Application.LogCallback callback = (condition, stackTrace, type) =>
         {
             if (condition != "HOL_SPLASH_CAPTURE_READY") return;
@@ -104,6 +107,9 @@ public sealed class SplashCapturePlayModeTests
             if (design == null || settled == null ||
                 !(bool)settled.GetValue(design, null))
                 markerObservedBeforeSettled = true;
+            if (bootstrap != null && presentationBarriers != null)
+                presentationBarriersAtMarker =
+                    (int)presentationBarriers.GetValue(bootstrap);
         };
         Application.logMessageReceived += callback;
 
@@ -124,8 +130,13 @@ public sealed class SplashCapturePlayModeTests
             Assert.That(settled, Is.Not.Null);
 
             InvokeInstallForScene(scene);
-            Assert.That(ComponentsInScene(scene, RuntimeType("SplashCaptureBootstrap")),
-                Has.Count.EqualTo(1));
+            var bootstraps = ComponentsInScene(
+                scene, RuntimeType("SplashCaptureBootstrap"));
+            Assert.That(bootstraps, Has.Count.EqualTo(1));
+            bootstrap = bootstraps[0];
+            presentationBarriers = bootstrap.GetType().GetField(
+                "presentationBarriersPassed", InstanceFlags);
+            Assert.That(presentationBarriers, Is.Not.Null);
 
             float deadline = Time.realtimeSinceStartup + 2f;
             while (markerCount == 0 && Time.realtimeSinceStartup < deadline)
@@ -134,6 +145,7 @@ public sealed class SplashCapturePlayModeTests
             Assert.That(markerCount, Is.EqualTo(1));
             Assert.That(markerObservedBeforeSettled, Is.False);
             Assert.That((bool)settled.GetValue(design, null), Is.True);
+            Assert.That(presentationBarriersAtMarker, Is.GreaterThanOrEqualTo(2));
 
             for (int i = 0; i < 5; i++)
                 yield return null;
