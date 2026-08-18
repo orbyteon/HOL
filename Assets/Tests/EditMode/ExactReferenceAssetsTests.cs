@@ -320,6 +320,13 @@ public class ExactReferenceAssetsTests
     }
 
     [Test]
+    public void SoloSearchPresentationContractExists()
+    {
+        Assert.IsNotNull(RuntimeType("SoloSearchVisuals"));
+        Assert.IsNotNull(RuntimeType("RadarScanner"));
+    }
+
+    [Test]
     public void ApprovedLayerDisablesLegacyScenePresentation()
     {
         var legacyObject = new GameObject("LegacyDesign");
