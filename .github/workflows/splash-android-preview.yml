@@ -1,0 +1,205 @@
+name: Splash Android Preview
+
+on:
+  pull_request:
+    paths:
+      - "Assets/SCRIPT/SplashLoader.cs"
+      - "Assets/SCRIPT/Design/SplashCaptureBootstrap.cs"
+      - "Assets/SCRIPT/Design/SplashDesign.cs"
+      - "Assets/Scenes/SplashScene.unity"
+      - "Assets/newdesign/Resources/splash/**"
+      - "Assets/newdesign/Resources/reference/hol_logo_exact*"
+      - "Assets/newdesign/Resources/reference/mascot_6_exact*"
+      - "Assets/newdesign/Resources/reference/mascot_7_exact*"
+      - "Assets/Tests/PlayMode/Splash*"
+      - "Assets/Editor/SplashPreviewBuild.cs"
+      - ".github/workflows/splash-android-preview.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: splash-android-preview-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  capture:
+    name: Build and capture Splash
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Require Unity credentials
+        shell: bash
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for name in UNITY_LICENSE UNITY_EMAIL UNITY_PASSWORD; do
+            test -n "${!name:-}" || {
+              echo "::error::$name is not configured"
+              exit 1
+            }
+          done
+
+      - name: Free runner disk for Unity Android image
+        shell: bash
+        run: |
+          set -euxo pipefail
+          df -h /
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup
+          docker system prune -af || true
+          sudo apt-get clean
+          df -h /
+
+      - name: Cache Library
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: Library
+          key: Library-Splash-Android-${{ hashFiles('Packages/manifest.json', 'Packages/packages-lock.json') }}
+          restore-keys: |
+            Library-Android-
+            Library-
+
+      - name: Build Development x86_64 Splash APK
+        uses: game-ci/unity-builder@d829bfc901f2347c8fe18898f06712b66916ef42 # v5.0.0
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          targetPlatform: Android
+          androidExportType: androidPackage
+          buildMethod: SplashPreviewBuild.Build
+          versioning: None
+
+      - name: Take ownership and verify exact APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo chown -R "$(id -u):$(id -g)" build
+          test -f build/Android/HOL-splash-debug.apk
+          mkdir -p build/Android/preview
+
+      - name: Install API 35 emulator image
+        shell: bash
+        run: |
+          set -euo pipefail
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0" \
+            "emulator" \
+            "system-images;android-35;google_apis;x86_64"
+          echo no | avdmanager create avd \
+            --force \
+            --name hol-splash-api35 \
+            --package "system-images;android-35;google_apis;x86_64"
+
+      - name: Boot 1080x1920 x86_64 emulator
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo chmod 666 /dev/kvm
+          nohup "$ANDROID_HOME/emulator/emulator" \
+            -avd hol-splash-api35 \
+            -no-window \
+            -no-snapshot \
+            -noaudio \
+            -no-boot-anim \
+            -gpu swiftshader_indirect \
+            > build/Android/preview/emulator.log 2>&1 &
+          echo "$!" > build/Android/preview/emulator.pid
+
+          adb wait-for-device
+          timeout 180 bash -c '
+            until [ "$(adb shell getprop sys.boot_completed | tr -d "\r")" = "1" ]; do
+              sleep 2
+            done
+          '
+          adb shell wm size 1080x1920
+          adb shell wm density 420
+          adb shell settings put global window_animation_scale 0
+          adb shell settings put global transition_animation_scale 0
+          adb shell settings put global animator_duration_scale 0
+
+      - name: Install, launch, and capture settled Splash
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=build/Android/HOL-splash-debug.apk
+          preview=build/Android/preview
+          aapt="$ANDROID_HOME/build-tools/35.0.0/aapt"
+
+          "$aapt" dump badging "$apk" | tee "$preview/aapt-badging.txt"
+          package_name=$("$aapt" dump badging "$apk" |
+            sed -n "s/^package: name='\([^']*\)'.*/\1/p")
+          launch_activity=$("$aapt" dump badging "$apk" |
+            sed -n "s/^launchable-activity: name='\([^']*\)'.*/\1/p")
+          test -n "$package_name"
+          test -n "$launch_activity"
+
+          adb install -r "$apk" | tee "$preview/adb-install.txt"
+          adb logcat -c
+          adb shell am force-stop "$package_name"
+          adb shell am start -W \
+            -n "$package_name/$launch_activity" \
+            --es hol_capture_screen splash \
+            | tee "$preview/am-start.txt"
+
+          ready=0
+          for attempt in $(seq 1 60); do
+            adb logcat -d > "$preview/logcat.txt"
+            if grep -Fq "HOL_SPLASH_CAPTURE_READY" "$preview/logcat.txt"; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+          test "$ready" -eq 1
+          test "$(grep -Fc "HOL_SPLASH_CAPTURE_READY" "$preview/logcat.txt")" -eq 1
+
+          adb exec-out screencap -p > "$preview/splash.png"
+          adb shell wm size > "$preview/display-size-density.txt"
+          adb shell wm density >> "$preview/display-size-density.txt"
+          adb shell dumpsys package "$package_name" > "$preview/package-metadata.txt"
+          adb shell dumpsys display > "$preview/display-metadata.txt"
+
+      - name: Validate capture and record hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('fs');
+          const path = 'build/Android/preview/splash.png';
+          const png = fs.readFileSync(path);
+          const signature = '89504e470d0a1a0a';
+          if (png.subarray(0, 8).toString('hex') !== signature ||
+              png.subarray(12, 16).toString('ascii') !== 'IHDR') {
+            throw new Error('splash.png does not have a valid PNG IHDR');
+          }
+          const width = png.readUInt32BE(16);
+          const height = png.readUInt32BE(20);
+          if (width !== 1080 || height !== 1920) {
+            throw new Error(`Expected 1080x1920 PNG, got ${width}x${height}`);
+          }
+          console.log(`Validated ${width}x${height} PNG IHDR`);
+          NODE
+          sha256sum \
+            build/Android/HOL-splash-debug.apk \
+            build/Android/preview/splash.png \
+            | tee build/Android/preview/SHA256SUMS
+
+      - name: Upload Splash Android preview
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hol-splash-android-preview
+          path: build/Android
+          retention-days: 7
