@@ -88,28 +88,19 @@ public sealed class SplashCapturePlayModeTests
     }
 
     [UnityTest]
-    public IEnumerator CaptureMarkerWaitsForTwoPresentedFramesAfterDesignSettles()
+    public IEnumerator CaptureIteratorHasTwoBarriersAndLogsExactlyOnceWhenAdvanced()
     {
         ResetCaptureState();
         SetCaptureRequested(true);
 
         int markerCount = 0;
-        bool markerObservedBeforeSettled = false;
-        int presentationBarriersAtMarker = -1;
         Component design = null;
         Component bootstrap = null;
         PropertyInfo settled = null;
-        FieldInfo presentationBarriers = null;
         Application.LogCallback callback = (condition, stackTrace, type) =>
         {
             if (condition != "HOL_SPLASH_CAPTURE_READY") return;
             markerCount++;
-            if (design == null || settled == null ||
-                !(bool)settled.GetValue(design, null))
-                markerObservedBeforeSettled = true;
-            if (bootstrap != null && presentationBarriers != null)
-                presentationBarriersAtMarker =
-                    (int)presentationBarriers.GetValue(bootstrap);
         };
         Application.logMessageReceived += callback;
 
@@ -128,31 +119,66 @@ public sealed class SplashCapturePlayModeTests
             Assert.That(design, Is.Not.Null);
             settled = design.GetType().GetProperty("IsSettled", InstanceFlags);
             Assert.That(settled, Is.Not.Null);
+            Assert.That((bool)settled.GetValue(design, null), Is.False);
 
+            InvokeInstallForScene(scene);
             InvokeInstallForScene(scene);
             var bootstraps = ComponentsInScene(
                 scene, RuntimeType("SplashCaptureBootstrap"));
             Assert.That(bootstraps, Has.Count.EqualTo(1));
             bootstrap = bootstraps[0];
-            presentationBarriers = bootstrap.GetType().GetField(
+            Assert.That(markerCount, Is.EqualTo(0));
+
+            var bootstrapBehaviour = (MonoBehaviour)bootstrap;
+            bootstrapBehaviour.StopAllCoroutines();
+            bootstrapBehaviour.enabled = false;
+
+            float settleDeadline = Time.realtimeSinceStartup + 2f;
+            while (!(bool)settled.GetValue(design, null) &&
+                   Time.realtimeSinceStartup < settleDeadline)
+                yield return null;
+            Assert.That((bool)settled.GetValue(design, null), Is.True);
+            Assert.That(markerCount, Is.EqualTo(0));
+
+            var presentationBarriers = bootstrap.GetType().GetField(
                 "presentationBarriersPassed", InstanceFlags);
             Assert.That(presentationBarriers, Is.Not.Null);
+            var waitStarted = bootstrap.GetType().GetField(
+                "presentationWaitStarted", InstanceFlags);
+            Assert.That(waitStarted, Is.Not.Null);
+            var markerLogged = bootstrap.GetType().GetField(
+                "markerLogged", StaticFlags);
+            Assert.That(markerLogged, Is.Not.Null);
+            var routineMethod = bootstrap.GetType().GetMethod(
+                "LogReadyAfterPresentation", InstanceFlags);
+            Assert.That(routineMethod, Is.Not.Null);
 
-            float deadline = Time.realtimeSinceStartup + 2f;
-            while (markerCount == 0 && Time.realtimeSinceStartup < deadline)
-                yield return null;
-
+            presentationBarriers.SetValue(bootstrap, 0);
+            waitStarted.SetValue(bootstrap, false);
+            var routine = (IEnumerator)routineMethod.Invoke(bootstrap, null);
+            AssertEndOfFrame(routine, presentationBarriers, bootstrap, 0);
+            AssertEndOfFrame(routine, presentationBarriers, bootstrap, 1);
+            Assert.That(routine.MoveNext(), Is.False);
+            Assert.That((int)presentationBarriers.GetValue(bootstrap), Is.EqualTo(2));
             Assert.That(markerCount, Is.EqualTo(1));
-            Assert.That(markerObservedBeforeSettled, Is.False);
-            Assert.That((bool)settled.GetValue(design, null), Is.True);
-            Assert.That(presentationBarriersAtMarker, Is.GreaterThanOrEqualTo(2));
+            Assert.That((bool)markerLogged.GetValue(null), Is.True);
 
-            for (int i = 0; i < 5; i++)
-                yield return null;
+            var duplicateRoutine =
+                (IEnumerator)routineMethod.Invoke(bootstrap, null);
+            AssertEndOfFrame(
+                duplicateRoutine, presentationBarriers, bootstrap, 2);
+            AssertEndOfFrame(
+                duplicateRoutine, presentationBarriers, bootstrap, 3);
+            Assert.That(duplicateRoutine.MoveNext(), Is.False);
             Assert.That(markerCount, Is.EqualTo(1));
         }
         finally
         {
+            if (bootstrap != null)
+            {
+                ((MonoBehaviour)bootstrap).StopAllCoroutines();
+                ((MonoBehaviour)bootstrap).enabled = false;
+            }
             Application.logMessageReceived -= callback;
             ResetCaptureState();
         }
@@ -191,6 +217,14 @@ public sealed class SplashCapturePlayModeTests
             SceneManager.sceneLoaded -= onLoaded;
             ResetCaptureState();
         }
+    }
+
+    static void AssertEndOfFrame(
+        IEnumerator routine, FieldInfo barriers, Component bootstrap, int expectedCount)
+    {
+        Assert.That(routine.MoveNext(), Is.True);
+        Assert.That(routine.Current, Is.TypeOf<WaitForEndOfFrame>());
+        Assert.That((int)barriers.GetValue(bootstrap), Is.EqualTo(expectedCount));
     }
 
     static float ResolveTimeout(bool captureRequested, float waitTime)

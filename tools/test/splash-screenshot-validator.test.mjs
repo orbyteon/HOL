@@ -34,9 +34,20 @@ const chunk = (type, data) => {
   return result;
 };
 
-const syntheticRgbaPng = pixel => {
-  const width = 1080;
-  const height = 1920;
+const rgbaPng = (width, height, compressed) => {
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr.set([8, 6, 0, 0, 0], 8);
+  return Buffer.concat([
+    Buffer.from("89504e470d0a1a0a", "hex"),
+    chunk("IHDR", ihdr),
+    chunk("IDAT", compressed),
+    chunk("IEND", Buffer.alloc(0)),
+  ]);
+};
+
+const syntheticRgbaPng = (pixel, width = 1080, height = 1920) => {
   const stride = width * 4;
   const raw = Buffer.allocUnsafe((stride + 1) * height);
   for (let y = 0; y < height; y++) {
@@ -51,18 +62,16 @@ const syntheticRgbaPng = pixel => {
       raw[offset + 3] = a;
     }
   }
-
-  const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(width, 0);
-  ihdr.writeUInt32BE(height, 4);
-  ihdr.set([8, 6, 0, 0, 0], 8);
-  return Buffer.concat([
-    Buffer.from("89504e470d0a1a0a", "hex"),
-    chunk("IHDR", ihdr),
-    chunk("IDAT", zlib.deflateSync(raw)),
-    chunk("IEND", Buffer.alloc(0)),
-  ]);
+  return rgbaPng(width, height, zlib.deflateSync(raw));
 };
+
+test("dimensions fail before malformed image data is inflated", () => {
+  const png = rgbaPng(1, 1, Buffer.from("not a deflate stream"));
+
+  assert.throws(
+    () => validateSplashPng(png),
+    /Expected 1080x1920, got 1x1/);
+});
 
 test("uniform gray Splash screenshot fails closed", () => {
   const png = syntheticRgbaPng(() => [127, 127, 127, 255]);
@@ -70,6 +79,17 @@ test("uniform gray Splash screenshot fails closed", () => {
   assert.throws(
     () => validateSplashPng(png),
     /uniform|range/i);
+});
+
+test("near-uniform Splash screenshot fails range thresholds", () => {
+  const png = syntheticRgbaPng((x, y, width) =>
+    x < width / 2
+      ? [127, 127, 127, 255]
+      : [130, 130, 130, 255]);
+
+  assert.throws(
+    () => validateSplashPng(png),
+    /luminance range|color range/i);
 });
 
 test("varied 1080x1920 Splash screenshot passes content validation", () => {
