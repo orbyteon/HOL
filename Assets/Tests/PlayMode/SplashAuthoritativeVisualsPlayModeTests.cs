@@ -62,8 +62,14 @@ public sealed class SplashAuthoritativeVisualsPlayModeTests
         Assert.That(background, Is.Not.Null);
         Assert.That(safeRoot, Is.Not.Null);
         AssertDirectChildren(safeRoot,
+            "SplashDecoStars",
+            "SplashDecoLightning",
+            "SplashDecoConfetti",
+            "SplashDecoNumbers",
             "SplashLogoGlow",
             "SplashLogo",
+            "SplashHeroBoy",
+            "SplashHeroGirl",
             "SplashMascotSix",
             "SplashMascotSeven",
             "SplashProgressTrack");
@@ -80,27 +86,54 @@ public sealed class SplashAuthoritativeVisualsPlayModeTests
         var expectedLayout = new[]
         {
             new LayoutExpectation("SplashLogoGlow",
-                new Vector2(0f, 260f), new Vector2(960f, 620f)),
+                new Vector2(0f, 280f), new Vector2(960f, 620f)),
             new LayoutExpectation("SplashLogo",
-                new Vector2(0f, 260f), new Vector2(820f, 546f)),
+                new Vector2(0f, 280f), new Vector2(820f, 546f)),
+            new LayoutExpectation("SplashHeroBoy",
+                new Vector2(-155f, -40f), new Vector2(380f, 460f)),
+            new LayoutExpectation("SplashHeroGirl",
+                new Vector2(155f, -40f), new Vector2(380f, 460f)),
             new LayoutExpectation("SplashMascotSix",
-                new Vector2(-285f, -330f), new Vector2(270f, 350f)),
+                new Vector2(-340f, -420f), new Vector2(240f, 320f)),
             new LayoutExpectation("SplashMascotSeven",
-                new Vector2(285f, -330f), new Vector2(250f, 350f)),
+                new Vector2(340f, -420f), new Vector2(230f, 320f)),
             new LayoutExpectation("SplashProgressTrack",
                 new Vector2(0f, -770f), new Vector2(480f, 8f))
         };
         foreach (var expected in expectedLayout)
             AssertLayout(safeRoot, expected.Name, expected.Position, expected.Size);
 
+        var boy = (RectTransform)DirectChild(safeRoot, "SplashHeroBoy");
+        var girl = (RectTransform)DirectChild(safeRoot, "SplashHeroGirl");
         var six = (RectTransform)DirectChild(safeRoot, "SplashMascotSix");
         var seven = (RectTransform)DirectChild(safeRoot, "SplashMascotSeven");
-        Assert.That(six.anchoredPosition.x, Is.LessThan(0f));
-        Assert.That(seven.anchoredPosition.x, Is.GreaterThan(0f));
+        Assert.That(boy.anchoredPosition.x, Is.LessThan(0f));
+        Assert.That(girl.anchoredPosition.x, Is.GreaterThan(0f));
+        Assert.That(boy.anchoredPosition.x, Is.LessThan(girl.anchoredPosition.x));
+        Assert.That(six.anchoredPosition.x, Is.LessThan(seven.anchoredPosition.x));
 
         AssertPreservesAspect(safeRoot, "SplashLogo");
+        AssertPreservesAspect(safeRoot, "SplashHeroBoy");
+        AssertPreservesAspect(safeRoot, "SplashHeroGirl");
         AssertPreservesAspect(safeRoot, "SplashMascotSix");
         AssertPreservesAspect(safeRoot, "SplashMascotSeven");
+
+        AssertStretchedDeco(safeRoot, "SplashDecoStars");
+        AssertStretchedDeco(safeRoot, "SplashDecoLightning");
+        AssertStretchedDeco(safeRoot, "SplashDecoConfetti");
+        AssertStretchedDeco(safeRoot, "SplashDecoNumbers");
+
+        AssertSprite(visualRoot, "SplashBackground", "splash/splash_bg_stairs_clouds");
+        AssertSprite(safeRoot, "SplashDecoStars", "splash/splash_deco_stars");
+        AssertSprite(safeRoot, "SplashDecoLightning", "splash/splash_deco_lightning");
+        AssertSprite(safeRoot, "SplashDecoConfetti", "splash/splash_deco_confetti");
+        AssertSprite(safeRoot, "SplashDecoNumbers", "splash/splash_deco_numbers");
+        AssertSprite(safeRoot, "SplashLogoGlow", "splash/splash_logo_glow");
+        AssertSprite(safeRoot, "SplashLogo", "reference/hol_logo_exact");
+        AssertSprite(safeRoot, "SplashHeroBoy", "splash/splash_char_boy");
+        AssertSprite(safeRoot, "SplashHeroGirl", "splash/splash_char_girl");
+        AssertSprite(safeRoot, "SplashMascotSix", "reference/mascot_6_exact");
+        AssertSprite(safeRoot, "SplashMascotSeven", "reference/mascot_7_exact");
 
         foreach (var image in visualRoot.GetComponentsInChildren<Image>(true))
             Assert.That(image.raycastTarget, Is.False,
@@ -108,6 +141,7 @@ public sealed class SplashAuthoritativeVisualsPlayModeTests
 
         Assert.That(ComponentsInScene<Button>(scene), Is.Empty,
             "The presentation-only Splash must not create a Button.");
+        AssertNoMainMenuChrome(scene);
 
         var legacyPanel = DirectChild(canvas.transform, "Panel");
         var legacyLogo = DirectChild(canvas.transform, "Image");
@@ -136,8 +170,94 @@ public sealed class SplashAuthoritativeVisualsPlayModeTests
         Assert.That((bool)settled.GetValue(splashDesign, null), Is.True);
     }
 
+    [UnityTest]
+    public IEnumerator ProgressFillAdvancesMonotonicallyAcrossWaitTime()
+    {
+        yield return SceneManager.LoadSceneAsync("SplashScene", LoadSceneMode.Single);
+        yield return null;
+
+        var scene = SceneManager.GetActiveScene();
+        var loader = FindInScene(scene, RuntimeType("SplashLoader"));
+        Assert.That(loader, Is.Not.Null);
+        ((MonoBehaviour)loader).CancelInvoke("LoadMenu");
+
+        var progress = FindByName(scene, "SplashProgressFill");
+        Assert.That(progress, Is.Not.Null);
+        var fill = progress.GetComponent<Image>();
+        Assert.That(fill, Is.Not.Null);
+
+        float previous = fill.fillAmount;
+        float deadline = Time.realtimeSinceStartup + 2.6f;
+        while (Time.realtimeSinceStartup < deadline)
+        {
+            yield return null;
+            Assert.That(fill.fillAmount, Is.GreaterThanOrEqualTo(previous));
+            previous = fill.fillAmount;
+        }
+        Assert.That(fill.fillAmount, Is.EqualTo(1f).Within(Tolerance));
+    }
+
+    [UnityTest]
+    public IEnumerator SkipTransitionReachesMainMenuExactlyOnce()
+    {
+        yield return SceneManager.LoadSceneAsync("SplashScene", LoadSceneMode.Single);
+        yield return null;
+
+        var loader = FindInScene(SceneManager.GetActiveScene(), RuntimeType("SplashLoader"));
+        Assert.That(loader, Is.Not.Null);
+        ((MonoBehaviour)loader).CancelInvoke("LoadMenu");
+
+        int mainMenuLoads = 0;
+        UnityEngine.Events.UnityAction<Scene, LoadSceneMode> onLoaded = (scene, mode) =>
+        {
+            if (scene.name == "MainMenu") mainMenuLoads++;
+        };
+        SceneManager.sceneLoaded += onLoaded;
+        try
+        {
+            loader.SendMessage("LoadMenu", SendMessageOptions.RequireReceiver);
+            while (SceneManager.GetActiveScene().name != "MainMenu")
+                yield return null;
+            yield return null;
+            Assert.That(mainMenuLoads, Is.EqualTo(1));
+        }
+        finally
+        {
+            SceneManager.sceneLoaded -= onLoaded;
+        }
+    }
+
+    [UnityTest]
+    public IEnumerator AutomaticTransitionReachesMainMenuExactlyOnce()
+    {
+        yield return SceneManager.LoadSceneAsync("SplashScene", LoadSceneMode.Single);
+        yield return null;
+
+        int mainMenuLoads = 0;
+        UnityEngine.Events.UnityAction<Scene, LoadSceneMode> onLoaded = (scene, mode) =>
+        {
+            if (scene.name == "MainMenu") mainMenuLoads++;
+        };
+        SceneManager.sceneLoaded += onLoaded;
+        try
+        {
+            float deadline = Time.realtimeSinceStartup + 4f;
+            while (SceneManager.GetActiveScene().name == "SplashScene" &&
+                   Time.realtimeSinceStartup < deadline)
+                yield return null;
+
+            Assert.That(SceneManager.GetActiveScene().name, Is.EqualTo("MainMenu"));
+            yield return null;
+            Assert.That(mainMenuLoads, Is.EqualTo(1));
+        }
+        finally
+        {
+            SceneManager.sceneLoaded -= onLoaded;
+        }
+    }
+
     [Test]
-    public void RequiredArtReadyNeedsAllFiveApprovedSprites()
+    public void RequiredArtReadyNeedsAllSevenApprovedSprites()
     {
         var sprites = RequiredSprites();
         for (int i = 0; i < sprites.Length; i++)
@@ -247,9 +367,11 @@ public sealed class SplashAuthoritativeVisualsPlayModeTests
     {
         return new object[]
         {
-            Resources.Load<Sprite>("splash/splash_bg_neon_arcade"),
+            Resources.Load<Sprite>("splash/splash_bg_stairs_clouds"),
             Resources.Load<Sprite>("splash/splash_logo_glow"),
             Resources.Load<Sprite>("reference/hol_logo_exact"),
+            Resources.Load<Sprite>("splash/splash_char_boy"),
+            Resources.Load<Sprite>("splash/splash_char_girl"),
             Resources.Load<Sprite>("reference/mascot_6_exact"),
             Resources.Load<Sprite>("reference/mascot_7_exact")
         };
@@ -279,6 +401,49 @@ public sealed class SplashAuthoritativeVisualsPlayModeTests
         var image = found.GetComponent<Image>();
         Assert.That(image, Is.Not.Null);
         Assert.That(image.preserveAspect, Is.True, name + " must preserve aspect ratio.");
+    }
+
+    static void AssertStretchedDeco(Transform root, string name)
+    {
+        var found = DirectChild(root, name) as RectTransform;
+        Assert.That(found, Is.Not.Null);
+        AssertVector(found.anchorMin, Vector2.zero, name + " minimum anchor");
+        AssertVector(found.anchorMax, Vector2.one, name + " maximum anchor");
+        AssertVector(found.sizeDelta, Vector2.zero, name + " size");
+
+        var image = found.GetComponent<Image>();
+        Assert.That(image, Is.Not.Null);
+        Assert.That(image.preserveAspect, Is.False);
+    }
+
+    static void AssertSprite(Transform root, string name, string resourcePath)
+    {
+        var found = DirectChild(root, name);
+        Assert.That(found, Is.Not.Null);
+        var image = found.GetComponent<Image>();
+        Assert.That(image, Is.Not.Null);
+        var approved = Resources.Load<Sprite>(resourcePath);
+        Assert.That(approved, Is.Not.Null, "Missing approved Sprite " + resourcePath);
+        Assert.That(image.sprite, Is.SameAs(approved),
+            name + " must use only its approved splash/reference resource.");
+    }
+
+    static void AssertNoMainMenuChrome(Scene scene)
+    {
+        var forbidden = new[]
+        {
+            "Settings", "PlayerChip", "Tip", "Solo", "Daily", "Gear", "Trophy", "1V1"
+        };
+        foreach (var root in scene.GetRootGameObjects())
+        {
+            foreach (var child in root.GetComponentsInChildren<Transform>(true))
+            {
+                foreach (var fragment in forbidden)
+                    Assert.That(child.name.IndexOf(
+                        fragment, System.StringComparison.OrdinalIgnoreCase), Is.LessThan(0),
+                        child.name + " invents Main Menu chrome on Splash.");
+            }
+        }
     }
 
     static void AssertDirectChildren(Transform parent, params string[] expectedNames)
@@ -311,6 +476,16 @@ public sealed class SplashAuthoritativeVisualsPlayModeTests
             var components = root.GetComponentsInChildren(type, true);
             if (components.Length > 0)
                 return components[0] as Component;
+        }
+        return null;
+    }
+
+    static Transform FindByName(Scene scene, string name)
+    {
+        foreach (var root in scene.GetRootGameObjects())
+        {
+            foreach (var child in root.GetComponentsInChildren<Transform>(true))
+                if (child.name == name) return child;
         }
         return null;
     }

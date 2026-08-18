@@ -6,9 +6,15 @@ using UnityEngine.UI;
 [DefaultExecutionOrder(-2000)]
 public sealed class SplashDesign : MonoBehaviour
 {
-    const string BackgroundResource = "splash/splash_bg_neon_arcade";
+    const string BackgroundResource = "splash/splash_bg_stairs_clouds";
+    const string DecoStarsResource = "splash/splash_deco_stars";
+    const string DecoLightningResource = "splash/splash_deco_lightning";
+    const string DecoConfettiResource = "splash/splash_deco_confetti";
+    const string DecoNumbersResource = "splash/splash_deco_numbers";
     const string GlowResource = "splash/splash_logo_glow";
     const string LogoResource = "reference/hol_logo_exact";
+    const string HeroBoyResource = "splash/splash_char_boy";
+    const string HeroGirlResource = "splash/splash_char_girl";
     const string MascotSixResource = "reference/mascot_6_exact";
     const string MascotSevenResource = "reference/mascot_7_exact";
 
@@ -18,10 +24,14 @@ public sealed class SplashDesign : MonoBehaviour
     const float SevenDelay = 0.08f;
 
     RectTransform logoRect;
+    RectTransform heroBoyRect;
+    RectTransform heroGirlRect;
     RectTransform mascotSixRect;
     RectTransform mascotSevenRect;
     CanvasGroup logoGlowGroup;
     CanvasGroup logoGroup;
+    CanvasGroup heroBoyGroup;
+    CanvasGroup heroGirlGroup;
     CanvasGroup mascotSixGroup;
     CanvasGroup mascotSevenGroup;
     Image progressFill;
@@ -43,8 +53,14 @@ public sealed class SplashDesign : MonoBehaviour
         HideLegacyPresentation(canvas.transform);
 
         var background = LoadSprite(BackgroundResource);
+        var decoStars = LoadSprite(DecoStarsResource);
+        var decoLightning = LoadSprite(DecoLightningResource);
+        var decoConfetti = LoadSprite(DecoConfettiResource);
+        var decoNumbers = LoadSprite(DecoNumbersResource);
         var glow = LoadSprite(GlowResource);
         var logo = LoadSprite(LogoResource);
+        var heroBoy = LoadSprite(HeroBoyResource);
+        var heroGirl = LoadSprite(HeroGirlResource);
         var mascotSix = LoadSprite(MascotSixResource);
         var mascotSeven = LoadSprite(MascotSevenResource);
 
@@ -58,29 +74,46 @@ public sealed class SplashDesign : MonoBehaviour
         var safeRoot = EnsureRect(visualRoot, "SplashSafeAreaRoot");
         ConfigureSafeArea(safeRoot, (RectTransform)canvas.transform);
 
+        BuildDeco(safeRoot, "SplashDecoStars", decoStars);
+        BuildDeco(safeRoot, "SplashDecoLightning", decoLightning);
+        BuildDeco(safeRoot, "SplashDecoConfetti", decoConfetti);
+        BuildDeco(safeRoot, "SplashDecoNumbers", decoNumbers);
+
         var glowImage = EnsureImage(safeRoot, "SplashLogoGlow");
         ConfigureImage(glowImage, glow, true);
-        Place(glowImage.rectTransform, new Vector2(0f, 260f), new Vector2(960f, 620f));
+        Place(glowImage.rectTransform, new Vector2(0f, 280f), new Vector2(960f, 620f));
 
         var logoImage = EnsureImage(safeRoot, "SplashLogo");
         ConfigureImage(logoImage, logo, true);
-        Place(logoImage.rectTransform, new Vector2(0f, 260f), new Vector2(820f, 546f));
+        Place(logoImage.rectTransform, new Vector2(0f, 280f), new Vector2(820f, 546f));
         logoRect = logoImage.rectTransform;
+
+        var boyImage = EnsureImage(safeRoot, "SplashHeroBoy");
+        ConfigureImage(boyImage, heroBoy, true);
+        Place(boyImage.rectTransform, new Vector2(-155f, -40f), new Vector2(380f, 460f));
+        heroBoyRect = boyImage.rectTransform;
+
+        var girlImage = EnsureImage(safeRoot, "SplashHeroGirl");
+        ConfigureImage(girlImage, heroGirl, true);
+        Place(girlImage.rectTransform, new Vector2(155f, -40f), new Vector2(380f, 460f));
+        heroGirlRect = girlImage.rectTransform;
 
         var sixImage = EnsureImage(safeRoot, "SplashMascotSix");
         ConfigureImage(sixImage, mascotSix, true);
-        Place(sixImage.rectTransform, new Vector2(-285f, -330f), new Vector2(270f, 350f));
+        Place(sixImage.rectTransform, new Vector2(-340f, -420f), new Vector2(240f, 320f));
         mascotSixRect = sixImage.rectTransform;
 
         var sevenImage = EnsureImage(safeRoot, "SplashMascotSeven");
         ConfigureImage(sevenImage, mascotSeven, true);
-        Place(sevenImage.rectTransform, new Vector2(285f, -330f), new Vector2(250f, 350f));
+        Place(sevenImage.rectTransform, new Vector2(340f, -420f), new Vector2(230f, 320f));
         mascotSevenRect = sevenImage.rectTransform;
 
         BuildProgress(safeRoot);
 
         logoGlowGroup = EnsureCanvasGroup(glowImage.gameObject);
         logoGroup = EnsureCanvasGroup(logoImage.gameObject);
+        heroBoyGroup = EnsureCanvasGroup(boyImage.gameObject);
+        heroGirlGroup = EnsureCanvasGroup(girlImage.gameObject);
         mascotSixGroup = EnsureCanvasGroup(sixImage.gameObject);
         mascotSevenGroup = EnsureCanvasGroup(sevenImage.gameObject);
         SetEntranceState();
@@ -89,7 +122,8 @@ public sealed class SplashDesign : MonoBehaviour
         if (loader != null && loader.waitTime > 0f)
             waitTime = loader.waitTime;
 
-        ApplyRequiredArtReadiness(background, glow, logo, mascotSix, mascotSeven);
+        ApplyRequiredArtReadiness(
+            background, glow, logo, heroBoy, heroGirl, mascotSix, mascotSeven);
     }
 
     void Update()
@@ -109,6 +143,8 @@ public sealed class SplashDesign : MonoBehaviour
 
         ApplyEntrance(logoGroup, logoRect, logoT, 0.86f);
         if (logoGlowGroup != null) logoGlowGroup.alpha = EaseOut(logoT);
+        ApplyEntrance(heroBoyGroup, heroBoyRect, logoT, 0.92f);
+        ApplyEntrance(heroGirlGroup, heroGirlRect, logoT, 0.92f);
         ApplyEntrance(mascotSixGroup, mascotSixRect, sixT, 0.92f);
         ApplyEntrance(mascotSevenGroup, mascotSevenRect, sevenT, 0.92f);
 
@@ -118,6 +154,13 @@ public sealed class SplashDesign : MonoBehaviour
             float breathe = 1f + Mathf.Sin(Time.unscaledTime * 1.6f) * 0.01f;
             logoRect.localScale = new Vector3(breathe, breathe, 1f);
         }
+    }
+
+    static void BuildDeco(Transform safeRoot, string name, Sprite sprite)
+    {
+        var image = EnsureImage(safeRoot, name);
+        ConfigureImage(image, sprite, false);
+        Stretch(image.rectTransform);
     }
 
     void BuildProgress(Transform safeRoot)
@@ -163,9 +206,13 @@ public sealed class SplashDesign : MonoBehaviour
         IsSettled = false;
         if (logoGlowGroup != null) logoGlowGroup.alpha = 0f;
         if (logoGroup != null) logoGroup.alpha = 0f;
+        if (heroBoyGroup != null) heroBoyGroup.alpha = 0f;
+        if (heroGirlGroup != null) heroGirlGroup.alpha = 0f;
         if (mascotSixGroup != null) mascotSixGroup.alpha = 0f;
         if (mascotSevenGroup != null) mascotSevenGroup.alpha = 0f;
         SetScale(logoRect, 0.86f);
+        SetScale(heroBoyRect, 0.92f);
+        SetScale(heroGirlRect, 0.92f);
         SetScale(mascotSixRect, 0.92f);
         SetScale(mascotSevenRect, 0.92f);
     }
@@ -189,18 +236,23 @@ public sealed class SplashDesign : MonoBehaviour
     }
 
     void ApplyRequiredArtReadiness(
-        Sprite background, Sprite glow, Sprite logo, Sprite mascotSix, Sprite mascotSeven)
+        Sprite background, Sprite glow, Sprite logo, Sprite heroBoy, Sprite heroGirl,
+        Sprite mascotSix, Sprite mascotSeven)
     {
-        IsReady = RequiredArtReady(background, glow, logo, mascotSix, mascotSeven);
+        IsReady = RequiredArtReady(
+            background, glow, logo, heroBoy, heroGirl, mascotSix, mascotSeven);
         if (!IsReady) IsSettled = false;
     }
 
     static bool RequiredArtReady(
-        Sprite background, Sprite glow, Sprite logo, Sprite mascotSix, Sprite mascotSeven)
+        Sprite background, Sprite glow, Sprite logo, Sprite heroBoy, Sprite heroGirl,
+        Sprite mascotSix, Sprite mascotSeven)
     {
         return background != null &&
                glow != null &&
                logo != null &&
+               heroBoy != null &&
+               heroGirl != null &&
                mascotSix != null &&
                mascotSeven != null;
     }
