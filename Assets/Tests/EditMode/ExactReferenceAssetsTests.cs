@@ -57,6 +57,29 @@ public class ExactReferenceAssetsTests
     }
 
     [Test]
+    public void PrebattleBuildCreatesOnePanelPerFlow()
+    {
+        var root = new GameObject("PvpRoot", typeof(RectTransform),
+            typeof(Canvas), typeof(GraphicRaycaster));
+
+        try
+        {
+            var ui = root.AddComponent(RuntimeType("PvpRuntimeUI"));
+            var controller = root.AddComponent(RuntimeType("PvpGameController"));
+            InvokePrivate(ui, "ReplacePrivateRoomPanels", controller);
+
+            Assert.AreEqual(1, DirectChildCount(root.transform, "PvPCreatePanel"),
+                "Pre-battle must not leave an obsolete create panel behind.");
+            Assert.AreEqual(1, DirectChildCount(root.transform, "PvPJoinPanel"),
+                "Pre-battle must not leave an obsolete join panel behind.");
+        }
+        finally
+        {
+            Object.DestroyImmediate(root);
+        }
+    }
+
+    [Test]
     public void ApprovedLayerDisablesLegacyScenePresentation()
     {
         var legacyObject = new GameObject("LegacyDesign");
@@ -131,6 +154,15 @@ public class ExactReferenceAssetsTests
         var child = new GameObject(name, typeof(RectTransform), typeof(Image));
         child.transform.SetParent(parent, false);
         return child;
+    }
+
+    static int DirectChildCount(Transform parent, string name)
+    {
+        int count = 0;
+        for (int i = 0; i < parent.childCount; i++)
+            if (parent.GetChild(i).name == name)
+                count++;
+        return count;
     }
 
     static void InvokePrivate(Component component, string methodName, params object[] arguments)
