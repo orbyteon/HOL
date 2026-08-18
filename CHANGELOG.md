@@ -28,6 +28,9 @@ Play Console versionName in `ProjectSettings.asset`.
 
 ### Added
 
+- **Portrait pre-battle waiting UI** — the existing PvP create/join waiting
+  surfaces now use the approved Teen Polish versus layout with live room code,
+  automatic-start status, localized rule copy, and no new gameplay action.
 - **Daily Hunt** — the parked product-pass draft's one unshipped idea (#6),
   ported onto the Consumer First board. One date-seeded secret number
   shared by every player per UTC day, seven guesses, an emoji-trail result
