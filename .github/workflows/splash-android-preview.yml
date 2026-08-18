@@ -3,17 +3,45 @@ name: Splash Android Preview
 on:
   pull_request:
     paths:
-      - "Assets/SCRIPT/SplashLoader.cs"
-      - "Assets/SCRIPT/Design/SplashCaptureBootstrap.cs"
-      - "Assets/SCRIPT/Design/SplashDesign.cs"
-      - "Assets/Scenes/SplashScene.unity"
-      - "Assets/newdesign/Resources/splash/**"
-      - "Assets/newdesign/Resources/reference/hol_logo_exact*"
-      - "Assets/newdesign/Resources/reference/mascot_6_exact*"
-      - "Assets/newdesign/Resources/reference/mascot_7_exact*"
-      - "Assets/Tests/PlayMode/Splash*"
-      - "Assets/Editor/SplashPreviewBuild.cs"
       - ".github/workflows/splash-android-preview.yml"
+      - "Assets/Editor/SplashPreviewBuild.cs"
+      - "Assets/Editor/SplashPreviewBuild.cs.meta"
+      - "Assets/Scenes/SplashScene.unity"
+      - "Assets/Scenes/SplashScene.unity.meta"
+      - "Assets/SCRIPT/SplashLoader.cs"
+      - "Assets/SCRIPT/SplashLoader.cs.meta"
+      - "Assets/SCRIPT/Design/SplashCaptureBootstrap.cs"
+      - "Assets/SCRIPT/Design/SplashCaptureBootstrap.cs.meta"
+      - "Assets/SCRIPT/Design/SplashDesign.cs"
+      - "Assets/SCRIPT/Design/SplashDesign.cs.meta"
+      - "Assets/SCRIPT/RuntimeUI/RuntimeUI.cs"
+      - "Assets/SCRIPT/RuntimeUI/RuntimeUI.cs.meta"
+      - "Assets/SCRIPT/Design/ConvergingLight.cs"
+      - "Assets/SCRIPT/Design/ConvergingLight.cs.meta"
+      - "Assets/SCRIPT/Design/ExactReferenceVisuals.cs"
+      - "Assets/SCRIPT/Design/ExactReferenceVisuals.cs.meta"
+      - "Assets/SCRIPT/Design/AttachmentReskinVisuals.cs"
+      - "Assets/SCRIPT/Design/AttachmentReskinVisuals.cs.meta"
+      - "Assets/SCRIPT/Design/AttachmentReskinPolish.cs"
+      - "Assets/SCRIPT/Design/AttachmentReskinPolish.cs.meta"
+      - "Assets/SCRIPT/Design/AttachmentReskinCanvasBindings.cs"
+      - "Assets/SCRIPT/Design/AttachmentReskinCanvasBindings.cs.meta"
+      - "Assets/newdesign/Resources/splash/**"
+      - "Assets/newdesign/Resources/reference/hol_logo_exact.png"
+      - "Assets/newdesign/Resources/reference/hol_logo_exact.png.meta"
+      - "Assets/newdesign/Resources/reference/mascot_6_exact.png"
+      - "Assets/newdesign/Resources/reference/mascot_6_exact.png.meta"
+      - "Assets/newdesign/Resources/reference/mascot_7_exact.png"
+      - "Assets/newdesign/Resources/reference/mascot_7_exact.png.meta"
+      - "Assets/Tests/PlayMode/SplashCapturePlayModeTests.cs"
+      - "Assets/Tests/PlayMode/SplashCapturePlayModeTests.cs.meta"
+      - "Assets/Tests/PlayMode/SplashAuthoritativeVisualsPlayModeTests.cs"
+      - "Assets/Tests/PlayMode/SplashAuthoritativeVisualsPlayModeTests.cs.meta"
+      - "Assets/Tests/EditMode/SplashProductionAssetsTests.cs"
+      - "Assets/Tests/EditMode/SplashProductionAssetsTests.cs.meta"
+      - "Packages/manifest.json"
+      - "Packages/packages-lock.json"
+      - "ProjectSettings/ProjectVersion.txt"
   workflow_dispatch:
 
 permissions:
@@ -136,6 +164,60 @@ jobs:
           apk=build/Android/HOL-splash-debug.apk
           preview=build/Android/preview
           aapt="$ANDROID_HOME/build-tools/35.0.0/aapt"
+          package_name=
+
+          collect_diagnostics() {
+            status=$?
+            trap - EXIT
+            set +e
+            mkdir -p "$preview"
+
+            if [ -z "${package_name:-}" ] &&
+               [ -x "$aapt" ] &&
+               [ -f "$apk" ]; then
+              package_name=$("$aapt" dump badging "$apk" 2>/dev/null |
+                sed -n "s/^package: name='\([^']*\)'.*/\1/p")
+            fi
+
+            if command -v adb >/dev/null 2>&1; then
+              adb logcat -d > "$preview/logcat.txt" 2>&1
+              {
+                adb shell wm size
+                adb shell wm density
+              } > "$preview/display-size-density.txt" 2>&1
+              adb shell dumpsys display > "$preview/display-metadata.txt" 2>&1
+              adb shell dumpsys activity activities \
+                > "$preview/activity-state.txt" 2>&1
+
+              if [ -n "${package_name:-}" ]; then
+                adb shell dumpsys package "$package_name" \
+                  > "$preview/package-metadata.txt" 2>&1
+                adb shell pm path "$package_name" \
+                  > "$preview/package-path.txt" 2>&1
+                {
+                  adb shell pidof "$package_name"
+                  adb shell ps -A
+                } > "$preview/process-state.txt" 2>&1
+              else
+                echo "Package name was not discoverable." \
+                  > "$preview/package-metadata.txt"
+                echo "Package name was not discoverable." \
+                  > "$preview/package-path.txt"
+                adb shell ps -A > "$preview/process-state.txt" 2>&1
+              fi
+            else
+              echo "adb is unavailable." > "$preview/logcat.txt"
+              echo "adb is unavailable." > "$preview/display-size-density.txt"
+              echo "adb is unavailable." > "$preview/display-metadata.txt"
+              echo "adb is unavailable." > "$preview/activity-state.txt"
+              echo "adb is unavailable." > "$preview/package-metadata.txt"
+              echo "adb is unavailable." > "$preview/package-path.txt"
+              echo "adb is unavailable." > "$preview/process-state.txt"
+            fi
+
+            exit "$status"
+          }
+          trap 'collect_diagnostics' EXIT
 
           "$aapt" dump badging "$apk" | tee "$preview/aapt-badging.txt"
           package_name=$("$aapt" dump badging "$apk" |
@@ -145,13 +227,23 @@ jobs:
           test -n "$package_name"
           test -n "$launch_activity"
 
-          adb install -r "$apk" | tee "$preview/adb-install.txt"
+          if adb install -r "$apk" > "$preview/install.log" 2>&1; then
+            :
+          else
+            status=$?
+            exit "$status"
+          fi
           adb logcat -c
           adb shell am force-stop "$package_name"
-          adb shell am start -W \
-            -n "$package_name/$launch_activity" \
-            --es hol_capture_screen splash \
-            | tee "$preview/am-start.txt"
+          if adb shell am start -W \
+              -n "$package_name/$launch_activity" \
+              --es hol_capture_screen splash \
+              > "$preview/start.log" 2>&1; then
+            :
+          else
+            status=$?
+            exit "$status"
+          fi
 
           ready=0
           for attempt in $(seq 1 60); do
@@ -166,10 +258,6 @@ jobs:
           test "$(grep -Fc "HOL_SPLASH_CAPTURE_READY" "$preview/logcat.txt")" -eq 1
 
           adb exec-out screencap -p > "$preview/splash.png"
-          adb shell wm size > "$preview/display-size-density.txt"
-          adb shell wm density >> "$preview/display-size-density.txt"
-          adb shell dumpsys package "$package_name" > "$preview/package-metadata.txt"
-          adb shell dumpsys display > "$preview/display-metadata.txt"
 
       - name: Validate capture and record hashes
         shell: bash
