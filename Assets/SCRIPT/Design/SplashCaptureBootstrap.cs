@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -12,6 +13,8 @@ public sealed class SplashCaptureBootstrap : MonoBehaviour
 
     static bool markerLogged;
     SplashDesign splashDesign;
+    bool presentationWaitStarted;
+    int presentationBarriersPassed;
 
     public static bool CaptureRequested { get; private set; }
 
@@ -95,11 +98,17 @@ public sealed class SplashCaptureBootstrap : MonoBehaviour
     {
         if (!CaptureRequested)
         {
+            if (presentationWaitStarted)
+                StopAllCoroutines();
+            presentationWaitStarted = false;
             enabled = false;
             return;
         }
         if (markerLogged)
         {
+            if (presentationWaitStarted)
+                StopAllCoroutines();
+            presentationWaitStarted = false;
             enabled = false;
             return;
         }
@@ -108,6 +117,32 @@ public sealed class SplashCaptureBootstrap : MonoBehaviour
             splashDesign = FindDesignInScene();
         if (splashDesign == null || !splashDesign.IsSettled)
             return;
+
+        if (!presentationWaitStarted)
+        {
+            presentationWaitStarted = true;
+            presentationBarriersPassed = 0;
+            StartCoroutine(LogReadyAfterPresentation());
+        }
+    }
+
+    IEnumerator LogReadyAfterPresentation()
+    {
+        yield return new WaitForEndOfFrame();
+        presentationBarriersPassed++;
+        yield return new WaitForEndOfFrame();
+        presentationBarriersPassed++;
+
+        presentationWaitStarted = false;
+        if (!CaptureRequested ||
+            markerLogged ||
+            splashDesign == null ||
+            !splashDesign.IsSettled)
+        {
+            if (!CaptureRequested || markerLogged)
+                enabled = false;
+            yield break;
+        }
 
         markerLogged = true;
         Debug.Log(ReadyMarker);
