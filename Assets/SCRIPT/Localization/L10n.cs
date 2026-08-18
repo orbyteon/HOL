@@ -128,6 +128,7 @@ public static class L10n
         { "prebattle_title",         new[] { "Before the battle", "Πριν τη μάχη" } },
         { "prebattle_you",           new[] { "YOU", "ΕΣΥ" } },
         { "prebattle_opponent",      new[] { "OPPONENT", "ΑΝΤΙΠΑΛΟΣ" } },
+        { "prebattle_found",         new[] { "FOUND", "ΒΡΕΘΗΚΕ" } },
         { "prebattle_rule_title",    new[] { "RULE", "ΚΑΝΟΝΑΣ" } },
         { "prebattle_rule",          new[] {
             "Guess the secret number 1–100 before your opponent.",

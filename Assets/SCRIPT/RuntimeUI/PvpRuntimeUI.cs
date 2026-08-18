@@ -554,7 +554,7 @@ public class PvpRuntimeUI : MonoBehaviour
             ConsumerTokens.Magenta, 0.90f, true, ConsumerTokens.CardPink);
         AddSprite(right.transform, "Girl", "reference/char_girl_exact",
             new Vector2(0f, 20f), new Vector2(330f, 320f));
-        AddLocalizedText(right.transform, "Status", "pvp_opponent_found", 26,
+        AddLocalizedText(right.transform, "Status", "prebattle_found", 26,
             new Vector2(0f, -160f), new Vector2(360f, 58f),
             ConvergingLight.NearWhite);
         AddSprite(root, "VsBurst", "reference/board_vs_burst_exact",
@@ -685,65 +685,6 @@ public class PvpRuntimeUI : MonoBehaviour
             L10n.Get("back"), new Vector2(0f, -850f),
             new Vector2(260f, 70f), ConsumerTokens.SurfaceElevated);
         RuntimeUI.Localize(back, "back");
-
-        var createPanel = BuildPortraitPanel(transform, "PvPCreatePanel");
-        AddSprite(createPanel.transform, "Logo", "reference/hol_logo_exact",
-            new Vector2(0f, 690f), new Vector2(470f, 220f));
-        AddLocalizedText(createPanel.transform, "Title", "pvp_create_room", 48,
-            new Vector2(0f, 470f), new Vector2(820f, 90f),
-            ConvergingLight.NearWhite);
-        var createSecret = RuntimeUI.CreateInputField(createPanel.transform,
-            "SecretInput", L10n.Get("pvp_secret"), new Vector2(0f, 300f),
-            new Vector2(650f, 100f));
-        var createGo = RuntimeUI.CreateButton(createPanel.transform,
-            "ConfirmCreateButton", L10n.Get("confirm"), new Vector2(0f, 150f),
-            new Vector2(600f, 100f), ConsumerTokens.Gold, DarkLabel);
-        var codeFrame = NeonFrame.Frame(createPanel.transform, "RoomCodeFrame",
-            new Vector2(0f, -40f), new Vector2(850f, 250f),
-            ConsumerTokens.Cyan, 0.9f, true, ConsumerTokens.Surface);
-        AddLocalizedText(codeFrame.transform, "CodeCaption", "pvp_enter_code",
-            26, new Vector2(0f, 70f), new Vector2(760f, 50f),
-            ConvergingLight.WithAlpha(ConvergingLight.NearWhite, 0.75f));
-        var codeText = RuntimeUI.CreateText(codeFrame.transform, "RoomCode",
-            "-----", 84, new Vector2(0f, -22f), new Vector2(760f, 130f));
-        var copyBtn = RuntimeUI.CreateButton(createPanel.transform, "CopyButton",
-            L10n.Get("private_room_share"), new Vector2(0f, -220f),
-            new Vector2(400f, 84f), ConsumerTokens.Cyan, DarkLabel);
-        var createStatus = RuntimeUI.CreateText(createPanel.transform, "Status",
-            "", 28, new Vector2(0f, -365f), new Vector2(820f, 100f));
-        var createBack = RuntimeUI.CreateButton(createPanel.transform, "BackButton",
-            L10n.Get("back"), new Vector2(0f, -520f), new Vector2(260f, 70f),
-            ConsumerTokens.SurfaceElevated);
-        RuntimeUI.LocalizePlaceholder(createSecret, "pvp_secret");
-        RuntimeUI.Localize(createGo, "confirm");
-        RuntimeUI.Localize(copyBtn, "private_room_share");
-        RuntimeUI.Localize(createBack, "back");
-
-        var joinPanel = BuildPortraitPanel(transform, "PvPJoinPanel");
-        AddSprite(joinPanel.transform, "Logo", "reference/hol_logo_exact",
-            new Vector2(0f, 690f), new Vector2(470f, 220f));
-        AddLocalizedText(joinPanel.transform, "Title", "private_room_join_title", 48,
-            new Vector2(0f, 470f), new Vector2(820f, 90f),
-            ConvergingLight.NearWhite);
-        var joinCode = RuntimeUI.CreateInputField(joinPanel.transform, "CodeInput",
-            L10n.Get("pvp_enter_code"), new Vector2(0f, 290f),
-            new Vector2(650f, 110f), 5, TMP_InputField.ContentType.Standard);
-        joinCode.onValidateInput = (text, index, ch) => char.ToUpperInvariant(ch);
-        var joinSecret = RuntimeUI.CreateInputField(joinPanel.transform,
-            "SecretInput", L10n.Get("pvp_secret"), new Vector2(0f, 140f),
-            new Vector2(650f, 100f));
-        var joinGo = RuntimeUI.CreateButton(joinPanel.transform,
-            "ConfirmJoinButton", L10n.Get("confirm"), new Vector2(0f, -10f),
-            new Vector2(600f, 100f), ConsumerTokens.Gold, DarkLabel);
-        var joinStatus = RuntimeUI.CreateText(joinPanel.transform, "Status",
-            "", 28, new Vector2(0f, -185f), new Vector2(820f, 100f));
-        var joinBack = RuntimeUI.CreateButton(joinPanel.transform, "BackButton",
-            L10n.Get("back"), new Vector2(0f, -360f), new Vector2(260f, 70f),
-            ConsumerTokens.SurfaceElevated);
-        RuntimeUI.LocalizePlaceholder(joinCode, "pvp_enter_code");
-        RuntimeUI.LocalizePlaceholder(joinSecret, "pvp_secret");
-        RuntimeUI.Localize(joinGo, "confirm");
-        RuntimeUI.Localize(joinBack, "back");
 
         var prebattleCreate = BuildPrebattlePanel("PvPCreatePanel", true);
         var prebattleJoin = BuildPrebattlePanel("PvPJoinPanel", false);

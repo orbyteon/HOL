@@ -44,8 +44,8 @@ public class ExactReferenceAssetsTests
 
         foreach (var key in new[] {
             "private_room_title", "private_room_tip", "prebattle_title",
-            "prebattle_you", "prebattle_opponent", "prebattle_rule_title",
-            "prebattle_rule", "prebattle_waiting"
+            "prebattle_you", "prebattle_opponent", "prebattle_found",
+            "prebattle_rule_title", "prebattle_rule", "prebattle_waiting"
         })
         {
             Assert.IsTrue(table.Contains(key), "Missing L10n key: " + key);
