@@ -51,23 +51,29 @@ public class ExactReferenceAssetsTests
     [Test]
     public void ExactReferenceInstallerSkipsSplashScene()
     {
-        var splashScene = SceneManager.CreateScene("SplashScene");
-        var canvasObject = new GameObject("SplashCanvas", typeof(RectTransform), typeof(Canvas));
+        var splashScene = default(Scene);
 
         try
         {
-            SceneManager.MoveGameObjectToScene(canvasObject, splashScene);
+            splashScene = EditorSceneManager.OpenScene(
+                "Assets/Scenes/SplashScene.unity", OpenSceneMode.Additive);
+            Assert.IsTrue(splashScene.IsValid());
+            Assert.IsTrue(splashScene.isLoaded);
+            Assert.AreEqual("SplashScene", splashScene.name);
+
             var exactType = RuntimeType("ExactReferenceVisuals");
+            Assert.IsNull(FindInScene(splashScene, exactType),
+                "The real Splash scene must not serialize ExactReferenceVisuals.");
 
             InvokePrivateStatic(exactType, "InstallForScene", splashScene);
 
-            Assert.IsNull(canvasObject.GetComponent(exactType),
+            Assert.IsNull(FindInScene(splashScene, exactType),
                 "ExactReferenceVisuals must leave Splash presentation to SplashDesign.");
         }
         finally
         {
-            Object.DestroyImmediate(canvasObject);
-            EditorSceneManager.CloseScene(splashScene, true);
+            if (splashScene.IsValid() && splashScene.isLoaded)
+                EditorSceneManager.CloseScene(splashScene, true);
         }
     }
 
@@ -86,6 +92,17 @@ public class ExactReferenceAssetsTests
             methodName, BindingFlags.Static | BindingFlags.NonPublic);
         Assert.IsNotNull(method, "Missing private static method: " + methodName);
         method.Invoke(null, arguments);
+    }
+
+    static Component FindInScene(Scene scene, System.Type type)
+    {
+        foreach (var root in scene.GetRootGameObjects())
+        {
+            var components = root.GetComponentsInChildren(type, true);
+            if (components.Length > 0)
+                return components[0] as Component;
+        }
+        return null;
     }
 
     static System.Type RuntimeType(string name)
