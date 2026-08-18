@@ -329,7 +329,7 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
 
         var body = EnsureTmp(tip.transform, "HomeTipBody", 26f);
         body.color = ConvergingLight.NearWhite;
-        body.alignment = TextAlignmentOptions.TopLeft;
+        body.alignment = TextAlignmentOptions.Left;
         Place(body.rectTransform, new Vector2(40f, -28f), new Vector2(760f, 110f));
         SetLocalized(body, "home_tip_body");
     }
