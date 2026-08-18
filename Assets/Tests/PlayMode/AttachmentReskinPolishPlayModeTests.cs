@@ -59,6 +59,11 @@ public sealed class AttachmentReskinPolishPlayModeTests
 
         Assert.That(Find(canvas.transform, "HomeLogo"), Is.Not.Null);
         Assert.That(Find(canvas.transform, "HomeTipCard"), Is.Not.Null);
+        var homeTip = Find(canvas.transform, "HomeTipCard").GetComponent<Image>();
+        Assert.That(homeTip.sprite, Is.Not.Null);
+        Assert.That(homeTip.sprite.name, Does.Contain("tip_frame"),
+            "Polish must not restyle Home chrome owned by MainMenuHomeVisuals.");
+        Assert.That(homeTip.GetComponent<Outline>(), Is.Null);
         Assert.That(Find(canvas.transform, "HomePrivateIcon"), Is.Not.Null,
             "The real runtime-injected PvP button should receive the private-room icon.");
         Assert.That(Find(canvas.transform, "HomeDailyIcon"), Is.Not.Null,

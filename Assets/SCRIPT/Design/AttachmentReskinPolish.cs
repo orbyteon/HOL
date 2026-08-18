@@ -277,8 +277,11 @@ public sealed class AttachmentReskinPolish : MonoBehaviour
         if (root == null) return;
         foreach (var image in root.GetComponentsInChildren<Image>(true))
         {
+            if (IsUnderHomeVisualRoot(image.transform)) continue;
             string name = image.transform.name;
-            if (name.StartsWith("Board") || name.StartsWith("Exact")) continue;
+            if (name.StartsWith("Board") || name.StartsWith("Exact") ||
+                name.StartsWith("Home"))
+                continue;
             if (!Contains(name, "Card") && !Contains(name, "Frame")) continue;
             if (image.GetComponent<Button>() != null) continue;
 
@@ -287,6 +290,17 @@ public sealed class AttachmentReskinPolish : MonoBehaviour
             image.color = Panel;
             EnsureOutline(image.gameObject, Purple, 2f);
         }
+    }
+
+    static bool IsUnderHomeVisualRoot(Transform transform)
+    {
+        while (transform != null)
+        {
+            if (transform.name == MainMenuHomeVisuals.VisualRootName)
+                return true;
+            transform = transform.parent;
+        }
+        return false;
     }
 
     static Image AddImage(Transform parent, string name, Sprite sprite,

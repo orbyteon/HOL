@@ -85,6 +85,10 @@ public sealed class MainMenuHomeVisualsPlayModeTests
         Assert.That(chip.text, Does.Not.Contain("2,450"));
         Assert.That(Find(canvas.transform, "HomePlayerChip").GetComponent<Image>().raycastTarget,
             Is.False);
+        yield return new WaitForSecondsRealtime(0.35f);
+        var tip = Find(canvas.transform, "HomeTipCard").GetComponent<Image>();
+        Assert.That(tip.sprite.name, Does.Contain("tip_frame"));
+        Assert.That(tip.GetComponent<Outline>(), Is.Null);
 
         var paths = (string[])ownerType.GetField("LoadedResources", StaticFlags)
             .GetValue(null);
