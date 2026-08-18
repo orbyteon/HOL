@@ -202,12 +202,14 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
 
         var menu = FindInScene<MenuManager>(gameObject.scene);
         if (menu != null && menu.mainMenuPanel != null &&
-            menu.mainMenuPanel.GetComponentInParent<Canvas>() == GetComponent<Canvas>())
+            menu.mainMenuPanel.GetComponentInParent<Canvas>() == GetComponent<Canvas>() &&
+            gameObject.scene.name != "MainMenu")
             BuildMainMenu(menu.mainMenuPanel.transform);
     }
 
     void ApplyBackdrop(Transform canvasRoot)
     {
+        if (gameObject.scene.name == "MainMenu") return;
         DisableDirectChild(canvasRoot, "BackdropDepth");
         DisableDirectChild(canvasRoot, "BackdropNumbers");
 
@@ -706,7 +708,8 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
         foreach (var button in root.GetComponentsInChildren<Button>(true))
         {
             string name = button.transform.name;
-            if (name == "ButtonPlay" || name == "ButtonPvP" || name == "DailyHuntButton")
+            if (name == "ButtonPlay" || name == "ButtonPvP" ||
+                name == "DailyHuntButton" || name == "Buttonsettings")
                 continue;
 
             Color fill = SurfaceRaised;

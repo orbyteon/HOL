@@ -123,7 +123,8 @@ public sealed class AttachmentReskinPolish : MonoBehaviour
         if (menu == null) return;
 
         StyleRuntimeCards(transform);
-        PolishHome(menu);
+        if (gameObject.scene.name != "MainMenu")
+            PolishHome(menu);
         PolishSearching(menu);
         PolishSoloResult();
         PolishPvp();
