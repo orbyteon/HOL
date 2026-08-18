@@ -55,7 +55,7 @@ concurrency:
 
 jobs:
   build:
-    name: Build development x86_64 APK
+    name: Build development universal ARM64 + x86_64 APK
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -96,7 +96,7 @@ jobs:
             Library-Android-
             Library-
 
-      - name: Build Development x86_64 Splash APK
+      - name: Build Development universal ARM64 + x86_64 Splash APK
         uses: game-ci/unity-builder@d829bfc901f2347c8fe18898f06712b66916ef42 # v5.0.0
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}

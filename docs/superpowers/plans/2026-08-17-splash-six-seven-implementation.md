@@ -1,5 +1,10 @@
 # HOL Splash 6–7 Implementation Plan
 
+> **Status — Superseded (2026-08-18):** Superseded by the 2026-08-18 cartoon
+> stairs/clouds Splash (mascot 6 left / 7 right, boy + girl, no neon-grid).
+> The live contract is `SplashDesign` +
+> `Resources/splash/splash_bg_stairs_clouds` and related cartoon assets.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use
 > superpowers:subagent-driven-development (recommended) or
 > superpowers:executing-plans to implement this plan task-by-task. Steps use

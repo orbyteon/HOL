@@ -1,5 +1,10 @@
 # HOL Splash 6–7 Design Specification
 
+> **Status — Superseded (2026-08-18):** Superseded by the 2026-08-18 cartoon
+> stairs/clouds Splash (mascot 6 left / 7 right, boy + girl, no neon-grid).
+> The live contract is `SplashDesign` +
+> `Resources/splash/splash_bg_stairs_clouds` and related cartoon assets.
+
 **Status:** Approved in conversation on 2026-08-17, with the requested
 replacement of mascot 3 by mascot 6 so the pair reads left-to-right as 6–7.
 
