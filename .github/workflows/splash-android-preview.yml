@@ -249,12 +249,24 @@ jobs:
           test -n "$package_name"
           test -n "$launch_activity"
 
-          adb wait-for-device
-          adb shell input keyevent KEYCODE_WAKEUP
-          adb shell wm dismiss-keyguard
+          wait_for_adb() {
+            for wait_attempt in $(seq 1 30); do
+              if adb wait-for-device >/dev/null 2>&1 &&
+                 [ "$(adb get-state 2>/dev/null || true)" = "device" ]; then
+                return 0
+              fi
+              sleep 1
+            done
+            echo "::error::adb device never became ready"
+            return 1
+          }
+
+          wait_for_adb
+          adb shell input keyevent KEYCODE_WAKEUP || true
+          adb shell wm dismiss-keyguard || true
           adb shell wm size 1080x1920
           adb shell wm density 420
-          adb shell settings put secure immersive_mode_confirmations confirmed
+          adb shell settings put secure immersive_mode_confirmations confirmed || true
 
           if adb install -r "$apk" > "$output/install.log" 2>&1; then
             :
@@ -262,8 +274,9 @@ jobs:
             status=$?
             exit "$status"
           fi
-          adb logcat -c
-          adb shell am force-stop "$package_name"
+          # Clearing logcat on API 35 can return 255 and abort the job
+          # before Unity even starts; keep the ring buffer.
+          adb shell am force-stop "$package_name" || true
           if adb shell am start -W \
               -n "$package_name/$launch_activity" \
               --es hol_capture_screen splash \
@@ -275,8 +288,16 @@ jobs:
           fi
 
           ready=0
+          set +e
           for attempt in $(seq 1 60); do
-            adb logcat -d -v brief > "$output/marker-logcat.txt"
+            echo "Splash capture poll ${attempt}/60"
+            if ! adb logcat -d -v threadtime \
+                > "$output/marker-logcat.txt" 2>/dev/null; then
+              echo "logcat dump failed; waiting for adb"
+              wait_for_adb || true
+              sleep 1
+              continue
+            fi
             if grep -Fq "HOL_SPLASH_CAPTURE_READY" \
                 "$output/marker-logcat.txt"; then
               ready=1
@@ -284,6 +305,7 @@ jobs:
             fi
             sleep 1
           done
+          set -e
           if [ "$ready" -ne 1 ]; then
             echo "::error::Timed out waiting for HOL_SPLASH_CAPTURE_READY"
             exit 1
@@ -295,7 +317,21 @@ jobs:
             exit 1
           fi
 
-          adb exec-out screencap -p > "$output/splash.png"
+          adb exec-out screencap -p > "$output/splash.png" || true
+          if ! [ -s "$output/splash.png" ]; then
+            set +e
+            for shot in $(seq 1 10); do
+              echo "Retrying screencap ${shot}/10"
+              wait_for_adb || true
+              adb exec-out screencap -p > "$output/splash.png"
+              if [ -s "$output/splash.png" ]; then
+                break
+              fi
+              sleep 1
+            done
+            set -e
+          fi
+          test -s "$output/splash.png"
           node tools/splash/validate-splash-screenshot.mjs \
             "$output/splash.png"
 
@@ -315,10 +351,13 @@ jobs:
           arch: x86_64
           target: google_apis
           profile: pixel_2
+          cores: 2
+          ram-size: 4096M
+          heap-size: 576M
           emulator-boot-timeout: 1200
-          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          emulator-options: "-no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -feature -Vulkan"
           disable-animations: true
-          script: ${{ runner.temp }}/splash-capture.sh
+          script: bash ${{ runner.temp }}/splash-capture.sh
 
       - name: Upload complete Splash Android preview artifact
         if: always()
