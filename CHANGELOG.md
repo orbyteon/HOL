@@ -84,7 +84,10 @@ Play Console versionName in `ProjectSettings.asset`.
   chip, one dominant gold Play Solo CTA, compact side-by-side Private Room
   and Daily Hunt cards, and a smaller localized tip. Existing scene-owned
   callbacks remain unchanged; the presentation is safe-area aware and does
-  not add Store, Profile, 1v1, coins, or fake `2,450` UI.
+  not add Store, Profile, 1v1, coins, or fake `2,450` UI. Android preview
+  capture waits two end-of-frame barriers before logging ready, and preview
+  workflows share one Unity build concurrency group with `actions: read` for
+  artifact handoff.
 - **PanelPlay** (Play Solo → find challenger) uses the same stairs/clouds
   bible as a quieter inner page: HOL logo, cyan Back, gold Find Challenger,
   and the existing simulated-opponents disclosure. Searching, Settings,

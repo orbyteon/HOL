@@ -119,6 +119,10 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         for (int i = 0; i < 12; i++)
             yield return null;
         BuildHome();
+        // Procedural neon seams and CTAs need a painted frame before Android
+        // capture logs HOL_MAINMENU_CAPTURE_READY.
+        yield return new WaitForEndOfFrame();
+        yield return new WaitForEndOfFrame();
         IsSettled = IsReady;
         laidOut = true;
     }

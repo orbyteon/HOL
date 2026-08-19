@@ -48,9 +48,10 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
-  group: mainmenu-android-preview-${{ github.ref }}
+  group: hol-android-preview-build-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -138,12 +139,19 @@ jobs:
           name: mainmenu-preview-apk-transfer
           path: build/Android
 
+      - name: Require downloaded APK
+        shell: bash
+        run: test -f build/Android/HOL-mainmenu-debug.apk
+
       - name: Enable KVM acceleration
         shell: bash
         run: |
           set -euo pipefail
-          test -e /dev/kvm
-          sudo chmod 0666 /dev/kvm
+          if [ -e /dev/kvm ]; then
+            sudo chmod 0666 /dev/kvm
+          else
+            echo "::warning::/dev/kvm is unavailable; emulator runner will retry"
+          fi
 
       - name: Prepare fail-safe Main Menu capture script
         shell: bash
@@ -289,8 +297,8 @@ jobs:
 
           ready=0
           set +e
-          for attempt in $(seq 1 90); do
-            echo "Main Menu capture poll ${attempt}/90"
+          for attempt in $(seq 1 120); do
+            echo "Main Menu capture poll ${attempt}/120"
             if ! adb logcat -d -v threadtime \
                 > "$output/marker-logcat.txt" 2>/dev/null; then
               echo "logcat dump failed; waiting for adb"
