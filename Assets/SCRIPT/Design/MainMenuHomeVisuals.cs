@@ -120,9 +120,18 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
             yield return null;
         BuildHome();
         // Procedural neon seams and CTAs need a painted frame before Android
-        // capture logs HOL_MAINMENU_CAPTURE_READY.
-        yield return new WaitForEndOfFrame();
-        yield return new WaitForEndOfFrame();
+        // capture logs HOL_MAINMENU_CAPTURE_READY. WaitForEndOfFrame never
+        // completes in headless PlayMode CI (batchmode), so use null yields there.
+        if (Application.isBatchMode)
+        {
+            yield return null;
+            yield return null;
+        }
+        else
+        {
+            yield return new WaitForEndOfFrame();
+            yield return new WaitForEndOfFrame();
+        }
         IsSettled = IsReady;
         laidOut = true;
     }

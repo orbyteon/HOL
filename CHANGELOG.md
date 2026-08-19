@@ -7,6 +7,9 @@ Play Console versionName in `ProjectSettings.asset`.
 
 ### Fixed
 
+- Home PlayMode settle gate no longer blocks on `WaitForEndOfFrame` in
+  headless CI batchmode; Android preview builds still wait for end-of-frame
+  paint before logging `HOL_MAINMENU_CAPTURE_READY`.
 - Delayed PvP guesses from a finished match can no longer land on a rematch:
   `submitGuess` rejects a stale or omitted `matchIndex`, the PlayFab client
   ignores a late success that belongs to a previous match, and the controller
