@@ -581,27 +581,47 @@ public class ExactReferenceAssetsTests
     static void InvokePublic(Component component, string methodName,
         params object[] arguments)
     {
-        var method = component.GetType().GetMethod(
-            methodName, BindingFlags.Instance | BindingFlags.Public);
-        Assert.IsNotNull(method, "Missing public method: " + methodName);
-        method.Invoke(component, arguments);
+        InvokeNamed(component, methodName,
+            BindingFlags.Instance | BindingFlags.Public, arguments);
     }
 
     static void InvokePrivate(Component component, string methodName, params object[] arguments)
     {
-        var method = component.GetType().GetMethod(
-            methodName, BindingFlags.Instance | BindingFlags.NonPublic);
-        Assert.IsNotNull(method, "Missing private method: " + methodName);
-        method.Invoke(component, arguments);
+        InvokeNamed(component, methodName,
+            BindingFlags.Instance | BindingFlags.NonPublic, arguments);
     }
 
     static object InvokePrivateResult(Component component, string methodName,
         params object[] arguments)
     {
+        return InvokeNamed(component, methodName,
+            BindingFlags.Instance | BindingFlags.NonPublic, arguments);
+    }
+
+    // Bind by argument types so overloaded methods (PvpResultPresentation.Show)
+    // do not throw AmbiguousMatchException the way a name-only GetMethod does.
+    static object InvokeNamed(Component component, string methodName,
+        BindingFlags flags, object[] arguments)
+    {
+        var types = ArgumentTypes(arguments);
         var method = component.GetType().GetMethod(
-            methodName, BindingFlags.Instance | BindingFlags.NonPublic);
-        Assert.IsNotNull(method, "Missing private method: " + methodName);
+            methodName, flags, null, types, null);
+        Assert.IsNotNull(method, "Missing method: " + methodName);
         return method.Invoke(component, arguments);
+    }
+
+    static System.Type[] ArgumentTypes(object[] arguments)
+    {
+        if (arguments == null || arguments.Length == 0)
+            return System.Type.EmptyTypes;
+        var types = new System.Type[arguments.Length];
+        for (int i = 0; i < arguments.Length; i++)
+        {
+            Assert.IsNotNull(arguments[i],
+                "Reflection invoke cannot infer a type from a null argument.");
+            types[i] = arguments[i].GetType();
+        }
+        return types;
     }
 
     static System.Type RuntimeType(string name)

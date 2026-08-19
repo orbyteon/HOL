@@ -7,6 +7,9 @@ Play Console versionName in `ProjectSettings.asset`.
 
 ### Fixed
 
+- EditMode PvP panel builds no longer call `Destroy` (Unity forbids it
+  outside Play mode) and reflection helpers bind `Show` by argument types
+  so the 4-argument result presentation overload is no longer ambiguous.
 - The Consumer First art actually renders. All 25 hand-authored design
   asset `.meta` files carried invalid GUIDs (30–31 hex chars where Unity
   requires exactly 32), so Unity silently regenerated them at import and

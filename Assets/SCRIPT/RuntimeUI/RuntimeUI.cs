@@ -315,4 +315,20 @@ public static class RuntimeUI
         if (input == null) return;
         Localize(input.placeholder as TMP_Text, key);
     }
+
+    // Unity forbids Object.Destroy from EditMode tests and editor scripts —
+    // that path must use DestroyImmediate. Play mode keeps the deferred
+    // Destroy so in-flight listeners cannot see a hole mid-frame.
+    public static void DestroyNow(Object target)
+    {
+        if (target == null) return;
+#if UNITY_EDITOR
+        if (!Application.isPlaying)
+        {
+            Object.DestroyImmediate(target);
+            return;
+        }
+#endif
+        Object.Destroy(target);
+    }
 }

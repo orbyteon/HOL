@@ -986,7 +986,7 @@ public class PvpRuntimeUI : MonoBehaviour
         if (panel == null) return;
         panel.SetActive(false);
         panel.name = "Retired" + panel.name;
-        Destroy(panel);
+        RuntimeUI.DestroyNow(panel);
     }
 
     static GameObject BuildPortraitPanel(Transform parent, string name)
