@@ -334,6 +334,36 @@ public class ExactReferenceAssetsTests
     }
 
     [Test]
+    public void SameCodeRetryAdoptsTheSuccessfulPendingJoin()
+    {
+        var host = new GameObject("PlayFabJoinRetry");
+        try
+        {
+            var client = host.AddComponent(RuntimeType(
+                "PlayFabPvpClient"));
+            bool completed = false;
+            System.Action<bool, string> done = (ok, _) => completed = ok;
+            SetPrivateField(client, "roomRequestEpoch", 2);
+            SetPrivateField(client, "pendingRoomCode", "ABCDE");
+            SetPrivateField(client, "pendingRoomDone", done);
+            SetPrivateField(client, "pendingRequestIsJoin", true);
+
+            bool adopted = (bool)InvokePrivateResult(client,
+                "TryAdoptPendingJoin", "ABCDE");
+
+            Assert.IsTrue(adopted);
+            Assert.IsTrue(completed);
+            var code = client.GetType().GetProperty("RoomCode").GetValue(
+                client, null);
+            Assert.AreEqual("ABCDE", code);
+        }
+        finally
+        {
+            Object.DestroyImmediate(host);
+        }
+    }
+
+    [Test]
     public void SettingsPresentationContractExists()
     {
         Assert.IsNotNull(RuntimeType("SettingsVisuals"));
