@@ -1,2 +1,5 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+Assets/newdesign/**/*.svg.meta whitespace=-trailing-space
+"Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF - Fallback.asset" whitespace=-trailing-space
