@@ -1,4 +1,5 @@
 name: Main Menu Android Preview
+# Temporary owner-requested APK preview trigger; remove with the trigger PR.
 
 on:
   pull_request:
