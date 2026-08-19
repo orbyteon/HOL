@@ -12,6 +12,7 @@
     }
   ],
   "dependencies": {
+    "com.google.external-dependency-manager": "1.2.188",
     "com.google.play.integrity": "1.4.1",
     "com.unity.services.levelplay": "9.5.0",
     "com.unity.test-framework": "1.1.33",
