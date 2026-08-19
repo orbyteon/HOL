@@ -11,12 +11,15 @@ public class FakeMatchmaking : MonoBehaviour
 
     bool isSearching; // review #8: prevent overlapping searches
     Coroutine dotsAnimation;
+    int searchGeneration;
 
     public void StartSearch()
     {
         if (isSearching)
             return;
 
+        StopAllCoroutines();
+        dotsAnimation = null;
         StartCoroutine(SearchRoutine());
     }
 
@@ -27,15 +30,48 @@ public class FakeMatchmaking : MonoBehaviour
             return;
 
         StopAllCoroutines();
+        if (foundSound != null) foundSound.Stop();
         isSearching = false;
-        searchingPanel.SetActive(false);
+        var canvasGroup = searchingPanel.GetComponent<CanvasGroup>();
+        if (canvasGroup == null)
+        {
+            searchingPanel.SetActive(false);
+            return;
+        }
+        StartCoroutine(FadeCancelled(canvasGroup, ++searchGeneration));
+    }
+
+    IEnumerator FadeCancelled(CanvasGroup canvasGroup, int generation)
+    {
+        float start = canvasGroup.alpha;
+        float elapsed = 0f;
+        while (elapsed < 0.18f)
+        {
+            if (generation != searchGeneration)
+            {
+                canvasGroup.alpha = 1f;
+                yield break;
+            }
+            elapsed += Time.unscaledDeltaTime;
+            canvasGroup.alpha = Mathf.Lerp(start, 0f,
+                Mathf.Clamp01(elapsed / 0.18f));
+            yield return null;
+        }
+        if (generation == searchGeneration)
+        {
+            canvasGroup.alpha = 1f;
+            searchingPanel.SetActive(false);
+        }
     }
 
     IEnumerator SearchRoutine()
     {
         isSearching = true;
+        int generation = ++searchGeneration;
 
         searchingPanel.SetActive(true);
+        var canvasGroup = searchingPanel.GetComponent<CanvasGroup>();
+        if (canvasGroup != null) canvasGroup.alpha = 1f;
 
         // Animate "Searching opponent" with cycling dots so the panel
         // doesn't look frozen.
@@ -54,6 +90,7 @@ public class FakeMatchmaking : MonoBehaviour
             waitTime = 5f;
 
         yield return new WaitForSeconds(waitTime);
+        if (generation != searchGeneration) yield break;
 
         StopDotsAnimation();
 
@@ -64,6 +101,7 @@ public class FakeMatchmaking : MonoBehaviour
         {
             searchingText.text = L10n.Get("opponent_not_found");
             yield return new WaitForSeconds(2f);
+            if (generation != searchGeneration) yield break;
             searchingPanel.SetActive(false);
             isSearching = false;
             yield break;
@@ -73,6 +111,7 @@ public class FakeMatchmaking : MonoBehaviour
         if (foundSound != null)
             foundSound.Play();
         yield return new WaitForSeconds(1.5f);
+        if (generation != searchGeneration) yield break;
 
         searchingPanel.SetActive(false);
         panelGame.SetActive(true);
@@ -108,5 +147,10 @@ public class FakeMatchmaking : MonoBehaviour
         // guard, so clear it here or StartSearch is dead after re-enabling.
         StopDotsAnimation();
         isSearching = false;
+        searchGeneration++;
+        var canvasGroup = searchingPanel == null
+            ? null
+            : searchingPanel.GetComponent<CanvasGroup>();
+        if (canvasGroup != null) canvasGroup.alpha = 1f;
     }
 }

@@ -13,6 +13,9 @@ public sealed class ExactReferenceVisualsPlayModeTests
     {
         var exactType = RuntimeType("ExactReferenceVisuals");
         var boardReskinType = RuntimeType("AttachmentReskinVisuals");
+        var boardPolishType = RuntimeType("AttachmentReskinPolish");
+        var canvasBindingsType = RuntimeType("AttachmentReskinCanvasBindings");
+        var homeType = RuntimeType("MainMenuHomeVisuals");
 
         // Invoke both runtime bootstraps explicitly so this regression remains
         // deterministic inside the Unity Test Runner as well as in a player.
@@ -26,15 +29,34 @@ public sealed class ExactReferenceVisualsPlayModeTests
         Assert.That(installBoardReskin, Is.Not.Null);
         installBoardReskin.Invoke(null, null);
 
+        var installBoardPolish = boardPolishType.GetMethod(
+            "Install", BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.That(installBoardPolish, Is.Not.Null);
+        installBoardPolish.Invoke(null, null);
+
+        var installCanvasBindings = canvasBindingsType.GetMethod(
+            "Install", BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.That(installCanvasBindings, Is.Not.Null);
+        installCanvasBindings.Invoke(null, null);
+
+        var installHome = homeType.GetMethod(
+            "Install", BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.That(installHome, Is.Not.Null);
+        installHome.Invoke(null, null);
+
         yield return SceneManager.LoadSceneAsync("SplashScene", LoadSceneMode.Single);
         yield return null;
 
         var splashVisuals = Object.FindObjectOfType(exactType) as Component;
-        Assert.That(splashVisuals, Is.Not.Null,
-            "SplashScene should receive the approved visuals owner.");
+        Assert.That(splashVisuals, Is.Null,
+            "SplashDesign, not ExactReferenceVisuals, owns SplashScene.");
         var splashBoardReskin = Object.FindObjectOfType(boardReskinType) as Component;
-        Assert.That(splashBoardReskin, Is.Not.Null,
-            "SplashScene should receive the attachment reskin layer.");
+        Assert.That(splashBoardReskin, Is.Null,
+            "The MainMenu attachment reskin must skip SplashScene.");
+        Assert.That(Object.FindObjectOfType(boardPolishType), Is.Null,
+            "The MainMenu polish layer must skip SplashScene.");
+        Assert.That(Object.FindObjectOfType(canvasBindingsType), Is.Null,
+            "The MainMenu canvas bindings must skip SplashScene.");
 
         var splashLoader = Object.FindObjectOfType(RuntimeType("SplashLoader")) as Component;
         Assert.That(splashLoader, Is.Not.Null);
@@ -42,8 +64,9 @@ public sealed class ExactReferenceVisualsPlayModeTests
 
         while (SceneManager.GetActiveScene().name != "MainMenu")
             yield return null;
-        for (int i = 0; i < 6; i++)
+        for (int i = 0; i < 20; i++)
             yield return null;
+        yield return new WaitForSecondsRealtime(0.35f);
 
         var mainMenuVisuals = Object.FindObjectOfType(exactType) as Component;
         Assert.That(mainMenuVisuals, Is.Not.Null,
@@ -57,10 +80,23 @@ public sealed class ExactReferenceVisualsPlayModeTests
         Assert.That(mainMenuBoardReskin, Is.Not.Null,
             "The attachment reskin must survive the SplashScene to MainMenu transition.");
         Assert.That(mainMenuBoardReskin.GetComponent<Canvas>(), Is.SameAs(ownedCanvas));
+        var mainMenuBoardPolish = Object.FindObjectOfType(boardPolishType) as Component;
+        Assert.That(mainMenuBoardPolish, Is.Not.Null,
+            "The attachment polish must still install on MainMenu.");
+        Assert.That(mainMenuBoardPolish.GetComponent<Canvas>(), Is.SameAs(ownedCanvas));
+        var mainMenuCanvasBindings = Object.FindObjectOfType(canvasBindingsType) as Component;
+        Assert.That(mainMenuCanvasBindings, Is.Not.Null,
+            "The attachment canvas bindings must still install on MainMenu.");
+        Assert.That(mainMenuCanvasBindings.GetComponent<Canvas>(), Is.SameAs(ownedCanvas));
 
-        Assert.That(FindByName(ownedCanvas.transform, "BoardHomeLogo"), Is.Not.Null,
-            "The existing main menu should receive the reference-board home composition.");
-        Assert.That(FindByName(ownedCanvas.transform, "BoardHomeTipCard"), Is.Not.Null);
+        var homeOwner = Object.FindObjectOfType(homeType) as Component;
+        Assert.That(homeOwner, Is.Not.Null,
+            "MainMenu Home should be owned by MainMenuHomeVisuals.");
+        Assert.That(FindByName(ownedCanvas.transform, "HomeLogo"), Is.Not.Null,
+            "Cartoon Home must compose the HOL logo.");
+        Assert.That(FindByName(ownedCanvas.transform, "HomeTipCard"), Is.Not.Null);
+        Assert.That(FindByName(ownedCanvas.transform, "BoardHomeLogo"), Is.Null,
+            "Attachment Home composition must not run on MainMenu.");
 
         // This is a reskin, not a feature pass. It may add images/text but it
         // must not create new interactive buttons, Store screens or Profile
@@ -115,14 +151,14 @@ public sealed class ExactReferenceVisualsPlayModeTests
         Component profileText = null;
         foreach (var component in ownedCanvas.GetComponentsInChildren(tmpTextType, true))
         {
-            if (component.name != "ExactPlayerChipText") continue;
+            if (component.name != "HomePlayerChipText") continue;
             profileText = component;
             break;
         }
         Assert.That(profileText, Is.Not.Null);
         string profileCopy = (string)tmpTextType.GetProperty("text").GetValue(profileText, null);
         string localizedStreak = LocalizedCopy(l10nType, "stats_streak");
-        Assert.That(profileCopy, Does.Contain(localizedStreak.ToUpperInvariant()));
+        Assert.That(profileCopy, Does.Contain(localizedStreak));
         Assert.That(profileCopy, Does.Not.Contain("STREAK"));
         setLanguage.Invoke(null, new[] { originalLanguage });
 

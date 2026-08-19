@@ -7,6 +7,16 @@ Play Console versionName in `ProjectSettings.asset`.
 
 ### Fixed
 
+- Delayed PvP guesses from a finished match can no longer land on a rematch:
+  `submitGuess` rejects a stale or omitted `matchIndex`, the PlayFab client
+  ignores a late success that belongs to a previous match, and the controller
+  drops that callback instead of re-entering result handling.
+- Integration EditMode tests compile again after combining Splash and Teen
+  Polish: `ExactReferenceAssetsTests` keeps the Splash scene helpers and
+  restores `using UnityEngine.UI` for GraphicRaycaster/Button/Image.
+- EditMode PvP panel builds no longer call `Destroy` (Unity forbids it
+  outside Play mode) and reflection helpers bind `Show` by argument types
+  so the 4-argument result presentation overload is no longer ambiguous.
 - The Consumer First art actually renders. All 25 hand-authored design
   asset `.meta` files carried invalid GUIDs (30–31 hex chars where Unity
   requires exactly 32), so Unity silently regenerated them at import and
@@ -28,13 +38,34 @@ Play Console versionName in `ProjectSettings.asset`.
 
 ### Added
 
+- A non-production Splash Android preview workflow builds a universal ARM64
+  and x86_64 Development APK, captures and validates a 1080×1920
+  `splash.png`, and uploads `hol-splash-android-preview` for QA. It does not
+  use the production environment or change `versionCode`.
+- **Portrait Private Room menu** — create/join and their waiting states now use
+  the approved Teen Polish cards, 6/7 cast, live code sharing, and the existing
+  PlayFab-authoritative callbacks.
+- **Portrait Settings and Solo Search** — existing name, language, music,
+  difficulty, ads-privacy, search, and cancel controls now share the same
+  safe-area-aware Teen Polish presentation; Solo Search adds an animated radar.
+- **Portrait Daily Hunt presentation** — the existing persisted daily challenge
+  now uses the approved logo/ribbon/card layout without changing its guess,
+  revive, or share rules.
+- **Portrait PvP result celebration** — win/loss/draw now opens the approved
+  Teen Polish result overlay with authoritative attempt counts, revealed
+  number, fresh-secret rematch, Exit, the six fixed Signals, and a one-shot
+  radial confetti/trophy pop on wins.
+- **Portrait pre-battle waiting UI** — the existing PvP create/join waiting
+  surfaces now use the approved Teen Polish versus layout with live room code,
+  automatic-start status, localized rule copy, and no new gameplay action.
 - **Daily Hunt** — the parked product-pass draft's one unshipped idea (#6),
   ported onto the Consumer First board. One date-seeded secret number
   shared by every player per UTC day, seven guesses, an emoji-trail result
   that copies to the clipboard for sharing, one rewarded-ad revive worth
   two extra guesses, and its own found-day streak. Pure client and fully
-  resumable: state persists after every guess, the secret is a keyed hash
-  of the day number (not a predictable seeded PRNG), a backwards clock
+  resumable: state persists after every guess, the answer uses a stable
+  domain-separated day hash (not a predictable seeded PRNG, but still
+  client-readable rather than cheat-resistant), a backwards clock
   cannot replay a revealed answer, and a missed day ends the streak the
   moment the panel opens rather than at the next win. Deliberately left
   for follow-ups so this ships without a server or package change: the
@@ -43,6 +74,27 @@ Play Console versionName in `ProjectSettings.asset`.
 
 ### Changed
 
+- Splash Home / `SplashScene` presentation is now owned by `SplashDesign`:
+  cartoon stairs and clouds, the HOL logo, a boy-and-girl fist-bump, mascot
+  6 on the left and 7 on the right, and only a gold elapsed hairline. It has
+  no Main Menu chrome and no user-facing Splash text.
+- Main Menu **Home** now uses the cartoon stairs/clouds bible: HOL logo,
+  blue-hoodie boy + pink-hoodie girl, mascot **6 left / 7 right**, mapped
+  onto the existing Settings gear, live name + match-win streak chip,
+  Play Solo, Private Room, Daily Hunt, and tip. No Store, Profile, 1v1,
+  coins, or fake `2,450`. Development Android QA captures a 1080×1920 Home
+  screenshot plus an ARM64-capable debug APK; that preview is not a store
+  build.
+- **PanelPlay** (Play Solo → find challenger) uses the same stairs/clouds
+  bible as a quieter inner page: HOL logo, cyan Back, gold Find Challenger,
+  and the existing simulated-opponents disclosure. Searching, Settings,
+  PvP, Daily Hunt, and the board stay unchanged. Development Android QA
+  captures a 1080×1920 idle PanelPlay screenshot; that preview is not a
+  store build.
+- Daily Hunt and the PvP result presentation now refresh their formatted
+  dynamic labels when the player changes language while either screen is
+  active; result headings retain their localization key instead of a stale
+  rendered string.
 - The privacy policy's contact address is now `support@orbyteon.com` —
   a role mailbox owned by the publisher instead of a personal one. Both
   committed copies (the canonical `docs/privacy.html` and the byte-identical

@@ -55,10 +55,11 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
     static void InstallForScene(Scene scene)
     {
         if (!scene.IsValid() || !scene.isLoaded) return;
+        if (scene.name == "SplashScene") return;
 
         // Prefer the canvas that owns the menu controller's panel. This avoids
         // styling unrelated SDK/debug/world-space canvases that may exist in the
-        // same scene. Splash and other scenes fall back to their first root,
+        // same scene. Other eligible scenes fall back to their first root,
         // screen-space canvas.
         Canvas canvas = null;
         var menu = FindInScene<MenuManager>(scene);
@@ -202,12 +203,14 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
 
         var menu = FindInScene<MenuManager>(gameObject.scene);
         if (menu != null && menu.mainMenuPanel != null &&
-            menu.mainMenuPanel.GetComponentInParent<Canvas>() == GetComponent<Canvas>())
+            menu.mainMenuPanel.GetComponentInParent<Canvas>() == GetComponent<Canvas>() &&
+            gameObject.scene.name != "MainMenu")
             BuildMainMenu(menu.mainMenuPanel.transform);
     }
 
     void ApplyBackdrop(Transform canvasRoot)
     {
+        if (gameObject.scene.name == "MainMenu") return;
         DisableDirectChild(canvasRoot, "BackdropDepth");
         DisableDirectChild(canvasRoot, "BackdropNumbers");
 
@@ -392,7 +395,8 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
         LayoutPvpMatch(DeepFind(root, "PvPMatchPanel"));
         LayoutDailyHunt(DeepFind(root, "DailyHuntPanel"));
         LayoutSearching(DeepFind(root, "PanelSearching"));
-        LayoutSimpleScreen(DeepFind(root, "PanelPlay"), "ExactPlayLogo");
+        if (gameObject.scene.name != "MainMenu")
+            LayoutSimpleScreen(DeepFind(root, "PanelPlay"), "ExactPlayLogo");
         LayoutSimpleScreen(DeepFind(root, "PanelSettings"), "ExactSettingsLogo");
         LayoutSimpleScreen(DeepFind(root, "PanelGAME"), "ExactSoloLogo");
         LayoutDialog(DeepFind(root, "ConsentPanel"), false);
@@ -528,6 +532,13 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
     void LayoutDailyHunt(Transform panel)
     {
         if (panel == null) return;
+        if (DeepFind(panel, "DailyHuntVisualRoot") != null)
+        {
+            SetActive(DeepFind(panel, "ExactDailyLogo"), false);
+            SetActive(DeepFind(panel, "ExactDailySeven"), false);
+            SetActive(DeepFind(panel, "ExactDailyThree"), false);
+            return;
+        }
 
         AddExactImage(panel, "ExactDailyLogo", logo,
             new Vector2(0f, 790f), new Vector2(360f, 235f));
@@ -545,6 +556,14 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
     void LayoutSearching(Transform panel)
     {
         if (panel == null) return;
+        if (DeepFind(panel, "SoloSearchVisualRoot") != null)
+        {
+            SetActive(DeepFind(panel, "ExactSearchingLogo"), false);
+            SetActive(DeepFind(panel, "ExactSearchingPlayer"), false);
+            SetActive(DeepFind(panel, "ExactSearchingOpponent"), false);
+            SetActive(DeepFind(panel, "ExactSearchingVs"), false);
+            return;
+        }
 
         AddExactImage(panel, "ExactSearchingLogo", logo,
             new Vector2(0f, 700f), new Vector2(440f, 290f));
@@ -553,7 +572,7 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
         AddExactImage(panel, "ExactSearchingOpponent", opponentPortrait,
             new Vector2(280f, 170f), new Vector2(380f, 440f));
         var vs = EnsureText(panel, "ExactSearchingVs");
-        vs.text = "VS";
+        vs.text = L10n.Get("versus");
         vs.fontSize = 72f;
         vs.fontStyle = FontStyles.Bold;
         vs.color = Gold;
@@ -564,6 +583,12 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
     void LayoutSimpleScreen(Transform panel, string imageName)
     {
         if (panel == null) return;
+        if (imageName == "ExactSettingsLogo" &&
+            DeepFind(panel, "SettingsVisualRoot") != null)
+        {
+            SetActive(DeepFind(panel, imageName), false);
+            return;
+        }
         AddExactImage(panel, imageName, logo,
             new Vector2(0f, 800f), new Vector2(330f, 215f));
     }
@@ -706,7 +731,9 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
         foreach (var button in root.GetComponentsInChildren<Button>(true))
         {
             string name = button.transform.name;
-            if (name == "ButtonPlay" || name == "ButtonPvP" || name == "DailyHuntButton")
+            if (name == "ButtonPlay" || name == "ButtonPvP" ||
+                name == "DailyHuntButton" || name == "Buttonsettings" ||
+                name == "ButtonBack" || name == "ButtonChallenger")
                 continue;
 
             Color fill = SurfaceRaised;
@@ -881,6 +908,11 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
     {
         var child = DirectChild(parent, name);
         if (child != null) child.gameObject.SetActive(false);
+    }
+
+    static void SetActive(Transform target, bool active)
+    {
+        if (target != null) target.gameObject.SetActive(active);
     }
 
     static Transform DeepFind(Transform root, string name)

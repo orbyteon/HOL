@@ -42,6 +42,7 @@ public sealed class AttachmentReskinPolish : MonoBehaviour
     static void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
         if (!scene.IsValid() || !scene.isLoaded) return;
+        if (scene.name == "SplashScene") return;
 
         Canvas canvas = null;
         var menu = FindInScene<MenuManager>(scene);
@@ -123,7 +124,8 @@ public sealed class AttachmentReskinPolish : MonoBehaviour
         if (menu == null) return;
 
         StyleRuntimeCards(transform);
-        PolishHome(menu);
+        if (gameObject.scene.name != "MainMenu")
+            PolishHome(menu);
         PolishSearching(menu);
         PolishSoloResult();
         PolishPvp();
@@ -167,6 +169,12 @@ public sealed class AttachmentReskinPolish : MonoBehaviour
     {
         if (menu.panelSearching == null || !menu.panelSearching.activeInHierarchy) return;
         var root = menu.panelSearching.transform;
+        if (DeepFind(root, "SoloSearchVisualRoot") != null)
+        {
+            SetActive(DeepFind(root, "BoardSearchRocketVector"), false);
+            SetActive(DeepFind(root, "BoardVsBurstVector"), false);
+            return;
+        }
         AddImage(root, "BoardSearchRocketVector", rocket,
             new Vector2(350f, -500f), new Vector2(245f, 300f), true);
         EnsureVsBurst(root);
@@ -216,16 +224,26 @@ public sealed class AttachmentReskinPolish : MonoBehaviour
         if (pvp.pvpMenuPanel != null && pvp.pvpMenuPanel.activeInHierarchy)
         {
             var root = pvp.pvpMenuPanel.transform;
-            ReplaceGlyphWithSprite(root, "CreateButton", "BoardCreatePlus", "BoardCreatePlusVector",
-                plusIcon, new Vector2(0f, 225f), new Vector2(88f, 88f));
-            ReplaceGlyphWithSprite(root, "JoinButton", "BoardJoinDoor", "BoardJoinDoorVector",
-                joinIcon, new Vector2(0f, 225f), new Vector2(90f, 90f));
-            SetActive(DeepFind(root, "BoardCreatePlusPlate"), false);
-            SetActive(DeepFind(root, "BoardJoinDoorPlate"), false);
+            if (DeepFind(root, "TitleRibbon") == null)
+            {
+                ReplaceGlyphWithSprite(root, "CreateButton", "BoardCreatePlus", "BoardCreatePlusVector",
+                    plusIcon, new Vector2(0f, 225f), new Vector2(88f, 88f));
+                ReplaceGlyphWithSprite(root, "JoinButton", "BoardJoinDoor", "BoardJoinDoorVector",
+                    joinIcon, new Vector2(0f, 225f), new Vector2(90f, 90f));
+                SetActive(DeepFind(root, "BoardCreatePlusPlate"), false);
+                SetActive(DeepFind(root, "BoardJoinDoorPlate"), false);
+            }
         }
 
         if (pvp.matchPanel == null || !pvp.matchPanel.activeInHierarchy) return;
         var matchRoot = pvp.matchPanel.transform;
+        var approvedResult = DeepFind(matchRoot, "ResultVisualRoot");
+        if (approvedResult != null && approvedResult.gameObject.activeInHierarchy)
+        {
+            SetActive(DeepFind(matchRoot, "BoardPvpTrophyVector"), false);
+            approvedResult.SetAsLastSibling();
+            return;
+        }
         EnsureVsBurst(matchRoot);
 
         bool result = pvp.resultText != null && !string.IsNullOrEmpty(pvp.resultText.text);
@@ -276,8 +294,11 @@ public sealed class AttachmentReskinPolish : MonoBehaviour
         if (root == null) return;
         foreach (var image in root.GetComponentsInChildren<Image>(true))
         {
+            if (IsUnderOwnedVisualRoot(image.transform)) continue;
             string name = image.transform.name;
-            if (name.StartsWith("Board") || name.StartsWith("Exact")) continue;
+            if (name.StartsWith("Board") || name.StartsWith("Exact") ||
+                name.StartsWith("Home") || name.StartsWith("Play"))
+                continue;
             if (!Contains(name, "Card") && !Contains(name, "Frame")) continue;
             if (image.GetComponent<Button>() != null) continue;
 
@@ -286,6 +307,18 @@ public sealed class AttachmentReskinPolish : MonoBehaviour
             image.color = Panel;
             EnsureOutline(image.gameObject, Purple, 2f);
         }
+    }
+
+    static bool IsUnderOwnedVisualRoot(Transform transform)
+    {
+        while (transform != null)
+        {
+            if (transform.name == MainMenuHomeVisuals.VisualRootName ||
+                transform.name == MainMenuPlayVisuals.VisualRootName)
+                return true;
+            transform = transform.parent;
+        }
+        return false;
     }
 
     static Image AddImage(Transform parent, string name, Sprite sprite,
