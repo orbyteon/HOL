@@ -630,6 +630,24 @@ public sealed class AttachmentReskinVisuals : MonoBehaviour
     {
         var root = pvp.matchPanel.transform;
         bool result = pvp.resultText != null && !string.IsNullOrEmpty(pvp.resultText.text);
+        var approvedResult = DeepFind(root, "ResultVisualRoot");
+        if (result && approvedResult != null)
+        {
+            SetActive(DeepFind(root, "BoardPvpMatchLogo"), false);
+            SetActive(DeepFind(root, "BoardVsPlayerCard"), false);
+            SetActive(DeepFind(root, "BoardVsOpponentCard"), false);
+            SetActive(DeepFind(root, "BoardVsBadge"), false);
+            SetActive(DeepFind(root, "BoardVsBurstVector"), false);
+            SetActive(DeepFind(root, "ExactMatchLogo"), false);
+            SetActive(DeepFind(root, "ExactMatchSeven"), false);
+            SetActive(DeepFind(root, "ExactMatchThree"), false);
+            SetActive(DeepFind(root, "BoardPvpResultLogo"), false);
+            SetActive(DeepFind(root, "BoardPvpResultPlayer"), false);
+            SetActive(DeepFind(root, "BoardPvpResultStats"), false);
+            SetActive(DeepFind(root, "BoardPvpTrophyVector"), false);
+            approvedResult.SetAsLastSibling();
+            return;
+        }
         if (result)
         {
             ApplyPvpResult(pvp, root);

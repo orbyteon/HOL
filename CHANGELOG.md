@@ -28,6 +28,10 @@ Play Console versionName in `ProjectSettings.asset`.
 
 ### Added
 
+- **Portrait PvP result celebration** — win/loss/draw now opens the approved
+  Teen Polish result overlay with authoritative attempt counts, revealed
+  number, fresh-secret rematch, Exit, the six fixed Signals, and a one-shot
+  radial confetti/trophy pop on wins.
 - **Portrait pre-battle waiting UI** — the existing PvP create/join waiting
   surfaces now use the approved Teen Polish versus layout with live room code,
   automatic-start status, localized rule copy, and no new gameplay action.

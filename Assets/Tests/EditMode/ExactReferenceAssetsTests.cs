@@ -45,7 +45,10 @@ public class ExactReferenceAssetsTests
         foreach (var key in new[] {
             "private_room_title", "private_room_tip", "prebattle_title",
             "prebattle_you", "prebattle_opponent", "prebattle_found",
-            "prebattle_rule_title", "prebattle_rule", "prebattle_waiting"
+            "prebattle_rule_title", "prebattle_rule", "prebattle_waiting",
+            "result_page_title", "result_attempts", "result_attempts_short",
+            "result_rematch_heading", "result_reactions", "result_exit",
+            "result_win_title", "result_loss_title", "result_draw_title"
         })
         {
             Assert.IsTrue(table.Contains(key), "Missing L10n key: " + key);
@@ -76,6 +79,221 @@ public class ExactReferenceAssetsTests
         finally
         {
             Object.DestroyImmediate(root);
+        }
+    }
+
+    [Test]
+    public void ResultPresentationAndVictoryPopContractsExist()
+    {
+        Assert.IsNotNull(RuntimeType("PvpResultPresentation"),
+            "The portrait result overlay needs a focused presentation owner.");
+
+        var confetti = RuntimeType("ConfettiBurst");
+        Assert.IsNotNull(confetti.GetField("popTarget"),
+            "Victory confetti must expose the headline/trophy pop target.");
+        Assert.IsNotNull(confetti.GetField("radial"),
+            "Victory confetti must support the approved radial explosion.");
+        Assert.IsNotNull(confetti.GetField("secondaryPieces"),
+            "Victory confetti must support the approved secondary burst.");
+    }
+
+    [Test]
+    public void ResultOverlayBuildsOneRootAndSixSignals()
+    {
+        var host = new GameObject("ResultHost", typeof(RectTransform),
+            typeof(Canvas), typeof(GraphicRaycaster));
+        try
+        {
+            var ui = host.AddComponent(RuntimeType("PvpRuntimeUI"));
+            var controller = host.AddComponent(RuntimeType("PvpGameController"));
+            var match = Child(host.transform, "PvPMatchPanel");
+
+            InvokePrivate(ui, "BuildResultOverlay", controller, match);
+
+            Assert.AreEqual(1, DescendantCount(match.transform,
+                "ResultVisualRoot"));
+            for (int i = 0; i < 6; i++)
+                Assert.AreEqual(1, DescendantCount(match.transform,
+                    "ResultSignal" + i));
+        }
+        finally
+        {
+            Object.DestroyImmediate(host);
+        }
+    }
+
+    [Test]
+    public void ApprovedResultOverlaySuppressesLegacyPvpResultArt()
+    {
+        var host = new GameObject("ResultOwner", typeof(RectTransform),
+            typeof(Canvas), typeof(GraphicRaycaster));
+        try
+        {
+            var ui = host.AddComponent(RuntimeType("PvpRuntimeUI"));
+            var controller = host.AddComponent(RuntimeType("PvpGameController"));
+            var match = Child(host.transform, "PvPMatchPanel");
+            InvokePrivate(ui, "BuildResultOverlay", controller, match);
+
+            var textType = System.Type.GetType(
+                "TMPro.TextMeshProUGUI, Unity.TextMeshPro");
+            Assert.IsNotNull(textType);
+            var resultObject = new GameObject("Result", typeof(RectTransform));
+            resultObject.transform.SetParent(match.transform, false);
+            var result = resultObject.AddComponent(textType);
+            result.GetType().GetProperty("text").SetValue(result, "WIN", null);
+
+            controller.GetType().GetField("matchPanel").SetValue(
+                controller, match);
+            controller.GetType().GetField("resultText").SetValue(
+                controller, result);
+
+            var legacy = host.AddComponent(RuntimeType(
+                "AttachmentReskinVisuals"));
+            InvokePrivate(legacy, "Awake");
+            result.GetType().GetProperty("text").SetValue(result, "", null);
+            InvokePrivate(legacy, "ApplyPvpMatch", controller);
+            Assert.AreEqual(1, DescendantCount(match.transform,
+                "BoardPvpMatchLogo"),
+                "The test must reproduce late-created live-match art.");
+
+            result.GetType().GetProperty("text").SetValue(result, "WIN", null);
+            var presentation = (Component)controller.GetType().GetField(
+                "resultPresentation").GetValue(controller);
+            InvokePublic(presentation, "Show", "WIN", 5, 7, 67);
+            InvokePrivate(legacy, "ApplyPvpMatch", controller);
+
+            Assert.AreEqual(0, DescendantCount(match.transform,
+                "BoardPvpResultLogo"),
+                "The old result reskin must defer to ResultVisualRoot.");
+            Assert.IsFalse(FindDescendant(match.transform,
+                "BoardPvpMatchLogo").gameObject.activeSelf);
+            Assert.IsFalse(FindDescendant(match.transform,
+                "BoardVsPlayerCard").gameObject.activeSelf);
+            Assert.IsFalse(FindDescendant(match.transform,
+                "BoardVsOpponentCard").gameObject.activeSelf);
+
+            var resultRoot = FindDescendant(match.transform,
+                "ResultVisualRoot");
+            Assert.AreEqual(match.transform.childCount - 1,
+                resultRoot.GetSiblingIndex(),
+                "ResultVisualRoot must render above every late reskin sibling.");
+        }
+        finally
+        {
+            Object.DestroyImmediate(host);
+        }
+    }
+
+    [Test]
+    public void ResultPresentationPaintsAuthoritativeValues()
+    {
+        var root = new GameObject("ResultPresentation", typeof(RectTransform));
+        try
+        {
+            var presentation = root.AddComponent(RuntimeType(
+                "PvpResultPresentation"));
+            var title = TmpText(root.transform, "Title");
+            var mine = TmpText(root.transform, "Mine");
+            var theirs = TmpText(root.transform, "Theirs");
+            var revealed = TmpText(root.transform, "Revealed");
+
+            SetPublicField(presentation, "titleText", title);
+            SetPublicField(presentation, "playerAttemptsText", mine);
+            SetPublicField(presentation, "opponentAttemptsText", theirs);
+            SetPublicField(presentation, "revealedNumberText", revealed);
+
+            InvokePublic(presentation, "Show", "WIN", 5, 7, 67);
+
+            Assert.AreEqual("WIN", TextOf(title));
+            Assert.AreEqual("5", TextOf(mine));
+            Assert.AreEqual("7", TextOf(theirs));
+            Assert.IsTrue(TextOf(revealed).Contains("67"));
+        }
+        finally
+        {
+            Object.DestroyImmediate(root);
+        }
+    }
+
+    [Test]
+    public void InterruptedVictoryPopRestoresTargetScale()
+    {
+        var root = new GameObject("Confetti", typeof(RectTransform));
+        var target = Child(root.transform, "PopTarget");
+        try
+        {
+            var confetti = root.AddComponent(RuntimeType("ConfettiBurst"));
+            var rect = (RectTransform)target.transform;
+            rect.localScale = new Vector3(0.82f, 0.82f, 0.82f);
+
+            SetPublicField(confetti, "popTarget", rect);
+            SetPrivateField(confetti, "popBaseScale", Vector3.one);
+            SetPrivateField(confetti, "popBaseCaptured", true);
+            InvokePrivate(confetti, "OnDisable");
+
+            Assert.IsTrue(Mathf.Abs(rect.localScale.x - 1f) < 0.001f);
+            Assert.IsTrue(Mathf.Abs(rect.localScale.y - 1f) < 0.001f);
+        }
+        finally
+        {
+            Object.DestroyImmediate(root);
+        }
+    }
+
+    [Test]
+    public void ResultAttemptCountsMapAuthoritativeRoomSides()
+    {
+        var backend = RuntimeType("PvpBackend");
+        var roomType = backend.GetNestedType("RoomState",
+            BindingFlags.Public);
+        Assert.IsNotNull(roomType);
+        var state = System.Activator.CreateInstance(roomType);
+        roomType.GetField("hostGuessCount").SetValue(state, 5);
+        roomType.GetField("guestGuessCount").SetValue(state, 7);
+
+        var controller = RuntimeType("PvpGameController");
+        var method = controller.GetMethod("ResultAttemptCounts",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.IsNotNull(method);
+
+        object[] hostArgs = { state, "host", 0, 0 };
+        method.Invoke(null, hostArgs);
+        Assert.AreEqual(5, hostArgs[2]);
+        Assert.AreEqual(7, hostArgs[3]);
+
+        object[] guestArgs = { state, "guest", 0, 0 };
+        method.Invoke(null, guestArgs);
+        Assert.AreEqual(7, guestArgs[2]);
+        Assert.AreEqual(5, guestArgs[3]);
+    }
+
+    [Test]
+    public void SignalCallbackFenceIncludesFlowGenerationAndMatch()
+    {
+        var host = new GameObject("SignalFence");
+        try
+        {
+            var controller = host.AddComponent(RuntimeType(
+                "PvpGameController"));
+            var backend = RuntimeType("PvpBackend");
+            var roomType = backend.GetNestedType("RoomState",
+                BindingFlags.Public);
+            var state = System.Activator.CreateInstance(roomType);
+            roomType.GetField("matchIndex").SetValue(state, 3);
+
+            SetPrivateField(controller, "flowGeneration", 8);
+            SetPrivateField(controller, "lastState", state);
+
+            Assert.IsTrue((bool)InvokePrivateResult(controller,
+                "IsCurrentSignalCallback", 8, 3));
+            Assert.IsFalse((bool)InvokePrivateResult(controller,
+                "IsCurrentSignalCallback", 7, 3));
+            Assert.IsFalse((bool)InvokePrivateResult(controller,
+                "IsCurrentSignalCallback", 8, 2));
+        }
+        finally
+        {
+            Object.DestroyImmediate(host);
         }
     }
 
@@ -165,12 +383,78 @@ public class ExactReferenceAssetsTests
         return count;
     }
 
+    static int DescendantCount(Transform parent, string name)
+    {
+        int count = 0;
+        foreach (var child in parent.GetComponentsInChildren<Transform>(true))
+            if (child.name == name)
+                count++;
+        return count;
+    }
+
+    static Transform FindDescendant(Transform parent, string name)
+    {
+        foreach (var child in parent.GetComponentsInChildren<Transform>(true))
+            if (child.name == name)
+                return child;
+        Assert.IsTrue(false, "Missing descendant: " + name);
+        return null;
+    }
+
+    static Component TmpText(Transform parent, string name)
+    {
+        var type = System.Type.GetType(
+            "TMPro.TextMeshProUGUI, Unity.TextMeshPro");
+        Assert.IsNotNull(type);
+        var go = Child(parent, name);
+        return go.AddComponent(type);
+    }
+
+    static string TextOf(Component text)
+    {
+        return (string)text.GetType().GetProperty("text").GetValue(text, null);
+    }
+
+    static void SetPublicField(Component component, string name, object value)
+    {
+        var field = component.GetType().GetField(name,
+            BindingFlags.Public | BindingFlags.Instance);
+        Assert.IsNotNull(field, "Missing public field: " + name);
+        field.SetValue(component, value);
+    }
+
+    static void SetPrivateField(Component component, string name, object value)
+    {
+        var field = component.GetType().GetField(name,
+            BindingFlags.NonPublic | BindingFlags.Instance);
+        Assert.IsNotNull(field, "Missing private field: " + name);
+        field.SetValue(component, value);
+    }
+
+    static void InvokePublic(Component component, string methodName,
+        params object[] arguments)
+    {
+        var method = component.GetType().GetMethod(
+            methodName, BindingFlags.Instance | BindingFlags.Public);
+        Assert.IsNotNull(method, "Missing public method: " + methodName);
+        method.Invoke(component, arguments);
+    }
+
     static void InvokePrivate(Component component, string methodName, params object[] arguments)
     {
         var method = component.GetType().GetMethod(
             methodName, BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.IsNotNull(method, "Missing private method: " + methodName);
         method.Invoke(component, arguments);
+    }
+
+    static object InvokePrivateResult(Component component, string methodName,
+        params object[] arguments)
+    {
+        var method = component.GetType().GetMethod(
+            methodName, BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.IsNotNull(method, "Missing private method: " + methodName);
+        return method.Invoke(component, arguments);
     }
 
     static System.Type RuntimeType(string name)
