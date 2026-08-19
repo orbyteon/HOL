@@ -319,9 +319,15 @@ public class PvpGameController : MonoBehaviour
         turnText.text = L10n.Get("pvp_sending");
         guessInFlight = true;
         int gen = flowGeneration;
+        int sentMatchIndex = lastState.matchIndex;
         client.SubmitGuess(guess, staked, lastState, ok =>
         {
             if (gen != flowGeneration) return;
+            if (lastState == null || lastState.matchIndex != sentMatchIndex)
+            {
+                guessInFlight = false;
+                return;
+            }
 
             guessInFlight = false;
             if (ok)

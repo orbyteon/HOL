@@ -143,7 +143,10 @@ export function seededRandom(seed) {
 }
 
 export function guess(cs, roomId, side, value, lock = false) {
-  return cs.call("submitGuess", PLAYER[side], { roomId, guess: value, lock });
+  const state = JSON.parse(cs.store.groups.get(roomId).state);
+  return cs.call("submitGuess", PLAYER[side], {
+    roomId, guess: value, lock, matchIndex: state.matchIndex | 0,
+  });
 }
 
 // The strategy every rational player converges on: halve the interval. `slop`

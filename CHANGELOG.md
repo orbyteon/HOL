@@ -7,6 +7,10 @@ Play Console versionName in `ProjectSettings.asset`.
 
 ### Fixed
 
+- Delayed PvP guesses from a finished match can no longer land on a rematch:
+  `submitGuess` rejects a stale or omitted `matchIndex`, the PlayFab client
+  ignores a late success that belongs to a previous match, and the controller
+  drops that callback instead of re-entering result handling.
 - EditMode PvP panel builds no longer call `Destroy` (Unity forbids it
   outside Play mode) and reflection helpers bind `Show` by argument types
   so the 4-argument result presentation overload is no longer ambiguous.

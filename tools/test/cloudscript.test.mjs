@@ -396,6 +396,18 @@ test("a rematch deals a clean match, and its first guess is accepted", () => {
   assert.equal(staleSignal.ok, false);
   assert.equal(staleSignal.error, "stale match");
 
+  const actor = next.turn === "host" ? "HOST" : "GUEST";
+  const staleGuess = cs.call("submitGuess", actor, {
+    roomId, guess: 50, lock: false, matchIndex: next.matchIndex - 1,
+  });
+  assert.equal(staleGuess.ok, false);
+  assert.equal(staleGuess.error, "stale match");
+  const omittedIndex = cs.call("submitGuess", actor, {
+    roomId, guess: 50, lock: false,
+  });
+  assert.equal(omittedIndex.ok, false, "a guess with no matchIndex is match 0 and must not land after rematch");
+  assert.equal(omittedIndex.error, "stale match");
+
   // The real hazard: turn claims from the finished match must not block the new
   // one. Turn ids are never reused and the old window is swept on reset.
   const opened = guess(cs, roomId, next.turn, 50);

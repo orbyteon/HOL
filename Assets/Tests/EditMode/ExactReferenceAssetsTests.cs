@@ -397,6 +397,45 @@ public class ExactReferenceAssetsTests
     }
 
     [Test]
+    public void StaleGuessResponseDoesNotOverwriteNewerMatchState()
+    {
+        var host = new GameObject("StaleGuessFence");
+        try
+        {
+            var client = host.AddComponent(RuntimeType(
+                "PlayFabPvpClient"));
+            var backend = RuntimeType("PvpBackend");
+            var roomType = backend.GetNestedType("RoomState",
+                BindingFlags.Public);
+            var current = System.Activator.CreateInstance(roomType);
+            roomType.GetField("matchIndex").SetValue(current, 1);
+            roomType.GetField("hostGuessCount").SetValue(current, 0);
+            roomType.GetField("phase").SetValue(current, "play");
+
+            InvokePrivate(client, "ApplyReturnedState", current,
+                "{\"ok\":true,\"state\":\"{\\\"matchIndex\\\":0," +
+                "\\\"hostGuessCount\\\":9,\\\"phase\\\":\\\"done\\\"}\"}");
+
+            Assert.AreEqual(1, roomType.GetField("matchIndex").GetValue(
+                current));
+            Assert.AreEqual(0, roomType.GetField("hostGuessCount").GetValue(
+                current));
+            Assert.AreEqual("play", roomType.GetField("phase").GetValue(
+                current));
+
+            InvokePrivate(client, "ApplyReturnedState", current,
+                "{\"ok\":true,\"state\":\"{\\\"matchIndex\\\":1," +
+                "\\\"hostGuessCount\\\":2,\\\"phase\\\":\\\"play\\\"}\"}");
+            Assert.AreEqual(2, roomType.GetField("hostGuessCount").GetValue(
+                current));
+        }
+        finally
+        {
+            Object.DestroyImmediate(host);
+        }
+    }
+
+    [Test]
     public void LeavingInvalidatesPendingPlayFabRoomRequest()
     {
         var host = new GameObject("PlayFabRoomFence");

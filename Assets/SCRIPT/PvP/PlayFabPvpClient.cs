@@ -262,14 +262,22 @@ public class PlayFabPvpClient : PvpBackend
 
     public override void SubmitGuess(int guess, bool useLock, RoomState current, Action<bool> done)
     {
-        if (string.IsNullOrEmpty(RoomCode)) { done?.Invoke(false); return; }
+        if (string.IsNullOrEmpty(RoomCode) || current == null) { done?.Invoke(false); return; }
 
         string args = "{\"roomId\":\"" + EscapeJson(RoomCode) +
                       "\",\"guess\":" + guess +
-                      ",\"lock\":" + (useLock ? "true" : "false") + "}";
+                      ",\"lock\":" + (useLock ? "true" : "false") +
+                      ",\"matchIndex\":" + current.matchIndex + "}";
+        int sentMatchIndex = current.matchIndex;
         ExecuteCloudScript("submitGuess", args, (ok, resp) =>
         {
             if (!ok || !CloudOk(resp))
+            {
+                done?.Invoke(false);
+                return;
+            }
+
+            if (current.matchIndex != sentMatchIndex)
             {
                 done?.Invoke(false);
                 return;
@@ -465,6 +473,7 @@ public class PlayFabPvpClient : PvpBackend
         {
             var applied = JsonUtility.FromJson<RoomState>(inner);
             if (applied == null) return;
+            if (applied.matchIndex != current.matchIndex) return;
 
             current.hostName = applied.hostName;
             current.guestName = applied.guestName;
