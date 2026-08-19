@@ -138,8 +138,6 @@ public class PvpGameController : MonoBehaviour
         {
             if (createEntryStatusText != null)
                 createEntryStatusText.text = L10n.Get("pvp_secret");
-            createPanel.SetActive(true);
-            pvpMenuPanel.SetActive(false);
             return;
         }
 
@@ -225,10 +223,8 @@ public class PvpGameController : MonoBehaviour
 
     void ShowCreateEntry(string message)
     {
-        if (createEntryRoot != null) createEntryRoot.SetActive(true);
-        if (createWaitingRoot != null) createWaitingRoot.SetActive(false);
-        if (createSecretInput != null) createSecretInput.gameObject.SetActive(true);
-        if (createConfirmButton != null) createConfirmButton.SetActive(true);
+        if (createPanel != null) createPanel.SetActive(false);
+        if (pvpMenuPanel != null) pvpMenuPanel.SetActive(true);
         if (createEntryStatusText != null) createEntryStatusText.text = message;
     }
 
@@ -240,11 +236,8 @@ public class PvpGameController : MonoBehaviour
 
     void ShowJoinEntry(string message)
     {
-        if (joinEntryRoot != null) joinEntryRoot.SetActive(true);
-        if (joinWaitingRoot != null) joinWaitingRoot.SetActive(false);
-        if (joinCodeInput != null) joinCodeInput.gameObject.SetActive(true);
-        if (joinSecretInput != null) joinSecretInput.gameObject.SetActive(true);
-        if (joinConfirmButton != null) joinConfirmButton.SetActive(true);
+        if (joinPanel != null) joinPanel.SetActive(false);
+        if (pvpMenuPanel != null) pvpMenuPanel.SetActive(true);
         if (joinEntryStatusText != null) joinEntryStatusText.text = message;
     }
 
@@ -272,6 +265,8 @@ public class PvpGameController : MonoBehaviour
             return;
         }
 
+        if (pvpMenuPanel != null) pvpMenuPanel.SetActive(false);
+        if (joinPanel != null) joinPanel.SetActive(true);
         ShowJoinWaiting();
         joinStatusText.text = L10n.Get("pvp_joining");
         joinCreateInFlight = true;

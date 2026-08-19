@@ -890,35 +890,63 @@ public class PvpRuntimeUI : MonoBehaviour
         AddLocalizedText(ribbon.transform, "Title", "private_room_title", 48,
             Vector2.zero, new Vector2(860f, 110f), ConvergingLight.NearWhite);
 
-        var create = RuntimeUI.CreateButton(menu.transform, "CreateButton",
-            L10n.Get("pvp_create_room"), new Vector2(0f, 40f),
-            new Vector2(860f, 330f), ConsumerTokens.Cyan, DarkLabel);
-        ForceProceduralButton(create, ConsumerTokens.Cyan);
-        AddSprite(create.transform, "FriendArt", "reference/player_cyan_exact",
+        var createCard = NeonFrame.Frame(menu.transform, "CreateCard",
+            new Vector2(0f, 40f), new Vector2(860f, 330f),
+            ConsumerTokens.Cyan, 0.92f, true, ConsumerTokens.CardBlue);
+        AddSprite(createCard.transform, "FriendArt", "reference/player_cyan_exact",
             new Vector2(-255f, 22f), new Vector2(250f, 220f));
-        AddSprite(create.transform, "GirlArt", "reference/char_girl_exact",
+        AddSprite(createCard.transform, "GirlArt", "reference/char_girl_exact",
             new Vector2(-70f, 4f), new Vector2(190f, 180f));
-        AddLocalizedText(create.transform, "Hint", "private_room_create_hint", 25,
-            new Vector2(245f, 54f), new Vector2(300f, 84f),
+        AddLocalizedText(createCard.transform, "CreateTitle", "pvp_create_room", 30,
+            new Vector2(220f, 98f), new Vector2(400f, 56f),
             ConvergingLight.NearWhite);
-        RuntimeUI.Localize(create, "pvp_create_room");
+        AddLocalizedText(createCard.transform, "Hint", "private_room_create_hint", 22,
+            new Vector2(220f, 44f), new Vector2(360f, 72f),
+            ConvergingLight.WithAlpha(ConvergingLight.NearWhite, 0.82f));
+        var menuCreateSecret = RuntimeUI.CreateInputField(
+            createCard.transform, "SecretInput",
+            L10n.Get("pvp_secret"), new Vector2(220f, -28f),
+            new Vector2(380f, 72f));
+        RuntimeUI.LocalizePlaceholder(menuCreateSecret, "pvp_secret");
+        var menuCreateConfirm = RuntimeUI.CreateButton(
+            createCard.transform, "ConfirmCreateButton",
+            L10n.Get("pvp_create_room"), new Vector2(220f, -112f),
+            new Vector2(380f, 74f), ConsumerTokens.Gold, DarkLabel);
+        RuntimeUI.Localize(menuCreateConfirm, "pvp_create_room");
+        var menuCreateStatus = RuntimeUI.CreateText(
+            createCard.transform, "EntryStatus", "", 20,
+            new Vector2(220f, -175f), new Vector2(380f, 44f),
+            ConsumerTokens.TextSecondary);
 
-        var join = RuntimeUI.CreateButton(menu.transform, "JoinButton",
-            L10n.Get("pvp_join_room"), new Vector2(0f, -315f),
-            new Vector2(860f, 330f), ConsumerTokens.Magenta, DarkLabel);
-        ForceProceduralButton(join, ConsumerTokens.Magenta);
-        var joinBuiltInLabel = join.GetComponentInChildren<TMP_Text>();
-        if (joinBuiltInLabel != null)
-            joinBuiltInLabel.gameObject.SetActive(false);
-        AddSprite(join.transform, "DoorArt", "reference/board_join_exact",
+        var joinCard = NeonFrame.Frame(menu.transform, "JoinCard",
+            new Vector2(0f, -315f), new Vector2(860f, 330f),
+            ConsumerTokens.Magenta, 0.92f, true, ConsumerTokens.CardPink);
+        AddSprite(joinCard.transform, "DoorArt", "reference/board_join_exact",
             new Vector2(-250f, 20f), new Vector2(220f, 190f));
-        AddLocalizedText(join.transform, "JoinTitle", "private_room_join_title", 30,
-            new Vector2(220f, 78f), new Vector2(400f, 72f),
+        AddLocalizedText(joinCard.transform, "JoinTitle", "private_room_join_title", 30,
+            new Vector2(220f, 98f), new Vector2(400f, 56f),
             ConvergingLight.NearWhite);
-        AddLocalizedText(join.transform, "CodeCaption", "pvp_enter_code", 22,
-            new Vector2(220f, -8f), new Vector2(360f, 48f),
-            ConvergingLight.WithAlpha(ConvergingLight.NearWhite, 0.75f));
-        RuntimeUI.Localize(join, "pvp_join_room");
+        var menuJoinCode = RuntimeUI.CreateInputField(
+            joinCard.transform, "CodeInput",
+            L10n.Get("pvp_enter_code"), new Vector2(220f, 18f),
+            new Vector2(380f, 72f), 5, TMP_InputField.ContentType.Standard);
+        menuJoinCode.onValidateInput = (text, index, ch) =>
+            char.ToUpperInvariant(ch);
+        RuntimeUI.LocalizePlaceholder(menuJoinCode, "pvp_enter_code");
+        var menuJoinSecret = RuntimeUI.CreateInputField(
+            joinCard.transform, "SecretInput",
+            L10n.Get("pvp_secret"), new Vector2(220f, -72f),
+            new Vector2(380f, 72f));
+        RuntimeUI.LocalizePlaceholder(menuJoinSecret, "pvp_secret");
+        var menuJoinConfirm = RuntimeUI.CreateButton(
+            joinCard.transform, "ConfirmJoinButton",
+            L10n.Get("private_room_join_cta"), new Vector2(220f, -156f),
+            new Vector2(380f, 74f), ConsumerTokens.Gold, DarkLabel);
+        RuntimeUI.Localize(menuJoinConfirm, "private_room_join_cta");
+        var menuJoinStatus = RuntimeUI.CreateText(
+            joinCard.transform, "EntryStatus", "", 20,
+            new Vector2(220f, -218f), new Vector2(380f, 44f),
+            ConsumerTokens.TextSecondary);
 
         AddRoomTip(menu.transform, new Vector2(0f, -720f));
         AddSprite(menu.transform, "MascotSix", "reference/mascot_6_exact",
@@ -936,21 +964,21 @@ public class PvpRuntimeUI : MonoBehaviour
         controller.pvpMenuPanel = menu;
         controller.createPanel = prebattleCreate.panel;
         controller.joinPanel = prebattleJoin.panel;
-        controller.createSecretInput = prebattleCreate.secret;
-        controller.createConfirmButton = prebattleCreate.confirm;
+        controller.createSecretInput = menuCreateSecret;
+        controller.createConfirmButton = menuCreateConfirm.gameObject;
+        controller.createEntryStatusText = menuCreateStatus;
         controller.createEntryRoot = prebattleCreate.entryRoot;
         controller.createWaitingRoot = prebattleCreate.waitingRoot;
-        controller.createEntryStatusText = prebattleCreate.entryStatus;
         controller.createOpponentStatusText =
             prebattleCreate.opponentStatus;
         controller.roomCodeText = prebattleCreate.codeText;
         controller.createStatusText = prebattleCreate.status;
-        controller.joinCodeInput = prebattleJoin.codeInput;
-        controller.joinSecretInput = prebattleJoin.secret;
-        controller.joinConfirmButton = prebattleJoin.confirm;
+        controller.joinCodeInput = menuJoinCode;
+        controller.joinSecretInput = menuJoinSecret;
+        controller.joinConfirmButton = menuJoinConfirm.gameObject;
+        controller.joinEntryStatusText = menuJoinStatus;
         controller.joinEntryRoot = prebattleJoin.entryRoot;
         controller.joinWaitingRoot = prebattleJoin.waitingRoot;
-        controller.joinEntryStatusText = prebattleJoin.entryStatus;
         controller.joinOpponentStatusText = prebattleJoin.opponentStatus;
         controller.joinStatusText = prebattleJoin.status;
         var prebattleEllipsis = prebattleCreate.status.gameObject
@@ -959,21 +987,17 @@ public class PvpRuntimeUI : MonoBehaviour
         prebattleEllipsis.enabled = false;
         controller.createStatusEllipsis = prebattleEllipsis;
 
-        create.onClick.AddListener(() => ShowOnly(controller, prebattleCreate.panel));
-        join.onClick.AddListener(() => ShowOnly(controller, prebattleJoin.panel));
         back.onClick.AddListener(controller.ClosePvpMenu);
-        prebattleCreate.confirm.GetComponent<Button>().onClick.AddListener(
-            controller.OnCreateRoomPressed);
+        menuCreateConfirm.onClick.AddListener(controller.OnCreateRoomPressed);
         prebattleCreate.copy.onClick.AddListener(controller.OnCopyInvitePressed);
         prebattleCreate.back.onClick.AddListener(controller.CancelRoomAndLeave);
-        prebattleJoin.confirm.GetComponent<Button>().onClick.AddListener(
-            controller.OnJoinRoomPressed);
+        menuJoinConfirm.onClick.AddListener(controller.OnJoinRoomPressed);
         prebattleJoin.back.onClick.AddListener(controller.CancelRoomAndLeave);
-        prebattleCreate.secret.onSubmit.AddListener(
+        menuCreateSecret.onSubmit.AddListener(
             _ => controller.OnCreateRoomPressed());
-        prebattleJoin.codeInput.onSubmit.AddListener(
+        menuJoinCode.onSubmit.AddListener(
             _ => controller.OnJoinRoomPressed());
-        prebattleJoin.secret.onSubmit.AddListener(
+        menuJoinSecret.onSubmit.AddListener(
             _ => controller.OnJoinRoomPressed());
 
         menu.SetActive(false);

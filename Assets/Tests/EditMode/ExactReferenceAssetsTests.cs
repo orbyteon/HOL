@@ -45,7 +45,8 @@ public class ExactReferenceAssetsTests
         var table = (IDictionary)field.GetValue(null);
 
         foreach (var key in new[] {
-            "private_room_title", "private_room_tip", "prebattle_title",
+            "private_room_title", "private_room_tip", "private_room_join_cta",
+            "prebattle_title",
             "prebattle_you", "prebattle_opponent", "prebattle_found",
             "prebattle_rule_title", "prebattle_rule", "prebattle_waiting",
             "result_page_title", "result_attempts", "result_attempts_short",
@@ -89,6 +90,41 @@ public class ExactReferenceAssetsTests
                 "Join waiting must not expose an inert Share action.");
             Assert.AreEqual(0, DescendantCount(join, "RoomCodeFrame"),
                 "Join waiting must not show a stale placeholder code.");
+        }
+        finally
+        {
+            Object.DestroyImmediate(root);
+        }
+    }
+
+    [Test]
+    public void PrivateRoomMenuHasIntegratedEntryFields()
+    {
+        var root = new GameObject("PrivateRoomMenu", typeof(RectTransform),
+            typeof(Canvas), typeof(GraphicRaycaster));
+
+        try
+        {
+            var ui = root.AddComponent(RuntimeType("PvpRuntimeUI"));
+            var controller = root.AddComponent(RuntimeType("PvpGameController"));
+            InvokePrivate(ui, "BuildPanels", controller);
+
+            var menu = FindDescendant(root.transform, "PvPMenuPanel");
+            Assert.IsNotNull(menu, "Private Room menu panel must exist.");
+            Assert.AreEqual(1, DescendantCount(menu, "CreateCard"),
+                "Create must be a card frame, not a navigation button.");
+            Assert.AreEqual(1, DescendantCount(menu, "JoinCard"),
+                "Join must be a card frame, not a navigation button.");
+            Assert.AreEqual(0, DescendantCount(menu, "CreateButton"),
+                "Legacy navigation CreateButton must not remain on the menu.");
+            Assert.AreEqual(0, DescendantCount(menu, "JoinButton"),
+                "Legacy navigation JoinButton must not remain on the menu.");
+            Assert.AreEqual(1, DescendantCount(menu, "ConfirmCreateButton"));
+            Assert.AreEqual(1, DescendantCount(menu, "ConfirmJoinButton"));
+            Assert.AreEqual(1, DescendantCount(menu, "CodeInput"),
+                "Room code entry must live on the menu join card.");
+            Assert.AreEqual(2, DescendantCount(menu, "SecretInput"),
+                "Create and join secret fields must both live on the menu.");
         }
         finally
         {

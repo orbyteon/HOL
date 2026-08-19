@@ -74,6 +74,11 @@ Play Console versionName in `ProjectSettings.asset`.
 
 ### Changed
 
+- Main Menu **Private Room** now matches the integrated reference layout:
+  create and join cards keep their hero art on one portrait screen with
+  inline secret/code fields, a gold `JOIN!` / `ΜΠΕΣ!` CTA, and validation
+  feedback without opening separate entry panels; pre-battle waiting with
+  room code, share, and VS cards remains unchanged.
 - Splash Home / `SplashScene` presentation is now owned by `SplashDesign`:
   cartoon stairs and clouds, the HOL logo, a boy-and-girl fist-bump, mascot
   6 on the left and 7 on the right, and only a gold elapsed hairline. It has
