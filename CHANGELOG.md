@@ -5,6 +5,14 @@ Play Console versionName in `ProjectSettings.asset`.
 
 ## [Unreleased]
 
+### Changed
+
+- CI cost guardrails: PlayMode runs only after a green `CI` workflow;
+  Android preview captures are label-triggered (`preview-mainmenu`,
+  `preview-panelplay`, `preview-splash`) or manual, require green CI, checkout
+  the PR merge ref, share one preview concurrency group, and retain artifacts
+  for 3 days. Documented in `docs/ci-policy.md`.
+
 ### Fixed
 
 - Home PlayMode settle gate no longer blocks on `WaitForEndOfFrame` in
