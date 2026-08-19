@@ -25,7 +25,6 @@ public class ExtrasRuntimeWiring : MonoBehaviour
 
     TMP_Text statsLabel;
     TMP_Text disclosurePlay;
-    TMP_Text disclosureSearch;
 
     void Start()
     {
@@ -317,14 +316,16 @@ public class ExtrasRuntimeWiring : MonoBehaviour
         RuntimeUI.Localize(languageLabel, "language");
 
         englishButton = RuntimeUI.CreateButton(menu.settingsPanel.transform,
-            "EnglishButton", "English",
+            "EnglishButton", L10n.Get("language_english"),
             new Vector2(-130f, -560f), new Vector2(220f, 80f), Neutral);
         englishButton.onClick.AddListener(selector.SetEnglish);
+        RuntimeUI.Localize(englishButton, "language_english");
 
         greekButton = RuntimeUI.CreateButton(menu.settingsPanel.transform,
-            "GreekButton", "Ελληνικά",
+            "GreekButton", L10n.Get("language_greek"),
             new Vector2(130f, -560f), new Vector2(220f, 80f), Neutral);
         greekButton.onClick.AddListener(selector.SetGreek);
+        RuntimeUI.Localize(greekButton, "language_greek");
 
         RefreshLanguageButtons();
         L10n.OnLanguageChanged += RefreshLanguageButtons;
@@ -412,15 +413,6 @@ public class ExtrasRuntimeWiring : MonoBehaviour
                 new Color(0.91f, 0.93f, 1f, 0.6f));
         }
 
-        var mm = FindObjectOfType<FakeMatchmaking>();
-        if (mm != null && mm.searchingPanel != null)
-        {
-            disclosureSearch = RuntimeUI.CreateText(mm.searchingPanel.transform,
-                "DisclosureLabel", "", 22,
-                new Vector2(0f, -540f), new Vector2(760f, 70f),
-                new Color(0.91f, 0.93f, 1f, 0.6f));
-        }
-
         RefreshDisclosure();
         L10n.OnLanguageChanged += RefreshDisclosure;
     }
@@ -430,8 +422,6 @@ public class ExtrasRuntimeWiring : MonoBehaviour
         string text = L10n.Get("simulated_opponents");
         if (disclosurePlay != null)
             disclosurePlay.text = text;
-        if (disclosureSearch != null)
-            disclosureSearch.text = text;
     }
 
     void OnDestroy()

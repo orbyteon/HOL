@@ -468,6 +468,8 @@ function resetForRematch(state) {
     // a client that missed one does not replay it.
     state.hostSignalCount = 0;
     state.guestSignalCount = 0;
+    state.signalBy = "";
+    state.signalId = -1;
 }
 
 handlers.createRoom = function (args, context) {
@@ -598,6 +600,11 @@ handlers.submitGuess = function (args, context) {
     return withRoomMutation(roomId, function (state) {
         var side = sideForPlayer(state, playerId);
         if (!side) return { result: { ok: false, error: "not a member" } };
+        // Omitted matchIndex is match 0 so a delayed first-match guess cannot
+        // land after rematch. Current-match clients always send the live index.
+        var sentIndex = args.matchIndex === undefined ? 0 : (Number(args.matchIndex) | 0);
+        if (sentIndex !== (state.matchIndex | 0))
+            return { result: { ok: false, error: "stale match" } };
         if (state.phase !== "play")
             return { result: { ok: false, error: "not in play" } };
         if (state.turn !== side)
@@ -668,6 +675,9 @@ handlers.sendSignal = function (args, context) {
         if (!side) return { result: { ok: false, error: "not a member" } };
         if (state.phase !== "play" && state.phase !== "done")
             return { result: { ok: false, error: "not in play" } };
+        if (args.matchIndex !== undefined &&
+            (Number(args.matchIndex) | 0) !== (state.matchIndex | 0))
+            return { result: { ok: false, error: "stale match" } };
 
         var countKey = side === "host" ? "hostSignalCount" : "guestSignalCount";
         if ((state[countKey] | 0) >= SIGNAL_CAP_PER_SIDE)

@@ -138,11 +138,26 @@ public class PlayFabPvpClient : PvpBackend
 
     // ------------------------------------------------ create / join
 
+    int roomRequestEpoch;
+    string pendingRoomCode = "";
+    Action<bool, string> pendingRoomDone;
+    bool pendingRequestIsJoin;
+
     public override void CreateRoom(string hostName, int hostSecret, Action<bool, string> done)
     {
+        int requestEpoch = ++roomRequestEpoch;
+        pendingRoomCode = "";
+        pendingRoomDone = done;
+        pendingRequestIsJoin = false;
         EnsureLogin(ok =>
         {
-            if (!ok) { done?.Invoke(false, L10n.Get("pvp_network_error")); return; }
+            if (requestEpoch != roomRequestEpoch) return;
+            if (!ok)
+            {
+                ClearPendingRoomRequest(requestEpoch);
+                done?.Invoke(false, L10n.Get("pvp_network_error"));
+                return;
+            }
 
             string args = "{\"hostName\":\"" + EscapeJson(hostName) +
                           "\",\"hostSecret\":" + hostSecret + "}";
@@ -150,6 +165,8 @@ public class PlayFabPvpClient : PvpBackend
             {
                 if (!ok2 || !CloudOk(resp))
                 {
+                    if (requestEpoch != roomRequestEpoch) return;
+                    ClearPendingRoomRequest(requestEpoch);
                     done?.Invoke(false, L10n.Get("pvp_network_error"));
                     return;
                 }
@@ -157,11 +174,19 @@ public class PlayFabPvpClient : PvpBackend
                 string code = ExtractString(resp, "roomId");
                 if (string.IsNullOrEmpty(code))
                 {
+                    if (requestEpoch != roomRequestEpoch) return;
+                    ClearPendingRoomRequest(requestEpoch);
                     done?.Invoke(false, L10n.Get("pvp_network_error"));
                     return;
                 }
 
+                if (requestEpoch != roomRequestEpoch)
+                {
+                    if (RoomCode != code) LeaveExactRoom(code);
+                    return;
+                }
                 RoomCode = code;
+                ClearPendingRoomRequest(requestEpoch);
                 IsHost = true;
                 done?.Invoke(true, code);
             });
@@ -171,37 +196,62 @@ public class PlayFabPvpClient : PvpBackend
     public override void JoinRoom(string code, string guestName, int guestSecret, Action<bool, string> done)
     {
         code = (code ?? "").Trim().ToUpperInvariant();
+        int requestEpoch = ++roomRequestEpoch;
+        pendingRoomCode = code;
+        pendingRoomDone = done;
+        pendingRequestIsJoin = true;
         EnsureLogin(ok =>
         {
-            if (!ok) { done?.Invoke(false, L10n.Get("pvp_network_error")); return; }
+            if (requestEpoch != roomRequestEpoch) return;
+            if (!ok)
+            {
+                ClearPendingRoomRequest(requestEpoch);
+                done?.Invoke(false, L10n.Get("pvp_network_error"));
+                return;
+            }
 
             string args = "{\"roomId\":\"" + EscapeJson(code) +
                           "\",\"guestName\":\"" + EscapeJson(guestName) +
                           "\",\"guestSecret\":" + guestSecret + "}";
             ExecuteCloudScript("joinRoom", args, (ok2, resp) =>
             {
+                bool joined = ok2 && CloudOk(resp);
+                if (requestEpoch != roomRequestEpoch)
+                {
+                    if (joined && TryAdoptPendingJoin(code)) return;
+                    else if (joined && RoomCode != code)
+                    {
+                        LeaveExactRoom(code);
+                    }
+                    return;
+                }
                 if (!ok2)
                 {
+                    ClearPendingRoomRequest(requestEpoch);
                     done?.Invoke(false, L10n.Get("pvp_network_error"));
                     return;
                 }
                 if (HasCloudError(resp, "room full"))
                 {
+                    ClearPendingRoomRequest(requestEpoch);
                     done?.Invoke(false, L10n.Get("pvp_room_full"));
                     return;
                 }
                 if (HasCloudError(resp, "room not found") || HasCloudError(resp, "bad secret"))
                 {
+                    ClearPendingRoomRequest(requestEpoch);
                     done?.Invoke(false, L10n.Get("pvp_room_not_found"));
                     return;
                 }
                 if (!CloudOk(resp))
                 {
+                    ClearPendingRoomRequest(requestEpoch);
                     done?.Invoke(false, L10n.Get("pvp_network_error"));
                     return;
                 }
 
                 RoomCode = code;
+                ClearPendingRoomRequest(requestEpoch);
                 IsHost = false;
                 done?.Invoke(true, "");
             });
@@ -212,14 +262,22 @@ public class PlayFabPvpClient : PvpBackend
 
     public override void SubmitGuess(int guess, bool useLock, RoomState current, Action<bool> done)
     {
-        if (string.IsNullOrEmpty(RoomCode)) { done?.Invoke(false); return; }
+        if (string.IsNullOrEmpty(RoomCode) || current == null) { done?.Invoke(false); return; }
 
         string args = "{\"roomId\":\"" + EscapeJson(RoomCode) +
                       "\",\"guess\":" + guess +
-                      ",\"lock\":" + (useLock ? "true" : "false") + "}";
+                      ",\"lock\":" + (useLock ? "true" : "false") +
+                      ",\"matchIndex\":" + current.matchIndex + "}";
+        int sentMatchIndex = current.matchIndex;
         ExecuteCloudScript("submitGuess", args, (ok, resp) =>
         {
             if (!ok || !CloudOk(resp))
+            {
+                done?.Invoke(false);
+                return;
+            }
+
+            if (current.matchIndex != sentMatchIndex)
             {
                 done?.Invoke(false);
                 return;
@@ -232,6 +290,12 @@ public class PlayFabPvpClient : PvpBackend
 
     public override void SendSignal(int signalId, Action<bool> done)
     {
+        SendSignal(signalId, -1, done);
+    }
+
+    public override void SendSignal(int signalId, int matchIndex,
+        Action<bool> done)
+    {
         if (string.IsNullOrEmpty(RoomCode) || !Signals.IsValid(signalId))
         {
             done?.Invoke(false);
@@ -239,7 +303,10 @@ public class PlayFabPvpClient : PvpBackend
         }
 
         string args = "{\"roomId\":\"" + EscapeJson(RoomCode) +
-                      "\",\"signalId\":" + signalId + "}";
+                      "\",\"signalId\":" + signalId +
+                      (matchIndex >= 0
+                          ? ",\"matchIndex\":" + matchIndex
+                          : "") + "}";
         ExecuteCloudScript("sendSignal", args, (ok, resp) => done?.Invoke(ok && CloudOk(resp)));
     }
 
@@ -270,13 +337,48 @@ public class PlayFabPvpClient : PvpBackend
 
     public override void DeleteRoom()
     {
+        roomRequestEpoch++;
+        pendingRoomCode = "";
+        pendingRoomDone = null;
+        pendingRequestIsJoin = false;
         if (!string.IsNullOrEmpty(RoomCode))
         {
             string code = RoomCode;
-            string args = "{\"roomId\":\"" + EscapeJson(code) + "\"}";
-            ExecuteCloudScript("leaveRoom", args, (_, __) => { });
+            LeaveExactRoom(code);
         }
         RoomCode = "";
+    }
+
+    void LeaveExactRoom(string code)
+    {
+        if (string.IsNullOrEmpty(code)) return;
+        string args = "{\"roomId\":\"" + EscapeJson(code) + "\"}";
+        ExecuteCloudScript("leaveRoom", args, (_, __) => { });
+    }
+
+    void ClearPendingRoomRequest(int requestEpoch)
+    {
+        if (requestEpoch != roomRequestEpoch) return;
+        pendingRoomCode = "";
+        pendingRoomDone = null;
+        pendingRequestIsJoin = false;
+    }
+
+    bool TryAdoptPendingJoin(string code)
+    {
+        if (!pendingRequestIsJoin || pendingRoomCode != code ||
+            pendingRoomDone == null)
+            return false;
+
+        var latestDone = pendingRoomDone;
+        RoomCode = code;
+        IsHost = false;
+        roomRequestEpoch++;
+        pendingRoomCode = "";
+        pendingRoomDone = null;
+        pendingRequestIsJoin = false;
+        latestDone(true, "");
+        return true;
     }
 
     public override void AcknowledgeResult()
@@ -371,6 +473,7 @@ public class PlayFabPvpClient : PvpBackend
         {
             var applied = JsonUtility.FromJson<RoomState>(inner);
             if (applied == null) return;
+            if (applied.matchIndex != current.matchIndex) return;
 
             current.hostName = applied.hostName;
             current.guestName = applied.guestName;

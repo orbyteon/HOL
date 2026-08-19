@@ -87,14 +87,46 @@ public sealed class AttachmentReskinPolishPlayModeTests
         Assert.That(pvpMenuField, Is.Not.Null);
         var pvpMenuPanel = pvpMenuField.GetValue(pvp) as GameObject;
         Assert.That(pvpMenuPanel, Is.Not.Null);
-        Assert.That(Find(pvpMenuPanel.transform, "BoardCreatePlusVector"), Is.Not.Null);
-        Assert.That(Find(pvpMenuPanel.transform, "BoardJoinDoorVector"), Is.Not.Null);
+        Assert.That(Find(pvpMenuPanel.transform, "TitleRibbon"), Is.Not.Null);
+        Assert.That(Find(pvpMenuPanel.transform, "FriendArt"), Is.Not.Null);
+        Assert.That(Find(pvpMenuPanel.transform, "GirlArt"), Is.Not.Null);
+        Assert.That(Find(pvpMenuPanel.transform, "DoorArt"), Is.Not.Null);
+        Assert.That(Find(pvpMenuPanel.transform, "BoardCreatePlusVector"), Is.Null);
+        Assert.That(Find(pvpMenuPanel.transform, "BoardJoinDoorVector"), Is.Null);
 
         // Exercise the existing solo-search flow rather than activating the
         // nested searching child in isolation. PanelSearching lives under
         // PanelPlay, so MenuManager.OnPlayPressed must open its parent first.
         var menu = Object.FindObjectOfType(RuntimeType("MenuManager")) as Component;
         Assert.That(menu, Is.Not.Null);
+
+        menu.SendMessage("OpenSettings", SendMessageOptions.RequireReceiver);
+        yield return new WaitForSecondsRealtime(0.35f);
+        var settingsField = menu.GetType().GetField("settingsPanel",
+            BindingFlags.Instance | BindingFlags.Public);
+        var settings = settingsField.GetValue(menu) as GameObject;
+        Assert.That(settings, Is.Not.Null);
+        Assert.That(Find(settings.transform, "SettingsVisualRoot"), Is.Not.Null);
+        var nameInput = Find(settings.transform, "InputField (TMP)") as RectTransform;
+        var save = Find(settings.transform, "Buttonsave") as RectTransform;
+        Assert.That(Overlaps(nameInput, save), Is.False,
+            "Name input and Save must not overlap.");
+        var toggle = Find(settings.transform, "Toggle") as RectTransform;
+        Assert.That(toggle.localScale, Is.EqualTo(Vector3.one));
+        var back = Find(settings.transform, "Buttonback") as RectTransform;
+        Assert.That(back.sizeDelta.x, Is.LessThanOrEqualTo(100f));
+        for (int i = 0; i < 3; i++)
+        {
+            var current = Find(settings.transform, "Difficulty" + i)
+                as RectTransform;
+            var next = Find(settings.transform, "Difficulty" + (i + 1))
+                as RectTransform;
+            Assert.That(Overlaps(current, next), Is.False,
+                "Difficulty choices must not overlap.");
+        }
+        menu.SendMessage("BackToMenu", SendMessageOptions.RequireReceiver);
+        yield return null;
+
         menu.SendMessage("OnPlayPressed", SendMessageOptions.RequireReceiver);
         yield return null;
 
@@ -110,8 +142,10 @@ public sealed class AttachmentReskinPolishPlayModeTests
         Assert.That(searchingPanel.activeInHierarchy, Is.True,
             "The real StartSearch flow should make PanelSearching visible.");
 
-        Assert.That(Find(searchingPanel.transform, "BoardSearchRocketVector"), Is.Not.Null);
-        Assert.That(Find(searchingPanel.transform, "BoardVsBurstVector"), Is.Not.Null);
+        Assert.That(Find(searchingPanel.transform, "SoloSearchVisualRoot"), Is.Not.Null);
+        Assert.That(Find(searchingPanel.transform, "Radar"), Is.Not.Null);
+        Assert.That(Find(searchingPanel.transform, "BoardSearchRocketVector"), Is.Null);
+        Assert.That(Find(searchingPanel.transform, "BoardVsBurstVector"), Is.Null);
         matchmaking.SendMessage("CancelSearch", SendMessageOptions.RequireReceiver);
 
         // Presentation-only contract: every Button must still be a controller/
@@ -147,6 +181,16 @@ public sealed class AttachmentReskinPolishPlayModeTests
             if (found != null) return found;
         }
         return null;
+    }
+
+    static bool Overlaps(RectTransform a, RectTransform b)
+    {
+        Assert.That(a, Is.Not.Null);
+        Assert.That(b, Is.Not.Null);
+        return Mathf.Abs(a.anchoredPosition.x - b.anchoredPosition.x) <
+                   (a.sizeDelta.x + b.sizeDelta.x) * 0.5f &&
+               Mathf.Abs(a.anchoredPosition.y - b.anchoredPosition.y) <
+                   (a.sizeDelta.y + b.sizeDelta.y) * 0.5f;
     }
 
     static System.Type RuntimeType(string name)

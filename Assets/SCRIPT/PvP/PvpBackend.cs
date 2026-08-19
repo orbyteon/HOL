@@ -88,6 +88,11 @@ public abstract class PvpBackend : MonoBehaviour
 
     // Sends one entry from the fixed Signals table.
     public virtual void SendSignal(int signalId, Action<bool> done) { done?.Invoke(false); }
+    public virtual void SendSignal(int signalId, int matchIndex,
+        Action<bool> done)
+    {
+        SendSignal(signalId, done);
+    }
 
     // Commits a fresh secret for another match in the same room. The next match
     // is dealt only once both sides have committed.

@@ -532,6 +532,13 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
     void LayoutDailyHunt(Transform panel)
     {
         if (panel == null) return;
+        if (DeepFind(panel, "DailyHuntVisualRoot") != null)
+        {
+            SetActive(DeepFind(panel, "ExactDailyLogo"), false);
+            SetActive(DeepFind(panel, "ExactDailySeven"), false);
+            SetActive(DeepFind(panel, "ExactDailyThree"), false);
+            return;
+        }
 
         AddExactImage(panel, "ExactDailyLogo", logo,
             new Vector2(0f, 790f), new Vector2(360f, 235f));
@@ -549,6 +556,14 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
     void LayoutSearching(Transform panel)
     {
         if (panel == null) return;
+        if (DeepFind(panel, "SoloSearchVisualRoot") != null)
+        {
+            SetActive(DeepFind(panel, "ExactSearchingLogo"), false);
+            SetActive(DeepFind(panel, "ExactSearchingPlayer"), false);
+            SetActive(DeepFind(panel, "ExactSearchingOpponent"), false);
+            SetActive(DeepFind(panel, "ExactSearchingVs"), false);
+            return;
+        }
 
         AddExactImage(panel, "ExactSearchingLogo", logo,
             new Vector2(0f, 700f), new Vector2(440f, 290f));
@@ -557,7 +572,7 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
         AddExactImage(panel, "ExactSearchingOpponent", opponentPortrait,
             new Vector2(280f, 170f), new Vector2(380f, 440f));
         var vs = EnsureText(panel, "ExactSearchingVs");
-        vs.text = "VS";
+        vs.text = L10n.Get("versus");
         vs.fontSize = 72f;
         vs.fontStyle = FontStyles.Bold;
         vs.color = Gold;
@@ -568,6 +583,12 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
     void LayoutSimpleScreen(Transform panel, string imageName)
     {
         if (panel == null) return;
+        if (imageName == "ExactSettingsLogo" &&
+            DeepFind(panel, "SettingsVisualRoot") != null)
+        {
+            SetActive(DeepFind(panel, imageName), false);
+            return;
+        }
         AddExactImage(panel, imageName, logo,
             new Vector2(0f, 800f), new Vector2(330f, 215f));
     }
@@ -887,6 +908,11 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
     {
         var child = DirectChild(parent, name);
         if (child != null) child.gameObject.SetActive(false);
+    }
+
+    static void SetActive(Transform target, bool active)
+    {
+        if (target != null) target.gameObject.SetActive(active);
     }
 
     static Transform DeepFind(Transform root, string name)
