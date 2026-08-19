@@ -42,6 +42,17 @@ public sealed class MainMenuHomeVisualsPlayModeTests
         Assert.That(Find(canvas.transform, "BoardStorePanel"), Is.Null);
         Assert.That(Find(canvas.transform, "BoardProfilePanel"), Is.Null);
 
+        var backdrop = Find(canvas.transform, "HomeNeonBackdrop");
+        Assert.That(backdrop, Is.Not.Null);
+        var backdropImage = backdrop.GetComponent<Image>();
+        Assert.That(backdropImage, Is.Not.Null);
+        Assert.That(backdropImage.raycastTarget, Is.False);
+
+        var background = Find(canvas.transform, "HomeBackground")
+            .GetComponent<Image>();
+        Assert.That(background.sprite, Is.Not.Null);
+        Assert.That(background.sprite.name, Does.Not.Contain("stairs_clouds"));
+
         var six = Find(canvas.transform, "HomeMascotSix") as RectTransform;
         var seven = Find(canvas.transform, "HomeMascotSeven") as RectTransform;
         Assert.That(six.anchoredPosition.x, Is.LessThan(seven.anchoredPosition.x));
@@ -68,6 +79,20 @@ public sealed class MainMenuHomeVisualsPlayModeTests
         var pvp = Find(canvas.transform, "ButtonPvP").GetComponent<Button>();
         var hunt = Find(canvas.transform, "DailyHuntButton").GetComponent<Button>();
         var settings = Find(canvas.transform, "Buttonsettings").GetComponent<Button>();
+        var playRect = play.transform as RectTransform;
+        var pvpRect = pvp.transform as RectTransform;
+        var huntRect = hunt.transform as RectTransform;
+        Assert.That(playRect.sizeDelta.x, Is.GreaterThan(pvpRect.sizeDelta.x));
+        Assert.That(playRect.sizeDelta.x, Is.GreaterThan(huntRect.sizeDelta.x));
+        Assert.That(Mathf.Abs(pvpRect.anchoredPosition.y -
+            huntRect.anchoredPosition.y), Is.LessThan(0.01f));
+        Assert.That(pvpRect.anchoredPosition.x, Is.LessThan(
+            huntRect.anchoredPosition.x));
+        Assert.That(Mathf.Abs(pvpRect.anchoredPosition.x +
+            huntRect.anchoredPosition.x), Is.LessThan(0.01f));
+        Assert.That(playRect.anchoredPosition.y, Is.GreaterThan(
+            pvpRect.anchoredPosition.y));
+        Assert.That(huntRect.anchoredPosition.y, Is.GreaterThan(-900f));
         Assert.That(play.onClick.GetPersistentEventCount() + play.onClick.GetPersistentEventCount(),
             Is.GreaterThanOrEqualTo(0));
         Assert.That(play.GetComponent<Image>().sprite.name, Does.Contain("gold"));

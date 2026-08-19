@@ -5,8 +5,19 @@ Play Console versionName in `ProjectSettings.asset`.
 
 ## [Unreleased]
 
+### Changed
+
+- CI cost guardrails: PlayMode runs only after a green `CI` workflow;
+  Android preview captures are label-triggered (`preview-mainmenu`,
+  `preview-panelplay`, `preview-splash`) or manual, require green CI, checkout
+  the PR merge ref, share one preview concurrency group, and retain artifacts
+  for 3 days. Documented in `docs/ci-policy.md`.
+
 ### Fixed
 
+- Home PlayMode settle gate no longer blocks on `WaitForEndOfFrame` in
+  headless CI batchmode; Android preview builds still wait for end-of-frame
+  paint before logging `HOL_MAINMENU_CAPTURE_READY`.
 - Delayed PvP guesses from a finished match can no longer land on a rematch:
   `submitGuess` rejects a stale or omitted `matchIndex`, the PlayFab client
   ignores a late success that belongs to a previous match, and the controller
@@ -83,13 +94,16 @@ Play Console versionName in `ProjectSettings.asset`.
   cartoon stairs and clouds, the HOL logo, a boy-and-girl fist-bump, mascot
   6 on the left and 7 on the right, and only a gold elapsed hairline. It has
   no Main Menu chrome and no user-facing Splash text.
-- Main Menu **Home** now uses the cartoon stairs/clouds bible: HOL logo,
-  blue-hoodie boy + pink-hoodie girl, mascot **6 left / 7 right**, mapped
-  onto the existing Settings gear, live name + match-win streak chip,
-  Play Solo, Private Room, Daily Hunt, and tip. No Store, Profile, 1v1,
-  coins, or fake `2,450`. Development Android QA captures a 1080×1920 Home
-  screenshot plus an ARM64-capable debug APK; that preview is not a store
-  build.
+- Main Menu **Home** now uses the solo-first neon hierarchy: deep indigo
+  geometric light seams, the HOL logo and blue-hoodie/pink-hoodie hero pair,
+  mascot **6 left / 7 right**, the existing Settings gear and live player
+  chip, one dominant gold Play Solo CTA, compact side-by-side Private Room
+  and Daily Hunt cards, and a smaller localized tip. Existing scene-owned
+  callbacks remain unchanged; the presentation is safe-area aware and does
+  not add Store, Profile, 1v1, coins, or fake `2,450` UI. Android preview
+  capture waits two end-of-frame barriers before logging ready, and preview
+  workflows share one Unity build concurrency group with `actions: read` for
+  artifact handoff.
 - **PanelPlay** (Play Solo → find challenger) uses the same stairs/clouds
   bible as a quieter inner page: HOL logo, cyan Back, gold Find Challenger,
   and the existing simulated-opponents disclosure. Searching, Settings,

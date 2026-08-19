@@ -24,7 +24,6 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
     public const string PrivateIconName = "HomePrivateIcon";
     public const string DailyIconName = "HomeDailyIcon";
 
-    const string BackgroundResource = "mainmenu/mainmenu_bg_stairs_clouds";
     const string DecoStarsResource = "mainmenu/mainmenu_deco_stars";
     const string DecoLightningResource = "mainmenu/mainmenu_deco_lightning";
     const string DecoConfettiResource = "mainmenu/mainmenu_deco_confetti";
@@ -52,7 +51,7 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
 
     public static readonly string[] LoadedResources =
     {
-        BackgroundResource, DecoStarsResource, DecoLightningResource,
+        DecoStarsResource, DecoLightningResource,
         DecoConfettiResource, DecoNumbersResource, LogoResource,
         HeroBoyResource, HeroGirlResource, MascotSixResource, MascotSevenResource,
         GoldCtaResource, BlueCtaResource, MagentaCtaResource, ChipFrameResource,
@@ -120,6 +119,19 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         for (int i = 0; i < 12; i++)
             yield return null;
         BuildHome();
+        // Procedural neon seams and CTAs need a painted frame before Android
+        // capture logs HOL_MAINMENU_CAPTURE_READY. WaitForEndOfFrame never
+        // completes in headless PlayMode CI (batchmode), so use null yields there.
+        if (Application.isBatchMode)
+        {
+            yield return null;
+            yield return null;
+        }
+        else
+        {
+            yield return new WaitForEndOfFrame();
+            yield return new WaitForEndOfFrame();
+        }
         IsSettled = IsReady;
         laidOut = true;
     }
@@ -156,7 +168,6 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
             return;
         }
 
-        var background = LoadRequired(BackgroundResource);
         var logo = LoadRequired(LogoResource);
         var boy = LoadRequired(HeroBoyResource);
         var girl = LoadRequired(HeroGirlResource);
@@ -169,7 +180,7 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         var tipFrame = LoadRequired(TipFrameResource);
         var gear = LoadRequired(GearResource);
 
-        IsReady = background != null && logo != null && boy != null &&
+        IsReady = logo != null && boy != null &&
                   girl != null && six != null && seven != null &&
                   gold != null && cyan != null && magenta != null &&
                   chipFrame != null && tipFrame != null && gear != null;
@@ -184,11 +195,12 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
 
         var bg = EnsureImage(visualRoot, BackgroundName);
         Stretch(bg.rectTransform);
-        ConfigureImage(bg, background, false);
+        ConfigureImage(bg, ConvergingLight.DepthGradientSprite, false);
 
         var safe = EnsureRect(visualRoot, SafeRootName);
         ConfigureSafeArea(safe, (RectTransform)canvas.transform);
 
+        BuildNeonBackdrop(safe);
         BuildDeco(safe, "HomeDecoStars", LoadOptional(DecoStarsResource));
         BuildDeco(safe, "HomeDecoLightning", LoadOptional(DecoLightningResource));
         BuildDeco(safe, "HomeDecoConfetti", LoadOptional(DecoConfettiResource));
@@ -196,32 +208,32 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
 
         var logoImage = EnsureImage(safe, LogoName);
         ConfigureImage(logoImage, logo, true);
-        Place(logoImage.rectTransform, new Vector2(0f, 620f), new Vector2(720f, 420f));
+        Place(logoImage.rectTransform, new Vector2(0f, 600f), new Vector2(760f, 440f));
 
         var boyImage = EnsureImage(safe, HeroBoyName);
         ConfigureImage(boyImage, boy, true);
-        Place(boyImage.rectTransform, new Vector2(-155f, 310f), new Vector2(300f, 360f));
+        Place(boyImage.rectTransform, new Vector2(-170f, 220f), new Vector2(340f, 400f));
 
         var girlImage = EnsureImage(safe, HeroGirlName);
         ConfigureImage(girlImage, girl, true);
-        Place(girlImage.rectTransform, new Vector2(155f, 310f), new Vector2(300f, 360f));
+        Place(girlImage.rectTransform, new Vector2(170f, 220f), new Vector2(340f, 400f));
 
         var sixImage = EnsureImage(safe, MascotSixName);
         ConfigureImage(sixImage, six, true);
-        Place(sixImage.rectTransform, new Vector2(-390f, 80f), new Vector2(220f, 280f));
+        Place(sixImage.rectTransform, new Vector2(-410f, 90f), new Vector2(240f, 310f));
 
         var sevenImage = EnsureImage(safe, MascotSevenName);
         ConfigureImage(sevenImage, seven, true);
-        Place(sevenImage.rectTransform, new Vector2(390f, 80f), new Vector2(210f, 280f));
+        Place(sevenImage.rectTransform, new Vector2(410f, 90f), new Vector2(230f, 310f));
 
         RestyleGear(safe, gear);
         BuildChip(safe, chipFrame);
         RestyleCta(safe, "ButtonPlay", gold, SoloIconResource, SoloIconName,
-            "play_solo", new Vector2(0f, 40f), new Vector2(860f, 150f), true);
+            "play_solo", new Vector2(0f, -265f), new Vector2(900f, 180f), true);
         RestyleCta(safe, "ButtonPvP", cyan, PrivateIconResource, PrivateIconName,
-            "private_room", new Vector2(0f, -130f), new Vector2(860f, 128f), false);
+            "private_room", new Vector2(-225f, -475f), new Vector2(420f, 132f), false);
         RestyleCta(safe, "DailyHuntButton", magenta, DailyIconResource, DailyIconName,
-            "daily_hunt", new Vector2(0f, -280f), new Vector2(860f, 128f), false);
+            "daily_hunt", new Vector2(225f, -475f), new Vector2(420f, 132f), false);
         BuildTip(safe, tipFrame);
         RefreshChip();
     }
@@ -231,7 +243,7 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         var button = FindButton("Buttonsettings");
         if (button == null) return;
         Reparent(button.transform, safe);
-        Place((RectTransform)button.transform, new Vector2(-455f, 820f), new Vector2(88f, 88f));
+        Place((RectTransform)button.transform, new Vector2(-455f, 840f), new Vector2(88f, 88f));
         var image = button.GetComponent<Image>();
         if (image != null)
         {
@@ -267,15 +279,25 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         {
             var iconImage = EnsureImage(button.transform, iconName);
             ConfigureImage(iconImage, icon, true);
-            Place(iconImage.rectTransform, new Vector2(-320f, 0f), new Vector2(88f, 88f));
+            float iconX = Mathf.Max(-320f, -size.x * 0.5f + 58f);
+            Place(iconImage.rectTransform, new Vector2(iconX, 0f),
+                new Vector2(88f, 88f));
         }
 
         var label = EnsureButtonLabel(button);
-        label.fontSize = goldLabel ? 52f : 40f;
+        label.fontSize = goldLabel ? 52f : (size.x <= 500f ? 30f : 40f);
         label.fontStyle = FontStyles.Bold;
         label.color = goldLabel ? Ink : Ink;
         label.alignment = TextAlignmentOptions.Center;
-        Place(label.rectTransform, new Vector2(36f, 0f), new Vector2(size.x - 180f, size.y - 24f));
+        label.enableWordWrapping = !goldLabel && size.x <= 500f;
+        label.enableAutoSizing = !goldLabel && size.x <= 500f;
+        if (label.enableAutoSizing)
+        {
+            label.fontSizeMin = 20f;
+            label.fontSizeMax = 30f;
+        }
+        Place(label.rectTransform, new Vector2(goldLabel ? 36f : 30f, 0f),
+            new Vector2(size.x - (goldLabel ? 180f : 125f), size.y - 24f));
         SetLocalized(label, l10nKey);
     }
 
@@ -310,7 +332,7 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         tip.color = Color.white;
         tip.type = Image.Type.Sliced;
         tip.raycastTarget = false;
-        Place(tip.rectTransform, new Vector2(0f, -620f), new Vector2(920f, 220f));
+        Place(tip.rectTransform, new Vector2(0f, -730f), new Vector2(900f, 190f));
 
         var bulb = LoadOptional(BulbIconResource);
         if (bulb != null)
@@ -332,6 +354,51 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         body.alignment = TextAlignmentOptions.Left;
         Place(body.rectTransform, new Vector2(40f, -28f), new Vector2(760f, 110f));
         SetLocalized(body, "home_tip_body");
+    }
+
+    void BuildNeonBackdrop(Transform safe)
+    {
+        var backdrop = EnsureRect(safe, "HomeNeonBackdrop");
+        Stretch(backdrop);
+        backdrop.SetAsFirstSibling();
+
+        var wash = backdrop.GetComponent<Image>();
+        if (wash == null) wash = backdrop.gameObject.AddComponent<Image>();
+        wash.sprite = ConvergingLight.VerticalGradient(
+            ConvergingLight.WithAlpha(ConvergingLight.DepthTop, 0.98f),
+            ConvergingLight.WithAlpha(
+                new Color(0.08f, 0.04f, 0.30f, 1f), 0.98f));
+        wash.type = Image.Type.Simple;
+        wash.color = Color.white;
+        wash.raycastTarget = false;
+
+        AddNeonSeam(backdrop, "HomeNeonCyanSeam",
+            new Vector2(-250f, 650f), new Vector2(720f, 5f), -38f,
+            ConvergingLight.WithAlpha(ConvergingLight.Cyan, 0.42f));
+        AddNeonSeam(backdrop, "HomeNeonMagentaSeam",
+            new Vector2(310f, 190f), new Vector2(840f, 5f), 38f,
+            ConvergingLight.WithAlpha(ConvergingLight.Magenta, 0.38f));
+        AddNeonSeam(backdrop, "HomeNeonBlueSeam",
+            new Vector2(-300f, -360f), new Vector2(760f, 4f), 34f,
+            new Color(0.16f, 0.42f, 1f, 0.34f));
+        AddNeonSeam(backdrop, "HomeNeonPinkSeam",
+            new Vector2(250f, -720f), new Vector2(640f, 4f), -34f,
+            new Color(1f, 0.10f, 0.68f, 0.28f));
+
+        ConvergingLight.NumberField(backdrop, 18, 0.035f);
+    }
+
+    static Image AddNeonSeam(Transform parent, string name, Vector2 position,
+        Vector2 size, float angle, Color color)
+    {
+        var seam = EnsureImage(parent, name);
+        seam.sprite = RuntimeUI.RoundedRectSprite;
+        seam.type = Image.Type.Sliced;
+        seam.color = color;
+        seam.raycastTarget = false;
+        Place(seam.rectTransform, position, size);
+        seam.rectTransform.localRotation = Quaternion.Euler(0f, 0f, angle);
+        return seam;
     }
 
     void BuildDeco(Transform safe, string name, Sprite sprite)

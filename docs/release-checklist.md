@@ -9,6 +9,11 @@ to fail closed; a green PR does **not** deploy production or publish to Google P
 Unity EditMode tests, and an Android compile/package build. Missing Unity
 credentials fail CI instead of skipping the Unity jobs.
 
+Pull requests validate `refs/pull/<number>/merge`. PlayMode tests run after a
+successful `CI` workflow on the same commit. Android preview captures are
+opt-in via labels (`preview-mainmenu`, `preview-panelplay`, `preview-splash`)
+or manual workflow dispatch — see `docs/ci-policy.md`.
+
 Required repository/production secrets for CI:
 
 - `UNITY_LICENSE`
@@ -22,7 +27,9 @@ Before merging a release candidate:
 - [ ] `Duel rule tests` is green
 - [ ] `EditMode tests` is green
 - [ ] `Build Android (compile check)` is green
+- [ ] `Exact visuals PlayMode` is green when PlayMode/visual paths changed
 - [ ] the debug Android artifact is produced
+- [ ] org Actions budget alerts are configured (see `docs/ci-policy.md` §9)
 
 ## 1. Configure the protected `production` GitHub Environment
 

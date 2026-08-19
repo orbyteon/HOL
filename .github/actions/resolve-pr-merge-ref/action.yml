@@ -1,0 +1,43 @@
+name: Resolve PR merge ref
+description: Output a checkout ref — merge ref for open PR branches, otherwise the commit SHA.
+
+inputs:
+  sha:
+    description: Branch head SHA to resolve.
+    required: true
+  branch:
+    description: Branch name associated with the SHA.
+    required: true
+
+outputs:
+  ref:
+    description: Git ref suitable for actions/checkout.
+    value: ${{ steps.resolve.outputs.ref }}
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve merge ref for open pull requests
+      id: resolve
+      shell: bash
+      env:
+        SHA: ${{ inputs.sha }}
+        BRANCH: ${{ inputs.branch }}
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        set -euo pipefail
+        ref="$SHA"
+        if [ "$BRANCH" != "main" ]; then
+          pr_number="$(
+            gh api "repos/${GITHUB_REPOSITORY}/pulls" \
+              -f head="${GITHUB_REPOSITORY_OWNER}:${BRANCH}" \
+              -f state=open \
+              -f per_page=1 \
+              --jq '.[0].number // empty'
+          )"
+          if [ -n "$pr_number" ]; then
+            ref="refs/pull/${pr_number}/merge"
+          fi
+        fi
+        echo "ref=${ref}" >> "$GITHUB_OUTPUT"
+        echo "Checkout ref: ${ref}"

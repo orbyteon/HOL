@@ -9,7 +9,8 @@ First design built at runtime from code.
 1. **Branch** off fresh `main`, named `claude/<topic>`. One feature per
    branch, nothing else riding along.
 2. **Work** that single feature.
-3. **Test locally before pushing.** The strongest local gate per area:
+3. **Test locally before pushing.** Open the PR as **draft** until local gates
+   pass. The strongest local gate per area:
    - C# — stub-compile *all* of `Assets/SCRIPT` together against Unity/TMP
      stubs (mcs; keep legacy `Text` int/`TextAnchor` vs TMP float/
      `TextAlignmentOptions` shapes honest so misuse fails like Unity).
@@ -17,7 +18,10 @@ First design built at runtime from code.
    - Provisioner — `npm test` in `services/provisioner`.
    - CloudScript / duel rules — `node --test tools/test`.
    - Real Unity CI (EditMode + Android compile) is always the authority.
-4. **PR and merge** (merge commit) only when every CI job is green.
+4. **PR and merge** (merge commit) only when every CI job is green. Mark the PR
+   ready for review only after local verification; expensive Android preview
+   captures are label-triggered (`preview-mainmenu`, `preview-panelplay`,
+   `preview-splash`) after CI is green — see `docs/ci-policy.md`.
 5. **Delete the merged branch.** The repo auto-deletes head branches on
    merge; delete the local branch too. The CI credential cannot delete
    remote refs directly — do not fight the 403.
