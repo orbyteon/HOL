@@ -298,6 +298,16 @@ public class ExactReferenceAssetsTests
     }
 
     [Test]
+    public void SettingsPresentationContractExists()
+    {
+        Assert.IsNotNull(RuntimeType("SettingsVisuals"));
+        var l10n = RuntimeType("L10n");
+        var table = (IDictionary)l10n.GetField("Table",
+            BindingFlags.NonPublic | BindingFlags.Static).GetValue(null);
+        Assert.IsTrue(table.Contains("settings_title"));
+    }
+
+    [Test]
     public void ApprovedLayerDisablesLegacyScenePresentation()
     {
         var legacyObject = new GameObject("LegacyDesign");

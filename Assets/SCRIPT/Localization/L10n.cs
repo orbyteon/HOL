@@ -55,6 +55,7 @@ public static class L10n
         { "save",                    new[] { "Save", "Αποθήκευση" } },
         { "language",                new[] { "Language", "Γλώσσα" } },
         { "music",                   new[] { "Music", "Μουσική" } },
+        { "settings_title",          new[] { "Settings", "Ρυθμίσεις" } },
         { "player_name",             new[] { "Your name", "Το όνομά σου" } },
         { "player_default",          new[] { "Player", "Παίκτης" } },
 
