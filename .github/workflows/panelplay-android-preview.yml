@@ -1,0 +1,369 @@
+name: PanelPlay Android Preview
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/panelplay-android-preview.yml"
+      - "Assets/Editor/PanelPlayPreviewBuild.cs"
+      - "Assets/Editor/PanelPlayPreviewBuild.cs.meta"
+      - "Assets/Scenes/MainMenu.unity"
+      - "Assets/Scenes/MainMenu.unity.meta"
+      - "Assets/SCRIPT/Design/PanelPlayCaptureBootstrap.cs"
+      - "Assets/SCRIPT/Design/PanelPlayCaptureBootstrap.cs.meta"
+      - "Assets/SCRIPT/Design/MainMenuPlayVisuals.cs"
+      - "Assets/SCRIPT/Design/MainMenuPlayVisuals.cs.meta"
+      - "Assets/SCRIPT/Design/MainMenuHomeVisuals.cs"
+      - "Assets/SCRIPT/Design/MainMenuHomeVisuals.cs.meta"
+      - "Assets/SCRIPT/Design/ExactReferenceVisuals.cs"
+      - "Assets/SCRIPT/Design/ExactReferenceVisuals.cs.meta"
+      - "Assets/SCRIPT/Design/AttachmentReskinVisuals.cs"
+      - "Assets/SCRIPT/Design/AttachmentReskinVisuals.cs.meta"
+      - "Assets/SCRIPT/Design/AttachmentReskinPolish.cs"
+      - "Assets/SCRIPT/Design/AttachmentReskinPolish.cs.meta"
+      - "Assets/SCRIPT/Design/AttachmentReskinCanvasBindings.cs"
+      - "Assets/SCRIPT/Design/AttachmentReskinCanvasBindings.cs.meta"
+      - "Assets/SCRIPT/Localization/L10n.cs"
+      - "Assets/SCRIPT/Localization/L10n.cs.meta"
+      - "Assets/newdesign/Resources/mainmenu/**"
+      - "Assets/newdesign/Resources/reference/hol_logo_exact.png"
+      - "Assets/newdesign/Resources/reference/hol_logo_exact.png.meta"
+      - "Assets/newdesign/Resources/reference/mascot_6_exact.png"
+      - "Assets/newdesign/Resources/reference/mascot_6_exact.png.meta"
+      - "Assets/newdesign/Resources/reference/mascot_7_exact.png"
+      - "Assets/newdesign/Resources/reference/mascot_7_exact.png.meta"
+      - "Assets/newdesign/Resources/reference/char_boy_exact.png"
+      - "Assets/newdesign/Resources/reference/char_boy_exact.png.meta"
+      - "Assets/newdesign/Resources/reference/char_girl_exact.png"
+      - "Assets/newdesign/Resources/reference/char_girl_exact.png.meta"
+      - "Assets/Tests/PlayMode/PanelPlayCapturePlayModeTests.cs"
+      - "Assets/Tests/PlayMode/PanelPlayCapturePlayModeTests.cs.meta"
+      - "Assets/Tests/PlayMode/MainMenuPlayVisualsPlayModeTests.cs"
+      - "Assets/Tests/PlayMode/MainMenuPlayVisualsPlayModeTests.cs.meta"
+      - "tools/panelplay/validate-panelplay-screenshot.mjs"
+      - "tools/test/panelplay-screenshot-validator.test.mjs"
+      - "Packages/manifest.json"
+      - "Packages/packages-lock.json"
+      - "ProjectSettings/ProjectVersion.txt"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: panelplay-android-preview-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build development universal ARM64 + x86_64 APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Require Unity credentials
+        shell: bash
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for name in UNITY_LICENSE UNITY_EMAIL UNITY_PASSWORD; do
+            test -n "${!name:-}" || {
+              echo "::error::$name is not configured"
+              exit 1
+            }
+          done
+
+      - name: Free runner disk for Unity Android image
+        shell: bash
+        run: |
+          set -euxo pipefail
+          df -h /
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/lib/android
+          docker system prune -af || true
+          sudo apt-get clean
+          df -h /
+
+      - name: Cache Library
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: Library
+          key: Library-PanelPlay-Android-${{ hashFiles('Packages/manifest.json', 'Packages/packages-lock.json') }}
+          restore-keys: |
+            Library-Android-
+            Library-
+
+      - name: Build Development universal ARM64 + x86_64 PanelPlay APK
+        uses: game-ci/unity-builder@d829bfc901f2347c8fe18898f06712b66916ef42 # v5.0.0
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          targetPlatform: Android
+          androidExportType: androidPackage
+          buildMethod: PanelPlayPreviewBuild.Build
+          versioning: None
+
+      - name: Require exact APK output
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo chown -R "$(id -u):$(id -g)" build
+          test -f build/Android/HOL-panelplay-debug.apk
+
+      - name: Transfer APK to emulator job
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: panelplay-preview-apk-transfer
+          path: build/Android/HOL-panelplay-debug.apk
+          if-no-files-found: error
+          retention-days: 1
+
+  capture:
+    name: Capture PanelPlay at 1080x1920
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Download exact debug APK
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: panelplay-preview-apk-transfer
+          path: build/Android
+
+      - name: Enable KVM acceleration
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -e /dev/kvm
+          sudo chmod 0666 /dev/kvm
+
+      - name: Prepare fail-safe PanelPlay capture script
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/panelplay-android-preview
+          test -f build/Android/HOL-panelplay-debug.apk
+          cp build/Android/HOL-panelplay-debug.apk \
+            artifacts/panelplay-android-preview/HOL-panelplay-debug.apk
+          for diagnostic in \
+            logcat.txt \
+            display-size-density.txt \
+            display-metadata.txt \
+            activity-state.txt \
+            package-metadata.txt \
+            package-path.txt \
+            process-state.txt \
+            install.log \
+            start.log; do
+            echo "Capture script did not start." \
+              > "artifacts/panelplay-android-preview/$diagnostic"
+          done
+
+          cat > "$RUNNER_TEMP/panelplay-capture.sh" <<'CAPTURE_SCRIPT'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          apk="build/Android/HOL-panelplay-debug.apk"
+          output="artifacts/panelplay-android-preview"
+          aapt_path=
+          package_name=
+          launch_activity=
+
+          collect_diagnostics() {
+            status=$?
+            trap - EXIT
+            set +e
+            mkdir -p "$output"
+
+            if [ -z "${package_name:-}" ] &&
+               [ -x "${aapt_path:-}" ] &&
+               [ -f "$apk" ]; then
+              package_name=$("$aapt_path" dump badging "$apk" 2>/dev/null |
+                sed -n "s/^package: name='\([^']*\)'.*/\1/p")
+            fi
+
+            if command -v adb >/dev/null 2>&1 &&
+               adb get-state >/dev/null 2>&1; then
+              adb logcat -d -v threadtime > "$output/logcat.txt" 2>&1
+              {
+                adb shell wm size
+                adb shell wm density
+              } > "$output/display-size-density.txt" 2>&1
+              adb shell dumpsys display > "$output/display-metadata.txt" 2>&1
+              adb shell dumpsys activity activities \
+                > "$output/activity-state.txt" 2>&1
+
+              if [ -n "${package_name:-}" ]; then
+                adb shell dumpsys package "$package_name" \
+                  > "$output/package-metadata.txt" 2>&1
+                adb shell pm path "$package_name" \
+                  > "$output/package-path.txt" 2>&1
+                {
+                  adb shell pidof "$package_name"
+                  adb shell ps -A
+                } > "$output/process-state.txt" 2>&1
+              else
+                echo "Package name was not discoverable." \
+                  > "$output/package-metadata.txt"
+                echo "Package name was not discoverable." \
+                  > "$output/package-path.txt"
+                adb shell ps -A > "$output/process-state.txt" 2>&1
+              fi
+            else
+              echo "adb or the emulator is unavailable." > "$output/logcat.txt"
+              echo "adb or the emulator is unavailable." \
+                > "$output/display-size-density.txt"
+              echo "adb or the emulator is unavailable." \
+                > "$output/display-metadata.txt"
+              echo "adb or the emulator is unavailable." \
+                > "$output/activity-state.txt"
+              echo "adb or the emulator is unavailable." \
+                > "$output/package-metadata.txt"
+              echo "adb or the emulator is unavailable." \
+                > "$output/package-path.txt"
+              echo "adb or the emulator is unavailable." \
+                > "$output/process-state.txt"
+            fi
+
+            exit "$status"
+          }
+          trap 'collect_diagnostics' EXIT
+
+          test -f "$apk"
+          aapt_path="$(ls "$ANDROID_HOME"/build-tools/*/aapt |
+            sort -V |
+            tail -n 1)"
+          test -x "$aapt_path"
+          "$aapt_path" dump badging "$apk" > "$output/aapt-badging.txt"
+          package_name=$("$aapt_path" dump badging "$apk" |
+            sed -n "s/^package: name='\([^']*\)'.*/\1/p")
+          launch_activity=$("$aapt_path" dump badging "$apk" |
+            sed -n "s/^launchable-activity: name='\([^']*\)'.*/\1/p")
+          test -n "$package_name"
+          test -n "$launch_activity"
+
+          wait_for_adb() {
+            for wait_attempt in $(seq 1 30); do
+              if adb wait-for-device >/dev/null 2>&1 &&
+                 [ "$(adb get-state 2>/dev/null || true)" = "device" ]; then
+                return 0
+              fi
+              sleep 1
+            done
+            echo "::error::adb device never became ready"
+            return 1
+          }
+
+          wait_for_adb
+          adb shell input keyevent KEYCODE_WAKEUP || true
+          adb shell wm dismiss-keyguard || true
+          adb shell wm size 1080x1920
+          adb shell wm density 420
+          adb shell settings put secure immersive_mode_confirmations confirmed || true
+
+          if adb install -r "$apk" > "$output/install.log" 2>&1; then
+            :
+          else
+            status=$?
+            exit "$status"
+          fi
+          # Clearing logcat on API 35 can return 255 and abort the job
+          # before Unity even starts; keep the ring buffer.
+          adb shell am force-stop "$package_name" || true
+          if adb shell am start -W \
+              -n "$package_name/$launch_activity" \
+              --es hol_capture_screen panelplay \
+              > "$output/start.log" 2>&1; then
+            :
+          else
+            status=$?
+            exit "$status"
+          fi
+
+          ready=0
+          set +e
+          for attempt in $(seq 1 90); do
+            echo "PanelPlay capture poll ${attempt}/90"
+            if ! adb logcat -d -v threadtime \
+                > "$output/marker-logcat.txt" 2>/dev/null; then
+              echo "logcat dump failed; waiting for adb"
+              wait_for_adb || true
+              sleep 1
+              continue
+            fi
+            if grep -Fq "HOL_PANELPLAY_CAPTURE_READY" \
+                "$output/marker-logcat.txt"; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+          set -e
+          if [ "$ready" -ne 1 ]; then
+            echo "::error::Timed out waiting for HOL_PANELPLAY_CAPTURE_READY"
+            exit 1
+          fi
+          marker_count=$(grep -Fc "HOL_PANELPLAY_CAPTURE_READY" \
+            "$output/marker-logcat.txt" || true)
+          if [ "$marker_count" -ne 1 ]; then
+            echo "::error::Expected exactly one HOL_PANELPLAY_CAPTURE_READY marker"
+            exit 1
+          fi
+
+          adb exec-out screencap -p > "$output/panelplay.png" || true
+          if ! [ -s "$output/panelplay.png" ]; then
+            set +e
+            for shot in $(seq 1 10); do
+              echo "Retrying screencap ${shot}/10"
+              wait_for_adb || true
+              adb exec-out screencap -p > "$output/panelplay.png"
+              if [ -s "$output/panelplay.png" ]; then
+                break
+              fi
+              sleep 1
+            done
+            set -e
+          fi
+          test -s "$output/panelplay.png"
+          node tools/panelplay/validate-panelplay-screenshot.mjs \
+            "$output/panelplay.png"
+
+          (
+            cd "$output"
+            sha256sum \
+              HOL-panelplay-debug.apk \
+              panelplay.png > SHA256SUMS
+          )
+          CAPTURE_SCRIPT
+          chmod +x "$RUNNER_TEMP/panelplay-capture.sh"
+
+      - name: Boot API 35 x86_64 emulator and capture PanelPlay
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          profile: pixel_2
+          cores: 2
+          ram-size: 4096M
+          heap-size: 576M
+          emulator-boot-timeout: 1200
+          emulator-options: "-no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -feature -Vulkan"
+          disable-animations: true
+          script: bash ${{ runner.temp }}/panelplay-capture.sh
+
+      - name: Upload complete PanelPlay Android preview artifact
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hol-panelplay-android-preview
+          path: artifacts/panelplay-android-preview
+          if-no-files-found: error
+          retention-days: 7

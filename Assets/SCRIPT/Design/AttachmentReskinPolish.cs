@@ -124,7 +124,8 @@ public sealed class AttachmentReskinPolish : MonoBehaviour
         if (menu == null) return;
 
         StyleRuntimeCards(transform);
-        PolishHome(menu);
+        if (gameObject.scene.name != "MainMenu")
+            PolishHome(menu);
         PolishSearching(menu);
         PolishSoloResult();
         PolishPvp();
@@ -277,8 +278,11 @@ public sealed class AttachmentReskinPolish : MonoBehaviour
         if (root == null) return;
         foreach (var image in root.GetComponentsInChildren<Image>(true))
         {
+            if (IsUnderOwnedVisualRoot(image.transform)) continue;
             string name = image.transform.name;
-            if (name.StartsWith("Board") || name.StartsWith("Exact")) continue;
+            if (name.StartsWith("Board") || name.StartsWith("Exact") ||
+                name.StartsWith("Home") || name.StartsWith("Play"))
+                continue;
             if (!Contains(name, "Card") && !Contains(name, "Frame")) continue;
             if (image.GetComponent<Button>() != null) continue;
 
@@ -287,6 +291,18 @@ public sealed class AttachmentReskinPolish : MonoBehaviour
             image.color = Panel;
             EnsureOutline(image.gameObject, Purple, 2f);
         }
+    }
+
+    static bool IsUnderOwnedVisualRoot(Transform transform)
+    {
+        while (transform != null)
+        {
+            if (transform.name == MainMenuHomeVisuals.VisualRootName ||
+                transform.name == MainMenuPlayVisuals.VisualRootName)
+                return true;
+            transform = transform.parent;
+        }
+        return false;
     }
 
     static Image AddImage(Transform parent, string name, Sprite sprite,

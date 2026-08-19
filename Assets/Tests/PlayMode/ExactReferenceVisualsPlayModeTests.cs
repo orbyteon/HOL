@@ -15,6 +15,7 @@ public sealed class ExactReferenceVisualsPlayModeTests
         var boardReskinType = RuntimeType("AttachmentReskinVisuals");
         var boardPolishType = RuntimeType("AttachmentReskinPolish");
         var canvasBindingsType = RuntimeType("AttachmentReskinCanvasBindings");
+        var homeType = RuntimeType("MainMenuHomeVisuals");
 
         // Invoke both runtime bootstraps explicitly so this regression remains
         // deterministic inside the Unity Test Runner as well as in a player.
@@ -38,6 +39,11 @@ public sealed class ExactReferenceVisualsPlayModeTests
         Assert.That(installCanvasBindings, Is.Not.Null);
         installCanvasBindings.Invoke(null, null);
 
+        var installHome = homeType.GetMethod(
+            "Install", BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.That(installHome, Is.Not.Null);
+        installHome.Invoke(null, null);
+
         yield return SceneManager.LoadSceneAsync("SplashScene", LoadSceneMode.Single);
         yield return null;
 
@@ -58,8 +64,9 @@ public sealed class ExactReferenceVisualsPlayModeTests
 
         while (SceneManager.GetActiveScene().name != "MainMenu")
             yield return null;
-        for (int i = 0; i < 6; i++)
+        for (int i = 0; i < 20; i++)
             yield return null;
+        yield return new WaitForSecondsRealtime(0.35f);
 
         var mainMenuVisuals = Object.FindObjectOfType(exactType) as Component;
         Assert.That(mainMenuVisuals, Is.Not.Null,
@@ -82,9 +89,14 @@ public sealed class ExactReferenceVisualsPlayModeTests
             "The attachment canvas bindings must still install on MainMenu.");
         Assert.That(mainMenuCanvasBindings.GetComponent<Canvas>(), Is.SameAs(ownedCanvas));
 
-        Assert.That(FindByName(ownedCanvas.transform, "BoardHomeLogo"), Is.Not.Null,
-            "The existing main menu should receive the reference-board home composition.");
-        Assert.That(FindByName(ownedCanvas.transform, "BoardHomeTipCard"), Is.Not.Null);
+        var homeOwner = Object.FindObjectOfType(homeType) as Component;
+        Assert.That(homeOwner, Is.Not.Null,
+            "MainMenu Home should be owned by MainMenuHomeVisuals.");
+        Assert.That(FindByName(ownedCanvas.transform, "HomeLogo"), Is.Not.Null,
+            "Cartoon Home must compose the HOL logo.");
+        Assert.That(FindByName(ownedCanvas.transform, "HomeTipCard"), Is.Not.Null);
+        Assert.That(FindByName(ownedCanvas.transform, "BoardHomeLogo"), Is.Null,
+            "Attachment Home composition must not run on MainMenu.");
 
         // This is a reskin, not a feature pass. It may add images/text but it
         // must not create new interactive buttons, Store screens or Profile
@@ -139,14 +151,14 @@ public sealed class ExactReferenceVisualsPlayModeTests
         Component profileText = null;
         foreach (var component in ownedCanvas.GetComponentsInChildren(tmpTextType, true))
         {
-            if (component.name != "ExactPlayerChipText") continue;
+            if (component.name != "HomePlayerChipText") continue;
             profileText = component;
             break;
         }
         Assert.That(profileText, Is.Not.Null);
         string profileCopy = (string)tmpTextType.GetProperty("text").GetValue(profileText, null);
         string localizedStreak = LocalizedCopy(l10nType, "stats_streak");
-        Assert.That(profileCopy, Does.Contain(localizedStreak.ToUpperInvariant()));
+        Assert.That(profileCopy, Does.Contain(localizedStreak));
         Assert.That(profileCopy, Does.Not.Contain("STREAK"));
         setLanguage.Invoke(null, new[] { originalLanguage });
 

@@ -103,7 +103,8 @@ public sealed class AttachmentReskinCanvasBindings : MonoBehaviour
     void ApplyBindings()
     {
         var menu = FindInScene<MenuManager>(gameObject.scene);
-        if (menu != null && menu.mainMenuPanel != null && menu.mainMenuPanel.activeInHierarchy)
+        if (menu != null && menu.mainMenuPanel != null && menu.mainMenuPanel.activeInHierarchy &&
+            gameObject.scene.name != "MainMenu")
             ApplyHomeButtons();
 
         // ExtrasRuntimeWiring turns the existing solo result button into the

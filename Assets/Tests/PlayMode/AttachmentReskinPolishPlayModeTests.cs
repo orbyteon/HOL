@@ -20,6 +20,7 @@ public sealed class AttachmentReskinPolishPlayModeTests
         InvokeInstaller(reskinType);
         InvokeInstaller(polishType);
         InvokeInstaller(bindingsType);
+        InvokeInstaller(RuntimeType("MainMenuHomeVisuals"));
 
         yield return SceneManager.LoadSceneAsync("MainMenu", LoadSceneMode.Single);
         for (int i = 0; i < 12; i++)
@@ -56,12 +57,18 @@ public sealed class AttachmentReskinPolishPlayModeTests
             Assert.That(Resources.Load<Sprite>(resource), Is.Not.Null,
                 "Missing reference-board sprite: " + resource);
 
-        Assert.That(Find(canvas.transform, "BoardHomeLogo"), Is.Not.Null);
-        Assert.That(Find(canvas.transform, "BoardHomeTipCard"), Is.Not.Null);
-        Assert.That(Find(canvas.transform, "BoardFriendVector"), Is.Not.Null,
-            "The real runtime-injected PvP button should receive the friend artwork.");
-        Assert.That(Find(canvas.transform, "BoardDailyVector"), Is.Not.Null,
-            "The real runtime-injected Daily Hunt button should receive the lightning artwork.");
+        Assert.That(Find(canvas.transform, "HomeLogo"), Is.Not.Null);
+        Assert.That(Find(canvas.transform, "HomeTipCard"), Is.Not.Null);
+        var homeTip = Find(canvas.transform, "HomeTipCard").GetComponent<Image>();
+        Assert.That(homeTip.sprite, Is.Not.Null);
+        Assert.That(homeTip.sprite.name, Does.Contain("tip_frame"),
+            "Polish must not restyle Home chrome owned by MainMenuHomeVisuals.");
+        Assert.That(homeTip.GetComponent<Outline>(), Is.Null);
+        Assert.That(Find(canvas.transform, "HomePrivateIcon"), Is.Not.Null,
+            "The real runtime-injected PvP button should receive the private-room icon.");
+        Assert.That(Find(canvas.transform, "HomeDailyIcon"), Is.Not.Null,
+            "The real runtime-injected Daily Hunt button should receive the hunt icon.");
+        Assert.That(Find(canvas.transform, "BoardHomeLogo"), Is.Null);
 
         var exactLogo = Find(canvas.transform, "ExactHOLLogo");
         if (exactLogo != null)

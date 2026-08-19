@@ -50,6 +50,11 @@ public static class L10n
     {
         // main menu
         { "play",                    new[] { "Play", "Παίξε" } },
+        { "play_solo",               new[] { "Play Solo", "Παίξε μόνος" } },
+        { "private_room",            new[] { "Private Room", "Ιδιωτικό δωμάτιο" } },
+        { "home_tip_body",           new[] {
+            "Bigger numbers are riskier — start in the middle.",
+            "Οι μεγάλοι αριθμοί είναι πιο ριψοκίνδυνοι — ξεκίνα από τη μέση." } },
         { "back",                    new[] { "Back", "Πίσω" } },
         { "quit",                    new[] { "Quit", "Έξοδος" } },
         { "save",                    new[] { "Save", "Αποθήκευση" } },

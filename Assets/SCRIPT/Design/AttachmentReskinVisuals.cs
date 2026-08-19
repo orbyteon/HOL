@@ -138,9 +138,11 @@ public sealed class AttachmentReskinVisuals : MonoBehaviour
         var menu = FindInScene<MenuManager>(gameObject.scene);
         if (menu != null)
         {
-            ApplyHome(menu);
+            if (gameObject.scene.name != "MainMenu")
+                ApplyHome(menu);
             ApplySimplePanel(menu.settingsPanel == null ? null : menu.settingsPanel.transform);
-            ApplySimplePanel(menu.panelPlay == null ? null : menu.panelPlay.transform);
+            if (gameObject.scene.name != "MainMenu")
+                ApplySimplePanel(menu.panelPlay == null ? null : menu.panelPlay.transform);
             ApplySearching(menu.panelSearching == null ? null : menu.panelSearching.transform);
         }
 
@@ -162,6 +164,7 @@ public sealed class AttachmentReskinVisuals : MonoBehaviour
 
     void ApplyCanvasBackdrop()
     {
+        if (gameObject.scene.name == "MainMenu") return;
         var backdrop = DirectChild(transform, "AttachmentReferenceBackdrop");
         if (backdrop == null)
         {
