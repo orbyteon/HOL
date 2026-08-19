@@ -25,7 +25,6 @@ public class ExtrasRuntimeWiring : MonoBehaviour
 
     TMP_Text statsLabel;
     TMP_Text disclosurePlay;
-    TMP_Text disclosureSearch;
 
     void Start()
     {
@@ -423,8 +422,6 @@ public class ExtrasRuntimeWiring : MonoBehaviour
         string text = L10n.Get("simulated_opponents");
         if (disclosurePlay != null)
             disclosurePlay.text = text;
-        if (disclosureSearch != null)
-            disclosureSearch.text = text;
     }
 
     void OnDestroy()
