@@ -20,6 +20,7 @@ public sealed class PvpResultPresentation : MonoBehaviour
 
     void OnEnable()
     {
+        L10n.OnLanguageChanged -= RefreshForLanguage;
         L10n.OnLanguageChanged += RefreshForLanguage;
         if (isShown)
             RefreshForLanguage();

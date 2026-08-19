@@ -254,6 +254,7 @@ public class ExactReferenceAssetsTests
             SetPrivateField(hunt, "done", true);
 
             SetLanguage("English");
+            InvokePrivate(hunt, "OnEnable");
             InvokePrivate(hunt, "Refresh");
             string englishTitle = TextOf((Component)GetPrivateField(
                 hunt, "title"));
@@ -292,6 +293,7 @@ public class ExactReferenceAssetsTests
             SetPublicField(presentation, "playerChipText", chip);
 
             SetLanguage("English");
+            InvokePrivate(presentation, "OnEnable");
             InvokePublic(presentation, "ShowLocalized",
                 "result_win_title", 5, 7, 67, true);
             string englishTitle = TextOf(title);

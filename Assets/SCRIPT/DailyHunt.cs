@@ -72,6 +72,7 @@ public class DailyHunt : MonoBehaviour
 
     void OnEnable()
     {
+        L10n.OnLanguageChanged -= RefreshForLanguage;
         L10n.OnLanguageChanged += RefreshForLanguage;
     }
 
