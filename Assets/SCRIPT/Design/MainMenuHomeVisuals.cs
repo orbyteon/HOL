@@ -266,15 +266,25 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         {
             var iconImage = EnsureImage(button.transform, iconName);
             ConfigureImage(iconImage, icon, true);
-            Place(iconImage.rectTransform, new Vector2(-320f, 0f), new Vector2(88f, 88f));
+            float iconX = Mathf.Max(-320f, -size.x * 0.5f + 58f);
+            Place(iconImage.rectTransform, new Vector2(iconX, 0f),
+                new Vector2(88f, 88f));
         }
 
         var label = EnsureButtonLabel(button);
-        label.fontSize = goldLabel ? 52f : 40f;
+        label.fontSize = goldLabel ? 52f : (size.x <= 500f ? 30f : 40f);
         label.fontStyle = FontStyles.Bold;
         label.color = goldLabel ? Ink : Ink;
         label.alignment = TextAlignmentOptions.Center;
-        Place(label.rectTransform, new Vector2(36f, 0f), new Vector2(size.x - 180f, size.y - 24f));
+        label.enableWordWrapping = !goldLabel && size.x <= 500f;
+        label.enableAutoSizing = !goldLabel && size.x <= 500f;
+        if (label.enableAutoSizing)
+        {
+            label.fontSizeMin = 20f;
+            label.fontSizeMax = 30f;
+        }
+        Place(label.rectTransform, new Vector2(goldLabel ? 36f : 30f, 0f),
+            new Vector2(size.x - (goldLabel ? 180f : 125f), size.y - 24f));
         SetLocalized(label, l10nKey);
     }
 
