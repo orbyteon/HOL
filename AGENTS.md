@@ -134,3 +134,31 @@ missing so a skipped compile cannot look green.
   environment secrets; the workflow passes `-holReleaseBuild`, and
   `ReleaseBuildGuard` enables/validates custom signing only for that build.
   Never commit the keystore or its passwords; keep an offline backup.
+
+## Cursor Cloud specific instructions
+
+- **Only the Node.js surface runs in the cloud VM.** Unity (EditMode/PlayMode
+  tests, Android compile) needs the licensed GameCI editor image and Unity
+  credential secrets, so it cannot be built or run here — GitHub Actions is the
+  authority for anything under `Assets/`. Don't try to install Unity/`mono`/`mcs`;
+  the `CLAUDE.md` stub-compile is a human-only local aid and its stubs are not in
+  the repo.
+- **The startup update script already runs `npm ci` for `services/provisioner`.**
+  Provisioner deps (`@azure/functions`, `google-auth-library`) are present after
+  startup; no reinstall is needed before running its tests. `tools/test/` and
+  `playfab/cloudscript.js` have no dependencies (pure Node built-ins).
+- The three headless CI jobs from `.github/workflows/ci.yml` are the ones you can
+  reproduce locally. Run them from the repo root:
+  - `static-checks`: `node --check` on the JS files plus the grep/`node` integrity
+    guards (server-authoritative PlayFab, privacy.html byte-copy, empty
+    `HOLReleaseConfig.json`, dependency pinning, `.meta` presence).
+  - `rules-tests`: `node --check playfab/cloudscript.js` then
+    `node --test tools/test/*.test.mjs` (the glob form is required; the bare
+    directory does not resolve). This drives the real production CloudScript in an
+    in-memory Shared Group sandbox — the fastest way to exercise PvP end to end
+    without Unity or PlayFab.
+  - `provisioner-test` (from `services/provisioner/`): `npm test` then
+    `npm run check`. Node must be `>=22 <23`.
+- The `check-license`, `test`, and `build` CI jobs will always fail here because
+  the Unity secrets are absent; that is expected and not something to "fix" in the
+  VM.
