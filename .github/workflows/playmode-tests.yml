@@ -1,24 +1,74 @@
+# PlayMode exact-visual tests run only after CI succeeds on the same commit.
+# Manual dispatch remains available for targeted reruns. See docs/ci-policy.md.
+
 name: PlayMode tests
 
 on:
-  pull_request:
-  push:
-    branches: [main]
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Optional git ref to test (defaults to the branch head).
+        required: false
+        type: string
 
 concurrency:
-  group: playmode-${{ github.ref }}
+  group: playmode-${{ github.event.workflow_run.head_branch || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
   exact-visuals-playmode:
     name: Exact visuals PlayMode
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     permissions:
       checks: write
       contents: read
+      actions: read
+      pull-requests: read
     steps:
-      - name: Checkout
+      - name: Checkout actions for local composite steps
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: .github/actions
+          sparse-checkout-cone-mode: false
+
+      - name: Resolve target commit
+        id: target
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+            echo "branch=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+            echo "ref=${{ inputs.ref || github.ref }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "sha=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
+            echo "branch=${{ github.event.workflow_run.head_branch }}" >> "$GITHUB_OUTPUT"
+            echo "ref=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Require successful CI on target commit
+        if: github.event_name == 'workflow_run'
+        uses: ./.github/actions/require-ci-green
+        with:
+          sha: ${{ steps.target.outputs.sha }}
+
+      - name: Resolve merge ref for pull requests
+        id: merge_ref
+        uses: ./.github/actions/resolve-pr-merge-ref
+        with:
+          sha: ${{ steps.target.outputs.sha }}
+          branch: ${{ steps.target.outputs.branch }}
+
+      - name: Checkout merge ref for pull requests
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.merge_ref.outputs.ref }}
 
       - name: Require Unity credentials
         env:
@@ -72,4 +122,4 @@ jobs:
         with:
           name: playmode-test-results
           path: artifacts
-          retention-days: 7
+          retention-days: 3

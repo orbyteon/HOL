@@ -1,6 +1,8 @@
 # CI: static integrity + server bootstrap tests + Unity EditMode tests + Android compile build.
 # Unity credentials are mandatory: missing secrets make CI fail loudly instead
 # of producing a misleading green run with the real jobs skipped.
+# Pull requests checkout refs/pull/<n>/merge so CI validates the merge result.
+# See docs/ci-policy.md for job ordering and expensive-workflow gates.
 
 name: CI
 
@@ -18,8 +20,10 @@ jobs:
     name: Static integrity
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout merge ref for pull requests
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event_name == 'pull_request' && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.ref }}
 
       - name: Validate JavaScript syntax
         run: |
@@ -165,6 +169,28 @@ jobs:
             exit 1
           fi
 
+      - name: Enforce opt-in Android preview workflows
+        shell: bash
+        run: |
+          set -euo pipefail
+          for workflow in \
+            .github/workflows/mainmenu-android-preview.yml \
+            .github/workflows/panelplay-android-preview.yml \
+            .github/workflows/splash-android-preview.yml; do
+            if grep -A2 '^  pull_request:' "$workflow" | grep -q 'paths:'; then
+              echo "::error::${workflow} must not auto-run Android previews on every path-filtered push; use label triggers (docs/ci-policy.md)"
+              exit 1
+            fi
+            grep -q 'types: \[labeled\]' "$workflow" || {
+              echo "::error::${workflow} must trigger pull_request previews via types: [labeled]"
+              exit 1
+            }
+          done
+          grep -q 'workflow_run:' .github/workflows/playmode-tests.yml || {
+            echo "::error::PlayMode tests must follow a successful CI run (workflow_run), not every push"
+            exit 1
+          }
+
       - name: Enforce one server-authoritative PvP backend
         shell: bash
         run: |
@@ -225,8 +251,10 @@ jobs:
     needs: static-checks
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout merge ref for pull requests
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event_name == 'pull_request' && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.ref }}
 
       - name: Setup Node 22
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -245,8 +273,10 @@ jobs:
     needs: static-checks
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout merge ref for pull requests
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event_name == 'pull_request' && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.ref }}
 
       - name: Setup Node 22
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -290,8 +320,10 @@ jobs:
       checks: write
       contents: read
     steps:
-      - name: Checkout
+      - name: Checkout merge ref for pull requests
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event_name == 'pull_request' && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.ref }}
 
       - name: Cache Library
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -318,15 +350,17 @@ jobs:
         with:
           name: test-results
           path: artifacts
-          retention-days: 7
+          retention-days: 3
 
   build:
     name: Build Android (compile check)
     needs: [static-checks, provisioner-test, rules-tests, check-license]
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout merge ref for pull requests
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event_name == 'pull_request' && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.ref }}
 
       - name: Free runner disk for Unity Android image
         shell: bash
@@ -364,4 +398,4 @@ jobs:
         with:
           name: hol-android-debug
           path: build/Android
-          retention-days: 7
+          retention-days: 3
