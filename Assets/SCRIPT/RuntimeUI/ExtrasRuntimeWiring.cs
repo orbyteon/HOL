@@ -414,15 +414,6 @@ public class ExtrasRuntimeWiring : MonoBehaviour
                 new Color(0.91f, 0.93f, 1f, 0.6f));
         }
 
-        var mm = FindObjectOfType<FakeMatchmaking>();
-        if (mm != null && mm.searchingPanel != null)
-        {
-            disclosureSearch = RuntimeUI.CreateText(mm.searchingPanel.transform,
-                "DisclosureLabel", "", 22,
-                new Vector2(0f, -540f), new Vector2(760f, 70f),
-                new Color(0.91f, 0.93f, 1f, 0.6f));
-        }
-
         RefreshDisclosure();
         L10n.OnLanguageChanged += RefreshDisclosure;
     }

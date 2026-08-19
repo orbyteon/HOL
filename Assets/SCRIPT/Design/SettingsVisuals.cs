@@ -11,8 +11,6 @@ using UnityEngine.UI;
 public sealed class SettingsVisuals : MonoBehaviour
 {
     const string RootName = "SettingsVisualRoot";
-    static readonly Color Ink = new Color(0.08f, 0.04f, 0.20f, 1f);
-    static readonly Color Muted = new Color(0.70f, 0.72f, 0.92f, 1f);
 
     RectTransform root;
     MenuManager menu;
@@ -73,6 +71,8 @@ public sealed class SettingsVisuals : MonoBehaviour
     {
         if (built || menu == null || menu.settingsPanel == null) return;
         built = true;
+        var page = menu.settingsPanel.transform as RectTransform;
+        if (page != null) page.localScale = Vector3.one;
 
         root = RuntimeUI.CreateObject(RootName, menu.settingsPanel.transform)
             .GetComponent<RectTransform>();
@@ -127,10 +127,10 @@ public sealed class SettingsVisuals : MonoBehaviour
     {
         var panel = menu.settingsPanel.transform;
         var input = Find<TMP_InputField>(panel, "InputField (TMP)");
-        Place(input == null ? null : input.transform, new Vector2(120f, 340f),
-            new Vector2(430f, 82f));
+        Place(input == null ? null : input.transform, new Vector2(100f, 340f),
+            new Vector2(300f, 82f));
         Place(Find<Button>(panel, "Buttonsave")?.transform,
-            new Vector2(365f, 340f), new Vector2(190f, 74f));
+            new Vector2(350f, 340f), new Vector2(160f, 74f));
         Place(Find<Button>(panel, "EnglishButton")?.transform,
             new Vector2(30f, 110f), new Vector2(210f, 70f));
         Place(Find<Button>(panel, "GreekButton")?.transform,
@@ -140,8 +140,8 @@ public sealed class SettingsVisuals : MonoBehaviour
 
         for (int i = 0; i < 4; i++)
             Place(Find<Button>(panel, "Difficulty" + i)?.transform,
-                new Vector2(45f + i * 145f, -350f),
-                new Vector2(130f, 65f));
+                new Vector2(5f + i * 120f, -350f),
+                new Vector2(110f, 65f));
         var ads = Find<Button>(panel, "AdsPrivacyButton");
         Place(ads?.transform, new Vector2(305f, -580f),
             new Vector2(200f, 72f));
@@ -159,8 +159,30 @@ public sealed class SettingsVisuals : MonoBehaviour
         SetActive(Find<Transform>(panel, "DifficultyLabel"), false);
         var toggle = Find<Toggle>(panel, "Toggle");
         if (toggle != null)
+        {
+            var toggleBackground = toggle.transform.Find("Background")
+                as RectTransform;
+            if (toggleBackground != null)
+            {
+                PlaceLocal(toggleBackground, Vector2.zero,
+                    new Vector2(150f, 70f));
+                var image = toggleBackground.GetComponent<Image>();
+                if (image != null)
+                {
+                    image.sprite = RuntimeUI.RoundedRectSprite;
+                    image.type = Image.Type.Sliced;
+                    image.color = ConsumerTokens.Cyan;
+                }
+                var checkmark = toggleBackground.Find("Checkmark")
+                    as RectTransform;
+                PlaceLocal(checkmark, new Vector2(40f, 0f),
+                    new Vector2(54f, 54f));
+            }
             foreach (var text in toggle.GetComponentsInChildren<TMP_Text>(true))
                 text.gameObject.SetActive(false);
+            foreach (var text in toggle.GetComponentsInChildren<Text>(true))
+                text.gameObject.SetActive(false);
+        }
     }
 
     bool ControlsReady()
@@ -183,6 +205,16 @@ public sealed class SettingsVisuals : MonoBehaviour
         rect.anchoredPosition = position;
         rect.sizeDelta = size;
         RuntimeUI.ClampToSafeArea(rect, size, position);
+    }
+
+    static void PlaceLocal(RectTransform rect, Vector2 position, Vector2 size)
+    {
+        if (rect == null) return;
+        rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.localScale = Vector3.one;
+        rect.anchoredPosition = position;
+        rect.sizeDelta = size;
     }
 
     static T Find<T>(Transform parent, string name) where T : Component

@@ -533,6 +533,8 @@ public class PvpRuntimeUI : MonoBehaviour
         var chip = NeonFrame.Frame(root.transform, "PlayerChip",
             new Vector2(350f, 825f), new Vector2(310f, 92f),
             ConsumerTokens.Cyan, 0.84f, true, ConsumerTokens.Surface);
+        RuntimeUI.ClampToSafeArea((RectTransform)chip.transform,
+            new Vector2(310f, 92f), new Vector2(350f, 825f));
         AddSprite(chip.transform, "Avatar", "reference/player_cyan_exact",
             new Vector2(-105f, 0f), new Vector2(70f, 70f));
         var chipText = RuntimeUI.CreateText(chip.transform, "Text", "", 20,
@@ -554,10 +556,12 @@ public class PvpRuntimeUI : MonoBehaviour
         var pop = RuntimeUI.CreateObject("ResultPopTarget", root.transform);
         ConvergingLight.Center(pop, new Vector2(0f, 260f),
             new Vector2(1000f, 900f));
+        RuntimeUI.ClampToSafeArea((RectTransform)pop.transform,
+            new Vector2(1000f, 900f), new Vector2(0f, 260f));
         confetti.popTarget = (RectTransform)pop.transform;
 
         var title = RuntimeUI.CreateText(pop.transform, "ResultTitle", "", 78,
-            new Vector2(0f, 260f), new Vector2(900f, 140f),
+            new Vector2(0f, 330f), new Vector2(900f, 140f),
             ConsumerTokens.Gold);
         title.enableAutoSizing = true;
         title.fontSizeMin = 42f;
@@ -616,6 +620,8 @@ public class PvpRuntimeUI : MonoBehaviour
         var rematchCard = NeonFrame.Frame(root.transform, "RematchCard",
             new Vector2(0f, -365f), new Vector2(850f, 230f),
             ConsumerTokens.Magenta, 0.88f, true, ConsumerTokens.Surface);
+        RuntimeUI.ClampToSafeArea((RectTransform)rematchCard.transform,
+            new Vector2(850f, 230f), new Vector2(0f, -365f));
         AddLocalizedText(rematchCard.transform, "Heading",
             "result_rematch_heading", 24, new Vector2(0f, 82f),
             new Vector2(780f, 42f), ConvergingLight.NearWhite);
@@ -640,6 +646,8 @@ public class PvpRuntimeUI : MonoBehaviour
         var reactionCard = NeonFrame.Frame(root.transform, "ReactionCard",
             new Vector2(0f, -690f), new Vector2(760f, 310f),
             ConsumerTokens.Magenta, 0.82f, true, ConsumerTokens.Surface);
+        RuntimeUI.ClampToSafeArea((RectTransform)reactionCard.transform,
+            new Vector2(760f, 310f), new Vector2(0f, -690f));
         AddLocalizedText(reactionCard.transform, "Heading",
             "result_reactions", 23, new Vector2(0f, 125f),
             new Vector2(700f, 40f), ConvergingLight.NearWhite);
