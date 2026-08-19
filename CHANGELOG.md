@@ -11,6 +11,9 @@ Play Console versionName in `ProjectSettings.asset`.
   `submitGuess` rejects a stale or omitted `matchIndex`, the PlayFab client
   ignores a late success that belongs to a previous match, and the controller
   drops that callback instead of re-entering result handling.
+- Integration EditMode tests compile again after combining Splash and Teen
+  Polish: `ExactReferenceAssetsTests` keeps the Splash scene helpers and
+  restores `using UnityEngine.UI` for GraphicRaycaster/Button/Image.
 - EditMode PvP panel builds no longer call `Destroy` (Unity forbids it
   outside Play mode) and reflection helpers bind `Show` by argument types
   so the 4-argument result presentation overload is no longer ambiguous.
