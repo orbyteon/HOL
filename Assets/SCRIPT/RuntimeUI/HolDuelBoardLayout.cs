@@ -12,6 +12,8 @@ using UnityEngine.UI;
 [RequireComponent(typeof(RectTransform))]
 public sealed class HolDuelBoardLayout : MonoBehaviour
 {
+    const string BackspaceCommand = "BACKSPACE";
+
     static readonly Color Indigo = new Color(0.035f, 0.035f, 0.12f, 0.98f);
     static readonly Color CardBlue = new Color(0.08f, 0.28f, 0.68f, 0.96f);
     static readonly Color CardPink = new Color(0.72f, 0.08f, 0.34f, 0.96f);
@@ -237,17 +239,18 @@ public sealed class HolDuelBoardLayout : MonoBehaviour
         var rootRect = (RectTransform)keypadRoot.transform;
         CenterRoot(rootRect, new Vector2(660f, 620f), new Vector2(-196f, -285f));
 
-        string[] keys = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "×", "0", "⌫" };
+        string[] keys = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "×", "0", BackspaceCommand };
         for (int i = 0; i < keys.Length; i++)
         {
             int index = i;
             int column = i % 3;
             int row = i / 3;
-            var button = RuntimeUI.CreateButton(keypadRoot.transform, "Key_" + keys[i], keys[i],
+            string label = keys[i] == BackspaceCommand ? "←" : keys[i];
+            var button = RuntimeUI.CreateButton(keypadRoot.transform, "Key_" + keys[i], label,
                 new Vector2(-220f + column * 220f, 215f - row * 142f),
                 new Vector2(190f, 118f), KeyBlue, NearWhite);
             var text = button.GetComponentInChildren<TMP_Text>();
-            if (text != null) text.fontSize = keys[i] == "⌫" || keys[i] == "×" ? 38 : 48;
+            if (text != null) text.fontSize = keys[i] == BackspaceCommand || keys[i] == "×" ? 38 : 48;
             button.onClick.AddListener(() => OnKeyPressed(keys[index]));
         }
 
@@ -292,7 +295,7 @@ public sealed class HolDuelBoardLayout : MonoBehaviour
             return;
         }
 
-        if (key == "⌫")
+        if (key == BackspaceCommand)
         {
             if (!string.IsNullOrEmpty(input.text))
                 input.text = input.text.Substring(0, input.text.Length - 1);

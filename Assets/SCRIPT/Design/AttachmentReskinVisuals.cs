@@ -289,7 +289,7 @@ public sealed class AttachmentReskinVisuals : MonoBehaviour
         EnsureOutline(card.gameObject, Purple, 2f);
 
         var title = EnsureText(card.transform, "BoardHomeTipTitle");
-        title.text = "★ " + L10n.Get("hud_tip").ToUpperInvariant() + ":";
+        title.text = L10n.Get("hud_tip").ToUpperInvariant() + ":";
         title.fontSize = 31f;
         title.fontStyle = FontStyles.Bold;
         title.color = Gold;
@@ -587,15 +587,6 @@ public sealed class AttachmentReskinVisuals : MonoBehaviour
             new Vector2(0f, 800f), new Vector2(350f, 190f), true);
         AddImage(root, "BoardSoloWinner", player,
             new Vector2(-270f, 315f), new Vector2(380f, 430f), true);
-
-        var trophy = EnsureText(root, "BoardSoloTrophy");
-        trophy.text = "★";
-        trophy.fontSize = 118f;
-        trophy.fontStyle = FontStyles.Bold;
-        trophy.color = Gold;
-        trophy.alignment = TextAlignmentOptions.Center;
-        Place(trophy.rectTransform, new Vector2(-90f, 285f), new Vector2(160f, 160f));
-        EnsureOutline(trophy.gameObject, GoldDark, 3f);
 
         if (game.turnText != null)
         {
