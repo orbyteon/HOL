@@ -1,66 +1,70 @@
 name: Splash Android Preview
 
+# Opt-in Android preview: add label preview-splash or run manually.
+# Requires green CI on the same commit. See docs/ci-policy.md.
+
 on:
   pull_request:
-    paths:
-      - ".github/workflows/splash-android-preview.yml"
-      - "Assets/Editor/SplashPreviewBuild.cs"
-      - "Assets/Editor/SplashPreviewBuild.cs.meta"
-      - "Assets/Scenes/SplashScene.unity"
-      - "Assets/Scenes/SplashScene.unity.meta"
-      - "Assets/SCRIPT/SplashLoader.cs"
-      - "Assets/SCRIPT/SplashLoader.cs.meta"
-      - "Assets/SCRIPT/Design/SplashCaptureBootstrap.cs"
-      - "Assets/SCRIPT/Design/SplashCaptureBootstrap.cs.meta"
-      - "Assets/SCRIPT/Design/SplashDesign.cs"
-      - "Assets/SCRIPT/Design/SplashDesign.cs.meta"
-      - "Assets/SCRIPT/RuntimeUI/RuntimeUI.cs"
-      - "Assets/SCRIPT/RuntimeUI/RuntimeUI.cs.meta"
-      - "Assets/SCRIPT/Design/ConvergingLight.cs"
-      - "Assets/SCRIPT/Design/ConvergingLight.cs.meta"
-      - "Assets/SCRIPT/Design/ExactReferenceVisuals.cs"
-      - "Assets/SCRIPT/Design/ExactReferenceVisuals.cs.meta"
-      - "Assets/SCRIPT/Design/AttachmentReskinVisuals.cs"
-      - "Assets/SCRIPT/Design/AttachmentReskinVisuals.cs.meta"
-      - "Assets/SCRIPT/Design/AttachmentReskinPolish.cs"
-      - "Assets/SCRIPT/Design/AttachmentReskinPolish.cs.meta"
-      - "Assets/SCRIPT/Design/AttachmentReskinCanvasBindings.cs"
-      - "Assets/SCRIPT/Design/AttachmentReskinCanvasBindings.cs.meta"
-      - "Assets/newdesign/Resources/splash/**"
-      - "Assets/newdesign/Resources/reference/hol_logo_exact.png"
-      - "Assets/newdesign/Resources/reference/hol_logo_exact.png.meta"
-      - "Assets/newdesign/Resources/reference/mascot_6_exact.png"
-      - "Assets/newdesign/Resources/reference/mascot_6_exact.png.meta"
-      - "Assets/newdesign/Resources/reference/mascot_7_exact.png"
-      - "Assets/newdesign/Resources/reference/mascot_7_exact.png.meta"
-      - "Assets/Tests/PlayMode/SplashCapturePlayModeTests.cs"
-      - "Assets/Tests/PlayMode/SplashCapturePlayModeTests.cs.meta"
-      - "Assets/Tests/PlayMode/SplashAuthoritativeVisualsPlayModeTests.cs"
-      - "Assets/Tests/PlayMode/SplashAuthoritativeVisualsPlayModeTests.cs.meta"
-      - "Assets/Tests/EditMode/SplashProductionAssetsTests.cs"
-      - "Assets/Tests/EditMode/SplashProductionAssetsTests.cs.meta"
-      - "tools/splash/validate-splash-screenshot.mjs"
-      - "tools/test/splash-screenshot-validator.test.mjs"
-      - "Packages/manifest.json"
-      - "Packages/packages-lock.json"
-      - "ProjectSettings/ProjectVersion.txt"
+    types: [labeled]
   workflow_dispatch:
 
 permissions:
   contents: read
+  actions: read
+  pull-requests: read
 
 concurrency:
-  group: splash-android-preview-${{ github.ref }}
+  group: hol-android-preview-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
+  preflight:
+    name: Preflight
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.action == 'labeled' && github.event.label.name == 'preview-splash')
+    outputs:
+      checkout_ref: ${{ steps.merge_ref.outputs.ref }}
+    steps:
+      - name: Checkout actions for local composite steps
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: .github/actions
+          sparse-checkout-cone-mode: false
+
+      - name: Block draft pull requests
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event.pull_request.draft }}" = "true" ]; then
+            echo "::error::Mark the PR ready for review before requesting Android previews."
+            exit 1
+          fi
+
+      - name: Require green CI on PR head
+        uses: ./.github/actions/require-ci-green
+        with:
+          sha: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Resolve merge ref for pull requests
+        id: merge_ref
+        uses: ./.github/actions/resolve-pr-merge-ref
+        with:
+          sha: ${{ github.event.pull_request.head.sha || github.sha }}
+          branch: ${{ github.event.pull_request.head.ref || github.ref_name }}
+
   build:
     name: Build development universal ARM64 + x86_64 APK
+    needs: preflight
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
-      - name: Checkout
+      - name: Checkout merge ref for pull requests
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.preflight.outputs.checkout_ref }}
 
       - name: Require Unity credentials
         shell: bash
@@ -125,12 +129,14 @@ jobs:
 
   capture:
     name: Capture Splash at 1080x1920
-    needs: build
+    needs: [preflight, build]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - name: Checkout
+      - name: Checkout merge ref for pull requests
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.preflight.outputs.checkout_ref }}
 
       - name: Download exact debug APK
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -366,4 +372,4 @@ jobs:
           name: hol-splash-android-preview
           path: artifacts/splash-android-preview
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 3

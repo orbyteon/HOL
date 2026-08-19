@@ -106,6 +106,10 @@ missing so a skipped compile cannot look green.
   immediately. Never commit tokens, keystores (`*.keystore` is ignored),
   or `hol.bundle` / `_to_delete/`. Watch for `.git/index.lock` — another
   assistant session sometimes works this repo concurrently.
+- CI cost and ordering: see `docs/ci-policy.md`. Fast `CI` checks run on
+  every PR push; PlayMode follows a green `CI` run; Android preview APK
+  captures require an explicit label or manual dispatch and a green `CI`
+  run on the same commit.
 
 ## Backend setup state
 
