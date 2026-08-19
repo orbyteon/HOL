@@ -48,7 +48,9 @@ public class ExactReferenceAssetsTests
             "prebattle_rule_title", "prebattle_rule", "prebattle_waiting",
             "result_page_title", "result_attempts", "result_attempts_short",
             "result_rematch_heading", "result_reactions", "result_exit",
-            "result_win_title", "result_loss_title", "result_draw_title"
+            "result_win_title", "result_loss_title", "result_draw_title",
+            "prebattle_waiting_short", "versus", "settings_change",
+            "language_english", "language_greek", "solo_search_title"
         })
         {
             Assert.IsTrue(table.Contains(key), "Missing L10n key: " + key);
@@ -69,12 +71,22 @@ public class ExactReferenceAssetsTests
         {
             var ui = root.AddComponent(RuntimeType("PvpRuntimeUI"));
             var controller = root.AddComponent(RuntimeType("PvpGameController"));
-            InvokePrivate(ui, "ReplacePrivateRoomPanels", controller);
+            InvokePrivate(ui, "BuildPanels", controller);
 
             Assert.AreEqual(1, DirectChildCount(root.transform, "PvPCreatePanel"),
                 "Pre-battle must not leave an obsolete create panel behind.");
             Assert.AreEqual(1, DirectChildCount(root.transform, "PvPJoinPanel"),
                 "Pre-battle must not leave an obsolete join panel behind.");
+            var create = FindDescendant(root.transform, "PvPCreatePanel");
+            var join = FindDescendant(root.transform, "PvPJoinPanel");
+            Assert.AreEqual(1, DescendantCount(create, "EntryState"));
+            Assert.AreEqual(1, DescendantCount(create, "WaitingState"));
+            Assert.AreEqual(1, DescendantCount(join, "EntryState"));
+            Assert.AreEqual(1, DescendantCount(join, "WaitingState"));
+            Assert.AreEqual(0, DescendantCount(join, "ShareButton"),
+                "Join waiting must not expose an inert Share action.");
+            Assert.AreEqual(0, DescendantCount(join, "RoomCodeFrame"),
+                "Join waiting must not show a stale placeholder code.");
         }
         finally
         {
@@ -216,6 +228,93 @@ public class ExactReferenceAssetsTests
     }
 
     [Test]
+    public void DailyHuntRefreshesFormattedLabelsWhenLanguageChanges()
+    {
+        var root = new GameObject("DailyLanguage");
+        Component hunt = null;
+        try
+        {
+            hunt = root.AddComponent(RuntimeType("DailyHunt"));
+            SetPrivateField(hunt, "title", TmpText(root.transform, "Title"));
+            SetPrivateField(hunt, "status", TmpText(root.transform, "Status"));
+            SetPrivateField(hunt, "trailText", TmpText(root.transform, "Trail"));
+            SetPrivateField(hunt, "streakText", TmpText(root.transform, "Streak"));
+            SetPrivateField(hunt, "reviveLabel", TmpText(root.transform, "Revive"));
+            SetPrivateField(hunt, "input", Child(root.transform, "Input")
+                .AddComponent(System.Type.GetType(
+                    "TMPro.TMP_InputField, Unity.TextMeshPro")));
+            SetPrivateField(hunt, "guessButton",
+                Child(root.transform, "GuessButton").AddComponent<Button>());
+            SetPrivateField(hunt, "reviveButton",
+                Child(root.transform, "ReviveButton").AddComponent<Button>());
+            SetPrivateField(hunt, "shareButton",
+                Child(root.transform, "ShareButton").AddComponent<Button>());
+            SetPrivateField(hunt, "day", 1);
+            SetPrivateField(hunt, "budget", 7);
+            SetPrivateField(hunt, "done", true);
+
+            SetLanguage("English");
+            InvokePrivate(hunt, "OnEnable");
+            InvokePrivate(hunt, "Refresh");
+            string englishTitle = TextOf((Component)GetPrivateField(
+                hunt, "title"));
+            string englishRevive = TextOf((Component)GetPrivateField(
+                hunt, "reviveLabel"));
+
+            SetLanguage("Greek");
+
+            Assert.IsFalse(englishTitle == TextOf((Component)GetPrivateField(
+                hunt, "title")));
+            Assert.IsFalse(englishRevive == TextOf((Component)GetPrivateField(
+                hunt, "reviveLabel")));
+        }
+        finally
+        {
+            InvokeIfPresent(hunt, "OnDisable");
+            SetLanguage("English");
+            Object.DestroyImmediate(root);
+        }
+    }
+
+    [Test]
+    public void ResultPresentationRefreshesLocalizedDynamicLabelsWhenLanguageChanges()
+    {
+        var root = new GameObject("ResultLanguage", typeof(RectTransform));
+        Component presentation = null;
+        try
+        {
+            presentation = root.AddComponent(RuntimeType(
+                "PvpResultPresentation"));
+            var title = TmpText(root.transform, "Title");
+            var revealed = TmpText(root.transform, "Revealed");
+            var chip = TmpText(root.transform, "Chip");
+            SetPublicField(presentation, "titleText", title);
+            SetPublicField(presentation, "revealedNumberText", revealed);
+            SetPublicField(presentation, "playerChipText", chip);
+
+            SetLanguage("English");
+            InvokePrivate(presentation, "OnEnable");
+            InvokePublic(presentation, "ShowLocalized",
+                "result_win_title", 5, 7, 67, true);
+            string englishTitle = TextOf(title);
+            string englishRevealed = TextOf(revealed);
+            string englishChip = TextOf(chip);
+
+            SetLanguage("Greek");
+
+            Assert.IsFalse(englishTitle == TextOf(title));
+            Assert.IsFalse(englishRevealed == TextOf(revealed));
+            Assert.IsFalse(englishChip == TextOf(chip));
+        }
+        finally
+        {
+            InvokeIfPresent(presentation, "OnDisable");
+            SetLanguage("English");
+            Object.DestroyImmediate(root);
+        }
+    }
+
+    [Test]
     public void InterruptedVictoryPopRestoresTargetScale()
     {
         var root = new GameObject("Confetti", typeof(RectTransform));
@@ -298,6 +397,99 @@ public class ExactReferenceAssetsTests
     }
 
     [Test]
+    public void StaleGuessResponseDoesNotOverwriteNewerMatchState()
+    {
+        var host = new GameObject("StaleGuessFence");
+        try
+        {
+            var client = host.AddComponent(RuntimeType(
+                "PlayFabPvpClient"));
+            var backend = RuntimeType("PvpBackend");
+            var roomType = backend.GetNestedType("RoomState",
+                BindingFlags.Public);
+            var current = System.Activator.CreateInstance(roomType);
+            roomType.GetField("matchIndex").SetValue(current, 1);
+            roomType.GetField("hostGuessCount").SetValue(current, 0);
+            roomType.GetField("phase").SetValue(current, "play");
+
+            InvokePrivate(client, "ApplyReturnedState", current,
+                "{\"ok\":true,\"state\":\"{\\\"matchIndex\\\":0," +
+                "\\\"hostGuessCount\\\":9,\\\"phase\\\":\\\"done\\\"}\"}");
+
+            Assert.AreEqual(1, roomType.GetField("matchIndex").GetValue(
+                current));
+            Assert.AreEqual(0, roomType.GetField("hostGuessCount").GetValue(
+                current));
+            Assert.AreEqual("play", roomType.GetField("phase").GetValue(
+                current));
+
+            InvokePrivate(client, "ApplyReturnedState", current,
+                "{\"ok\":true,\"state\":\"{\\\"matchIndex\\\":1," +
+                "\\\"hostGuessCount\\\":2,\\\"phase\\\":\\\"play\\\"}\"}");
+            Assert.AreEqual(2, roomType.GetField("hostGuessCount").GetValue(
+                current));
+        }
+        finally
+        {
+            Object.DestroyImmediate(host);
+        }
+    }
+
+    [Test]
+    public void LeavingInvalidatesPendingPlayFabRoomRequest()
+    {
+        var host = new GameObject("PlayFabRoomFence");
+        try
+        {
+            var client = host.AddComponent(RuntimeType(
+                "PlayFabPvpClient"));
+            var epoch = client.GetType().GetField("roomRequestEpoch",
+                BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.IsNotNull(epoch);
+            int before = (int)epoch.GetValue(client);
+
+            InvokePublic(client, "DeleteRoom");
+
+            Assert.AreEqual(before + 1, (int)epoch.GetValue(client),
+                "Cancel/leave must invalidate every in-flight create/join.");
+        }
+        finally
+        {
+            Object.DestroyImmediate(host);
+        }
+    }
+
+    [Test]
+    public void SameCodeRetryAdoptsTheSuccessfulPendingJoin()
+    {
+        var host = new GameObject("PlayFabJoinRetry");
+        try
+        {
+            var client = host.AddComponent(RuntimeType(
+                "PlayFabPvpClient"));
+            bool completed = false;
+            System.Action<bool, string> done = (ok, _) => completed = ok;
+            SetPrivateField(client, "roomRequestEpoch", 2);
+            SetPrivateField(client, "pendingRoomCode", "ABCDE");
+            SetPrivateField(client, "pendingRoomDone", done);
+            SetPrivateField(client, "pendingRequestIsJoin", true);
+
+            bool adopted = (bool)InvokePrivateResult(client,
+                "TryAdoptPendingJoin", "ABCDE");
+
+            Assert.IsTrue(adopted);
+            Assert.IsTrue(completed);
+            var code = client.GetType().GetProperty("RoomCode").GetValue(
+                client, null);
+            Assert.AreEqual("ABCDE", code);
+        }
+        finally
+        {
+            Object.DestroyImmediate(host);
+        }
+    }
+
+    [Test]
     public void SettingsPresentationContractExists()
     {
         Assert.IsNotNull(RuntimeType("SettingsVisuals"));
@@ -317,6 +509,65 @@ public class ExactReferenceAssetsTests
             "reference/mascot_6_exact"));
         Assert.IsNotNull(Resources.Load<Sprite>(
             "reference/mascot_7_exact"));
+    }
+
+    [Test]
+    public void SoloSearchPresentationContractExists()
+    {
+        Assert.IsNotNull(RuntimeType("SoloSearchVisuals"));
+        Assert.IsNotNull(RuntimeType("RadarScanner"));
+    }
+
+    [Test]
+    public void ModernPrebattleDefersLegacyReskin()
+    {
+        var host = new GameObject("PrebattleOwner");
+        try
+        {
+            var controller = host.AddComponent(RuntimeType(
+                "PvpGameController"));
+            var create = Child(host.transform, "PvPCreatePanel");
+            Child(create.transform, "YouCard");
+            controller.GetType().GetField("createPanel").SetValue(
+                controller, create);
+
+            var legacy = host.AddComponent(RuntimeType(
+                "AttachmentReskinVisuals"));
+            InvokePrivate(legacy, "Awake");
+            InvokePrivate(legacy, "ApplyPvp", controller);
+
+            Assert.AreEqual(0, DescendantCount(create.transform,
+                "BoardCreateLogo"));
+        }
+        finally
+        {
+            Object.DestroyImmediate(host);
+        }
+    }
+
+    [Test]
+    public void DailyCloseWaitsForInFlightReviveSettlement()
+    {
+        var host = new GameObject("DailyRevive");
+        try
+        {
+            var hunt = host.AddComponent(RuntimeType("DailyHunt"));
+            SetPrivateField(hunt, "done", false);
+            SetPrivateField(hunt, "used", 7);
+            SetPrivateField(hunt, "budget", 7);
+            SetPrivateField(hunt, "reviveInFlight", true);
+
+            InvokePublic(hunt, "Close");
+
+            var done = hunt.GetType().GetField("done",
+                BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.IsFalse((bool)done.GetValue(hunt),
+                "Closing must not finalize while a reward is settling.");
+        }
+        finally
+        {
+            Object.DestroyImmediate(host);
+        }
     }
 
     [Test]
@@ -453,30 +704,78 @@ public class ExactReferenceAssetsTests
         field.SetValue(component, value);
     }
 
+    static object GetPrivateField(Component component, string name)
+    {
+        var field = component.GetType().GetField(name,
+            BindingFlags.NonPublic | BindingFlags.Instance);
+        Assert.IsNotNull(field, "Missing private field: " + name);
+        return field.GetValue(component);
+    }
+
+    static void InvokeIfPresent(Component component, string methodName)
+    {
+        if (component == null) return;
+        var method = component.GetType().GetMethod(methodName,
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        if (method != null)
+            method.Invoke(component, null);
+    }
+
+    static void SetLanguage(string name)
+    {
+        var l10n = RuntimeType("L10n");
+        var language = l10n.GetNestedType("Language", BindingFlags.Public);
+        Assert.IsNotNull(language, "Missing L10n.Language enum.");
+        var setLanguage = l10n.GetMethod("SetLanguage",
+            BindingFlags.Public | BindingFlags.Static);
+        Assert.IsNotNull(setLanguage, "Missing L10n.SetLanguage.");
+        setLanguage.Invoke(null, new[] { System.Enum.Parse(language, name) });
+    }
+
     static void InvokePublic(Component component, string methodName,
         params object[] arguments)
     {
-        var method = component.GetType().GetMethod(
-            methodName, BindingFlags.Instance | BindingFlags.Public);
-        Assert.IsNotNull(method, "Missing public method: " + methodName);
-        method.Invoke(component, arguments);
+        InvokeNamed(component, methodName,
+            BindingFlags.Instance | BindingFlags.Public, arguments);
     }
 
     static void InvokePrivate(Component component, string methodName, params object[] arguments)
     {
-        var method = component.GetType().GetMethod(
-            methodName, BindingFlags.Instance | BindingFlags.NonPublic);
-        Assert.IsNotNull(method, "Missing private method: " + methodName);
-        method.Invoke(component, arguments);
+        InvokeNamed(component, methodName,
+            BindingFlags.Instance | BindingFlags.NonPublic, arguments);
     }
 
     static object InvokePrivateResult(Component component, string methodName,
         params object[] arguments)
     {
+        return InvokeNamed(component, methodName,
+            BindingFlags.Instance | BindingFlags.NonPublic, arguments);
+    }
+
+    // Bind by argument types so overloaded methods (PvpResultPresentation.Show)
+    // do not throw AmbiguousMatchException the way a name-only GetMethod does.
+    static object InvokeNamed(Component component, string methodName,
+        BindingFlags flags, object[] arguments)
+    {
+        var types = ArgumentTypes(arguments);
         var method = component.GetType().GetMethod(
-            methodName, BindingFlags.Instance | BindingFlags.NonPublic);
-        Assert.IsNotNull(method, "Missing private method: " + methodName);
+            methodName, flags, null, types, null);
+        Assert.IsNotNull(method, "Missing method: " + methodName);
         return method.Invoke(component, arguments);
+    }
+
+    static System.Type[] ArgumentTypes(object[] arguments)
+    {
+        if (arguments == null || arguments.Length == 0)
+            return System.Type.EmptyTypes;
+        var types = new System.Type[arguments.Length];
+        for (int i = 0; i < arguments.Length; i++)
+        {
+            Assert.IsNotNull(arguments[i],
+                "Reflection invoke cannot infer a type from a null argument.");
+            types[i] = arguments[i].GetType();
+        }
+        return types;
     }
 
     static System.Type RuntimeType(string name)

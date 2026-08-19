@@ -309,20 +309,29 @@ public sealed class AttachmentReskinVisuals : MonoBehaviour
         if (pvp.pvpMenuPanel != null && pvp.pvpMenuPanel.activeInHierarchy)
             ApplyPvpMenu(pvp.pvpMenuPanel.transform);
         if (pvp.createPanel != null && pvp.createPanel.activeInHierarchy)
-            ApplyCreatePanel(pvp);
+        {
+            if (DeepFind(pvp.createPanel.transform, "YouCard") == null)
+                ApplyCreatePanel(pvp);
+        }
         if (pvp.joinPanel != null && pvp.joinPanel.activeInHierarchy)
-            ApplyJoinPanel(pvp);
+        {
+            if (DeepFind(pvp.joinPanel.transform, "YouCard") == null)
+                ApplyJoinPanel(pvp);
+        }
         if (pvp.matchPanel != null && pvp.matchPanel.activeInHierarchy)
             ApplyPvpMatch(pvp);
     }
 
     void ApplyPvpMenu(Transform panelRoot)
     {
+        if (DeepFind(panelRoot, "TitleRibbon") != null)
+            return;
+
         AddImage(panelRoot, "BoardPvpLogo", logo,
             new Vector2(0f, 705f), new Vector2(500f, 265f), true);
 
         var title = EnsureText(panelRoot, "BoardPvpTitle");
-        title.text = IsGreek ? "ΠΑΙΞΕ ΜΕ ΦΙΛΟ" : "PLAY WITH A FRIEND";
+        title.text = L10n.Get("private_room_title").ToUpperInvariant();
         title.fontSize = 43f;
         title.fontStyle = FontStyles.Bold;
         title.color = White;
@@ -489,6 +498,16 @@ public sealed class AttachmentReskinVisuals : MonoBehaviour
     {
         if (root == null || !root.gameObject.activeInHierarchy) return;
 
+        if (DeepFind(root, "SoloSearchVisualRoot") != null)
+        {
+            SetActive(DeepFind(root, "BoardSearchLogo"), false);
+            SetActive(DeepFind(root, "BoardVsPlayerCard"), false);
+            SetActive(DeepFind(root, "BoardVsOpponentCard"), false);
+            SetActive(DeepFind(root, "BoardVsBadge"), false);
+            SetActive(DeepFind(root, "BoardSearchRule"), false);
+            return;
+        }
+
         AddImage(root, "BoardSearchLogo", logo,
             new Vector2(0f, 715f), new Vector2(440f, 235f), true);
         BuildVersusCards(root, new Vector2(0f, 220f), 390f, 470f);
@@ -503,14 +522,6 @@ public sealed class AttachmentReskinVisuals : MonoBehaviour
             Place(searching.searchingText.rectTransform, new Vector2(0f, -310f), new Vector2(800f, 120f));
             Responsive(searching.searchingText, 24f);
         }
-
-        var tip = EnsureText(root, "BoardSearchRule");
-        tip.text = L10n.Get("simulated_opponents");
-        tip.fontSize = 25f;
-        tip.color = White;
-        tip.alignment = TextAlignmentOptions.Center;
-        Place(tip.rectTransform, new Vector2(0f, -485f), new Vector2(780f, 120f));
-        Responsive(tip, 17f);
 
         SetActive(DeepFind(root, "ExactSearchingLogo"), false);
         SetActive(DeepFind(root, "ExactSearchingPlayer"), false);
@@ -787,7 +798,7 @@ public sealed class AttachmentReskinVisuals : MonoBehaviour
         AddImage(right.transform, "BoardVsOpponent", opponent,
             new Vector2(0f, 10f), new Vector2(cardWidth * 0.70f, cardHeight * 0.78f), true);
         var them = EnsureText(right.transform, "BoardVsThem");
-        them.text = IsGreek ? "ΑΝΤΙΠΑΛΟΣ" : "OPPONENT";
+        them.text = L10n.Get("prebattle_opponent").ToUpperInvariant();
         them.fontSize = 28f;
         them.fontStyle = FontStyles.Bold;
         them.color = White;
@@ -796,7 +807,7 @@ public sealed class AttachmentReskinVisuals : MonoBehaviour
 
         var vs = EnsureText(root, "BoardVsBadge");
         vs.gameObject.SetActive(true);
-        vs.text = "VS";
+        vs.text = L10n.Get("versus");
         vs.fontSize = 72f;
         vs.fontStyle = FontStyles.Bold;
         vs.color = Gold;

@@ -22,6 +22,10 @@ public class PvpGameController : MonoBehaviour
     [Header("Create flow")]
     public TMP_InputField createSecretInput;
     public GameObject createConfirmButton;
+    public GameObject createEntryRoot;
+    public GameObject createWaitingRoot;
+    public TMP_Text createEntryStatusText;
+    public TMP_Text createOpponentStatusText;
     public TMP_Text roomCodeText;
     public TMP_Text createStatusText;
     public AnimatedEllipsis createStatusEllipsis;
@@ -30,6 +34,10 @@ public class PvpGameController : MonoBehaviour
     public TMP_InputField joinCodeInput;
     public TMP_InputField joinSecretInput;
     public GameObject joinConfirmButton;
+    public GameObject joinEntryRoot;
+    public GameObject joinWaitingRoot;
+    public TMP_Text joinEntryStatusText;
+    public TMP_Text joinOpponentStatusText;
     public TMP_Text joinStatusText;
 
     [Header("Match UI")]
@@ -114,11 +122,7 @@ public class PvpGameController : MonoBehaviour
     public void OpenPvpMenu()
     {
         if (resultPresentation != null) resultPresentation.Hide();
-        if (createSecretInput != null) createSecretInput.gameObject.SetActive(true);
-        if (createConfirmButton != null) createConfirmButton.SetActive(true);
-        if (joinCodeInput != null) joinCodeInput.gameObject.SetActive(true);
-        if (joinSecretInput != null) joinSecretInput.gameObject.SetActive(true);
-        if (joinConfirmButton != null) joinConfirmButton.SetActive(true);
+        ResetPrebattlePanels();
         pvpMenuPanel.SetActive(true);
         createPanel.SetActive(false);
         joinPanel.SetActive(false);
@@ -132,7 +136,8 @@ public class PvpGameController : MonoBehaviour
         int secret;
         if (!TryReadSecret(createSecretInput, out secret))
         {
-            SetCreateStatus(L10n.Get("pvp_secret"), false);
+            if (createEntryStatusText != null)
+                createEntryStatusText.text = L10n.Get("pvp_secret");
             createPanel.SetActive(true);
             pvpMenuPanel.SetActive(false);
             return;
@@ -140,6 +145,7 @@ public class PvpGameController : MonoBehaviour
 
         pvpMenuPanel.SetActive(false);
         createPanel.SetActive(true);
+        ShowCreateWaiting();
         SetCreateStatus(L10n.Get("pvp_creating"), true);
         roomCodeText.text = "-----";
 
@@ -150,17 +156,14 @@ public class PvpGameController : MonoBehaviour
             joinCreateInFlight = false;
             if (gen != flowGeneration)
             {
-                client.DeleteRoom();
                 return;
             }
             if (!ok)
             {
-                SetCreateStatus(L10n.Get("pvp_network_error"), false);
+                ShowCreateEntry(L10n.Get("pvp_network_error"));
                 return;
             }
             roomCodeText.text = codeOrError;
-            if (createSecretInput != null) createSecretInput.gameObject.SetActive(false);
-            if (createConfirmButton != null) createConfirmButton.SetActive(false);
             SetCreateStatus(L10n.Get("prebattle_waiting"), true);
             BeginMatchPolling();
         });
@@ -185,7 +188,7 @@ public class PvpGameController : MonoBehaviour
         if (lastState != null && lastState.phase != "waiting")
             return;
 
-        SetCreateStatus(L10n.Get("pvp_waiting"), true);
+        SetCreateStatus(L10n.Get("prebattle_waiting"), true);
     }
 
     void SetCreateStatus(string message, bool animateDots)
@@ -202,6 +205,55 @@ public class PvpGameController : MonoBehaviour
         }
     }
 
+    void ResetPrebattlePanels()
+    {
+        if (createSecretInput != null) createSecretInput.text = "";
+        if (joinCodeInput != null) joinCodeInput.text = "";
+        if (joinSecretInput != null) joinSecretInput.text = "";
+        ShowCreateEntry("");
+        ShowJoinEntry("");
+        if (roomCodeText != null) roomCodeText.text = "-----";
+        if (createStatusText != null) createStatusText.text = "";
+        if (joinStatusText != null) joinStatusText.text = "";
+        if (createOpponentStatusText != null)
+            createOpponentStatusText.text = L10n.Get("prebattle_waiting_short");
+        if (joinOpponentStatusText != null)
+            joinOpponentStatusText.text = L10n.Get("prebattle_waiting_short");
+        if (createStatusEllipsis != null)
+            createStatusEllipsis.enabled = false;
+    }
+
+    void ShowCreateEntry(string message)
+    {
+        if (createEntryRoot != null) createEntryRoot.SetActive(true);
+        if (createWaitingRoot != null) createWaitingRoot.SetActive(false);
+        if (createSecretInput != null) createSecretInput.gameObject.SetActive(true);
+        if (createConfirmButton != null) createConfirmButton.SetActive(true);
+        if (createEntryStatusText != null) createEntryStatusText.text = message;
+    }
+
+    void ShowCreateWaiting()
+    {
+        if (createEntryRoot != null) createEntryRoot.SetActive(false);
+        if (createWaitingRoot != null) createWaitingRoot.SetActive(true);
+    }
+
+    void ShowJoinEntry(string message)
+    {
+        if (joinEntryRoot != null) joinEntryRoot.SetActive(true);
+        if (joinWaitingRoot != null) joinWaitingRoot.SetActive(false);
+        if (joinCodeInput != null) joinCodeInput.gameObject.SetActive(true);
+        if (joinSecretInput != null) joinSecretInput.gameObject.SetActive(true);
+        if (joinConfirmButton != null) joinConfirmButton.SetActive(true);
+        if (joinEntryStatusText != null) joinEntryStatusText.text = message;
+    }
+
+    void ShowJoinWaiting()
+    {
+        if (joinEntryRoot != null) joinEntryRoot.SetActive(false);
+        if (joinWaitingRoot != null) joinWaitingRoot.SetActive(true);
+    }
+
     public void OnJoinRoomPressed()
     {
         if (joinCreateInFlight || !string.IsNullOrEmpty(client.RoomCode)) return;
@@ -209,15 +261,18 @@ public class PvpGameController : MonoBehaviour
         int secret;
         if (!TryReadSecret(joinSecretInput, out secret))
         {
-            joinStatusText.text = L10n.Get("pvp_secret");
+            if (joinEntryStatusText != null)
+                joinEntryStatusText.text = L10n.Get("pvp_secret");
             return;
         }
         if (string.IsNullOrEmpty(joinCodeInput.text.Trim()))
         {
-            joinStatusText.text = L10n.Get("pvp_enter_code");
+            if (joinEntryStatusText != null)
+                joinEntryStatusText.text = L10n.Get("pvp_enter_code");
             return;
         }
 
+        ShowJoinWaiting();
         joinStatusText.text = L10n.Get("pvp_joining");
         joinCreateInFlight = true;
         int gen = flowGeneration;
@@ -226,17 +281,15 @@ public class PvpGameController : MonoBehaviour
             joinCreateInFlight = false;
             if (gen != flowGeneration)
             {
-                client.DeleteRoom();
                 return;
             }
             if (!ok)
             {
-                joinStatusText.text = error;
+                ShowJoinEntry(error);
                 return;
             }
-            if (joinCodeInput != null) joinCodeInput.gameObject.SetActive(false);
-            if (joinSecretInput != null) joinSecretInput.gameObject.SetActive(false);
-            if (joinConfirmButton != null) joinConfirmButton.SetActive(false);
+            if (joinOpponentStatusText != null)
+                joinOpponentStatusText.text = L10n.Get("prebattle_found");
             joinStatusText.text = L10n.Get("prebattle_waiting");
             BeginMatchPolling();
         });
@@ -266,9 +319,15 @@ public class PvpGameController : MonoBehaviour
         turnText.text = L10n.Get("pvp_sending");
         guessInFlight = true;
         int gen = flowGeneration;
+        int sentMatchIndex = lastState.matchIndex;
         client.SubmitGuess(guess, staked, lastState, ok =>
         {
             if (gen != flowGeneration) return;
+            if (lastState == null || lastState.matchIndex != sentMatchIndex)
+            {
+                guessInFlight = false;
+                return;
+            }
 
             guessInFlight = false;
             if (ok)
@@ -327,7 +386,7 @@ public class PvpGameController : MonoBehaviour
         ShowSignalLine(L10n.Get("you"), signalId);
         int sentGeneration = flowGeneration;
         int sentMatchIndex = lastState.matchIndex;
-        client.SendSignal(signalId, ok =>
+        client.SendSignal(signalId, sentMatchIndex, ok =>
         {
             if (ok || !IsCurrentSignalCallback(
                     sentGeneration, sentMatchIndex))
@@ -381,7 +440,9 @@ public class PvpGameController : MonoBehaviour
         client.DeleteRoom();
         matchOver = false;
         guessInFlight = false;
+        joinCreateInFlight = false;
         rematchInFlight = false;
+        CancelInvoke(nameof(ResumeWaitingStatus));
         lastState = null;
         shownGuessKey = "";
         ShowRematchOffer(false);
@@ -619,13 +680,13 @@ public class PvpGameController : MonoBehaviour
             }
             if (resultPresentation != null)
             {
-                string title = isDraw
-                    ? L10n.Get("result_draw_title")
+                string titleKey = isDraw
+                    ? "result_draw_title"
                     : iWon
-                        ? L10n.Get("result_win_title")
-                        : L10n.Get("result_loss_title");
-                resultPresentation.Show(title, myGuessCount,
-                    opponentGuessCount, huntedSecret);
+                        ? "result_win_title"
+                        : "result_loss_title";
+                resultPresentation.ShowLocalized(titleKey, myGuessCount,
+                    opponentGuessCount, huntedSecret, iWon);
             }
             RefreshSignalsAvailability();
             if (audioSource != null && !isDraw)

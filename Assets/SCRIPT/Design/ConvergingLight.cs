@@ -18,6 +18,17 @@ public static class ConvergingLight
     public static readonly Color TrackIndigo = new Color(0.16f, 0.15f, 0.26f);
     public static readonly Color PanelIndigo = new Color(0.09f, 0.08f, 0.19f);
     public static readonly Color ScrimIndigo = new Color(0.05f, 0.05f, 0.12f);
+    static Sprite depthGradientSprite;
+
+    public static Sprite DepthGradientSprite
+    {
+        get
+        {
+            if (depthGradientSprite == null)
+                depthGradientSprite = VerticalGradient(DepthTop, DepthBottom);
+            return depthGradientSprite;
+        }
+    }
 
     public static Color WithAlpha(Color c, float a)
     {

@@ -167,6 +167,12 @@ public sealed class AttachmentReskinPolish : MonoBehaviour
     {
         if (menu.panelSearching == null || !menu.panelSearching.activeInHierarchy) return;
         var root = menu.panelSearching.transform;
+        if (DeepFind(root, "SoloSearchVisualRoot") != null)
+        {
+            SetActive(DeepFind(root, "BoardSearchRocketVector"), false);
+            SetActive(DeepFind(root, "BoardVsBurstVector"), false);
+            return;
+        }
         AddImage(root, "BoardSearchRocketVector", rocket,
             new Vector2(350f, -500f), new Vector2(245f, 300f), true);
         EnsureVsBurst(root);
@@ -216,12 +222,15 @@ public sealed class AttachmentReskinPolish : MonoBehaviour
         if (pvp.pvpMenuPanel != null && pvp.pvpMenuPanel.activeInHierarchy)
         {
             var root = pvp.pvpMenuPanel.transform;
-            ReplaceGlyphWithSprite(root, "CreateButton", "BoardCreatePlus", "BoardCreatePlusVector",
-                plusIcon, new Vector2(0f, 225f), new Vector2(88f, 88f));
-            ReplaceGlyphWithSprite(root, "JoinButton", "BoardJoinDoor", "BoardJoinDoorVector",
-                joinIcon, new Vector2(0f, 225f), new Vector2(90f, 90f));
-            SetActive(DeepFind(root, "BoardCreatePlusPlate"), false);
-            SetActive(DeepFind(root, "BoardJoinDoorPlate"), false);
+            if (DeepFind(root, "TitleRibbon") == null)
+            {
+                ReplaceGlyphWithSprite(root, "CreateButton", "BoardCreatePlus", "BoardCreatePlusVector",
+                    plusIcon, new Vector2(0f, 225f), new Vector2(88f, 88f));
+                ReplaceGlyphWithSprite(root, "JoinButton", "BoardJoinDoor", "BoardJoinDoorVector",
+                    joinIcon, new Vector2(0f, 225f), new Vector2(90f, 90f));
+                SetActive(DeepFind(root, "BoardCreatePlusPlate"), false);
+                SetActive(DeepFind(root, "BoardJoinDoorPlate"), false);
+            }
         }
 
         if (pvp.matchPanel == null || !pvp.matchPanel.activeInHierarchy) return;

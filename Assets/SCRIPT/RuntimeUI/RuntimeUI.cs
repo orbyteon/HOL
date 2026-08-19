@@ -85,25 +85,29 @@ public static class RuntimeUI
     // Runtime page roots use a 1080x1920 portrait reference canvas. Clamp
     // direct children of a full-screen page to Android's safe area while leaving
     // nested labels/children in their local card coordinates.
-    static bool IsPageChild(RectTransform rect)
+    static Canvas FindPageCanvas(RectTransform rect)
     {
-        if (rect == null || rect.parent == null) return false;
-        var parent = rect.parent as RectTransform;
-        if (parent == null) return false;
-        if (parent.GetComponent<Canvas>() != null) return true;
-        return parent.parent != null &&
-               parent.anchorMin == Vector2.zero &&
-               parent.anchorMax == Vector2.one &&
-               parent.parent.GetComponent<Canvas>() != null;
+        if (rect == null || rect.parent == null) return null;
+        Transform current = rect.parent;
+        while (current != null)
+        {
+            var canvas = current.GetComponent<Canvas>();
+            if (canvas != null) return canvas;
+
+            var page = current as RectTransform;
+            if (page == null ||
+                page.anchorMin != Vector2.zero ||
+                page.anchorMax != Vector2.one)
+                return null;
+            current = current.parent;
+        }
+        return null;
     }
 
     static void ClampPageChild(RectTransform rect, Vector2 size, Vector2 requested)
     {
-        if (!IsPageChild(rect)) return;
-
-        var canvas = rect.parent.GetComponent<Canvas>();
-        if (canvas == null && rect.parent.parent != null)
-            canvas = rect.parent.parent.GetComponent<Canvas>();
+        var canvas = FindPageCanvas(rect);
+        if (canvas == null) return;
         var canvasRect = canvas != null ? canvas.transform as RectTransform : null;
         Vector2 canvasSize = canvasRect != null && canvasRect.rect.size.sqrMagnitude > 0f
             ? canvasRect.rect.size
@@ -125,6 +129,14 @@ public static class RuntimeUI
 
         if (size.x < 48f || size.y < 48f)
             Debug.LogWarning("HOL UI: page touch target below 48px: " + rect.name);
+    }
+
+    // Public hook for presentation-only layout passes that reposition an
+    // already-built direct child after the initial construction clamp.
+    public static void ClampToSafeArea(RectTransform rect, Vector2 size,
+        Vector2 requested)
+    {
+        ClampPageChild(rect, size, requested);
     }
 
     public static GameObject CreateObject(string name, Transform parent)
@@ -302,5 +314,21 @@ public static class RuntimeUI
     {
         if (input == null) return;
         Localize(input.placeholder as TMP_Text, key);
+    }
+
+    // Unity forbids Object.Destroy from EditMode tests and editor scripts —
+    // that path must use DestroyImmediate. Play mode keeps the deferred
+    // Destroy so in-flight listeners cannot see a hole mid-frame.
+    public static void DestroyNow(Object target)
+    {
+        if (target == null) return;
+#if UNITY_EDITOR
+        if (!Application.isPlaying)
+        {
+            Object.DestroyImmediate(target);
+            return;
+        }
+#endif
+        Object.Destroy(target);
     }
 }

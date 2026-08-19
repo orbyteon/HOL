@@ -11,13 +11,12 @@ using UnityEngine.UI;
 public sealed class SettingsVisuals : MonoBehaviour
 {
     const string RootName = "SettingsVisualRoot";
-    static readonly Color Ink = new Color(0.08f, 0.04f, 0.20f, 1f);
-    static readonly Color Muted = new Color(0.70f, 0.72f, 0.92f, 1f);
 
     RectTransform root;
     MenuManager menu;
     int frames;
     bool built;
+    float nextLayout;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     static void Install()
@@ -43,11 +42,10 @@ public sealed class SettingsVisuals : MonoBehaviour
 
     IEnumerator Start()
     {
-        while (!built && frames++ < 24)
+        while (!built && frames++ < 120)
         {
             menu = FindObjectOfType<MenuManager>();
-            if (menu != null && menu.settingsPanel != null &&
-                menu.settingsPanel.GetComponentInChildren<Button>(true) != null)
+            if (ControlsReady())
             {
                 Build();
                 break;
@@ -62,12 +60,19 @@ public sealed class SettingsVisuals : MonoBehaviour
         bool visible = menu.settingsPanel.activeSelf;
         if (root.gameObject.activeSelf != visible)
             root.gameObject.SetActive(visible);
+        if (visible && Time.unscaledTime >= nextLayout)
+        {
+            nextLayout = Time.unscaledTime + 0.5f;
+            RepositionExistingControls();
+        }
     }
 
     void Build()
     {
         if (built || menu == null || menu.settingsPanel == null) return;
         built = true;
+        var page = menu.settingsPanel.transform as RectTransform;
+        if (page != null) page.localScale = Vector3.one;
 
         root = RuntimeUI.CreateObject(RootName, menu.settingsPanel.transform)
             .GetComponent<RectTransform>();
@@ -75,8 +80,7 @@ public sealed class SettingsVisuals : MonoBehaviour
         root.SetAsFirstSibling();
 
         var back = root.gameObject.AddComponent<Image>();
-        back.sprite = ConvergingLight.VerticalGradient(
-            ConvergingLight.DepthTop, ConvergingLight.DepthBottom);
+        back.sprite = ConvergingLight.DepthGradientSprite;
         back.raycastTarget = false;
 
         AddSprite(root, "Logo", "reference/hol_logo_exact",
@@ -86,19 +90,21 @@ public sealed class SettingsVisuals : MonoBehaviour
             ConvergingLight.NearWhite);
 
         var card = NeonFrame.Frame(root, "SettingsCard",
-            new Vector2(0f, -65f), new Vector2(930f, 980f),
+            new Vector2(0f, -80f), new Vector2(930f, 1160f),
             ConsumerTokens.Magenta, 0.88f, true, ConsumerTokens.Surface);
-        BuildRow(card.transform, "NameRow", "player_name", 335f);
-        BuildRow(card.transform, "LanguageRow", "language", 105f);
-        BuildRow(card.transform, "MusicRow", "music", -125f);
-        BuildRow(card.transform, "DifficultyRow", "difficulty", -355f);
-        BuildRow(card.transform, "AdsRow", "ads_privacy", -585f);
+        BuildRow(card.transform, "NameRow", "player_name", 420f);
+        BuildRow(card.transform, "LanguageRow", "language", 190f);
+        BuildRow(card.transform, "MusicRow", "music", -40f);
+        BuildRow(card.transform, "DifficultyRow", "difficulty", -270f);
+        BuildRow(card.transform, "AdsRow", "ads_privacy", -500f);
 
         AddSprite(root, "MascotSix", "reference/mascot_6_exact",
             new Vector2(-410f, -780f), new Vector2(190f, 220f));
         AddSprite(root, "MascotSeven", "reference/mascot_7_exact",
             new Vector2(410f, -780f), new Vector2(190f, 220f));
 
+        SetActive(Find<Transform>(menu.settingsPanel.transform,
+            "ExactSettingsLogo"), false);
         RepositionExistingControls();
     }
 
@@ -121,23 +127,70 @@ public sealed class SettingsVisuals : MonoBehaviour
     {
         var panel = menu.settingsPanel.transform;
         var input = Find<TMP_InputField>(panel, "InputField (TMP)");
-        Place(input == null ? null : input.transform, new Vector2(120f, 335f),
-            new Vector2(430f, 82f));
+        Place(input == null ? null : input.transform, new Vector2(100f, 340f),
+            new Vector2(300f, 82f));
         Place(Find<Button>(panel, "Buttonsave")?.transform,
-            new Vector2(365f, 335f), new Vector2(190f, 74f));
+            new Vector2(350f, 340f), new Vector2(160f, 74f));
         Place(Find<Button>(panel, "EnglishButton")?.transform,
-            new Vector2(30f, 105f), new Vector2(210f, 70f));
+            new Vector2(30f, 110f), new Vector2(210f, 70f));
         Place(Find<Button>(panel, "GreekButton")?.transform,
-            new Vector2(260f, 105f), new Vector2(210f, 70f));
+            new Vector2(260f, 110f), new Vector2(210f, 70f));
         Place(Find<Toggle>(panel, "Toggle")?.transform,
-            new Vector2(250f, -125f), new Vector2(150f, 70f));
+            new Vector2(250f, -120f), new Vector2(150f, 70f));
 
         for (int i = 0; i < 4; i++)
             Place(Find<Button>(panel, "Difficulty" + i)?.transform,
-                new Vector2(45f + i * 145f, -355f),
-                new Vector2(130f, 65f));
-        Place(Find<Button>(panel, "AdsPrivacyButton")?.transform,
-            new Vector2(305f, -585f), new Vector2(200f, 72f));
+                new Vector2(5f + i * 120f, -350f),
+                new Vector2(110f, 65f));
+        var ads = Find<Button>(panel, "AdsPrivacyButton");
+        Place(ads?.transform, new Vector2(305f, -580f),
+            new Vector2(200f, 72f));
+        if (ads != null)
+        {
+            var localized = ads.GetComponentInChildren<LocalizedText>(true);
+            if (localized != null) localized.key = "settings_change";
+            var label = ads.GetComponentInChildren<TMP_Text>(true);
+            if (label != null) label.text = L10n.Get("settings_change");
+        }
+        Place(Find<Button>(panel, "Buttonback")?.transform,
+            new Vector2(-455f, 820f), new Vector2(84f, 84f));
+
+        SetActive(Find<Transform>(panel, "LanguageLabel"), false);
+        SetActive(Find<Transform>(panel, "DifficultyLabel"), false);
+        var toggle = Find<Toggle>(panel, "Toggle");
+        if (toggle != null)
+        {
+            var toggleBackground = toggle.transform.Find("Background")
+                as RectTransform;
+            if (toggleBackground != null)
+            {
+                PlaceLocal(toggleBackground, Vector2.zero,
+                    new Vector2(150f, 70f));
+                var image = toggleBackground.GetComponent<Image>();
+                if (image != null)
+                {
+                    image.sprite = RuntimeUI.RoundedRectSprite;
+                    image.type = Image.Type.Sliced;
+                    image.color = ConsumerTokens.Cyan;
+                }
+                var checkmark = toggleBackground.Find("Checkmark")
+                    as RectTransform;
+                PlaceLocal(checkmark, new Vector2(40f, 0f),
+                    new Vector2(54f, 54f));
+            }
+            foreach (var text in toggle.GetComponentsInChildren<TMP_Text>(true))
+                text.gameObject.SetActive(false);
+            foreach (var text in toggle.GetComponentsInChildren<Text>(true))
+                text.gameObject.SetActive(false);
+        }
+    }
+
+    bool ControlsReady()
+    {
+        if (menu == null || menu.settingsPanel == null) return false;
+        var panel = menu.settingsPanel.transform;
+        return Find<Button>(panel, "GreekButton") != null &&
+               Find<Button>(panel, "Difficulty3") != null;
     }
 
     static void Place(Transform target, Vector2 position, Vector2 size)
@@ -147,6 +200,19 @@ public sealed class SettingsVisuals : MonoBehaviour
         if (rect == null) return;
         rect.anchorMin = new Vector2(0.5f, 0.5f);
         rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.localScale = Vector3.one;
+        rect.anchoredPosition = position;
+        rect.sizeDelta = size;
+        RuntimeUI.ClampToSafeArea(rect, size, position);
+    }
+
+    static void PlaceLocal(RectTransform rect, Vector2 position, Vector2 size)
+    {
+        if (rect == null) return;
+        rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.localScale = Vector3.one;
         rect.anchoredPosition = position;
         rect.sizeDelta = size;
     }
@@ -156,6 +222,11 @@ public sealed class SettingsVisuals : MonoBehaviour
         foreach (var item in parent.GetComponentsInChildren<T>(true))
             if (item.name == name) return item;
         return null;
+    }
+
+    static void SetActive(Transform target, bool active)
+    {
+        if (target != null) target.gameObject.SetActive(active);
     }
 
     static Image AddSprite(Transform parent, string name, string resource,

@@ -198,7 +198,27 @@ jobs:
               missing=1
             fi
           done < <(find Assets -type f -name '*.cs' -print0)
-          exit "$missing"
+          invalid=0
+          while IFS= read -r -d '' meta; do
+            if ! grep -Eq '^guid: [0-9a-f]{32}$' "$meta"; then
+              echo "::error file=$meta::Unity meta GUID must be exactly 32 lowercase hex characters"
+              invalid=1
+            fi
+          done < <(find Assets -type f -name '*.meta' -print0)
+          duplicates="$(
+            while IFS= read -r -d '' meta; do
+              grep -hE '^guid: [0-9a-f]{32}$' "$meta" || true
+            done < <(find Assets -type f -name '*.meta' -print0) |
+              sort | uniq -d
+          )"
+          if [ -n "$duplicates" ]; then
+            echo "::error::Duplicate Unity meta GUIDs detected:"
+            echo "$duplicates"
+            invalid=1
+          fi
+          if [ "$missing" -ne 0 ] || [ "$invalid" -ne 0 ]; then
+            exit 1
+          fi
 
   provisioner-test:
     name: Provisioner tests

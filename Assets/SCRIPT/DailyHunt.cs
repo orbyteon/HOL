@@ -65,9 +65,30 @@ public class DailyHunt : MonoBehaviour
     bool done;
     bool found;
     bool revived;
+    bool reviveInFlight;
     string trail = "";
     int min = 1;
     int max = 100;
+
+    void OnEnable()
+    {
+        L10n.OnLanguageChanged -= RefreshForLanguage;
+        L10n.OnLanguageChanged += RefreshForLanguage;
+    }
+
+    void OnDisable()
+    {
+        L10n.OnLanguageChanged -= RefreshForLanguage;
+    }
+
+    void RefreshForLanguage()
+    {
+        // The panel can be enabled before Build has assigned its fields.
+        // Ignore that transient construction window; Open/Build will perform
+        // the first complete refresh.
+        if (title != null)
+            Refresh();
+    }
 
     // Builds the hidden panel on the canvas and injects the menu entry
     // button right below the PvP entry, mirroring how PvpRuntimeUI places
@@ -161,7 +182,7 @@ public class DailyHunt : MonoBehaviour
     {
         // Backing out of the revive offer settles the day as a loss —
         // leaving it unfinalized dropped the fail from the streak entirely.
-        if (!done && used >= budget)
+        if (!done && used >= budget && !reviveInFlight)
             FinalizeFail();
         gameObject.SetActive(false);
     }
@@ -184,9 +205,11 @@ public class DailyHunt : MonoBehaviour
 
     static int SecretFor(int dayNumber)
     {
-        // Keyed hash instead of System.Random(day): the seeded-PRNG secret
-        // was computable for every future day from the visible day number,
-        // and its multiplied seed overflowed int in 2031.
+        // Stable domain-separated hash instead of System.Random(day), whose
+        // multiplied seed overflowed in 2031. This remains a client-only daily
+        // challenge, not an anti-cheat secret: a determined APK reader can
+        // reproduce the answer. Server-held material would be required for
+        // cheat resistance while keeping one answer shared by every player.
         using (var sha = System.Security.Cryptography.SHA256.Create())
         {
             byte[] hash = sha.ComputeHash(
@@ -350,7 +373,11 @@ public class DailyHunt : MonoBehaviour
 
     void OnRevivePressed()
     {
+        if (reviveInFlight || done) return;
         if (ads == null) { FinalizeFail(); Refresh(); return; }
+        reviveInFlight = true;
+        if (reviveButton != null) reviveButton.interactable = false;
+        int requestedDay = day;
 
         // Intent first, like the streak save: if the process dies after the
         // reward lands but before the callback below runs, the next open
@@ -360,7 +387,16 @@ public class DailyHunt : MonoBehaviour
 
         ads.ShowRewardedAd(() =>
         {
+            reviveInFlight = false;
+            if (requestedDay != PlayerPrefs.GetInt(DayKey, 0))
+            {
+                PlayerPrefs.DeleteKey(PendingReviveKey);
+                PlayerPrefs.DeleteKey(AdsManager.PendingRewardEarnedKey);
+                PlayerPrefs.Save();
+                return;
+            }
             revived = true;
+            done = false;
             budget = GuessBudget + ReviveGuesses;
             Persist();
             // On success AdsManager leaves the earned marker for the
@@ -374,6 +410,7 @@ public class DailyHunt : MonoBehaviour
         },
         () =>
         {
+            reviveInFlight = false;
             PlayerPrefs.DeleteKey(PendingReviveKey);
             PlayerPrefs.Save();
             status.text = L10n.Get("ad_not_ready");
@@ -413,6 +450,7 @@ public class DailyHunt : MonoBehaviour
 
         bool awaitingRevive = !done && used >= budget;
         bool playing = !done && !awaitingRevive;
+        reviveButton.interactable = !reviveInFlight;
 
         input.gameObject.SetActive(playing);
         guessButton.gameObject.SetActive(playing);
