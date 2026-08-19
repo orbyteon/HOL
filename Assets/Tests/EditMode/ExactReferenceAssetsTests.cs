@@ -240,17 +240,20 @@ public class ExactReferenceAssetsTests
             SetPrivateField(hunt, "trailText", TmpText(root.transform, "Trail"));
             SetPrivateField(hunt, "streakText", TmpText(root.transform, "Streak"));
             SetPrivateField(hunt, "reviveLabel", TmpText(root.transform, "Revive"));
-            SetPrivateField(hunt, "input", root.AddComponent(
-                System.Type.GetType("TMPro.TMP_InputField, Unity.TextMeshPro")));
-            SetPrivateField(hunt, "guessButton", root.AddComponent<Button>());
-            SetPrivateField(hunt, "reviveButton", root.AddComponent<Button>());
-            SetPrivateField(hunt, "shareButton", root.AddComponent<Button>());
+            SetPrivateField(hunt, "input", Child(root.transform, "Input")
+                .AddComponent(System.Type.GetType(
+                    "TMPro.TMP_InputField, Unity.TextMeshPro")));
+            SetPrivateField(hunt, "guessButton",
+                Child(root.transform, "GuessButton").AddComponent<Button>());
+            SetPrivateField(hunt, "reviveButton",
+                Child(root.transform, "ReviveButton").AddComponent<Button>());
+            SetPrivateField(hunt, "shareButton",
+                Child(root.transform, "ShareButton").AddComponent<Button>());
             SetPrivateField(hunt, "day", 1);
             SetPrivateField(hunt, "budget", 7);
             SetPrivateField(hunt, "done", true);
 
             SetLanguage("English");
-            InvokePrivate(hunt, "OnEnable");
             InvokePrivate(hunt, "Refresh");
             string englishTitle = TextOf((Component)GetPrivateField(
                 hunt, "title"));
@@ -266,8 +269,8 @@ public class ExactReferenceAssetsTests
         }
         finally
         {
+            InvokeIfPresent(hunt, "OnDisable");
             SetLanguage("English");
-            if (hunt != null) InvokePrivate(hunt, "OnDisable");
             Object.DestroyImmediate(root);
         }
     }
@@ -289,7 +292,6 @@ public class ExactReferenceAssetsTests
             SetPublicField(presentation, "playerChipText", chip);
 
             SetLanguage("English");
-            InvokePrivate(presentation, "OnEnable");
             InvokePublic(presentation, "ShowLocalized",
                 "result_win_title", 5, 7, 67, true);
             string englishTitle = TextOf(title);
@@ -304,8 +306,8 @@ public class ExactReferenceAssetsTests
         }
         finally
         {
+            InvokeIfPresent(presentation, "OnDisable");
             SetLanguage("English");
-            if (presentation != null) InvokePrivate(presentation, "OnDisable");
             Object.DestroyImmediate(root);
         }
     }
@@ -667,6 +669,15 @@ public class ExactReferenceAssetsTests
             BindingFlags.NonPublic | BindingFlags.Instance);
         Assert.IsNotNull(field, "Missing private field: " + name);
         return field.GetValue(component);
+    }
+
+    static void InvokeIfPresent(Component component, string methodName)
+    {
+        if (component == null) return;
+        var method = component.GetType().GetMethod(methodName,
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        if (method != null)
+            method.Invoke(component, null);
     }
 
     static void SetLanguage(string name)
