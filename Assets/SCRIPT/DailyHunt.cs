@@ -70,6 +70,25 @@ public class DailyHunt : MonoBehaviour
     int min = 1;
     int max = 100;
 
+    void OnEnable()
+    {
+        L10n.OnLanguageChanged += RefreshForLanguage;
+    }
+
+    void OnDisable()
+    {
+        L10n.OnLanguageChanged -= RefreshForLanguage;
+    }
+
+    void RefreshForLanguage()
+    {
+        // The panel can be enabled before Build has assigned its fields.
+        // Ignore that transient construction window; Open/Build will perform
+        // the first complete refresh.
+        if (title != null)
+            Refresh();
+    }
+
     // Builds the hidden panel on the canvas and injects the menu entry
     // button right below the PvP entry, mirroring how PvpRuntimeUI places
     // its own button — no scene wiring anywhere.

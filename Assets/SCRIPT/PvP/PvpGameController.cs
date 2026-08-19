@@ -674,12 +674,12 @@ public class PvpGameController : MonoBehaviour
             }
             if (resultPresentation != null)
             {
-                string title = isDraw
-                    ? L10n.Get("result_draw_title")
+                string titleKey = isDraw
+                    ? "result_draw_title"
                     : iWon
-                        ? L10n.Get("result_win_title")
-                        : L10n.Get("result_loss_title");
-                resultPresentation.Show(title, myGuessCount,
+                        ? "result_win_title"
+                        : "result_loss_title";
+                resultPresentation.ShowLocalized(titleKey, myGuessCount,
                     opponentGuessCount, huntedSecret, iWon);
             }
             RefreshSignalsAvailability();

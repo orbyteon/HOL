@@ -228,6 +228,89 @@ public class ExactReferenceAssetsTests
     }
 
     [Test]
+    public void DailyHuntRefreshesFormattedLabelsWhenLanguageChanges()
+    {
+        var root = new GameObject("DailyLanguage");
+        Component hunt = null;
+        try
+        {
+            hunt = root.AddComponent(RuntimeType("DailyHunt"));
+            SetPrivateField(hunt, "title", TmpText(root.transform, "Title"));
+            SetPrivateField(hunt, "status", TmpText(root.transform, "Status"));
+            SetPrivateField(hunt, "trailText", TmpText(root.transform, "Trail"));
+            SetPrivateField(hunt, "streakText", TmpText(root.transform, "Streak"));
+            SetPrivateField(hunt, "reviveLabel", TmpText(root.transform, "Revive"));
+            SetPrivateField(hunt, "input", root.AddComponent(
+                System.Type.GetType("TMPro.TMP_InputField, Unity.TextMeshPro")));
+            SetPrivateField(hunt, "guessButton", root.AddComponent<Button>());
+            SetPrivateField(hunt, "reviveButton", root.AddComponent<Button>());
+            SetPrivateField(hunt, "shareButton", root.AddComponent<Button>());
+            SetPrivateField(hunt, "day", 1);
+            SetPrivateField(hunt, "budget", 7);
+            SetPrivateField(hunt, "done", true);
+
+            SetLanguage("English");
+            InvokePrivate(hunt, "OnEnable");
+            InvokePrivate(hunt, "Refresh");
+            string englishTitle = TextOf((Component)GetPrivateField(
+                hunt, "title"));
+            string englishRevive = TextOf((Component)GetPrivateField(
+                hunt, "reviveLabel"));
+
+            SetLanguage("Greek");
+
+            Assert.IsFalse(englishTitle == TextOf((Component)GetPrivateField(
+                hunt, "title")));
+            Assert.IsFalse(englishRevive == TextOf((Component)GetPrivateField(
+                hunt, "reviveLabel")));
+        }
+        finally
+        {
+            SetLanguage("English");
+            if (hunt != null) InvokePrivate(hunt, "OnDisable");
+            Object.DestroyImmediate(root);
+        }
+    }
+
+    [Test]
+    public void ResultPresentationRefreshesLocalizedDynamicLabelsWhenLanguageChanges()
+    {
+        var root = new GameObject("ResultLanguage", typeof(RectTransform));
+        Component presentation = null;
+        try
+        {
+            presentation = root.AddComponent(RuntimeType(
+                "PvpResultPresentation"));
+            var title = TmpText(root.transform, "Title");
+            var revealed = TmpText(root.transform, "Revealed");
+            var chip = TmpText(root.transform, "Chip");
+            SetPublicField(presentation, "titleText", title);
+            SetPublicField(presentation, "revealedNumberText", revealed);
+            SetPublicField(presentation, "playerChipText", chip);
+
+            SetLanguage("English");
+            InvokePrivate(presentation, "OnEnable");
+            InvokePublic(presentation, "ShowLocalized",
+                "result_win_title", 5, 7, 67, true);
+            string englishTitle = TextOf(title);
+            string englishRevealed = TextOf(revealed);
+            string englishChip = TextOf(chip);
+
+            SetLanguage("Greek");
+
+            Assert.IsFalse(englishTitle == TextOf(title));
+            Assert.IsFalse(englishRevealed == TextOf(revealed));
+            Assert.IsFalse(englishChip == TextOf(chip));
+        }
+        finally
+        {
+            SetLanguage("English");
+            if (presentation != null) InvokePrivate(presentation, "OnDisable");
+            Object.DestroyImmediate(root);
+        }
+    }
+
+    [Test]
     public void InterruptedVictoryPopRestoresTargetScale()
     {
         var root = new GameObject("Confetti", typeof(RectTransform));
@@ -576,6 +659,25 @@ public class ExactReferenceAssetsTests
             BindingFlags.NonPublic | BindingFlags.Instance);
         Assert.IsNotNull(field, "Missing private field: " + name);
         field.SetValue(component, value);
+    }
+
+    static object GetPrivateField(Component component, string name)
+    {
+        var field = component.GetType().GetField(name,
+            BindingFlags.NonPublic | BindingFlags.Instance);
+        Assert.IsNotNull(field, "Missing private field: " + name);
+        return field.GetValue(component);
+    }
+
+    static void SetLanguage(string name)
+    {
+        var l10n = RuntimeType("L10n");
+        var language = l10n.GetNestedType("Language", BindingFlags.Public);
+        Assert.IsNotNull(language, "Missing L10n.Language enum.");
+        var setLanguage = l10n.GetMethod("SetLanguage",
+            BindingFlags.Public | BindingFlags.Static);
+        Assert.IsNotNull(setLanguage, "Missing L10n.SetLanguage.");
+        setLanguage.Invoke(null, new[] { System.Enum.Parse(language, name) });
     }
 
     static void InvokePublic(Component component, string methodName,

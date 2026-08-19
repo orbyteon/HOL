@@ -63,6 +63,10 @@ Play Console versionName in `ProjectSettings.asset`.
 
 ### Changed
 
+- Daily Hunt and the PvP result presentation now refresh their formatted
+  dynamic labels when the player changes language while either screen is
+  active; result headings retain their localization key instead of a stale
+  rendered string.
 - The privacy policy's contact address is now `support@orbyteon.com` —
   a role mailbox owned by the publisher instead of a personal one. Both
   committed copies (the canonical `docs/privacy.html` and the byte-identical
