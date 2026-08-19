@@ -28,6 +28,10 @@ Play Console versionName in `ProjectSettings.asset`.
 
 ### Added
 
+- A non-production Splash Android preview workflow builds a universal ARM64
+  and x86_64 Development APK, captures and validates a 1080×1920
+  `splash.png`, and uploads `hol-splash-android-preview` for QA. It does not
+  use the production environment or change `versionCode`.
 - **Daily Hunt** — the parked product-pass draft's one unshipped idea (#6),
   ported onto the Consumer First board. One date-seeded secret number
   shared by every player per UTC day, seven guesses, an emoji-trail result
@@ -43,6 +47,10 @@ Play Console versionName in `ProjectSettings.asset`.
 
 ### Changed
 
+- Splash Home / `SplashScene` presentation is now owned by `SplashDesign`:
+  cartoon stairs and clouds, the HOL logo, a boy-and-girl fist-bump, mascot
+  6 on the left and 7 on the right, and only a gold elapsed hairline. It has
+  no Main Menu chrome and no user-facing Splash text.
 - The privacy policy's contact address is now `support@orbyteon.com` —
   a role mailbox owned by the publisher instead of a personal one. Both
   committed copies (the canonical `docs/privacy.html` and the byte-identical

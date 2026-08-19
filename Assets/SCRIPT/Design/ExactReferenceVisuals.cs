@@ -55,10 +55,11 @@ public sealed class ExactReferenceVisuals : MonoBehaviour
     static void InstallForScene(Scene scene)
     {
         if (!scene.IsValid() || !scene.isLoaded) return;
+        if (scene.name == "SplashScene") return;
 
         // Prefer the canvas that owns the menu controller's panel. This avoids
         // styling unrelated SDK/debug/world-space canvases that may exist in the
-        // same scene. Splash and other scenes fall back to their first root,
+        // same scene. Other eligible scenes fall back to their first root,
         // screen-space canvas.
         Canvas canvas = null;
         var menu = FindInScene<MenuManager>(scene);

@@ -1,7 +1,8 @@
 using System.Reflection;
 using NUnit.Framework;
+using UnityEditor.SceneManagement;
 using UnityEngine;
-using UnityEngine.UI;
+using UnityEngine.SceneManagement;
 
 public class ExactReferenceAssetsTests
 {
@@ -48,56 +49,32 @@ public class ExactReferenceAssetsTests
     }
 
     [Test]
-    public void ApprovedSplashDoesNotBuildLegacyVisuals()
+    public void ExactReferenceInstallerSkipsSplashScene()
     {
-        var canvasObject = new GameObject("ExactSplashCanvas", typeof(RectTransform), typeof(Canvas));
+        var splashScene = default(Scene);
 
         try
         {
-            var panel = ChildWithImage(canvasObject.transform, "Panel");
-            var oldLogo = ChildWithImage(canvasObject.transform, "Image");
-            var numberField = Child(canvasObject.transform, "NumberField");
-            var seam = Child(canvasObject.transform, "Seam");
-            var seamBloom = Child(canvasObject.transform, "SeamBloom");
-            var tagline = Child(canvasObject.transform, "Tagline");
-            var progressTrack = Child(canvasObject.transform, "ProgressTrack");
+            splashScene = EditorSceneManager.OpenScene(
+                "Assets/Scenes/SplashScene.unity", OpenSceneMode.Additive);
+            Assert.IsTrue(splashScene.IsValid());
+            Assert.IsTrue(splashScene.isLoaded);
+            Assert.AreEqual("SplashScene", splashScene.name);
 
-            canvasObject.AddComponent(RuntimeType("SplashLoader"));
-            var exact = canvasObject.AddComponent(RuntimeType("ExactReferenceVisuals"));
-            InvokePrivate(exact, "Awake");
-            InvokePrivate(exact, "LayoutSplash", canvasObject.transform);
+            var exactType = RuntimeType("ExactReferenceVisuals");
+            Assert.IsNull(FindInScene(splashScene, exactType),
+                "The real Splash scene must not serialize ExactReferenceVisuals.");
 
-            Assert.IsFalse(panel.GetComponent<Image>().enabled,
-                "The legacy splash background must be hidden.");
-            Assert.IsFalse(oldLogo.activeSelf,
-                "The legacy splash logo must be hidden.");
-            Assert.IsFalse(numberField.activeSelf);
-            Assert.IsFalse(seam.activeSelf);
-            Assert.IsFalse(seamBloom.activeSelf);
-            Assert.IsFalse(tagline.activeSelf);
-            Assert.IsTrue(progressTrack.activeSelf,
-                "The existing loading line must remain available.");
-            Assert.IsNotNull(canvasObject.transform.Find("ExactSplashLogo"),
-                "The approved HOL logo should replace the legacy splash artwork.");
+            InvokePrivateStatic(exactType, "InstallForScene", splashScene);
+
+            Assert.IsNull(FindInScene(splashScene, exactType),
+                "ExactReferenceVisuals must leave Splash presentation to SplashDesign.");
         }
         finally
         {
-            Object.DestroyImmediate(canvasObject);
+            if (splashScene.IsValid() && splashScene.isLoaded)
+                EditorSceneManager.CloseScene(splashScene, true);
         }
-    }
-
-    static GameObject Child(Transform parent, string name)
-    {
-        var child = new GameObject(name, typeof(RectTransform));
-        child.transform.SetParent(parent, false);
-        return child;
-    }
-
-    static GameObject ChildWithImage(Transform parent, string name)
-    {
-        var child = new GameObject(name, typeof(RectTransform), typeof(Image));
-        child.transform.SetParent(parent, false);
-        return child;
     }
 
     static void InvokePrivate(Component component, string methodName, params object[] arguments)
@@ -106,6 +83,26 @@ public class ExactReferenceAssetsTests
             methodName, BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.IsNotNull(method, "Missing private method: " + methodName);
         method.Invoke(component, arguments);
+    }
+
+    static void InvokePrivateStatic(
+        System.Type type, string methodName, params object[] arguments)
+    {
+        var method = type.GetMethod(
+            methodName, BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.IsNotNull(method, "Missing private static method: " + methodName);
+        method.Invoke(null, arguments);
+    }
+
+    static Component FindInScene(Scene scene, System.Type type)
+    {
+        foreach (var root in scene.GetRootGameObjects())
+        {
+            var components = root.GetComponentsInChildren(type, true);
+            if (components.Length > 0)
+                return components[0] as Component;
+        }
+        return null;
     }
 
     static System.Type RuntimeType(string name)

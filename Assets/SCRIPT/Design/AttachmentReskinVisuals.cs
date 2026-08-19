@@ -50,6 +50,7 @@ public sealed class AttachmentReskinVisuals : MonoBehaviour
     static void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
         if (!scene.IsValid() || !scene.isLoaded) return;
+        if (scene.name == "SplashScene") return;
 
         Canvas canvas = null;
         var menu = FindInScene<MenuManager>(scene);
