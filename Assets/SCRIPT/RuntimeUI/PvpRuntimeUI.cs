@@ -942,7 +942,7 @@ public class PvpRuntimeUI : MonoBehaviour
         AddSprite(menu.transform, "MascotSeven", "reference/mascot_7_exact",
             new Vector2(440f, -760f), new Vector2(150f, 180f));
         var back = RuntimeUI.CreateButton(menu.transform, L10n.Get("back"),
-            L10n.Get("back"), new Vector2(0f, -850f),
+            L10n.Get("back"), new Vector2(0f, -860f),
             new Vector2(260f, 70f), ConsumerTokens.SurfaceElevated);
         RuntimeUI.Localize(back, "back");
 

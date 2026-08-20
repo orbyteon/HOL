@@ -186,21 +186,8 @@ public sealed class SplashDesign : MonoBehaviour
 
     void ConfigureSafeArea(RectTransform safeRoot, RectTransform canvasRect)
     {
-        Rect normalized = NormalizedSafeArea(Screen.safeArea, Screen.width, Screen.height);
-        safeRoot.anchorMin = normalized.min;
-        safeRoot.anchorMax = normalized.max;
-        safeRoot.offsetMin = Vector2.zero;
-        safeRoot.offsetMax = Vector2.zero;
-        safeRoot.pivot = new Vector2(0.5f, 0.5f);
-
-        Vector2 canvasSize = canvasRect.rect.size;
-        if (canvasSize.x <= 0f || canvasSize.y <= 0f)
-            canvasSize = new Vector2(ReferenceWidth, ReferenceHeight);
-        float availableWidth = canvasSize.x * normalized.width;
-        float availableHeight = canvasSize.y * normalized.height;
-        float scale = Mathf.Min(1f,
-            Mathf.Min(availableWidth / ReferenceWidth, availableHeight / ReferenceHeight));
-        safeRoot.localScale = new Vector3(scale, scale, 1f);
+        ResponsiveSafeAreaRoot.Attach(safeRoot, canvasRect,
+            new Vector2(ReferenceWidth, ReferenceHeight));
     }
 
     void SetEntranceState()
@@ -262,12 +249,7 @@ public sealed class SplashDesign : MonoBehaviour
 
     static Rect NormalizedSafeArea(Rect safe, float width, float height)
     {
-        if (width <= 0f || height <= 0f) return new Rect(0f, 0f, 1f, 1f);
-        return new Rect(
-            Mathf.Clamp01(safe.xMin / width),
-            Mathf.Clamp01(safe.yMin / height),
-            Mathf.Clamp01(safe.width / width),
-            Mathf.Clamp01(safe.height / height));
+        return ResponsiveViewportGeometry.CalculateNormalizedSafeArea(safe, width, height);
     }
 
     Canvas FindSceneCanvas()

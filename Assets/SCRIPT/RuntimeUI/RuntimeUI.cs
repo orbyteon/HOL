@@ -82,50 +82,13 @@ public static class RuntimeUI
             new Vector4(border, border, border, border));
     }
 
-    // Runtime page roots use a 1080x1920 portrait reference canvas. Clamp
-    // direct children of a full-screen page to Android's safe area while leaving
-    // nested labels/children in their local card coordinates.
-    static Canvas FindPageCanvas(RectTransform rect)
-    {
-        if (rect == null || rect.parent == null) return null;
-        Transform current = rect.parent;
-        while (current != null)
-        {
-            var canvas = current.GetComponent<Canvas>();
-            if (canvas != null) return canvas;
-
-            var page = current as RectTransform;
-            if (page == null ||
-                page.anchorMin != Vector2.zero ||
-                page.anchorMax != Vector2.one)
-                return null;
-            current = current.parent;
-        }
-        return null;
-    }
-
+    // Runtime page roots use a 1080x1920 portrait reference canvas. Register
+    // direct page content with the one responsive owner for its nearest
+    // full-screen root. Nested labels and card children remain in local card
+    // coordinates, so safe-area compensation is never applied twice.
     static void ClampPageChild(RectTransform rect, Vector2 size, Vector2 requested)
     {
-        var canvas = FindPageCanvas(rect);
-        if (canvas == null) return;
-        var canvasRect = canvas != null ? canvas.transform as RectTransform : null;
-        Vector2 canvasSize = canvasRect != null && canvasRect.rect.size.sqrMagnitude > 0f
-            ? canvasRect.rect.size
-            : new Vector2(1080f, 1920f);
-
-        Rect safe = Screen.safeArea;
-        float width = Mathf.Max(1f, Screen.width);
-        float height = Mathf.Max(1f, Screen.height);
-        float left = safe.xMin / width * canvasSize.x - canvasSize.x * 0.5f;
-        float right = safe.xMax / width * canvasSize.x - canvasSize.x * 0.5f;
-        float bottom = safe.yMin / height * canvasSize.y - canvasSize.y * 0.5f;
-        float top = safe.yMax / height * canvasSize.y - canvasSize.y * 0.5f;
-        float halfW = size.x * 0.5f + 16f;
-        float halfH = size.y * 0.5f + 16f;
-
-        rect.anchoredPosition = new Vector2(
-            Mathf.Clamp(requested.x, left + halfW, right - halfW),
-            Mathf.Clamp(requested.y, bottom + halfH, top - halfH));
+        ResponsivePageLayout.Register(rect, size, requested);
 
         if (size.x < 48f || size.y < 48f)
             Debug.LogWarning("HOL UI: page touch target below 48px: " + rect.name);
@@ -170,8 +133,8 @@ public static class RuntimeUI
 
     // Every runtime-built label is TextMesh Pro, same as the scene's TMP
     // labels and the input fields below — one text stack, one default font
-    // asset. Wrapping and overflow mirror what the legacy version did: wrap
-    // horizontally, overflow vertically rather than truncate.
+    // asset. The shared responsive policy keeps English and Greek inside
+    // their authored regions with bounded autosizing and vertical ellipsis.
     public static TextMeshProUGUI CreateText(Transform parent, string name, string content,
         int fontSize, Vector2 position, Vector2 size, Color? color = null)
     {
@@ -190,8 +153,7 @@ public static class RuntimeUI
         // near-white, softened so it belongs to the night.
         text.color = color ?? new Color(0.91f, 0.93f, 1f);
         text.alignment = TextAlignmentOptions.Center;
-        text.enableWordWrapping = true;
-        text.overflowMode = TextOverflowModes.Overflow;
+        ResponsiveTextPolicy.Configure(text, ResponsiveTextRole.Body, fontSize);
         return text;
     }
 
@@ -224,6 +186,7 @@ public static class RuntimeUI
 
         var text = CreateText(go.transform, "Label", label, 30, Vector2.zero, size, labelColor);
         Stretch(text.gameObject);
+        ResponsiveTextPolicy.Configure(text, ResponsiveTextRole.Action, 30f);
 
         // Juice at creation time: buttons built after JuiceRuntimeWiring's
         // one-shot startup pass would otherwise stay flat and silent.
@@ -274,6 +237,7 @@ public static class RuntimeUI
         text.fontSize = 36;
         text.color = Color.black;
         text.alignment = TextAlignmentOptions.Center;
+        ResponsiveTextPolicy.Configure(text, ResponsiveTextRole.Input, 36f);
         input.textComponent = text;
 
         // Placeholder.
@@ -284,6 +248,7 @@ public static class RuntimeUI
         ph.fontSize = 36;
         ph.color = new Color(0f, 0f, 0f, 0.4f);
         ph.alignment = TextAlignmentOptions.Center;
+        ResponsiveTextPolicy.Configure(ph, ResponsiveTextRole.Input, 36f);
         input.placeholder = ph;
 
         return input;
@@ -314,6 +279,12 @@ public static class RuntimeUI
     {
         if (input == null) return;
         Localize(input.placeholder as TMP_Text, key);
+    }
+
+    public static void ConfigureText(TMP_Text text, ResponsiveTextRole role,
+        float configuredMaximum = 0f)
+    {
+        ResponsiveTextPolicy.Configure(text, role, configuredMaximum);
     }
 
     // Unity forbids Object.Destroy from EditMode tests and editor scripts —

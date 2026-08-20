@@ -113,6 +113,7 @@ public static class NeonFrame
     {
         var frame = RuntimeUI.CreateObject(name, parent);
         ConvergingLight.Center(frame, pos, size);
+        RuntimeUI.ClampToSafeArea((RectTransform)frame.transform, size, pos);
 
         if (glow)
         {

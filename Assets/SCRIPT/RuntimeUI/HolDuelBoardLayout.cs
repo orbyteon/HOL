@@ -126,31 +126,9 @@ public sealed class HolDuelBoardLayout : MonoBehaviour
     {
         if (rect == null) return;
         Center(rect, size, position);
-        rect.anchoredPosition = ClampToSafeArea(position, size);
+        RuntimeUI.ClampToSafeArea(rect, size, position);
         if (!layoutRoots.Contains(rect))
             layoutRoots.Add(rect);
-    }
-
-    Vector2 ClampToSafeArea(Vector2 position, Vector2 size)
-    {
-        var canvasRect = board != null ? board.parent as RectTransform : null;
-        Vector2 canvasSize = canvasRect != null && canvasRect.rect.size.sqrMagnitude > 0f
-            ? canvasRect.rect.size
-            : new Vector2(1080f, 1920f);
-
-        Rect safe = Screen.safeArea;
-        float width = Mathf.Max(1f, Screen.width);
-        float height = Mathf.Max(1f, Screen.height);
-        float left = (safe.xMin / width) * canvasSize.x - canvasSize.x * 0.5f;
-        float right = (safe.xMax / width) * canvasSize.x - canvasSize.x * 0.5f;
-        float bottom = (safe.yMin / height) * canvasSize.y - canvasSize.y * 0.5f;
-        float top = (safe.yMax / height) * canvasSize.y - canvasSize.y * 0.5f;
-
-        float halfWidth = size.x * 0.5f + 16f;
-        float halfHeight = size.y * 0.5f + 16f;
-        return new Vector2(
-            Mathf.Clamp(position.x, left + halfWidth, right - halfWidth),
-            Mathf.Clamp(position.y, bottom + halfHeight, top - halfHeight));
     }
 
     GameObject Card(string name, Vector2 size, Vector2 position, Color color)
@@ -252,6 +230,13 @@ public sealed class HolDuelBoardLayout : MonoBehaviour
             LayoutText(opponentIdentityText, new Vector2(255f, 680f), new Vector2(430f, 52f), 28f, NearWhite);
         }
 
+        // The three answer buttons are scene-authored beneath a legacy 100x100
+        // grouping RectTransform. Promote that presentation-only group to a
+        // full-screen coordinate root at runtime so the shared page contract
+        // can own its children without changing the scene or their callbacks.
+        var answerRoot = FindChild("AIBUTTONSPANEL");
+        if (answerRoot != null)
+            RuntimeUI.Stretch(answerRoot.gameObject);
         MoveIfFound("ButtonHIGHER", new Vector2(-300f, -705f), new Vector2(260f, 100f));
         MoveIfFound("ButtonCORRECT", new Vector2(0f, -705f), new Vector2(260f, 100f));
         MoveIfFound("ButtonLOWER", new Vector2(300f, -705f), new Vector2(260f, 100f));
@@ -264,7 +249,7 @@ public sealed class HolDuelBoardLayout : MonoBehaviour
         text.alignment = TextAlignmentOptions.Center;
         text.fontSize = fontSize;
         text.color = color;
-        text.enableWordWrapping = true;
+        RuntimeUI.ConfigureText(text, ResponsiveTextRole.Heading, fontSize);
     }
 
     void BuildHistoryCard()
@@ -304,7 +289,7 @@ public sealed class HolDuelBoardLayout : MonoBehaviour
     {
         keypadRoot = RuntimeUI.CreateObject("NumberKeypad", board);
         var rootRect = (RectTransform)keypadRoot.transform;
-        CenterRoot(rootRect, new Vector2(620f, 620f), new Vector2(-240f, -285f));
+        CenterRoot(rootRect, new Vector2(620f, 620f), new Vector2(-240f, -320f));
 
         string[] keys = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "×", "0", BackspaceCommand };
         for (int i = 0; i < keys.Length; i++)
