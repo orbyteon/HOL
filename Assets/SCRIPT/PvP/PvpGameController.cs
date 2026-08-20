@@ -29,6 +29,7 @@ public class PvpGameController : MonoBehaviour
     public TMP_Text roomCodeText;
     public TMP_Text createStatusText;
     public AnimatedEllipsis createStatusEllipsis;
+    public GameObject createCopyButton;
 
     [Header("Join flow")]
     public TMP_InputField joinCodeInput;
@@ -43,13 +44,17 @@ public class PvpGameController : MonoBehaviour
     [Header("Match UI")]
     public TMP_InputField guessInput;
     public GameObject guessButton;
+    public GameObject keypadRoot;
+    public GameObject leaveButton;
     public TMP_Text opponentNameText;
     // Optional: the Consumer First banner's round counter; null-safe everywhere.
     public TMP_Text roundText;
     public TMP_Text turnText;
     public TMP_Text historyText;
+    public GuessHistoryRail historyRail;
     public TMP_Text resultText;
     public PvpResultPresentation resultPresentation;
+    public PvpTerminalPresentation terminalPresentation;
 
     [Header("Duel rules UI")]
     // How far the player has narrowed the opponent's number, plus the Lock.
@@ -71,6 +76,7 @@ public class PvpGameController : MonoBehaviour
     public GameObject rematchButton;
     public TMP_InputField rematchSecretInput;
     public TMP_Text rematchStatusText;
+    public GameObject resultExitButton;
 
     public ConfettiBurst winConfetti;
     public AudioSource audioSource;
@@ -78,9 +84,10 @@ public class PvpGameController : MonoBehaviour
     public AudioClip loseSound;
 
     PvpBackend.RoomState lastState;
-    string shownGuessKey = "";
     bool matchOver;
     bool guessInFlight;
+    bool abnormalTerminal;
+    bool authoritativeResultShown;
 
     // The player's own narrowing interval on the opponent's number. PvP used to
     // show no range at all while solo play did; it is also what tells us how
@@ -106,9 +113,6 @@ public class PvpGameController : MonoBehaviour
 
     int flowGeneration;
     bool joinCreateInFlight;
-    string lastStateSignature = "";
-    int silentPolls;
-    const int MaxSilentPolls = 200;
 
     string MyName
     {
@@ -121,7 +125,11 @@ public class PvpGameController : MonoBehaviour
 
     public void OpenPvpMenu()
     {
+        abnormalTerminal = false;
+        authoritativeResultShown = false;
+        if (terminalPresentation != null) terminalPresentation.Hide();
         if (resultPresentation != null) resultPresentation.Hide();
+        if (leaveButton != null) leaveButton.SetActive(true);
         ResetPrebattlePanels();
         pvpMenuPanel.SetActive(true);
         createPanel.SetActive(false);
@@ -195,6 +203,7 @@ public class PvpGameController : MonoBehaviour
     {
         if (createStatusEllipsis != null)
             createStatusEllipsis.enabled = false;
+        if (createCopyButton != null) createCopyButton.SetActive(true);
 
         createStatusText.text = message;
 
@@ -330,6 +339,7 @@ public class PvpGameController : MonoBehaviour
             }
 
             guessInFlight = false;
+            if (abnormalTerminal) return;
             if (ok)
             {
                 lockArmed = false;
@@ -370,6 +380,7 @@ public class PvpGameController : MonoBehaviour
 
     public void OnSignalPressed(int signalId)
     {
+        if (abnormalTerminal) return;
         if (lastState == null || !Signals.IsValid(signalId)) return;
         if (!client.IsServerAuthoritative) return;
         if (signalsSent >= Signals.CapPerSide)
@@ -401,6 +412,7 @@ public class PvpGameController : MonoBehaviour
     bool IsCurrentSignalCallback(int generation, int matchIndex)
     {
         return generation == flowGeneration &&
+               !abnormalTerminal &&
                lastState != null &&
                lastState.matchIndex == matchIndex;
     }
@@ -409,6 +421,7 @@ public class PvpGameController : MonoBehaviour
     // the next match only once both players have committed.
     public void OnRematchPressed()
     {
+        if (abnormalTerminal) return;
         if (!matchOver || lastState == null || rematchInFlight) return;
         if (!client.IsServerAuthoritative || lastState.opponentLeft) return;
 
@@ -425,7 +438,7 @@ public class PvpGameController : MonoBehaviour
         int gen = flowGeneration;
         client.RequestRematch(secret, ok =>
         {
-            if (gen != flowGeneration) return;
+            if (gen != flowGeneration || abnormalTerminal) return;
 
             rematchInFlight = false;
             if (ok) donePolls = 0;
@@ -440,11 +453,14 @@ public class PvpGameController : MonoBehaviour
         client.DeleteRoom();
         matchOver = false;
         guessInFlight = false;
+        abnormalTerminal = false;
+        authoritativeResultShown = false;
         joinCreateInFlight = false;
         rematchInFlight = false;
         CancelInvoke(nameof(ResumeWaitingStatus));
         lastState = null;
-        shownGuessKey = "";
+        if (terminalPresentation != null) terminalPresentation.Hide();
+        if (historyRail != null) historyRail.ResetForMatch(0);
         ShowRematchOffer(false);
         OpenPvpMenu();
     }
@@ -484,9 +500,8 @@ public class PvpGameController : MonoBehaviour
     {
         matchOver = false;
         guessInFlight = false;
-        shownGuessKey = "";
-        silentPolls = 0;
-        lastStateSignature = "";
+        abnormalTerminal = false;
+        authoritativeResultShown = false;
         myMin = 1;
         myMax = 100;
         lockArmed = false;
@@ -496,6 +511,9 @@ public class PvpGameController : MonoBehaviour
         lastMatchIndex = 0;
         rematchInFlight = false;
         donePolls = 0;
+        if (terminalPresentation != null) terminalPresentation.Hide();
+        if (historyRail != null) historyRail.ResetForMatch(0);
+        if (leaveButton != null) leaveButton.SetActive(true);
         ShowRematchOffer(false);
         UpdateRangeText();
         RefreshLockButton();
@@ -509,34 +527,71 @@ public class PvpGameController : MonoBehaviour
 
     void HandleRoomClosed()
     {
-        ShowTerminalStatus(L10n.Get("pvp_opponent_left"));
+        // A missing room can mean expiry, cleanup or departure. The transport
+        // cannot prove which, so the presentation must remain neutral.
+        EnterAbnormalTerminal(PvpTerminalReason.RoomUnavailable);
     }
 
     void HandleConnectionLost()
     {
-        ShowTerminalStatus(L10n.Get("pvp_connection_lost"));
+        EnterAbnormalTerminal(PvpTerminalReason.ConnectionLost);
     }
 
-    void ShowTerminalStatus(string message)
+    void EnterAbnormalTerminal(PvpTerminalReason reason)
     {
-        if (matchPanel.activeSelf)
+        client.StopPolling();
+        CancelInvoke(nameof(ResumeWaitingStatus));
+        abnormalTerminal = true;
+        matchOver = true;
+        guessInFlight = false;
+        rematchInFlight = false;
+
+        if (matchPanel != null && matchPanel.activeSelf)
         {
-            matchOver = true;
-            resultText.text = message;
-            turnText.text = "";
+            bool preserveResult = authoritativeResultShown;
+            if (!preserveResult && resultText != null) resultText.text = "";
+            if (turnText != null) turnText.text = "";
+            if (roundText != null) roundText.text = "";
+            if (rangeText != null) rangeText.text = "";
+
+            SetTerminalControlState(preserveResult);
+            if (terminalPresentation != null)
+                terminalPresentation.Show(reason, preserveResult);
         }
-        else if (createPanel.activeSelf)
+        else if (createPanel != null && createPanel.activeSelf)
         {
-            SetCreateStatus(message, false);
+            if (createStatusEllipsis != null)
+                createStatusEllipsis.enabled = false;
+            if (createCopyButton != null) createCopyButton.SetActive(false);
+            if (terminalPresentation != null)
+                terminalPresentation.ShowStatus(reason, createStatusText);
         }
-        else if (joinPanel.activeSelf)
+        else if (joinPanel != null && joinPanel.activeSelf)
         {
-            joinStatusText.text = message;
+            if (terminalPresentation != null)
+                terminalPresentation.ShowStatus(reason, joinStatusText);
         }
+    }
+
+    void SetTerminalControlState(bool preserveAuthoritativeResult)
+    {
+        if (guessInput != null) guessInput.gameObject.SetActive(false);
+        if (keypadRoot != null) keypadRoot.SetActive(false);
+        if (guessButton != null) guessButton.SetActive(false);
+        if (lockButton != null) lockButton.SetActive(false);
+        if (signalsRoot != null) signalsRoot.SetActive(false);
+        if (resultSignalsRoot != null) resultSignalsRoot.SetActive(false);
+        if (rematchButton != null) rematchButton.SetActive(false);
+        if (rematchSecretInput != null)
+            rematchSecretInput.gameObject.SetActive(false);
+        if (leaveButton != null) leaveButton.SetActive(false);
+        if (resultExitButton != null)
+            resultExitButton.SetActive(preserveAuthoritativeResult);
     }
 
     void OnState(PvpBackend.RoomState s)
     {
+        if (abnormalTerminal || s == null) return;
         if (s.phase == "closed")
         {
             client.StopPolling();
@@ -547,27 +602,6 @@ public class PvpGameController : MonoBehaviour
         lastState = s;
 
         string me = client.IsHost ? "host" : "guest";
-        string signature = s.phase + "|" + s.turn + "|" + s.lastBy + "|" +
-                           s.lastGuess + "|" + s.winner + "|" + s.hostGuessCount +
-                           "|" + s.guestGuessCount + "|" + s.matchIndex + "|" +
-                           s.iWantRematch + "|" + s.theyWantRematch;
-        if (signature != lastStateSignature)
-        {
-            lastStateSignature = signature;
-            silentPolls = 0;
-        }
-        else if (s.phase == "play" && s.turn != me && !matchOver)
-        {
-            if (++silentPolls >= MaxSilentPolls)
-            {
-                silentPolls = 0;
-                client.StopPolling();
-                client.DeleteRoom();
-                HandleConnectionLost();
-                return;
-            }
-        }
-        else silentPolls = 0;
 
         // Both sides committed a new secret, so the room dealt a fresh match in
         // place. Everything local to the old one has to go.
@@ -595,7 +629,8 @@ public class PvpGameController : MonoBehaviour
             matchPanel.SetActive(true);
             if (resultPresentation != null) resultPresentation.Hide();
             resultText.text = "";
-            historyText.text = "";
+            if (historyRail == null && historyText != null)
+                historyText.text = "";
         }
 
         string opponentName = client.IsHost ? s.guestName : s.hostName;
@@ -608,22 +643,19 @@ public class PvpGameController : MonoBehaviour
                 ? L10n.Get("round_label_open", s.roundIndex + 1)
                 : "";
 
-        string key = s.lastBy + ":" + s.lastGuess;
-        if (s.lastBy != "" && s.lastGuess != 0 && key != shownGuessKey)
+        if (s.lastBy != "" && s.lastGuess != 0)
         {
-            shownGuessKey = key;
             bool guessWasMine = (s.lastBy == me);
-            string who = guessWasMine ? L10n.Get("you") : opponentName;
-            string hint = LocalizedHint(s.lastHint);
-            if (s.lastLocked) who += " [" + L10n.Get("lock_armed") + "]";
-            historyText.text = who + ": " + s.lastGuess + "  →  " + hint;
+            int ordinal = s.lastBy == "host"
+                ? s.hostGuessCount
+                : s.guestGuessCount;
+            bool recorded = historyRail != null && historyRail.Record(
+                s.matchIndex, s.lastBy, ordinal,
+                s.hostGuessCount + s.guestGuessCount, s.lastGuess,
+                s.lastHint, s.lastLocked, guessWasMine, opponentName);
 
-            if (guessWasMine)
+            if (recorded && guessWasMine)
                 NarrowMyRange(s.lastGuess, s.lastHint);
-            if (s.lastLocked && s.lastHint != "correct")
-                historyText.text += "\n" + (guessWasMine
-                    ? L10n.Get("lock_missed")
-                    : L10n.Get("opponent_forfeits", opponentName));
         }
 
         ShowIncomingSignal(s, opponentName);
@@ -631,6 +663,9 @@ public class PvpGameController : MonoBehaviour
         if (s.phase == "done" && !matchOver)
         {
             matchOver = true;
+            authoritativeResultShown = true;
+            abnormalTerminal = false;
+            if (terminalPresentation != null) terminalPresentation.Hide();
 
             // Keep polling so the room can hear a rematch offer. Backends that
             // cannot deal one release the room immediately, as before.
@@ -703,7 +738,12 @@ public class PvpGameController : MonoBehaviour
                 lastMatchIndex = s.matchIndex;
                 if (rematchSecretInput != null) rematchSecretInput.text = "";
                 SetRematchStatus("");
-                ShowRematchOffer(true);
+                if (s.opponentLeft)
+                {
+                    EnterAbnormalTerminal(PvpTerminalReason.OpponentLeft);
+                    ReleaseFinishedRoom();
+                }
+                else ShowRematchOffer(true);
             }
             else
             {
@@ -792,8 +832,7 @@ public class PvpGameController : MonoBehaviour
 
         if (s.opponentLeft)
         {
-            ShowRematchOffer(false);
-            SetRematchStatus(L10n.Get("rematch_closed"));
+            EnterAbnormalTerminal(PvpTerminalReason.OpponentLeft);
             ReleaseFinishedRoom();
             return;
         }
@@ -809,8 +848,7 @@ public class PvpGameController : MonoBehaviour
         int limit = s.iWantRematch ? MaxDonePolls * 2 : MaxDonePolls;
         if (++donePolls >= limit)
         {
-            ShowRematchOffer(false);
-            SetRematchStatus(L10n.Get("rematch_closed"));
+            EnterAbnormalTerminal(PvpTerminalReason.RoomUnavailable);
             ReleaseFinishedRoom();
         }
     }
@@ -828,8 +866,8 @@ public class PvpGameController : MonoBehaviour
         matchOver = false;
         guessInFlight = false;
         rematchInFlight = false;
-        shownGuessKey = "";
-        silentPolls = 0;
+        abnormalTerminal = false;
+        authoritativeResultShown = false;
         donePolls = 0;
         myMin = 1;
         myMax = 100;
@@ -837,11 +875,15 @@ public class PvpGameController : MonoBehaviour
         lockRevealedThisMatch = false;
         signalsSent = 0; // the server grants a fresh allowance per match
 
+        if (terminalPresentation != null) terminalPresentation.Hide();
+        if (historyRail != null && lastState != null)
+            historyRail.ResetForMatch(lastState.matchIndex);
+        if (leaveButton != null) leaveButton.SetActive(true);
         ShowRematchOffer(false);
         SetRematchStatus("");
         if (resultPresentation != null) resultPresentation.Hide();
         if (resultText != null) resultText.text = "";
-        if (historyText != null) historyText.text = "";
+        if (historyRail == null && historyText != null) historyText.text = "";
         if (signalFeedText != null) signalFeedText.text = "";
         if (resultSignalFeedText != null) resultSignalFeedText.text = "";
         if (guessInput != null) guessInput.text = "";
@@ -861,6 +903,7 @@ public class PvpGameController : MonoBehaviour
         // no longer be used. They come back only for a live match.
         bool matchLive = !matchOver;
         if (guessInput != null) guessInput.gameObject.SetActive(!visible && matchLive);
+        if (keypadRoot != null) keypadRoot.SetActive(!visible && matchLive);
         if (guessButton != null) guessButton.SetActive(!visible && matchLive);
 
         if (!visible) SetRematchStatus("");
@@ -946,7 +989,7 @@ public class PvpGameController : MonoBehaviour
     void RefreshSignalsAvailability()
     {
         bool available = client != null && client.IsServerAuthoritative &&
-                         signalsSent < Signals.CapPerSide;
+                          !abnormalTerminal && signalsSent < Signals.CapPerSide;
         if (signalsRoot != null)
             signalsRoot.SetActive(available && !matchOver);
         if (resultSignalsRoot != null)
@@ -974,14 +1017,6 @@ public class PvpGameController : MonoBehaviour
 
         ShowSignalLine(opponentName, s.signalId);
         Haptics.Light();
-    }
-
-    static string LocalizedHint(string hint)
-    {
-        if (hint == "correct") return L10n.Get("correct") + "!";
-        if (hint == "higher") return L10n.Get("higher");
-        if (hint == "lower") return L10n.Get("lower");
-        return "";
     }
 
     static bool TryReadSecret(TMP_InputField field, out int value)

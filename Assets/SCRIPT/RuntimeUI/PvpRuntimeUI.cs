@@ -250,9 +250,8 @@ public class PvpRuntimeUI : MonoBehaviour
         var resultText = RuntimeUI.CreateText(banner.transform, "Result", "", 36,
             Vector2.zero, new Vector2(840f, 190f));
 
-        // --- left card: the guess flow. The keypad edits whichever input is
-        // live (guess during play, new secret on the rematch offer), so the
-        // soft keyboard never has to cover the board.
+        // --- left card: the guess flow. Rematch has one separately owned input
+        // in the approved result overlay; this keypad edits only the live guess.
         var guessCard = NeonFrame.Frame(matchPanel.transform, "GuessCard",
             new Vector2(-255f, -130f), new Vector2(530f, 900f),
             ConsumerTokens.Blue, 0.94f, true, ConsumerTokens.Surface);
@@ -264,28 +263,22 @@ public class PvpRuntimeUI : MonoBehaviour
             new Vector2(440f, 120f));
         StyleNumberDisplay(guessInput);
 
-        // Offered on the result screen, in the slots the guess controls vacate.
-        var rematchSecret = RuntimeUI.CreateInputField(guessCard.transform, "RematchSecret",
-            L10n.Get("number_placeholder"), new Vector2(0f, 315f),
-            new Vector2(440f, 120f));
-        StyleNumberDisplay(rematchSecret);
-        RuntimeUI.LocalizePlaceholder(rematchSecret, "rematch_prompt");
-
         System.Action<string> tapKey = key =>
         {
-            var target = rematchSecret.gameObject.activeInHierarchy ? rematchSecret : guessInput;
-            string text = target.text ?? "";
+            string text = guessInput.text ?? "";
             if (key == "C") text = "";
             else if (key == "<") text = text.Length > 0 ? text.Substring(0, text.Length - 1) : text;
             else if (text.Length < 3) text += key;
-            target.text = text;
+            guessInput.text = text;
         };
+        var keypadRoot = RuntimeUI.CreateObject("Keypad", guessCard.transform);
+        RuntimeUI.Stretch(keypadRoot);
         string[] keypadKeys = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "C", "0", "<" };
         for (int i = 0; i < keypadKeys.Length; i++)
         {
             string key = keypadKeys[i];
             string keyLabel = key == "<" ? "←" : key;
-            var keyBtn = RuntimeUI.CreateButton(guessCard.transform, "Key" + keyLabel, keyLabel,
+            var keyBtn = RuntimeUI.CreateButton(keypadRoot.transform, "Key" + keyLabel, keyLabel,
                 new Vector2((i % 3 - 1) * 152f, 180f - (i / 3) * 118f),
                 new Vector2(142f, 104f), ConsumerTokens.KeyBlue);
             ForceProceduralButton(keyBtn, ConsumerTokens.KeyBlue);
@@ -305,18 +298,9 @@ public class PvpRuntimeUI : MonoBehaviour
         var lockLabel = lockBtn.GetComponentInChildren<TMP_Text>();
         lockLabel.fontSize = 26;
 
-        // The rematch handshake reports here; the Lock hides once the match is
-        // decided, so the slot is free exactly when the status needs it.
-        var rematchStatus = RuntimeUI.CreateText(guessCard.transform, "RematchStatus", "", 28,
-            new Vector2(0f, -290f), new Vector2(440f, 80f), ConsumerTokens.TextSecondary);
-
         var guessBtn = RuntimeUI.CreateButton(guessCard.transform, "SubmitGuessButton",
             L10n.Get("pvp_guess"), new Vector2(0f, -395f), new Vector2(460f, 100f),
             ConsumerTokens.Gold, DarkLabel);
-        var rematchBtn = RuntimeUI.CreateButton(guessCard.transform, "RematchConfirmButton",
-            L10n.Get("rematch"), new Vector2(0f, -395f), new Vector2(460f, 100f),
-            ConsumerTokens.Gold, DarkLabel);
-        RuntimeUI.Localize(rematchBtn, "rematch");
 
         // --- right column: the opponent's story.
         var bubbleCard = NeonFrame.Frame(matchPanel.transform, "SignalBubble",
@@ -417,11 +401,12 @@ public class PvpRuntimeUI : MonoBehaviour
         controller.roundText = roundText;
         controller.historyText = historyText;
 
-        // The rail watches the latest-guess label the controller writes into;
-        // repaints are signature-gated, so every change is a real guess.
+        // The controller records typed, server-accepted events. Localized text
+        // is output only and never participates in event identity.
         var rail = historyCard.AddComponent<GuessHistoryRail>();
         rail.source = controller.historyText;
         rail.target = historyRailText;
+        controller.historyRail = rail;
         controller.resultText = resultText;
         controller.rangeText = rangeText;
         controller.signalFeedText = signalFeed;
@@ -429,12 +414,8 @@ public class PvpRuntimeUI : MonoBehaviour
         controller.lockButtonLabel = lockLabel;
         controller.signalsRoot = signalsRoot;
         controller.guessButton = guessBtn.gameObject;
-        controller.rematchButton = rematchBtn.gameObject;
-        controller.rematchSecretInput = rematchSecret;
-        // The rematch handshake reports into the Lock's slot in the guess card
-        // — free exactly when a match is decided — so the banner can hold the
-        // result text without the status writing over it.
-        controller.rematchStatusText = rematchStatus;
+        controller.keypadRoot = keypadRoot;
+        controller.leaveButton = leaveBtn.gameObject;
 
         // Button hooks.
         createBtn.onClick.AddListener(() => ShowOnly(controller, createPanel));
@@ -447,8 +428,6 @@ public class PvpRuntimeUI : MonoBehaviour
         joinBack.onClick.AddListener(controller.CancelRoomAndLeave);
         guessBtn.onClick.AddListener(controller.OnSubmitGuessPressed);
         lockBtn.onClick.AddListener(controller.OnLockTogglePressed);
-        rematchBtn.onClick.AddListener(controller.OnRematchPressed);
-        rematchSecret.onSubmit.AddListener(_ => controller.OnRematchPressed());
         leaveBtn.onClick.AddListener(controller.OnLeaveMatchPressed);
 
         for (int i = 0; i < signalButtons.Length; i++)
@@ -458,6 +437,7 @@ public class PvpRuntimeUI : MonoBehaviour
         }
 
         BuildResultOverlay(controller, matchPanel);
+        BuildTerminalOverlay(controller, matchPanel);
 
         // Soft-keyboard Done (Enter in the editor) submits the field's flow;
         // the handlers validate and give feedback, so a premature submit is
@@ -471,8 +451,6 @@ public class PvpRuntimeUI : MonoBehaviour
         // All panels start hidden; OpenPvpMenu shows the menu panel.
         lockBtn.gameObject.SetActive(false);
         signalsRoot.SetActive(false);
-        rematchBtn.gameObject.SetActive(false);
-        rematchSecret.gameObject.SetActive(false);
         menuPanel.SetActive(false);
         createPanel.SetActive(false);
         joinPanel.SetActive(false);
@@ -705,6 +683,7 @@ public class PvpRuntimeUI : MonoBehaviour
         controller.rematchButton = rematch.gameObject;
         controller.rematchSecretInput = rematchSecret;
         controller.rematchStatusText = rematchStatus;
+        controller.resultExitButton = exit.gameObject;
         controller.winConfetti = confetti;
 
         rematch.onClick.AddListener(controller.OnRematchPressed);
@@ -714,6 +693,43 @@ public class PvpRuntimeUI : MonoBehaviour
         rematch.gameObject.SetActive(false);
         rematchSecret.gameObject.SetActive(false);
         resultSignals.SetActive(false);
+        root.SetActive(false);
+    }
+
+    void BuildTerminalOverlay(PvpGameController controller,
+        GameObject matchPanel)
+    {
+        var root = RuntimeUI.CreateObject("PvpTerminalRoot", matchPanel.transform);
+        RuntimeUI.Stretch(root);
+        var background = root.AddComponent<Image>();
+        background.sprite = ConvergingLight.DepthGradientSprite;
+        background.color = Color.white;
+        background.raycastTarget = true;
+
+        var card = NeonFrame.Frame(root.transform, "TerminalCard",
+            Vector2.zero, new Vector2(840f, 540f), ConsumerTokens.Magenta,
+            0.92f, true, ConsumerTokens.Surface);
+        var title = RuntimeUI.CreateText(card.transform, "Title", "", 52,
+            new Vector2(0f, 145f), new Vector2(760f, 110f),
+            ConsumerTokens.Gold);
+        var message = RuntimeUI.CreateText(card.transform, "Message", "", 30,
+            new Vector2(0f, 20f), new Vector2(700f, 150f),
+            ConvergingLight.NearWhite);
+        var exit = RuntimeUI.CreateButton(card.transform, "TerminalExitButton",
+            L10n.Get("result_exit"), new Vector2(0f, -155f),
+            new Vector2(420f, 86f), ConsumerTokens.Cyan, DarkLabel);
+        RuntimeUI.Localize(exit, "result_exit");
+
+        var presentation = gameObject.AddComponent<PvpTerminalPresentation>();
+        presentation.terminalRoot = root;
+        presentation.titleText = title;
+        presentation.messageText = message;
+        presentation.resultStatusText = controller.rematchStatusText;
+        presentation.terminalExitButton = exit.gameObject;
+        presentation.resultExitButton = controller.resultExitButton;
+        controller.terminalPresentation = presentation;
+
+        exit.onClick.AddListener(controller.OnLeaveMatchPressed);
         root.SetActive(false);
     }
 
@@ -945,6 +961,7 @@ public class PvpRuntimeUI : MonoBehaviour
             prebattleCreate.opponentStatus;
         controller.roomCodeText = prebattleCreate.codeText;
         controller.createStatusText = prebattleCreate.status;
+        controller.createCopyButton = prebattleCreate.copy.gameObject;
         controller.joinCodeInput = prebattleJoin.codeInput;
         controller.joinSecretInput = prebattleJoin.secret;
         controller.joinConfirmButton = prebattleJoin.confirm;
