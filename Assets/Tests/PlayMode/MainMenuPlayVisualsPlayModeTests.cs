@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Reflection;
 using NUnit.Framework;
+using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
@@ -12,7 +13,7 @@ public sealed class MainMenuPlayVisualsPlayModeTests
         BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
 
     [UnityTest]
-    public IEnumerator PlayOwnerMapsExistingFindChallengerWithoutInventingFeatures()
+    public IEnumerator SoloAiEntryIsImmediateWhilePrivateRoomRemainsSeparate()
     {
         InvokeInstaller("MainMenuHomeVisuals");
         InvokeInstaller("MainMenuPlayVisuals");
@@ -81,6 +82,10 @@ public sealed class MainMenuPlayVisualsPlayModeTests
         string copy = (string)tmpTextType.GetProperty("text").GetValue(disclosureText, null);
         string expected = LocalizedCopy("simulated_opponents");
         Assert.That(copy, Does.Contain(expected));
+        Assert.That(find.GetComponentInChildren<TMP_Text>(true).text,
+            Is.EqualTo(LocalizedCopy("find_challenger")));
+        Assert.That(find.GetComponentInChildren<TMP_Text>(true).text,
+            Does.Contain("AI").IgnoreCase);
 
         var card = Find(canvas.transform, "PlayDisclosure");
         Assert.That(card, Is.Not.Null);
@@ -92,19 +97,65 @@ public sealed class MainMenuPlayVisualsPlayModeTests
         foreach (var path in paths)
             Assert.That(path.StartsWith("splash/"), Is.False, path);
 
-        var matchmaking = Object.FindObjectOfType(RuntimeType("FakeMatchmaking")) as Component;
-        Assert.That(matchmaking, Is.Not.Null);
-        matchmaking.SendMessage("StartSearch", SendMessageOptions.RequireReceiver);
-        yield return null;
-        Assert.That(searching.activeSelf, Is.True);
-        matchmaking.SendMessage("CancelSearch", SendMessageOptions.RequireReceiver);
-        yield return null;
-
+        // Back before entering the local duel must return home cleanly. Re-entry
+        // must not leave a deferred callback capable of reopening the board.
         back.onClick.Invoke();
         yield return null;
         Assert.That(panelPlay.activeSelf, Is.False);
+        Assert.That(searching.activeSelf, Is.False);
         Assert.That(Find(canvas.transform, "HomeVisualRoot").gameObject.activeSelf, Is.True);
-        Assert.That(Find(canvas.transform, "PlayVisualRoot").gameObject.activeSelf, Is.False);
+
+        // The separate online route remains the real Private Room flow and
+        // still exposes the existing Create and Join actions.
+        var privateRoom = Find(canvas.transform, "ButtonPvP").GetComponent<Button>();
+        Assert.That(privateRoom.GetComponentInChildren<TMP_Text>(true).text,
+            Is.EqualTo(LocalizedCopy("private_room")));
+        privateRoom.onClick.Invoke();
+        yield return null;
+        var pvp = Object.FindObjectOfType(RuntimeType("PvpGameController")) as Component;
+        Assert.That(pvp, Is.Not.Null);
+        var pvpMenu = pvp.GetType().GetField("pvpMenuPanel").GetValue(pvp) as GameObject;
+        Assert.That(pvpMenu, Is.Not.Null);
+        Assert.That(pvpMenu.activeSelf, Is.True);
+        Assert.That(Find(pvpMenu.transform, "CreateButton").GetComponent<Button>().interactable,
+            Is.True);
+        Assert.That(Find(pvpMenu.transform, "JoinButton").GetComponent<Button>().interactable,
+            Is.True);
+        pvp.SendMessage("ClosePvpMenu", SendMessageOptions.RequireReceiver);
+        yield return null;
+        Assert.That(pvpMenu.activeSelf, Is.False);
+
+        menu.SendMessage("OnPlayPressed", SendMessageOptions.RequireReceiver);
+        yield return null;
+        Assert.That(panelPlay.activeSelf, Is.True);
+
+        var matchmaking = Object.FindObjectOfType(RuntimeType("FakeMatchmaking")) as Component;
+        Assert.That(matchmaking, Is.Not.Null);
+        var panelGame = matchmaking.GetType().GetField("panelGame").GetValue(matchmaking) as GameObject;
+        Assert.That(panelGame, Is.Not.Null);
+        Assert.That(panelGame.activeSelf, Is.False);
+
+        // Same-call assertions are intentional: a coroutine-based fake search
+        // cannot satisfy this deterministic local-AI entry contract.
+        matchmaking.SendMessage("StartSearch", SendMessageOptions.RequireReceiver);
+        Assert.That(searching.activeSelf, Is.False);
+        Assert.That(panelGame.activeSelf, Is.True);
+        for (int i = 0; i < 12; i++)
+            yield return null;
+        Assert.That(searching.activeSelf, Is.False);
+        Assert.That(panelGame.activeSelf, Is.True);
+
+        // Verify the actual runtime lifecycle rather than assuming EditMode
+        // invokes MonoBehaviour disable callbacks.
+        panelGame.SetActive(false);
+        searching.SetActive(true);
+        ((Behaviour)matchmaking).enabled = false;
+        Assert.That(searching.activeSelf, Is.False);
+        Assert.That(panelGame.activeSelf, Is.False);
+        ((Behaviour)matchmaking).enabled = true;
+        matchmaking.SendMessage("StartSearch", SendMessageOptions.RequireReceiver);
+        Assert.That(searching.activeSelf, Is.False);
+        Assert.That(panelGame.activeSelf, Is.True);
     }
 
     static string LocalizedCopy(string key)
