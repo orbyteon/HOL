@@ -50,7 +50,7 @@ public static class L10n
     {
         // main menu
         { "play",                    new[] { "Play", "Παίξε" } },
-        { "play_solo",               new[] { "Play Solo", "Παίξε μόνος" } },
+        { "play_solo",               new[] { "Play Solo vs AI", "Παίξε Solo με AI" } },
         { "private_room",            new[] { "Private Room", "Ιδιωτικό δωμάτιο" } },
         { "home_tip_body",           new[] {
             "Bigger numbers are riskier — start in the middle.",
@@ -68,7 +68,7 @@ public static class L10n
         { "player_default",          new[] { "Player", "Παίκτης" } },
 
         // matchmaking
-        { "find_challenger",         new[] { "Find challenger", "Βρες αντίπαλο" } },
+        { "find_challenger",         new[] { "Play now vs AI", "Παίξε Solo με AI" } },
         { "solo_search_title",       new[] { "Find opponent", "Βρες αντίπαλο" } },
         { "searching",               new[] { "Searching opponent", "Αναζήτηση αντιπάλου" } },
         { "opponent_found",          new[] { "Opponent found!", "Βρέθηκε αντίπαλος!" } },
@@ -175,7 +175,7 @@ public static class L10n
         { "you",                     new[] { "You", "Εσύ" } },
 
         // disclosure / consent
-        { "simulated_opponents",     new[] { "Opponents are simulated by an on-device AI.", "Οι αντίπαλοι προσομοιώνονται από τεχνητή νοημοσύνη στη συσκευή." } },
+        { "simulated_opponents",     new[] { "Solo starts right away against a computer challenger.", "Το Solo ξεκινά αμέσως με αντίπαλο τον υπολογιστή." } },
         { "consent_message",         new[] { "Allow ads and related device access? If you choose No, ads stay disabled.", "Να επιτρέπονται διαφημίσεις και η σχετική πρόσβαση στη συσκευή; Αν επιλέξεις Όχι, οι διαφημίσεις θα παραμείνουν απενεργοποιημένες." } },
         { "yes",                     new[] { "Yes", "Ναι" } },
         { "no",                      new[] { "No", "Όχι" } },

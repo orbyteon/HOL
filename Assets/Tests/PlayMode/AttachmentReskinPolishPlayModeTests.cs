@@ -94,9 +94,8 @@ public sealed class AttachmentReskinPolishPlayModeTests
         Assert.That(Find(pvpMenuPanel.transform, "BoardCreatePlusVector"), Is.Null);
         Assert.That(Find(pvpMenuPanel.transform, "BoardJoinDoorVector"), Is.Null);
 
-        // Exercise the existing solo-search flow rather than activating the
-        // nested searching child in isolation. PanelSearching lives under
-        // PanelPlay, so MenuManager.OnPlayPressed must open its parent first.
+        // Exercise the real Solo entry flow rather than activating any nested
+        // child in isolation. Solo now enters the local AI board directly.
         var menu = Object.FindObjectOfType(RuntimeType("MenuManager")) as Component;
         Assert.That(menu, Is.Not.Null);
 
@@ -133,20 +132,19 @@ public sealed class AttachmentReskinPolishPlayModeTests
         var matchmaking = Object.FindObjectOfType(RuntimeType("FakeMatchmaking")) as Component;
         Assert.That(matchmaking, Is.Not.Null);
         matchmaking.SendMessage("StartSearch", SendMessageOptions.RequireReceiver);
-        yield return new WaitForSecondsRealtime(0.35f);
 
         var searchingField = menu.GetType().GetField("panelSearching", BindingFlags.Instance | BindingFlags.Public);
         Assert.That(searchingField, Is.Not.Null);
         var searchingPanel = searchingField.GetValue(menu) as GameObject;
         Assert.That(searchingPanel, Is.Not.Null);
-        Assert.That(searchingPanel.activeInHierarchy, Is.True,
-            "The real StartSearch flow should make PanelSearching visible.");
-
-        Assert.That(Find(searchingPanel.transform, "SoloSearchVisualRoot"), Is.Not.Null);
-        Assert.That(Find(searchingPanel.transform, "Radar"), Is.Not.Null);
-        Assert.That(Find(searchingPanel.transform, "BoardSearchRocketVector"), Is.Null);
-        Assert.That(Find(searchingPanel.transform, "BoardVsBurstVector"), Is.Null);
-        matchmaking.SendMessage("CancelSearch", SendMessageOptions.RequireReceiver);
+        Assert.That(searchingPanel.activeInHierarchy, Is.False,
+            "Local Solo entry must never expose simulated matchmaking.");
+        var gameField = matchmaking.GetType().GetField("panelGame",
+            BindingFlags.Instance | BindingFlags.Public);
+        var gamePanel = gameField.GetValue(matchmaking) as GameObject;
+        Assert.That(gamePanel, Is.Not.Null);
+        Assert.That(gamePanel.activeSelf, Is.True,
+            "Local Solo entry must activate the existing AI board immediately.");
 
         // Presentation-only contract: every Button must still be a controller/
         // scene button. Board-prefixed objects are decoration and text only.
