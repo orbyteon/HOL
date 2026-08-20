@@ -27,8 +27,9 @@ public class GameManager : MonoBehaviour
     public TMP_Text turnText;
     public TMP_Text opponentNameText;
 
-    // Optional UI (wire in Inspector): shows the player's narrowed guess
-    // range and running guess histories for both sides.
+    // Runtime bindings populated by HolDuelBoardLayout. The presenter is the
+    // only writer of these fields; they stay public because the current visual
+    // polish layer reads their references without owning their content.
     public TMP_Text rangeText;
     public TMP_Text playerHistoryText;
     public TMP_Text aiHistoryText;
@@ -59,6 +60,9 @@ public class GameManager : MonoBehaviour
     // StartMatch, which does not happen until a number has been submitted.
     public bool IsMatchOver => matchSetUp && rules.Finished;
 
+    public string CurrentOpponentName => currentOpponent;
+    public int CurrentRoundNumber => matchSetUp ? rules.RoundIndex + 1 : 0;
+
     readonly DuelRules rules = new DuelRules();
     bool awaitingAnswer;
     bool lockArmed;
@@ -85,20 +89,13 @@ public class GameManager : MonoBehaviour
     int aiSecretNumber;
     int playerGuessCount;
 
-    readonly System.Text.StringBuilder playerHistory = new System.Text.StringBuilder();
-    readonly System.Text.StringBuilder aiHistory = new System.Text.StringBuilder();
-
     string currentOpponent;
+    HolDuelBoardLayout boardPresenter;
 
     // Built at runtime next to the stop button, the same way the rewarded
     // streak-save offer is, so no scene surgery is needed.
     UnityEngine.UI.Button lockButton;
     TMP_Text lockButtonLabel;
-
-    // The rangeText Inspector field was never wired in MainMenu, so the range
-    // line — and the Lock's one-line explanation, which shares the slot — had
-    // nowhere to render in solo. Built at runtime like the Lock button.
-    TMP_Text runtimeRangeLabel;
 
     string[] fakeNames =
     {
@@ -115,17 +112,11 @@ public class GameManager : MonoBehaviour
 
         stopGameButton.SetActive(false);
         HideButtons();
-        EnsureRangeLabel();
         EnsureLockButton();
         RefreshLockButton();
 
-        int randomIndex = Random.Range(0, fakeNames.Length);
-        currentOpponent = fakeNames[randomIndex];
-
-        opponentNameText.text = L10n.Get("opponent_label", currentOpponent);
-
-        if (turnText != null)
-            turnText.text = L10n.Get("enter_your_number");
+        SelectOpponent();
+        Presenter()?.BeginNewMatch(currentOpponent);
     }
 
     public void SetPlayerNumber(int number)
@@ -134,6 +125,11 @@ public class GameManager : MonoBehaviour
     }
 
     public void StartGame()
+    {
+        StartGameWithOpener(Random.value < 0.5f ? AiSide : PlayerSide);
+    }
+
+    void StartGameWithOpener(DuelRules.Side opener)
     {
         CancelInvoke();
 
@@ -154,25 +150,22 @@ public class GameManager : MonoBehaviour
         aiNumberText.text = "?";
         aiAnswerText.text = "";
 
-        ResetHistory();
-        UpdateRangeText();
-
         stopGameButton.SetActive(false);
         HideButtons();
 
         // A fair coin decides who opens; the equal-turns rule then makes sure
         // opening is not itself worth a win.
-        rules.StartMatch(Random.value < 0.5f ? AiSide : PlayerSide);
+        rules.StartMatch(opener);
         RefreshLockButton();
 
         if (rules.Turn == AiSide)
         {
-            turnText.text = L10n.Get("opponent_thinking", currentOpponent);
+            Present(SoloBoardPhase.OpponentThinking, SoloBoardPrompt.OpponentThinking);
             Invoke(nameof(AIGuess), Random.Range(0.8f, 1.5f));
         }
         else
         {
-            turnText.text = L10n.Get("your_guess");
+            Present(SoloBoardPhase.PlayerGuess, SoloBoardPrompt.YourGuess);
         }
     }
 
@@ -207,13 +200,14 @@ public class GameManager : MonoBehaviour
                 aiGuess = (min + max) / 2;
         }
 
+        int submittedRound = rules.RoundIndex + 1;
         bool aiLocks = DuelRules.ShouldLock(AiLockStyle(), max - min + 1, rules.LockAvailable(AiSide));
         var move = rules.Submit(AiSide, aiGuess, playerSecretNumber, aiLocks);
         if (!move.Accepted) return;
 
         aiNumberText.text = currentOpponent + ": " + aiGuess +
                             (aiLocks ? "  [" + L10n.Get("lock_armed") + "]" : "");
-        AppendHistory(aiHistory, aiHistoryText, aiGuess);
+        Presenter()?.RecordAiGuess(aiGuess);
 
         // If that guess closed the round the match is already decided, so do
         // not make the player answer a guess nobody can act on — it would put
@@ -232,7 +226,7 @@ public class GameManager : MonoBehaviour
         // The player still confirms the answer, so the hint the rules computed
         // decides which single button is offered — a player cannot lie.
         awaitingAnswer = true;
-        turnText.text = L10n.Get("answer_opponent", currentOpponent);
+        Present(SoloBoardPhase.AnswerOpponent, SoloBoardPrompt.AnswerOpponent, 0, submittedRound);
         HideButtons();
 
         if (move.Hint == DuelRules.Hint.Higher) higherButton.SetActive(true);
@@ -328,7 +322,7 @@ public class GameManager : MonoBehaviour
             playerLabel += "  [" + L10n.Get("lock_armed") + "]";
 
         aiAnswerText.text = playerLabel + ": " + guess;
-        AppendHistory(playerHistory, playerHistoryText, guess);
+        Presenter()?.RecordPlayerGuess(guess);
 
         if (move.Hint == DuelRules.Hint.Correct)
         {
@@ -349,7 +343,6 @@ public class GameManager : MonoBehaviour
         if (staked && move.Hint != DuelRules.Hint.Correct)
             aiAnswerText.text += "\n" + L10n.Get("lock_missed");
 
-        UpdateRangeText();
         ContinueAfterMove();
         return true;
     }
@@ -358,6 +351,7 @@ public class GameManager : MonoBehaviour
     // just closed settled it.
     void ContinueAfterMove()
     {
+        Present(SoloBoardPhase.RoundResolution, SoloBoardPrompt.ResolvingRound);
         RefreshLockButton();
 
         if (rules.Finished)
@@ -368,21 +362,22 @@ public class GameManager : MonoBehaviour
 
         if (rules.Turn == AiSide)
         {
-            turnText.text = rules.ForfeitPending(AiSide)
-                ? L10n.Get("opponent_forfeits", currentOpponent)
-                : L10n.Get("opponent_thinking", currentOpponent);
+            Present(SoloBoardPhase.OpponentThinking,
+                rules.ForfeitPending(AiSide)
+                    ? SoloBoardPrompt.OpponentForfeits
+                    : SoloBoardPrompt.OpponentThinking);
             Invoke(nameof(AIGuess), Random.Range(1.5f, 3.5f));
             return;
         }
 
         if (rules.IsMatchPointAgainst(PlayerSide))
-            turnText.text = L10n.Get("match_point");
+            Present(SoloBoardPhase.PlayerGuess, SoloBoardPrompt.MatchPoint);
         else if (rules.PendingWin == PlayerSide)
-            turnText.text = L10n.Get("match_point_yours", currentOpponent);
+            Present(SoloBoardPhase.PlayerGuess, SoloBoardPrompt.MatchPointYours);
         else if (rules.ForfeitPending(PlayerSide))
-            turnText.text = L10n.Get("turn_forfeited");
+            Present(SoloBoardPhase.PlayerGuess, SoloBoardPrompt.TurnForfeited);
         else
-            turnText.text = L10n.Get("your_guess");
+            Present(SoloBoardPhase.PlayerGuess, SoloBoardPrompt.YourGuess);
     }
 
     void EndGame()
@@ -403,9 +398,7 @@ public class GameManager : MonoBehaviour
             Haptics.Light();
             GameEvents.MatchCompleted(SoloOutcome(MatchOutcome.Result.Draw));
 
-            turnText.text = L10n.Get("you_draw") + "\n" +
-                            L10n.Get("draw_in_guesses", playerGuessCount) + "\n" +
-                            L10n.Get("draw_tip");
+            Present(SoloBoardPhase.MatchResult, SoloBoardPrompt.Draw, playerGuessCount);
         }
         else if (rules.Result == DuelRules.Outcome.HostWins)
         {
@@ -413,9 +406,7 @@ public class GameManager : MonoBehaviour
             Haptics.Success();
             GameEvents.MatchCompleted(SoloOutcome(MatchOutcome.Result.Win));
 
-            turnText.text = L10n.Get("you_win") + "\n" + L10n.Get("won_in_guesses", playerGuessCount);
-            if (playerGuessCount <= 7)
-                turnText.text += "\n" + L10n.Get("perfect_game");
+            Present(SoloBoardPhase.MatchResult, SoloBoardPrompt.Win, playerGuessCount);
             if (audioSource != null && winSound != null)
                 audioSource.PlayOneShot(winSound);
             if (winConfetti != null)
@@ -428,7 +419,7 @@ public class GameManager : MonoBehaviour
             Haptics.Error();
             GameEvents.MatchCompleted(SoloOutcome(MatchOutcome.Result.Loss));
 
-            turnText.text = L10n.Get("you_lose") + "\n" + L10n.Get("number_was", aiSecretNumber);
+            Present(SoloBoardPhase.MatchResult, SoloBoardPrompt.Loss, aiSecretNumber);
             if (audioSource != null && loseSound != null)
                 audioSource.PlayOneShot(loseSound);
 
@@ -467,25 +458,6 @@ public class GameManager : MonoBehaviour
         lockArmed = !lockArmed;
         Haptics.Light();
         RefreshLockButton();
-    }
-
-    void EnsureRangeLabel()
-    {
-        if (rangeText != null || runtimeRangeLabel != null || stopGameButton == null) return;
-
-        // Sits in the empty band above the Lock button (y 168-252) and below the
-        // guess histories (y 475-525); nothing else in PanelGAME occupies it.
-        runtimeRangeLabel = RuntimeUI.CreateText(stopGameButton.transform.parent,
-            "RangeLabel", "", 32, new Vector2(0f, 300f), new Vector2(760f, 60f),
-            ConvergingLight.Cyan);
-    }
-
-    // Writes to whichever range line exists: a wired Inspector field if one is
-    // ever added, otherwise the runtime-built label.
-    void SetRangeLine(string text)
-    {
-        if (rangeText != null) rangeText.text = text;
-        else if (runtimeRangeLabel != null) runtimeRangeLabel.text = text;
     }
 
     void EnsureLockButton()
@@ -531,9 +503,10 @@ public class GameManager : MonoBehaviour
             lockRevealedThisMatch = true;
             if (LockIntro.ShouldExplain)
             {
-                // One line, in the secondary slot, replaced by the range again
-                // on the next guess.
-                SetRangeLine(L10n.Get("lock_hint"));
+                // Keep the presenter's valid-range line truthful. The one-time
+                // Lock explanation uses the ordinary feedback slot instead.
+                if (aiAnswerText != null)
+                    aiAnswerText.text = L10n.Get("lock_hint");
                 LockIntro.MarkExplained();
             }
         }
@@ -638,15 +611,11 @@ public class GameManager : MonoBehaviour
         playerMax = 100;
         RefreshLockButton();
 
-        int randomIndex = Random.Range(0, fakeNames.Length);
-        currentOpponent = fakeNames[randomIndex];
-        opponentNameText.text = L10n.Get("opponent_label", currentOpponent);
+        SelectOpponent();
 
         aiNumberText.text = "?";
         aiAnswerText.text = "";
-        turnText.text = L10n.Get("enter_your_number");
-
-        ResetHistory();
+        Presenter()?.BeginNewMatch(currentOpponent);
 
         stopGameButton.SetActive(false);
         HideButtons();
@@ -655,29 +624,26 @@ public class GameManager : MonoBehaviour
             numberManager.ResetForNewMatch();
     }
 
-    void ResetHistory()
+    void SelectOpponent()
     {
-        playerHistory.Length = 0;
-        aiHistory.Length = 0;
-
-        if (playerHistoryText != null)
-            playerHistoryText.text = "";
-        if (aiHistoryText != null)
-            aiHistoryText.text = "";
+        int randomIndex = Random.Range(0, fakeNames.Length);
+        currentOpponent = fakeNames[randomIndex];
     }
 
-    static void AppendHistory(System.Text.StringBuilder history, TMP_Text target, int guess)
+    HolDuelBoardLayout Presenter()
     {
-        if (history.Length > 0)
-            history.Append("  ");
-        history.Append(guess);
-
-        if (target != null)
-            target.text = history.ToString();
+        if (boardPresenter == null)
+            boardPresenter = FindObjectOfType<HolDuelBoardLayout>(true);
+        return boardPresenter;
     }
 
-    void UpdateRangeText()
+    void Present(SoloBoardPhase phase, SoloBoardPrompt prompt, int detailValue = 0,
+        int displayRound = 0)
     {
-        SetRangeLine(L10n.Get("between_range", playerMin, playerMax));
+        var presenter = Presenter();
+        if (presenter == null) return;
+        presenter.PresentPhase(phase, prompt,
+            displayRound > 0 ? displayRound : rules.RoundIndex + 1,
+            playerMin, playerMax, detailValue);
     }
 }
