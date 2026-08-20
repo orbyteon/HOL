@@ -1,20 +1,20 @@
 using System.Collections.Generic;
+using System.Text;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// Applies the new HOL duel-board composition to PanelGAME at runtime.
-/// Coordinates are authored against the existing 1080x1920 CanvasScaler:
-/// center anchors, pivot (0.5, 0.5), anchoredPosition in reference pixels.
-/// The keypad is functional and submits through NumberManager.
+/// Builds the existing HOL solo board and is the sole renderer of its typed
+/// presentation state. Gameplay remains owned by GameManager and DuelRules;
+/// this component owns prompts, round/range/history, board identity and which
+/// numeric controls the current phase may expose.
 /// </summary>
 [RequireComponent(typeof(RectTransform))]
 public sealed class HolDuelBoardLayout : MonoBehaviour
 {
     const string BackspaceCommand = "BACKSPACE";
 
-    static readonly Color Indigo = new Color(0.035f, 0.035f, 0.12f, 0.98f);
     static readonly Color CardBlue = new Color(0.08f, 0.28f, 0.68f, 0.96f);
     static readonly Color CardPink = new Color(0.72f, 0.08f, 0.34f, 0.96f);
     static readonly Color KeyBlue = new Color(0.16f, 0.18f, 0.62f, 1f);
@@ -22,17 +22,68 @@ public sealed class HolDuelBoardLayout : MonoBehaviour
     static readonly Color NearWhite = new Color(0.93f, 0.94f, 1f, 1f);
     static readonly Color Muted = new Color(0.66f, 0.70f, 0.86f, 1f);
 
+    readonly SoloBoardPresentationModel presentation = new SoloBoardPresentationModel();
+    readonly List<RectTransform> layoutRoots = new List<RectTransform>();
+
     RectTransform board;
     NumberManager numberManager;
     GameManager gameManager;
+    MenuManager menuManager;
     TMP_InputField input;
+    TMP_Text phaseText;
+    TMP_Text roundText;
+    TMP_Text rangeText;
+    TMP_Text playerHistoryText;
+    TMP_Text aiHistoryText;
+    TMP_Text opponentIdentityText;
+    GameObject historyRoot;
     GameObject keypadRoot;
+    Button submitControl;
     bool built;
-    readonly List<RectTransform> layoutRoots = new List<RectTransform>();
+
+    public SoloBoardPresentationState CurrentState => presentation.Current;
+    public Button SubmitControl => submitControl;
+    public GameObject KeypadRoot => keypadRoot;
+
+    void OnEnable()
+    {
+        L10n.OnLanguageChanged += Render;
+        Render();
+    }
+
+    void OnDisable()
+    {
+        L10n.OnLanguageChanged -= Render;
+    }
 
     void Start()
     {
         Invoke(nameof(Build), 0f);
+    }
+
+    public void BeginNewMatch(string opponentName)
+    {
+        presentation.BeginNewMatch(opponentName);
+        Render();
+    }
+
+    public void PresentPhase(SoloBoardPhase phase, SoloBoardPrompt prompt,
+        int roundNumber, int rangeMin, int rangeMax, int detailValue = 0)
+    {
+        presentation.Present(phase, prompt, roundNumber, rangeMin, rangeMax, detailValue);
+        Render();
+    }
+
+    public void RecordPlayerGuess(int guess)
+    {
+        presentation.RecordPlayerGuess(guess);
+        Render();
+    }
+
+    public void RecordAiGuess(int guess)
+    {
+        presentation.RecordAiGuess(guess);
+        Render();
     }
 
     void Build()
@@ -43,6 +94,7 @@ public sealed class HolDuelBoardLayout : MonoBehaviour
         board.localPosition = Vector3.zero;
         numberManager = GetComponent<NumberManager>();
         gameManager = FindObjectOfType<GameManager>(true);
+        menuManager = FindObjectOfType<MenuManager>(true);
         input = numberManager != null ? numberManager.numberInput : FindObjectOfType<TMP_InputField>(true);
 
         BuildHeader();
@@ -50,6 +102,7 @@ public sealed class HolDuelBoardLayout : MonoBehaviour
         LayoutExistingGameplay();
         BuildKeypad();
         built = true;
+        Render();
     }
 
     static void Center(RectTransform rect, Vector2 size, Vector2 position)
@@ -71,6 +124,7 @@ public sealed class HolDuelBoardLayout : MonoBehaviour
 
     void CenterRoot(RectTransform rect, Vector2 size, Vector2 position)
     {
+        if (rect == null) return;
         Center(rect, size, position);
         rect.anchoredPosition = ClampToSafeArea(position, size);
         if (!layoutRoots.Contains(rect))
@@ -121,13 +175,13 @@ public sealed class HolDuelBoardLayout : MonoBehaviour
 
     void BuildHeader()
     {
-        // Top-left navigation affordance, aligned to the safe top inset.
         var back = RuntimeUI.CreateButton(board, "DuelBack", L10n.Get("back"),
             new Vector2(-438f, 790f), new Vector2(118f, 92f), new Color(0.26f, 0.10f, 0.60f, 1f),
             NearWhite);
         CenterRoot((RectTransform)back.transform, new Vector2(118f, 92f), new Vector2(-438f, 790f));
         RuntimeUI.Localize(back, "back");
-        if (numberManager != null) back.onClick.AddListener(numberManager.ExitToMenu);
+        if (menuManager != null)
+            back.onClick.AddListener(menuManager.RequestSoloMatchExit);
 
         Label(board, "DuelTitle", "HOL", 82, new Vector2(0f, 790f),
             new Vector2(360f, 110f), new Color(0.95f, 0.20f, 0.82f, 1f));
@@ -141,23 +195,30 @@ public sealed class HolDuelBoardLayout : MonoBehaviour
         var opponent = Card("OpponentCard", new Vector2(470f, 205f), new Vector2(265f, 565f), CardPink);
         Label(opponent.transform, "OpponentCaption", L10n.Get("opponent_label", ""),
             30, new Vector2(0f, 62f), new Vector2(420f, 44f), NearWhite);
-        Label(opponent.transform, "OpponentName", gameManager != null && gameManager.opponentNameText != null ? gameManager.opponentNameText.text : "Andreas",
-            42, new Vector2(0f, -20f), new Vector2(410f, 56f), NearWhite);
 
         Label(board, "VsLabel", "VS", 78, new Vector2(0f, 565f),
             new Vector2(180f, 110f), Gold);
-        Label(board, "RoundLabel", L10n.Get("round_label", 1, 10), 34, new Vector2(0f, 385f),
+        roundText = Label(board, "RoundLabel", "", 34, new Vector2(0f, 385f),
             new Vector2(700f, 52f), NearWhite);
-        Label(board, "PromptLabel", L10n.Get("your_guess"), 42, new Vector2(0f, 325f),
-            new Vector2(850f, 64f), NearWhite);
+
+        phaseText = gameManager != null ? gameManager.turnText : null;
+        if (phaseText == null)
+            phaseText = Label(board, "PhasePrompt", "", 42, new Vector2(0f, 300f),
+                new Vector2(850f, 90f), NearWhite);
+
+        opponentIdentityText = gameManager != null ? gameManager.opponentNameText : null;
+        if (opponentIdentityText == null)
+            opponentIdentityText = Label(board, "OpponentIdentity", "", 30,
+                new Vector2(255f, 680f), new Vector2(430f, 52f), NearWhite);
     }
 
     void LayoutExistingGameplay()
     {
         if (input != null)
         {
-            CenterRoot(input.transform as RectTransform, new Vector2(440f, 122f), new Vector2(-220f, 180f));
+            CenterRoot(input.transform as RectTransform, new Vector2(440f, 122f), new Vector2(-220f, 135f));
             input.shouldHideMobileInput = true;
+            input.shouldHideSoftKeyboard = true;
             var image = input.GetComponent<Image>();
             if (image != null)
             {
@@ -169,29 +230,26 @@ public sealed class HolDuelBoardLayout : MonoBehaviour
 
         if (numberManager != null && numberManager.playerNumberText != null)
         {
-            CenterRoot(numberManager.playerNumberText.rectTransform, new Vector2(420f, 60f),
-                new Vector2(-220f, 310f));
+            CenterRoot(numberManager.playerNumberText.rectTransform, new Vector2(420f, 54f),
+                new Vector2(-220f, 225f));
             numberManager.playerNumberText.alignment = TextAlignmentOptions.Center;
             numberManager.playerNumberText.fontSize = 28f;
             numberManager.playerNumberText.color = Muted;
         }
 
-        var range = gameManager != null ? gameManager.rangeText : null;
-        if (range != null)
-        {
-            CenterRoot(range.rectTransform, new Vector2(420f, 60f), new Vector2(260f, 180f));
-            range.alignment = TextAlignmentOptions.Center;
-            range.fontSize = 27f;
-            range.color = Muted;
-        }
+        rangeText = gameManager != null ? gameManager.rangeText : null;
+        if (rangeText == null)
+            rangeText = Label(board, "RangeLabel", "", 27, new Vector2(0f, 20f),
+                new Vector2(820f, 48f), Muted);
+        LayoutText(rangeText, new Vector2(0f, 20f), new Vector2(820f, 48f), 27f, Muted);
 
         if (gameManager != null)
         {
-            LayoutText(gameManager.turnText, new Vector2(0f, 250f), new Vector2(900f, 60f), 28f, Muted);
-            LayoutText(gameManager.aiNumberText, new Vector2(260f, 305f), new Vector2(360f, 58f), 27f, NearWhite);
-            LayoutText(gameManager.aiAnswerText, new Vector2(260f, 180f), new Vector2(360f, 105f), 24f, NearWhite);
-            LayoutText(gameManager.playerHistoryText, new Vector2(285f, -245f), new Vector2(310f, 90f), 24f, NearWhite);
-            LayoutText(gameManager.aiHistoryText, new Vector2(285f, -365f), new Vector2(310f, 90f), 24f, NearWhite);
+            gameManager.rangeText = rangeText;
+            LayoutText(phaseText, new Vector2(0f, 300f), new Vector2(850f, 90f), 34f, NearWhite);
+            LayoutText(gameManager.aiNumberText, new Vector2(260f, 205f), new Vector2(360f, 48f), 27f, NearWhite);
+            LayoutText(gameManager.aiAnswerText, new Vector2(260f, 115f), new Vector2(360f, 105f), 24f, NearWhite);
+            LayoutText(opponentIdentityText, new Vector2(255f, 680f), new Vector2(430f, 52f), 28f, NearWhite);
         }
 
         MoveIfFound("ButtonHIGHER", new Vector2(-300f, -705f), new Vector2(260f, 100f));
@@ -211,12 +269,21 @@ public sealed class HolDuelBoardLayout : MonoBehaviour
 
     void BuildHistoryCard()
     {
-        var history = Card("HistoryCard", new Vector2(360f, 360f), new Vector2(300f, -260f),
+        historyRoot = Card("HistoryCard", new Vector2(330f, 360f), new Vector2(330f, -260f),
             new Color(0.05f, 0.04f, 0.20f, 0.98f));
-        Label(history.transform, "HistoryTitle", L10n.Get("guesses"), 28,
-            new Vector2(0f, 130f), new Vector2(320f, 48f), NearWhite);
-        Label(history.transform, "HistoryHint", L10n.Get("your_guess"), 22,
-            new Vector2(0f, 85f), new Vector2(300f, 40f), Muted);
+        var title = Label(historyRoot.transform, "HistoryTitle", L10n.Get("guesses"), 28,
+            new Vector2(0f, 130f), new Vector2(290f, 48f), NearWhite);
+        RuntimeUI.Localize(title, "guesses");
+        playerHistoryText = Label(historyRoot.transform, "PlayerGuessHistory", "", 23,
+            new Vector2(0f, 45f), new Vector2(290f, 105f), NearWhite);
+        aiHistoryText = Label(historyRoot.transform, "AiGuessHistory", "", 23,
+            new Vector2(0f, -82f), new Vector2(290f, 105f), NearWhite);
+
+        if (gameManager != null)
+        {
+            gameManager.playerHistoryText = playerHistoryText;
+            gameManager.aiHistoryText = aiHistoryText;
+        }
     }
 
     void MoveIfFound(string name, Vector2 position, Vector2 size)
@@ -237,7 +304,7 @@ public sealed class HolDuelBoardLayout : MonoBehaviour
     {
         keypadRoot = RuntimeUI.CreateObject("NumberKeypad", board);
         var rootRect = (RectTransform)keypadRoot.transform;
-        CenterRoot(rootRect, new Vector2(660f, 620f), new Vector2(-196f, -285f));
+        CenterRoot(rootRect, new Vector2(620f, 620f), new Vector2(-240f, -285f));
 
         string[] keys = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "×", "0", BackspaceCommand };
         for (int i = 0; i < keys.Length; i++)
@@ -247,20 +314,139 @@ public sealed class HolDuelBoardLayout : MonoBehaviour
             int row = i / 3;
             string label = keys[i] == BackspaceCommand ? "←" : keys[i];
             var button = RuntimeUI.CreateButton(keypadRoot.transform, "Key_" + keys[i], label,
-                new Vector2(-220f + column * 220f, 215f - row * 142f),
-                new Vector2(190f, 118f), KeyBlue, NearWhite);
+                new Vector2(-205f + column * 205f, 215f - row * 142f),
+                new Vector2(178f, 118f), KeyBlue, NearWhite);
             var text = button.GetComponentInChildren<TMP_Text>();
             if (text != null) text.fontSize = keys[i] == BackspaceCommand || keys[i] == "×" ? 38 : 48;
             button.onClick.AddListener(() => OnKeyPressed(keys[index]));
         }
 
-        var submit = RuntimeUI.CreateButton(board, "NumberSubmit", L10n.Get("confirm"),
-            new Vector2(-180f, -850f), new Vector2(660f, 112f), Gold, new Color(0.15f, 0.08f, 0.04f, 1f));
-        CenterRoot((RectTransform)submit.transform, new Vector2(660f, 112f), new Vector2(-180f, -850f));
-        RuntimeUI.Localize(submit, "confirm");
-        submit.onClick.AddListener(SubmitNumber);
+        foreach (var duplicate in GetComponentsInChildren<Button>(true))
+            if (duplicate.name == "NumberSubmit") duplicate.gameObject.SetActive(false);
 
+        var existing = FindChild("ButtonConfirm");
+        submitControl = existing != null ? existing.GetComponent<Button>() : null;
+        if (submitControl == null)
+        {
+            submitControl = RuntimeUI.CreateButton(board, "ButtonConfirm", L10n.Get("confirm"),
+                new Vector2(-180f, -850f), new Vector2(660f, 112f), Gold,
+                new Color(0.15f, 0.08f, 0.04f, 1f));
+            submitControl.onClick.AddListener(SubmitNumber);
+        }
+        else if (submitControl.onClick.GetPersistentEventCount() == 0 && numberManager != null)
+        {
+            submitControl.onClick.AddListener(numberManager.SubmitNumber);
+        }
+
+        CenterRoot((RectTransform)submitControl.transform, new Vector2(660f, 112f), new Vector2(-180f, -850f));
+        var submitLabel = submitControl.GetComponentInChildren<TMP_Text>(true);
+        if (submitLabel != null && submitLabel.GetComponent<LocalizedText>() == null)
+            RuntimeUI.Localize(submitControl, "confirm");
         ValidateLayout();
+    }
+
+    void Render()
+    {
+        if (!built) return;
+        var state = presentation.Current;
+
+        if (phaseText != null)
+            phaseText.text = PromptText(state);
+
+        if (roundText != null)
+        {
+            bool showRound = state.RoundNumber > 0;
+            roundText.gameObject.SetActive(showRound);
+            roundText.text = showRound ? L10n.Get("round_label_open", state.RoundNumber) : "";
+        }
+
+        if (rangeText != null)
+        {
+            bool showRange = state.Phase != SoloBoardPhase.ChooseSecret &&
+                             state.Phase != SoloBoardPhase.MatchResult;
+            rangeText.gameObject.SetActive(showRange);
+            rangeText.text = showRange ? L10n.Get("between_range", state.RangeMin, state.RangeMax) : "";
+        }
+
+        if (playerHistoryText != null)
+            playerHistoryText.text = HistoryLine(L10n.Get("you"), state.PlayerGuessHistory);
+        if (aiHistoryText != null)
+            aiHistoryText.text = HistoryLine(state.OpponentName, state.AiGuessHistory);
+        if (historyRoot != null)
+            historyRoot.SetActive(state.Phase != SoloBoardPhase.ChooseSecret);
+
+        if (opponentIdentityText != null)
+        {
+            opponentIdentityText.text = L10n.Get("opponent_label", state.OpponentName);
+            opponentIdentityText.transform.SetAsLastSibling();
+        }
+
+        bool numeric = state.NumericControlsAvailable;
+        if (input != null)
+        {
+            input.shouldHideMobileInput = true;
+            input.shouldHideSoftKeyboard = true;
+            input.interactable = numeric;
+            input.gameObject.SetActive(numeric);
+            if (!numeric) input.DeactivateInputField();
+        }
+        if (keypadRoot != null) keypadRoot.SetActive(numeric);
+        if (submitControl != null)
+        {
+            submitControl.interactable = numeric;
+            submitControl.gameObject.SetActive(state.SubmitControlVisible);
+        }
+    }
+
+    static string PromptText(SoloBoardPresentationState state)
+    {
+        switch (state.Prompt)
+        {
+            case SoloBoardPrompt.EnterSecret:
+                return L10n.Get("enter_your_number");
+            case SoloBoardPrompt.YourGuess:
+                return L10n.Get("your_guess");
+            case SoloBoardPrompt.OpponentThinking:
+                return L10n.Get("opponent_thinking", state.OpponentName);
+            case SoloBoardPrompt.AnswerOpponent:
+                return L10n.Get("answer_opponent", state.OpponentName);
+            case SoloBoardPrompt.OpponentForfeits:
+                return L10n.Get("opponent_forfeits", state.OpponentName);
+            case SoloBoardPrompt.MatchPoint:
+                return L10n.Get("match_point");
+            case SoloBoardPrompt.MatchPointYours:
+                return L10n.Get("match_point_yours", state.OpponentName);
+            case SoloBoardPrompt.TurnForfeited:
+                return L10n.Get("turn_forfeited");
+            case SoloBoardPrompt.ResolvingRound:
+                return "";
+            case SoloBoardPrompt.Win:
+            {
+                string result = L10n.Get("you_win") + "\n" + L10n.Get("won_in_guesses", state.DetailValue);
+                if (state.DetailValue <= 7) result += "\n" + L10n.Get("perfect_game");
+                return result;
+            }
+            case SoloBoardPrompt.Loss:
+                return L10n.Get("you_lose") + "\n" + L10n.Get("number_was", state.DetailValue);
+            case SoloBoardPrompt.Draw:
+                return L10n.Get("you_draw") + "\n" +
+                       L10n.Get("draw_in_guesses", state.DetailValue) + "\n" + L10n.Get("draw_tip");
+            default:
+                return "";
+        }
+    }
+
+    static string HistoryLine(string label, IReadOnlyList<int> history)
+    {
+        var text = new StringBuilder();
+        text.Append(label);
+        text.Append(':');
+        for (int i = 0; i < history.Count; i++)
+        {
+            text.Append("  ");
+            text.Append(history[i]);
+        }
+        return text.ToString();
     }
 
     void ValidateLayout()
@@ -288,7 +474,7 @@ public sealed class HolDuelBoardLayout : MonoBehaviour
 
     void OnKeyPressed(string key)
     {
-        if (input == null) return;
+        if (input == null || !input.interactable) return;
         if (key == "×")
         {
             input.text = "";

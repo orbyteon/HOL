@@ -84,7 +84,8 @@ public class NumberManager : MonoBehaviour
 
         numberInput.text = "";
         numberInput.DeactivateInputField();
-        if (gameManager == null || !gameManager.IsMatchOver)
+        if ((gameManager == null || !gameManager.IsMatchOver) &&
+            numberInput.interactable && numberInput.gameObject.activeInHierarchy)
             numberInput.ActivateInputField();
     }
 

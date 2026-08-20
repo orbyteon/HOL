@@ -68,6 +68,14 @@ public class MenuManager : MonoBehaviour
         ShowBackHint();
     }
 
+    // Runtime solo-board Back uses exactly the same guarded path as Android's
+    // system Back gesture. It must never bypass the live-match confirmation by
+    // calling NumberManager.ExitToMenu directly.
+    public void RequestSoloMatchExit()
+    {
+        ConfirmMatchExit();
+    }
+
     void ShowBackHint()
     {
         if (backHintLabel == null)
