@@ -143,7 +143,8 @@ public sealed class MainMenuPlayVisuals : MonoBehaviour
         ConfigureImage(bg, background, false);
 
         var safe = EnsureRect(visualRoot, SafeRootName);
-        ConfigureSafeArea(safe, (RectTransform)canvas.transform);
+        ResponsiveSafeAreaRoot.Attach(safe, (RectTransform)canvas.transform,
+            new Vector2(ReferenceWidth, ReferenceHeight));
 
         BuildDeco(safe, "PlayDecoStars", LoadOptional(DecoStarsResource));
 
@@ -192,6 +193,8 @@ public sealed class MainMenuPlayVisuals : MonoBehaviour
         label.fontStyle = FontStyles.Bold;
         label.color = Ink;
         label.alignment = TextAlignmentOptions.Center;
+        RuntimeUI.ConfigureText(label, ResponsiveTextRole.Action,
+            goldLabel ? 48f : 40f);
         Place(label.rectTransform, new Vector2(36f, 0f), new Vector2(size.x - 180f, size.y - 24f));
         SetLocalized(label, l10nKey);
     }
@@ -244,35 +247,6 @@ public sealed class MainMenuPlayVisuals : MonoBehaviour
         Place(image.rectTransform, Vector2.zero, new Vector2(ReferenceWidth, ReferenceHeight));
     }
 
-    void ConfigureSafeArea(RectTransform safeRoot, RectTransform canvasRect)
-    {
-        Rect normalized = NormalizedSafeArea(Screen.safeArea, Screen.width, Screen.height);
-        safeRoot.anchorMin = normalized.min;
-        safeRoot.anchorMax = normalized.max;
-        safeRoot.offsetMin = Vector2.zero;
-        safeRoot.offsetMax = Vector2.zero;
-        safeRoot.pivot = new Vector2(0.5f, 0.5f);
-
-        Vector2 canvasSize = canvasRect.rect.size;
-        if (canvasSize.x <= 0f || canvasSize.y <= 0f)
-            canvasSize = new Vector2(ReferenceWidth, ReferenceHeight);
-        float availableWidth = canvasSize.x * normalized.width;
-        float availableHeight = canvasSize.y * normalized.height;
-        float scale = Mathf.Min(1f,
-            Mathf.Min(availableWidth / ReferenceWidth, availableHeight / ReferenceHeight));
-        safeRoot.localScale = new Vector3(scale, scale, 1f);
-    }
-
-    static Rect NormalizedSafeArea(Rect safe, float width, float height)
-    {
-        if (width <= 0f || height <= 0f) return new Rect(0f, 0f, 1f, 1f);
-        return new Rect(
-            Mathf.Clamp01(safe.xMin / width),
-            Mathf.Clamp01(safe.yMin / height),
-            Mathf.Clamp01(safe.width / width),
-            Mathf.Clamp01(safe.height / height));
-    }
-
     Button FindButton(string name)
     {
         var found = DeepFind(transform, name);
@@ -305,6 +279,7 @@ public sealed class MainMenuPlayVisuals : MonoBehaviour
         tmp.fontSize = size;
         tmp.raycastTarget = false;
         tmp.color = ConvergingLight.NearWhite;
+        RuntimeUI.ConfigureText(tmp, ResponsiveTextRole.Body, size);
         return tmp;
     }
 
