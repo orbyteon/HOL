@@ -140,7 +140,15 @@ public sealed class AttachmentReskinVisuals : MonoBehaviour
         {
             if (gameObject.scene.name != "MainMenu")
                 ApplyHome(menu);
-            ApplySimplePanel(menu.settingsPanel == null ? null : menu.settingsPanel.transform);
+            var settingsPanel = menu.settingsPanel == null
+                ? null
+                : menu.settingsPanel.transform;
+            // SettingsVisuals is the authoritative owner once its production
+            // hierarchy exists. A later generic pass must never replace those
+            // approved sprites with procedural rounded rectangles.
+            if (settingsPanel == null ||
+                DeepFind(settingsPanel, "SettingsVisualRoot") == null)
+                ApplySimplePanel(settingsPanel);
             if (gameObject.scene.name != "MainMenu")
                 ApplySimplePanel(menu.panelPlay == null ? null : menu.panelPlay.transform);
             ApplySearching(menu.panelSearching == null ? null : menu.panelSearching.transform);

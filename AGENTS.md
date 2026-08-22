@@ -44,6 +44,50 @@ missing so a skipped compile cannot look green.
 
 ## Conventions (follow these)
 
+### HOL Production UI Asset Fidelity Contract — Mandatory
+
+This repository-wide contract applies to every existing and future HOL button,
+card, panel, icon, and piece of UI artwork. It applies to Main Menu, Settings,
+Private Room, Daily Hunt, Splash, gameplay UI, and every future screen. No agent
+or visual implementation may bypass it without the user's prior, explicit visual
+approval.
+
+1. When an approved production sprite, PNG, or SVG exists, that asset is the
+   sole visual source of truth.
+2. Approved artwork must not be replaced by simpler procedural graphics,
+   polygons, gradients, or code-drawn approximations without prior, explicit
+   visual approval from the user.
+3. A production sprite must remain visible with alpha `1` in its normal state.
+   Techniques such as alpha `0.002f` that hide the real asset are prohibited.
+4. Assets whose names contain `_9s` must use `Image.Type.Sliced` with their
+   approved sprite borders.
+5. Only additive overlays for glow, pulse, highlight, pressed, or disabled
+   states are permitted. They must not cover, replace, or visually degrade the
+   base artwork.
+6. TMP labels and localization must remain separate from the artwork.
+7. Preserve every existing callback, navigation path, hit target, and
+   accessibility behavior.
+8. UI imports must use Sprite (2D and UI), sRGB enabled, alpha transparency
+   enabled, mipmaps disabled, an appropriate Max Size, and quality-first Android
+   compression for gradients and outlines.
+9. Do not upscale artwork beyond the source asset's genuinely useful
+   resolution.
+10. Final visual quality is judged from a native-resolution Unity/device capture,
+    not from the source image or a reduced Game View preview.
+11. Every visual phase requires a side-by-side comparison with the approved
+    reference before it can be considered complete.
+12. Procedural rendering is permitted only when no approved production asset
+    exists or when the user explicitly approves it.
+13. Apply this contract project-wide, while keeping each implementation phase
+    within its explicitly approved scope. Do not use enforcement of this
+    contract as authorization for a mass refactor of unrelated screens; record
+    out-of-scope violations for later controlled phases.
+
+Focused automated coverage for production buttons must verify the expected
+sprite assignment, normal-state alpha `1`, `Image.Type.Sliced` for `_9s`
+assets, callback preservation, and the absence of a procedural replacement
+graphic above approved artwork.
+
 - **Every `.cs` and folder needs a committed `.meta`.** Scripts without
   metas got random GUIDs per machine in the past; don't let it happen
   again. MonoImporter metas use the standard block, new GUID per file.
