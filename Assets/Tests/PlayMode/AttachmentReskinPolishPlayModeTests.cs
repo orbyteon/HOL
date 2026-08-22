@@ -64,10 +64,26 @@ public sealed class AttachmentReskinPolishPlayModeTests
         Assert.That(homeTip.sprite.name, Does.Contain("tip_frame"),
             "Polish must not restyle Home chrome owned by MainMenuHomeVisuals.");
         Assert.That(homeTip.GetComponent<Outline>(), Is.Null);
-        Assert.That(Find(canvas.transform, "HomePrivateIcon"), Is.Not.Null,
-            "The real runtime-injected PvP button should receive the private-room icon.");
-        Assert.That(Find(canvas.transform, "HomeDailyIcon"), Is.Not.Null,
-            "The real runtime-injected Daily Hunt button should receive the hunt icon.");
+        var referenceIconType = RuntimeType("MainMenuReferenceIconGraphic");
+        var privateIcon = Find(canvas.transform, "HomePrivateIcon");
+        var dailyIcon = Find(canvas.transform, "HomeDailyIcon");
+        Assert.That(privateIcon, Is.Not.Null,
+            "The Home composition requires a private-room symbol.");
+        Assert.That(dailyIcon, Is.Not.Null,
+            "The Home composition requires a Daily Hunt symbol.");
+        Assert.That(privateIcon.GetComponent(referenceIconType), Is.Not.Null);
+        Assert.That(dailyIcon.GetComponent(referenceIconType), Is.Not.Null);
+        Assert.That(privateIcon.GetComponent<Image>(), Is.Null,
+            "The reference people symbol must not regress to the padded sticker PNG.");
+        Assert.That(dailyIcon.GetComponent<Image>(), Is.Null,
+            "The reference lightning symbol must not regress to the padded sticker PNG.");
+        Canvas.ForceUpdateCanvases();
+        Assert.That((privateIcon.GetComponent(referenceIconType) as Graphic)
+            .canvasRenderer.GetMesh().vertexCount, Is.GreaterThan(40));
+        Assert.That((dailyIcon.GetComponent(referenceIconType) as Graphic)
+            .canvasRenderer.GetMesh().vertexCount, Is.GreaterThan(7));
+        Assert.That(Find(canvas.transform, "HomePrivateTitle"), Is.Not.Null);
+        Assert.That(Find(canvas.transform, "HomeDailyTitle"), Is.Not.Null);
         Assert.That(Find(canvas.transform, "BoardHomeLogo"), Is.Null);
 
         var exactLogo = Find(canvas.transform, "ExactHOLLogo");

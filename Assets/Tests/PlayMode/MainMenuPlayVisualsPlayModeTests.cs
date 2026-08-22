@@ -109,7 +109,7 @@ public sealed class MainMenuPlayVisualsPlayModeTests
         // still exposes the existing Create and Join actions.
         var privateRoom = Find(canvas.transform, "ButtonPvP").GetComponent<Button>();
         Assert.That(privateRoom.GetComponentInChildren<TMP_Text>(true).text,
-            Is.EqualTo(LocalizedCopy("private_room")));
+            Is.EqualTo(LocalizedCopy("home_private_title")));
         privateRoom.onClick.Invoke();
         yield return null;
         var pvp = Object.FindObjectOfType(RuntimeType("PvpGameController")) as Component;
