@@ -259,15 +259,16 @@ public sealed class ResponsiveUIFoundationTests
 
         yield return new ScreenLayout("Settings", new[]
         {
-            new Region("Title", 0f, 455f, 420f, 78f),
-            new Region("NameInput", 100f, 340f, 300f, 82f),
-            new Region("Save", 350f, 340f, 160f, 74f),
-            new Region("Languages", 145f, 110f, 440f, 70f),
-            new Region("Music", 250f, -120f, 150f, 70f),
-            new Region("Difficulty", 185f, -350f, 470f, 65f),
-            new Region("Ads", 305f, -580f, 200f, 72f),
-            new Region("Back", -455f, 820f, 84f, 84f)
-        }, Pair("NameInput", "Languages"), Pair("Save", "Languages"),
+            new Region("Title", 0f, 540f, 520f, 112f),
+            new Region("NameInput", -15f, 270f, 450f, 84f),
+            new Region("Save", 330f, 270f, 220f, 84f),
+            new Region("Languages", 215f, 62f, 470f, 84f),
+            new Region("Music", 310f, -122f, 200f, 92f),
+            new Region("Difficulty", 43f, -363f, 685f, 76f),
+            new Region("Ads", 320f, -542f, 210f, 84f),
+            new Region("Back", -455f, 812f, 124f, 124f)
+        }, Pair("NameInput", "Save"), Pair("NameInput", "Languages"),
+            Pair("Save", "Languages"),
             Pair("Languages", "Music"), Pair("Music", "Difficulty"),
             Pair("Difficulty", "Ads"));
 

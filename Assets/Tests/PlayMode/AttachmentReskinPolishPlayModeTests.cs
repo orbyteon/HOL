@@ -129,7 +129,8 @@ public sealed class AttachmentReskinPolishPlayModeTests
         var toggle = Find(settings.transform, "Toggle") as RectTransform;
         Assert.That(toggle.localScale, Is.EqualTo(Vector3.one));
         var back = Find(settings.transform, "Buttonback") as RectTransform;
-        Assert.That(back.sizeDelta.x, Is.LessThanOrEqualTo(100f));
+        Assert.That(back.sizeDelta.x, Is.InRange(112f, 140f),
+            "The Settings Back action must keep the approved prominent touch target.");
         for (int i = 0; i < 3; i++)
         {
             var current = Find(settings.transform, "Difficulty" + i)

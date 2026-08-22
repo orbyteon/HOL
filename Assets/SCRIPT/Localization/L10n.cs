@@ -72,8 +72,16 @@ public static class L10n
         { "language_greek",          new[] { "Ελληνικά", "Ελληνικά" } },
         { "music",                   new[] { "Music", "Μουσική" } },
         { "settings_title",          new[] { "Settings", "Ρυθμίσεις" } },
+        { "settings_title_display",  new[] { "SETTINGS", "ΡΥΘΜΙΣΕΙΣ" } },
         { "settings_change",         new[] { "Change", "Αλλαγή" } },
+        { "settings_change_display", new[] { "CHANGE", "ΑΛΛΑΓΗ" } },
+        { "settings_save_display",   new[] { "SAVE", "ΑΠΟΘΗΚΕΥΣΗ" } },
         { "player_name",             new[] { "Your name", "Το όνομά σου" } },
+        { "settings_player_name",    new[] { "PLAYER NAME", "ΟΝΟΜΑ ΠΑΙΚΤΗ" } },
+        { "settings_language",       new[] { "LANGUAGE", "ΓΛΩΣΣΑ" } },
+        { "settings_music",          new[] { "MUSIC", "ΜΟΥΣΙΚΗ" } },
+        { "settings_ai_difficulty",  new[] { "AI DIFFICULTY", "ΔΥΣΚΟΛΙΑ AI" } },
+        { "settings_ads_privacy",    new[] { "ADS PRIVACY", "ΑΠΟΡΡΗΤΟ ΔΙΑΦΗΜΙΣΕΩΝ" } },
         { "player_default",          new[] { "Player", "Παίκτης" } },
 
         // matchmaking
