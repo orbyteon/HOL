@@ -70,6 +70,30 @@ public sealed class PrivateRoomProductionAssetsTests
     }
 
     [Test]
+    public void PrivateRoomReferenceCopyStaysExactInEnglishAndGreek()
+    {
+        bool hadLanguage = PlayerPrefs.HasKey("Language");
+        int previousLanguage = PlayerPrefs.GetInt("Language", 0);
+        try
+        {
+            PlayerPrefs.SetInt("Language", (int)L10n.Language.English);
+            Assert.That(L10n.Get("private_room_create_title"), Is.EqualTo("CREATE A ROOM"));
+            Assert.That(L10n.Get("private_room_create_action"), Is.EqualTo("CREATE"));
+            Assert.That(L10n.Get("private_room_join_action"), Is.EqualTo("JOIN!"));
+
+            PlayerPrefs.SetInt("Language", (int)L10n.Language.Greek);
+            Assert.That(L10n.Get("private_room_create_title"), Is.EqualTo("ΔΗΜΙΟΥΡΓΗΣΕ ΔΩΜΑΤΙΟ"));
+            Assert.That(L10n.Get("private_room_create_action"), Is.EqualTo("ΔΗΜΙΟΥΡΓΙΑ"));
+            Assert.That(L10n.Get("private_room_join_action"), Is.EqualTo("ΜΠΕΣ!"));
+        }
+        finally
+        {
+            if (hadLanguage) PlayerPrefs.SetInt("Language", previousLanguage);
+            else PlayerPrefs.DeleteKey("Language");
+        }
+    }
+
+    [Test]
     public void CurrentPrivateRoomOwnerExistsAndRetiredReskinOwnersAreGone()
     {
         Assert.That(RuntimeType("PrivateRoomVisuals"), Is.Not.Null);

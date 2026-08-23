@@ -237,7 +237,7 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
     {
         var step = EnsureImage(safeRoot, "PrivateRoomStepPill");
         ConfigureImage(step, pillSprite, false, Image.Type.Sliced);
-        Place(step.rectTransform, new Vector2(-350f, 820f),
+        Place(step.rectTransform, new Vector2(-270f, 820f),
             new Vector2(330f, 90f));
         var stepText = EnsureText(step.transform, "PrivateRoomStepText", 28f,
             displayFont, NearWhite, TextAlignmentOptions.Center);
@@ -302,7 +302,7 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
             displayFont, NearWhite, TextAlignmentOptions.Center);
         Place(heading.rectTransform, new Vector2(250f, 95f),
             new Vector2(390f, 110f));
-        RuntimeUI.Localize(heading, "pvp_create_room");
+        RuntimeUI.Localize(heading, "private_room_create_title");
 
         var hint = EnsureText(card.transform, "PrivateRoomCreateHint", 29f,
             bodyFont, NearWhite, TextAlignmentOptions.Center);
@@ -314,7 +314,7 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
         Place((RectTransform)createButton.transform, new Vector2(250f, -112f),
             new Vector2(360f, 104f));
         StyleButton(createButton, frame, DarkInk, 1f, Image.Type.Sliced);
-        ConfigureButtonLabel(createButton, "pvp_create_room", 38f, DarkInk);
+        ConfigureButtonLabel(createButton, "private_room_create_action", 38f, DarkInk);
     }
 
     void BuildJoinCard(Sprite magentaFrame, Sprite goldFrame,
@@ -372,7 +372,7 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
         Place((RectTransform)joinButton.transform, new Vector2(205f, -100f),
             new Vector2(430f, 104f));
         StyleButton(joinButton, goldFrame, DarkInk, 1f, Image.Type.Sliced);
-        ConfigureButtonLabel(joinButton, "pvp_join_room", 42f, DarkInk);
+        ConfigureButtonLabel(joinButton, "private_room_join_action", 42f, DarkInk);
         joinButton.onClick.AddListener(CopyLandingCodeIntoJoinFlow);
     }
 
