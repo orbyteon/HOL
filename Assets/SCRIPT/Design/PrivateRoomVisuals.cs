@@ -1,7 +1,6 @@
 using System.Collections;
 using TMPro;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 // Sole presentation owner for the Private Room landing screen.
@@ -58,28 +57,6 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
     float nextRefresh;
 
     public bool IsReady { get; private set; }
-
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
-    static void Install()
-    {
-        SceneManager.sceneLoaded -= OnSceneLoaded;
-        SceneManager.sceneLoaded += OnSceneLoaded;
-    }
-
-    static void OnSceneLoaded(Scene scene, LoadSceneMode mode)
-    {
-        if (!scene.IsValid() || !scene.isLoaded || scene.name == "SplashScene")
-            return;
-
-        foreach (var root in scene.GetRootGameObjects())
-        {
-            var controller = root.GetComponentInChildren<PvpGameController>(true);
-            if (controller == null) continue;
-            if (controller.GetComponent<PrivateRoomVisuals>() == null)
-                controller.gameObject.AddComponent<PrivateRoomVisuals>();
-            return;
-        }
-    }
 
     IEnumerator Start()
     {
