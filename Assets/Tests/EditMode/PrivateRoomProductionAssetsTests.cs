@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -72,19 +73,24 @@ public sealed class PrivateRoomProductionAssetsTests
     [Test]
     public void PrivateRoomReferenceCopyStaysExactInEnglishAndGreek()
     {
+        Type l10n = RuntimeType("L10n");
+        Assert.That(l10n, Is.Not.Null);
+        MethodInfo get = l10n.GetMethod("Get", BindingFlags.Public | BindingFlags.Static);
+        Assert.That(get, Is.Not.Null);
+
         bool hadLanguage = PlayerPrefs.HasKey("Language");
         int previousLanguage = PlayerPrefs.GetInt("Language", 0);
         try
         {
-            PlayerPrefs.SetInt("Language", (int)L10n.Language.English);
-            Assert.That(L10n.Get("private_room_create_title"), Is.EqualTo("CREATE A ROOM"));
-            Assert.That(L10n.Get("private_room_create_action"), Is.EqualTo("CREATE"));
-            Assert.That(L10n.Get("private_room_join_action"), Is.EqualTo("JOIN!"));
+            PlayerPrefs.SetInt("Language", 0);
+            Assert.That(Localize(get, "private_room_create_title"), Is.EqualTo("CREATE A ROOM"));
+            Assert.That(Localize(get, "private_room_create_action"), Is.EqualTo("CREATE"));
+            Assert.That(Localize(get, "private_room_join_action"), Is.EqualTo("JOIN!"));
 
-            PlayerPrefs.SetInt("Language", (int)L10n.Language.Greek);
-            Assert.That(L10n.Get("private_room_create_title"), Is.EqualTo("ΔΗΜΙΟΥΡΓΗΣΕ ΔΩΜΑΤΙΟ"));
-            Assert.That(L10n.Get("private_room_create_action"), Is.EqualTo("ΔΗΜΙΟΥΡΓΙΑ"));
-            Assert.That(L10n.Get("private_room_join_action"), Is.EqualTo("ΜΠΕΣ!"));
+            PlayerPrefs.SetInt("Language", 1);
+            Assert.That(Localize(get, "private_room_create_title"), Is.EqualTo("ΔΗΜΙΟΥΡΓΗΣΕ ΔΩΜΑΤΙΟ"));
+            Assert.That(Localize(get, "private_room_create_action"), Is.EqualTo("ΔΗΜΙΟΥΡΓΙΑ"));
+            Assert.That(Localize(get, "private_room_join_action"), Is.EqualTo("ΜΠΕΣ!"));
         }
         finally
         {
@@ -126,6 +132,11 @@ public sealed class PrivateRoomProductionAssetsTests
         foreach (string path in retired)
             Assert.That(Resources.Load<Sprite>(path), Is.Null,
                 "Retired generic theme surface returned: Resources/" + path);
+    }
+
+    static string Localize(MethodInfo get, string key)
+    {
+        return (string)get.Invoke(null, new object[] { key, Array.Empty<object>() });
     }
 
     static Type RuntimeType(string name)
