@@ -12,8 +12,12 @@ const dimensions = png => ({
 });
 const colorType = png => png[25];
 
-const homePngs = [
-  "mainmenu_bg_stairs_clouds.png",
+const approvedBackground =
+  "Assets/newdesign/Resources/phase2a/hol_neon_reference_bg_r3.png";
+const rejectedCloudBackground =
+  "Assets/newdesign/Resources/mainmenu/mainmenu_bg_stairs_clouds.png";
+
+const homeMainmenuPngs = [
   "mainmenu_deco_stars.png",
   "mainmenu_deco_lightning.png",
   "mainmenu_deco_confetti.png",
@@ -45,16 +49,23 @@ test("approved number six stays byte-exact", () => {
     "067beafc207aea302e0993a3bacdb2b69478429aa3685f275bb6705bd902ac4b");
 });
 
-test("Home background is exact Android portrait size", () => {
-  const png = read(
-    "Assets/newdesign/Resources/mainmenu/mainmenu_bg_stairs_clouds.png");
+test("approved Revision 3 Home background is exact Android portrait size", () => {
+  const png = read(approvedBackground);
   assert.deepEqual(dimensions(png), { width: 1080, height: 1920 });
   assert.ok(colorType(png) === 2 || colorType(png) === 6,
     "Home background must be RGB or RGBA");
+  assert.equal(exists(approvedBackground + ".meta"), true,
+    approvedBackground + ".meta");
 });
 
-test("every cartoon Home asset has a Unity meta", () => {
-  for (const filename of homePngs) {
+test("rejected stairs/clouds Home background is deleted", () => {
+  assert.equal(exists(rejectedCloudBackground), false, rejectedCloudBackground);
+  assert.equal(exists(rejectedCloudBackground + ".meta"), false,
+    rejectedCloudBackground + ".meta");
+});
+
+test("every current cartoon Home asset has a Unity meta", () => {
+  for (const filename of homeMainmenuPngs) {
     const path = "Assets/newdesign/Resources/mainmenu/" + filename;
     assert.equal(exists(path), true, path);
     assert.equal(exists(path + ".meta"), true, path + ".meta");
@@ -67,7 +78,7 @@ test("every cartoon Home asset has a Unity meta", () => {
 });
 
 test("cartoon Home art stays isolated from Splash resources", () => {
-  for (const filename of homePngs) {
+  for (const filename of homeMainmenuPngs) {
     const path = "Assets/newdesign/Resources/splash/" + filename;
     assert.equal(exists(path), false, path);
   }
@@ -99,9 +110,15 @@ test("Home does not ship a 1v1 CTA", () => {
 });
 
 test("Home chrome PNGs stay text-free RGBA overlays or 9-slices", () => {
-  const chrome = homePngs.filter(name => name !== "mainmenu_bg_stairs_clouds.png");
-  for (const filename of chrome) {
+  for (const filename of homeMainmenuPngs) {
     const png = read("Assets/newdesign/Resources/mainmenu/" + filename);
     assert.equal(colorType(png), 6, filename + " must be RGBA");
   }
+});
+
+test("Home owner uses approved background and cannot restore rejected one", () => {
+  const owner = "Assets/SCRIPT/Design/MainMenuHomeVisuals.cs";
+  const source = read(owner).toString("utf8");
+  assert.match(source, /phase2a\/hol_neon_reference_bg_r3/);
+  assert.equal(source.includes("mainmenu_bg_stairs_clouds"), false);
 });
