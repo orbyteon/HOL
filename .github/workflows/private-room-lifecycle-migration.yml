@@ -1,0 +1,113 @@
+name: Private Room Lifecycle Migration
+
+on:
+  push:
+    branches:
+      - refactor/remove-legacy-design-system
+    paths:
+      - .github/workflows/private-room-lifecycle-migration.yml
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refactor/remove-legacy-design-system
+          fetch-depth: 1
+
+      - name: Remove duplicate Private Room lifecycle hook and add regression gate
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          visuals_path = Path('Assets/SCRIPT/Design/PrivateRoomVisuals.cs')
+          text = visuals_path.read_text(encoding='utf-8')
+
+          import_line = 'using UnityEngine.SceneManagement;\n'
+          if text.count(import_line) != 1:
+              raise SystemExit(f'Refusing edit: expected one SceneManagement import, found {text.count(import_line)}')
+          text = text.replace(import_line, '')
+
+          retired = '''    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+    static void Install()
+    {
+        SceneManager.sceneLoaded -= OnSceneLoaded;
+        SceneManager.sceneLoaded += OnSceneLoaded;
+    }
+
+    static void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        if (!scene.IsValid() || !scene.isLoaded || scene.name == "SplashScene")
+            return;
+
+        foreach (var root in scene.GetRootGameObjects())
+        {
+            var controller = root.GetComponentInChildren<PvpGameController>(true);
+            if (controller == null) continue;
+            if (controller.GetComponent<PrivateRoomVisuals>() == null)
+                controller.gameObject.AddComponent<PrivateRoomVisuals>();
+            return;
+        }
+    }
+
+'''
+          if text.count(retired) != 1:
+              raise SystemExit(f'Refusing edit: expected one duplicate lifecycle block, found {text.count(retired)}')
+          visuals_path.write_text(text.replace(retired, ''), encoding='utf-8', newline='\n')
+
+          test_path = Path('Assets/Tests/EditMode/PrivateRoomProductionAssetsTests.cs')
+          tests = test_path.read_text(encoding='utf-8')
+          marker = '''    [Test]
+    public void RetiredGenericThemeSurfacesCannotLoad()
+'''
+          if tests.count(marker) != 1:
+              raise SystemExit('Refusing test edit: insertion marker is not unique')
+          if 'PrivateRoomInstallerIsTheOnlyRuntimeLifecycleOwner' in tests:
+              raise SystemExit('Lifecycle ownership regression test already exists unexpectedly')
+
+          regression = '''    [Test]
+    public void PrivateRoomInstallerIsTheOnlyRuntimeLifecycleOwner()
+    {
+        Type visuals = RuntimeType("PrivateRoomVisuals");
+        Type installer = RuntimeType("PrivateRoomVisualsInstaller");
+        Assert.That(visuals, Is.Not.Null);
+        Assert.That(installer, Is.Not.Null);
+
+        foreach (MethodInfo method in visuals.GetMethods(
+            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
+        {
+            object[] attributes = method.GetCustomAttributes(
+                typeof(RuntimeInitializeOnLoadMethodAttribute), false);
+            Assert.That(attributes, Is.Empty,
+                "PrivateRoomVisuals must not register its own runtime lifecycle hook: " + method.Name);
+        }
+
+        MethodInfo register = installer.GetMethod("Register",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.That(register, Is.Not.Null);
+        Assert.That(register.GetCustomAttributes(
+            typeof(RuntimeInitializeOnLoadMethodAttribute), false), Is.Not.Empty,
+            "PrivateRoomVisualsInstaller must remain the sole runtime lifecycle bridge.");
+    }
+
+'''
+          test_path.write_text(tests.replace(marker, regression + marker), encoding='utf-8', newline='\n')
+          PY
+
+      - name: Validate and commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          git diff -- Assets/SCRIPT/Design/PrivateRoomVisuals.cs Assets/Tests/EditMode/PrivateRoomProductionAssetsTests.cs
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Assets/SCRIPT/Design/PrivateRoomVisuals.cs Assets/Tests/EditMode/PrivateRoomProductionAssetsTests.cs
+          git commit -m "Make PrivateRoom installer sole lifecycle owner"
+          git push origin HEAD:refactor/remove-legacy-design-system
