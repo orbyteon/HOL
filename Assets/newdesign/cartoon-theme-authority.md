@@ -33,6 +33,12 @@ This file prevents older asset generations and generic runtime fallbacks from si
 - generic `Assets/UI/bg_menu_1080x1920.png`
 - procedural CTA/chip/icon geometry when the authoritative production asset above is available
 
+**Runtime ownership**
+
+- `MainMenuHomeVisuals` remains the Home composition/navigation owner.
+- `MainMenuHomeFidelityEnforcer` is the focused production-fidelity guard. It restores approved Home sprites to visible alpha `1`, uses `Image.Type.Sliced` for `_9s`, disables procedural replacement graphics that cover those assets, and must never replace callbacks, navigation, or gameplay state.
+- Legacy/global visual writers must defer to `HomeVisualRoot`.
+
 ## SPLASH
 
 Keep the dedicated `Resources/splash/` production family plus `Resources/reference/hol_logo_exact.png` and exact/approved character or mascot art referenced by `SplashDesign`.
