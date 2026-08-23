@@ -34,7 +34,7 @@ public sealed class MainMenuProductionAssetFidelityTests
 
         AssertCta("ButtonPlay", "phase2a/hol_cta_gold_r2_9s");
         AssertCta("ButtonPvP", "phase2a/hol_cta_blue_r2_9s");
-        AssertCta("DailyHuntButton", "phase2a/hol_cta_gold_r2_9s");
+        AssertCta("DailyHuntButton", "phase2a/hol_cta_magenta_r2_9s");
 
         play.onClick.Invoke();
         pvp.onClick.Invoke();
