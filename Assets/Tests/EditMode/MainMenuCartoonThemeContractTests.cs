@@ -7,8 +7,10 @@ public sealed class MainMenuCartoonThemeContractTests
     [Test]
     public void CanonicalCartoonThemeDocumentsExist()
     {
-        Assert.That(File.Exists("design/cartoon-theme.md"), Is.True);
-        Assert.That(File.Exists("Assets/newdesign/cartoon-theme-authority.md"), Is.True);
+        string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+        Assert.That(File.Exists(Path.Combine(projectRoot, "design", "cartoon-theme.md")), Is.True);
+        Assert.That(File.Exists(Path.Combine(projectRoot, "Assets", "newdesign",
+            "cartoon-theme-authority.md")), Is.True);
     }
 
     [TestCase("reference/hol_logo_exact")]
@@ -19,7 +21,9 @@ public sealed class MainMenuCartoonThemeContractTests
     [TestCase("phase2a/hol_menu_girl_forward_fist_r3")]
     [TestCase("phase2a/hol_cta_gold_r2_9s")]
     [TestCase("phase2a/hol_cta_blue_r2_9s")]
+    [TestCase("phase2a/hol_cta_magenta_r2_9s")]
     [TestCase("phase2a/hol_player_chip_r2_9s")]
+    [TestCase("phase2a/hol_tip_frame_r2_9s")]
     [TestCase("phase2a/hol_settings_gear_r2")]
     [TestCase("phase2a/hol_mode_private_r2")]
     [TestCase("phase2a/hol_mode_daily_r2")]
