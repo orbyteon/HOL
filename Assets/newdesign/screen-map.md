@@ -14,7 +14,7 @@ This map keeps the new consumer-first visual direction aligned with the existing
 | Profile / stats | `GameStats`, `SavePlayerName`, `DailyStreak` |
 | Ads consent / rewarded flow | `ConsentManager`, `AdsManager` |
 | Language switching | `Localization/L10n.cs`, `LocalizedText` |
-| Motion / feedback | `UIJuice/*`, `Haptics`, `DesignRuntimeWiring` |
+| Motion / feedback | `UIJuice/*`, `Haptics`, screen-specific `Design/*` owners |
 
 ## Rules
 

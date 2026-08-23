@@ -490,17 +490,10 @@ public class ExactReferenceAssetsTests
     }
 
     [Test]
-    public void SerializedLegacyThemeShimHasNoRuntimeThemeLifecycle()
+    public void RuntimeUiInfrastructureExistsWithoutSerializedGlobalThemeOwner()
     {
-        var type = RuntimeType("DesignRuntimeWiring");
-        Assert.IsNull(type.GetMethod("Awake",
-            BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly));
-        Assert.IsNull(type.GetMethod("Start",
-            BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly));
-        Assert.AreEqual(0, type.GetFields(
-            BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public |
-            BindingFlags.NonPublic | BindingFlags.DeclaredOnly).Length,
-            "The temporary serialized shim must remain behavior-free until scene YAML removes it.");
+        Assert.IsNotNull(RuntimeType("RuntimeUI"));
+        Assert.IsNull(System.Type.GetType("DesignRuntimeWiring, Assembly-CSharp"));
     }
 
     [Test]

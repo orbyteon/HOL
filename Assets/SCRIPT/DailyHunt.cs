@@ -109,6 +109,8 @@ public class DailyHunt : MonoBehaviour
         var entry = RuntimeUI.CreateButton(canvas, "DailyHuntButton",
             L10n.Get("daily_hunt"), new Vector2(0f, -740f), new Vector2(460f, 90f),
             ConsumerTokens.Cyan, DarkLabel);
+        RuntimeUI.ApplyProductionSprite(entry.GetComponent<Image>(),
+            "mainmenu/mainmenu_cta_blue_9s", Image.Type.Sliced, false, 2f);
         RuntimeUI.Localize(entry, "daily_hunt");
         entry.onClick.AddListener(hunt.Open);
 
@@ -123,9 +125,8 @@ public class DailyHunt : MonoBehaviour
 
     void Build()
     {
-        NeonFrame.Frame(transform, "Card", new Vector2(0f, -10f),
-            new Vector2(920f, 1340f), ConsumerTokens.Cyan, 0.985f, true,
-            ConsumerTokens.Surface);
+        RuntimeUI.CreateProductionFrame(transform, "Card", new Vector2(0f, -10f),
+            new Vector2(920f, 1340f), "mainmenu/mainmenu_tip_frame_9s", 2f);
 
         title = RuntimeUI.CreateText(transform, "Title", "", 46,
             new Vector2(0f, 550f), new Vector2(780f, 80f), ConsumerTokens.Gold);

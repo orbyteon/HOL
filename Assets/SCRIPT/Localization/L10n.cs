@@ -155,6 +155,7 @@ public static class L10n
         { "pvp_leave",               new[] { "Leave match", "Έξοδος από τον αγώνα" } },
         { "pvp_copy",                new[] { "Copy invite", "Αντιγραφή πρόσκλησης" } },
         { "private_room_title",      new[] { "Play with a friend", "Παίξε με φίλο" } },
+        { "private_room_step",       new[] { "2. PLAY WITH A FRIEND", "2. ΠΑΙΞΕ ΜΕ ΦΙΛΟ" } },
         { "private_room_create_hint",new[] { "Share the code with your friend", "Μοιράσου τον κωδικό με τον φίλο σου" } },
         { "private_room_join_title", new[] { "Join a room", "Συμμετοχή σε δωμάτιο" } },
         { "private_room_share",      new[] { "Share", "Μοιράσου" } },

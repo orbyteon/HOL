@@ -30,6 +30,7 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
     const string PurpleFrameResource = "mainmenu/mainmenu_tip_frame_9s";
     const string PlayerChipResource = "mainmenu/mainmenu_player_chip_frame_9s";
     const string TipIconResource = "mainmenu/mainmenu_icon_tip_bulb";
+    const string StreakIconResource = "mainmenu/mainmenu_icon_streak";
 
     const string DisplayFontResource = "phase2a/fonts/HOL Menu Display SDF";
     const string BodyFontResource = "phase2a/fonts/HOL Menu Body SDF";
@@ -143,11 +144,13 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
         Sprite chip = LoadRequired(PlayerChipResource);
         Sprite tip = LoadRequired(TipIconResource);
         Sprite chevron = LoadRequired(BackChevronResource);
+        Sprite streakIcon = LoadRequired(StreakIconResource);
 
         IsReady = background != null && logo != null && boy != null &&
             girl != null && door != null && six != null && seven != null &&
             avatar != null && blue != null && gold != null && magenta != null &&
             purple != null && chip != null && tip != null && chevron != null &&
+            streakIcon != null &&
             displayFont != null && bodyFont != null;
         if (!IsReady)
         {
@@ -196,7 +199,7 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
         var outer = EnsureImage(visualRoot, "PrivateRoomOuterFrame");
         ConfigureImage(outer, purple, false, Image.Type.Sliced);
         Place(outer.rectTransform, Vector2.zero, new Vector2(1030f, 1860f));
-        outer.color = new Color(0.80f, 0.68f, 1f, 0.70f);
+        outer.color = Color.white;
 
         safeRoot = EnsureRect(visualRoot, "PrivateRoomSafeRoot");
         Stretch(safeRoot);
@@ -205,7 +208,7 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
             ResponsiveSafeAreaRoot.Attach(safeRoot, canvas.transform as RectTransform,
                 new Vector2(ReferenceWidth, ReferenceHeight));
 
-        BuildTopBar(chip, avatar, purple, chevron);
+        BuildTopBar(chip, avatar, purple, chevron, streakIcon);
 
         var logoImage = EnsureImage(safeRoot, "PrivateRoomLogo");
         ConfigureImage(logoImage, logo, true, Image.Type.Simple);
@@ -230,7 +233,7 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
     }
 
     void BuildTopBar(Sprite chipSprite, Sprite avatar, Sprite pillSprite,
-        Sprite chevron)
+        Sprite chevron, Sprite streakIcon)
     {
         var step = EnsureImage(safeRoot, "PrivateRoomStepPill");
         ConfigureImage(step, pillSprite, false, Image.Type.Sliced);
@@ -239,7 +242,7 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
         var stepText = EnsureText(step.transform, "PrivateRoomStepText", 28f,
             displayFont, NearWhite, TextAlignmentOptions.Center);
         StretchText(stepText.rectTransform, 18f, 12f);
-        stepText.text = IsGreek ? "2. ΠΑΙΞΕ ΜΕ ΦΙΛΟ" : "2. PLAY WITH A FRIEND";
+        RuntimeUI.Localize(stepText, "private_room_step");
 
         var chip = EnsureImage(safeRoot, "PrivateRoomPlayerChip");
         ConfigureImage(chip, chipSprite, false, Image.Type.Sliced);
@@ -260,8 +263,12 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
         streakText = EnsureText(chip.transform, "PrivateRoomStreak", 30f,
             bodyFont, new Color(1f, 0.82f, 0.24f, 1f),
             TextAlignmentOptions.Center);
-        Place(streakText.rectTransform, new Vector2(38f, -27f),
-            new Vector2(210f, 40f));
+        Place(streakText.rectTransform, new Vector2(55f, -27f),
+            new Vector2(120f, 40f));
+        var streakImage = EnsureImage(chip.transform, "PrivateRoomStreakIcon");
+        ConfigureImage(streakImage, streakIcon, true, Image.Type.Simple);
+        Place(streakImage.rectTransform, new Vector2(-20f, -27f),
+            new Vector2(44f, 44f));
 
         Reparent(backButton.transform, safeRoot);
         Place((RectTransform)backButton.transform, new Vector2(-485f, 820f),
@@ -447,7 +454,7 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
         var stepText = DeepFind(safeRoot, "PrivateRoomStepText")
             ?.GetComponent<TMP_Text>();
         if (stepText != null)
-            stepText.text = IsGreek ? "2. ΠΑΙΞΕ ΜΕ ΦΙΛΟ" : "2. PLAY WITH A FRIEND";
+            stepText.text = L10n.Get("private_room_step");
         RefreshPlayerChip();
     }
 
@@ -457,16 +464,16 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
         string player = PlayerPrefs.GetString("PlayerName", "");
         if (string.IsNullOrWhiteSpace(player)) player = L10n.Get("player_default");
         playerNameText.text = player;
-        streakText.text = "🔥 " + GameStats.CurrentStreak;
+        streakText.text = GameStats.CurrentStreak.ToString();
     }
 
     void ConfigureButtonLabel(Button button, string key, float size, Color color)
     {
         if (button == null) return;
-        var label = button.GetComponentInChildren<TMP_Text>(true);
+        var label = DirectChild(button.transform, "PrivateRoomActionLabel")?.GetComponent<TMP_Text>();
         if (label == null)
         {
-            label = EnsureText(button.transform, "Label", size, displayFont,
+            label = EnsureText(button.transform, "PrivateRoomActionLabel", size, displayFont,
                 color, TextAlignmentOptions.Center);
         }
         label.gameObject.SetActive(true);
@@ -547,7 +554,12 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
     {
         if (root == null) return;
         for (int i = root.childCount - 1; i >= 0; i--)
-            RuntimeUI.DestroyNow(root.GetChild(i).gameObject);
+        {
+            var child = root.GetChild(i);
+            child.gameObject.SetActive(false);
+            child.SetParent(null, false);
+            RuntimeUI.DestroyNow(child.gameObject);
+        }
     }
 
     static void HideButtonLabels(Transform root)

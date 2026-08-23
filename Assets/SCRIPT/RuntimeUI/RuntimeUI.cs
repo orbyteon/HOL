@@ -195,6 +195,23 @@ public static class RuntimeUI
         return true;
     }
 
+    // Neutral infrastructure for a caller-owned production frame. The
+    // caller supplies the exact approved sprite path; RuntimeUI never chooses
+    // a visual language or substitutes generated artwork.
+    public static GameObject CreateProductionFrame(
+        Transform parent, string name, Vector2 position, Vector2 size,
+        string resourcePath, float pixelsPerUnitMultiplier = 2f)
+    {
+        var frame = CreateObject(name, parent);
+        Center(frame, position, size);
+        ClampToSafeArea((RectTransform)frame.transform, size, position);
+        var image = frame.AddComponent<Image>();
+        ApplyProductionSprite(image, resourcePath, Image.Type.Sliced, false,
+            pixelsPerUnitMultiplier);
+        image.raycastTarget = false;
+        return frame;
+    }
+
     // Every runtime-built label is TextMesh Pro, same as the scene's TMP
     // labels and the input fields below. The shared responsive policy keeps
     // English and Greek inside their authored regions with bounded autosizing.

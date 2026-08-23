@@ -66,9 +66,8 @@ public class ConsentManager : MonoBehaviour
 
         // The first dialog a new player ever sees, so it is the first place
         // the Consumer First board has to hold: framed card, token surface.
-        var card = NeonFrame.Frame(panel.transform, "Card", Vector2.zero,
-            new Vector2(600f, 420f), ConsumerTokens.Cyan, 0.97f, true,
-            ConsumerTokens.Surface);
+        var card = RuntimeUI.CreateProductionFrame(panel.transform, "Card", Vector2.zero,
+            new Vector2(600f, 420f), "mainmenu/mainmenu_tip_frame_9s", 2f);
 
         var message = CreateText(card.transform, "Message",
             L10n.Get("consent_message"), 34, new Vector2(0f, 60f));
@@ -142,9 +141,10 @@ public class ConsentManager : MonoBehaviour
         rect.anchoredPosition = position;
 
         var image = go.AddComponent<Image>();
-        image.sprite = RuntimeUI.RoundedRectSprite;
-        image.type = Image.Type.Sliced;
-        image.color = color;
+        string resource = name == "YesButton"
+            ? "mainmenu/mainmenu_cta_blue_9s"
+            : "mainmenu/mainmenu_tip_frame_9s";
+        RuntimeUI.ApplyProductionSprite(image, resource, Image.Type.Sliced, false, 2f);
 
         var button = go.AddComponent<Button>();
         button.targetGraphic = image;
