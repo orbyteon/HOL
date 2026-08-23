@@ -118,11 +118,11 @@ assets, callback preservation, and the absence of a procedural replacement
 graphic above approved artwork.
 
 For Main Menu Home specifically, `MainMenuHomeVisuals` remains the composition
-and navigation owner, while `MainMenuHomeFidelityEnforcer` is the focused
+and navigation owner, while `MainMenuProductionAssetFidelity` is the single
 post-build fidelity guard. The guard may restore approved sprites, alpha and
-slice mode and disable procedural replacement graphics inside `HomeVisualRoot`;
+slice mode and remove procedural replacement graphics inside `HomeVisualRoot`;
 it must never create or replace buttons, change callbacks/navigation, or mutate
-gameplay state.
+gameplay state. Do not add a second Home fidelity/restyle writer.
 
 ### HOL Typography, Readability & Layout Fidelity Contract — Mandatory
 
