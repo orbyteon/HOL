@@ -1,19 +1,28 @@
 {
-  "name": "HOL Consumer First",
-  "version": "1.0.0",
+  "name": "HOL Cartoon Theme",
+  "version": "2.0.0",
+  "identity": {
+    "product": "friendly competitive cartoon number brain game",
+    "style": "polished 2.5D mobile arcade cartoon",
+    "atmosphere": "deep night-plum with controlled neon accents",
+    "legacyAtmosphere": "Converging Light may be used only as secondary seasoning"
+  },
   "colors": {
-    "background0": "#07091C",
-    "background1": "#11143A",
-    "surface": "#171B46",
-    "surfaceElevated": "#20265A",
+    "outline": "#140A22",
+    "background0": "#12071F",
+    "background1": "#241645",
+    "surface": "#2C1952",
+    "surfaceElevated": "#3A2068",
     "cyan": "#40D9FF",
     "blue": "#2A8DFF",
     "magenta": "#E84791",
+    "violet": "#8B6CFF",
     "gold": "#FFCA55",
     "success": "#8AD64F",
-    "textPrimary": "#E9EDFF",
-    "textSecondary": "#AAB5D8",
-    "textMuted": "#6E7AA6"
+    "textPrimary": "#F5F0FF",
+    "textSecondary": "#C9BFE1",
+    "textMuted": "#8E82AE",
+    "ink": "#17102B"
   },
   "gradient": {
     "accentStart": "#40D9FF",
@@ -21,26 +30,53 @@
     "angle": 35
   },
   "layout": {
-    "screenPadding": 24,
-    "cardRadius": 22,
-    "buttonRadius": 18,
-    "controlHeight": 56,
-    "sectionGap": 20,
+    "referenceWidth": 1080,
+    "referenceHeight": 1920,
+    "screenPadding": 48,
+    "cardRadius": 28,
+    "buttonRadius": 24,
+    "controlHeight": 112,
+    "sectionGap": 28,
     "touchTargetMin": 48
   },
   "typography": {
-    "heading": "TMP-Bold",
-    "body": "TMP-Regular",
+    "heading": "HOL Menu Display SDF",
+    "body": "HOL Menu Body SDF",
+    "headingStyle": "bold friendly arcade readable",
+    "bodyStyle": "clean high-legibility",
     "headingScale": 1.0,
     "bodyScale": 0.78,
-    "letterSpacingHeading": 0.02
+    "letterSpacingHeading": -0.01
+  },
+  "motifs": [
+    "numbers",
+    "range intervals",
+    "chevrons",
+    "lightning",
+    "stars",
+    "sparse confetti",
+    "trophies",
+    "character expressions",
+    "number mascots"
+  ],
+  "rules": {
+    "goldRole": "primary_cta_only",
+    "cyanRole": "secondary_navigation_player",
+    "magentaRole": "opponent_competitive_emphasis",
+    "greenRole": "success_confirmation_only",
+    "genericHeartsAsDecoration": false,
+    "ridecoreMotifsAllowed": false,
+    "proceduralReplacementOfApprovedArt": false,
+    "approvedSpriteNormalAlpha": 1.0,
+    "nineSliceAssetsMustUseSliced": true,
+    "localizedTextSeparateFromArtwork": true
   },
   "navigation": [
     "home",
-    "play",
-    "friends",
-    "store",
-    "profile"
+    "solo",
+    "private_room",
+    "daily_hunt",
+    "settings"
   ],
   "monetization": {
     "interstitial": "post_match_only",
