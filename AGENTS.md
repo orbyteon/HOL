@@ -20,8 +20,8 @@ missing so a skipped compile cannot look green.
   `SmartHooks/` (`GameEvents`, `DailyStreak`, `Haptics`),
   `UIJuice/` (`ButtonJuice`, `PanelAnimator`, `ConfettiBurst`, …),
   `RuntimeUI/` (`RuntimeUI` factory + runtime wiring components),
-  `Design/` (Converging Light layer: `ConvergingLight` palette/textures,
-  `SplashDesign`, `DesignRuntimeWiring`, `NumberDrift`).
+  `Design/` (screen-specific presentation owners plus legacy Converging Light
+  atmosphere/fallbacks).
 - `Assets/Editor/ReleaseBuildGuard.cs` — release-only fail-closed validation
   activated by `-holReleaseBuild` in the signed-AAB workflow.
 - `services/provisioner/` — Azure Functions first-install account provisioner;
@@ -43,6 +43,39 @@ missing so a skipped compile cannot look green.
 - `docs/privacy.html` — privacy policy; keep it truthful when data practices change.
 
 ## Conventions (follow these)
+
+### HOL Cartoon Theme Contract — Mandatory
+
+`design/cartoon-theme.md` is the canonical product visual-identity contract and
+`Assets/newdesign/cartoon-theme-authority.md` is the production asset authority
+map. They apply repository-wide to Splash, Onboarding, Main Menu, Settings,
+Solo, PvP, Private Room, Daily Hunt, results, profile surfaces, consent/ads UI,
+and every future player-facing screen.
+
+HOL is a polished **2.5D cartoon competitive number/brain game**. The product
+identity is expressive characters and number mascots, chunky glossy mobile
+arcade controls, thick readable silhouettes, deep plum/indigo depth, controlled
+cyan/blue/magenta/violet accents, warm gold primary CTA hierarchy, and sparse
+numbers/chevrons/lightning/stars/confetti as supporting motifs.
+
+- Do not import RideCore language into HOL: no cars, tracks, garages, racing HUDs,
+  motorsport badges, or vehicle-progression motifs.
+- Do not use generic hearts as filler decoration. Hearts require explicit
+  semantic purpose and approval for the target feature.
+- Converging Light is **secondary atmosphere only**. Keep its depth, subtle
+  number fields, interval/chevron ideas and restrained neon glow where useful,
+  but it must never override approved cartoon art, chunky controls, production
+  typography, character hierarchy, or user-approved screen composition.
+- When sources disagree, precedence is: current user-approved screen/reference →
+  approved production art → `design/cartoon-theme.md` →
+  `Assets/newdesign/design-tokens.json` → legacy Converging Light/fallbacks.
+- One screen should converge toward one authoritative presentation owner.
+  Generic/legacy runtime restyle layers must defer once a screen-specific
+  production visual root exists.
+- Onboarding is the actual interactive player-setup flow, not a marketing board.
+  It must inherit the same HOL cartoon identity as the Main Menu. Until approved
+  onboarding art is committed, do not invent substitute production characters
+  or a procedural robot.
 
 ### HOL Production UI Asset Fidelity Contract — Mandatory
 
@@ -97,8 +130,9 @@ graphic above approved artwork.
   and reuse the ConsentManager block as the template.
 - **Prefer runtime wiring over scene surgery** for new UI: the
   `RuntimeUI/` components (`PvpRuntimeUI`, `ExtrasRuntimeWiring`,
-  `JuiceRuntimeWiring`) and `Design/DesignRuntimeWiring` build/attach UI
-  one frame after `Start`, so runtime-built panels are covered too.
+  `JuiceRuntimeWiring`) and screen-specific `Design/` owners build/attach UI
+  after `Start`, so runtime-built panels are covered too. Runtime wiring is not
+  permission to replace approved production art with procedural approximations.
 - **All user-facing strings go through `L10n.Get(key)`** with both EN and
   EL entries in `Assets/SCRIPT/Localization/L10n.cs`. Never add hardcoded
   English UI text. Formatted entries take args: `L10n.Get("key", arg)`.
@@ -106,18 +140,19 @@ graphic above approved artwork.
   `LocalizedText` (TMP) or `LocalizedLegacyText` (legacy `Text`) with the
   key instead of baking `L10n.Get` at build time — the
   `RuntimeUI.Localize*(..., key)` helpers do this in one call.
-- **UI colors follow Converging Light** (`design/philosophy.md`): indigo
-  depth backgrounds, cyan `(0.25, 0.85, 1)` for secondary actions, muted
-  gold `(1, 0.78, 0.34)` reserved for the primary CTA, text near-white
-  `(0.91, 0.93, 1)` — never pure white or pure black. Gold/cyan buttons
-  use dark indigo labels for contrast.
+- **UI colors follow the HOL Cartoon Theme tokens** in
+  `Assets/newdesign/design-tokens.json` / `ConsumerTokens.cs`: deep plum/indigo
+  depth, cyan/blue secondary actions, controlled magenta/violet competitive
+  accents, warm gold primary CTA, green success and warm near-white text.
+  `design/philosophy.md` remains useful for restrained atmospheric detail but
+  does not override the Cartoon Theme hierarchy.
 - **The duel rules live in two places and must stay in step.**
-  `Assets/SCRIPT/DuelRules.cs` (solo) and
-  `playfab/cloudscript.js` (PlayFab, server-authoritative) implement the same
-  round/last-licks/Lock machine. Change one, change the other, and update both
-  test suites — `Assets/Tests/EditMode/DuelRulesTests.cs` and
-  `tools/test/cloudscript.test.mjs` cover the same cases on each side.
-  `DuelRules` deliberately has no UnityEngine reference so it stays testable.
+  `Assets/SCRIPT/DuelRules.cs` (solo) and `playfab/cloudscript.js` (PlayFab,
+  server-authoritative) implement the same round/last-licks/Lock machine. Change
+  one, change the other, and update both test suites —
+  `Assets/Tests/EditMode/DuelRulesTests.cs` and `tools/test/cloudscript.test.mjs`
+  cover the same cases on each side. `DuelRules` deliberately has no UnityEngine
+  reference so it stays testable.
 - **Signals carry an index, never text.** `Signals.Table` order is protocol and
   the server validates against its length: append only, never reorder or remove.
   Keeping the vocabulary closed is what keeps HOL free of user-generated
@@ -168,11 +203,12 @@ graphic above approved artwork.
   project number in the production config.
 - Ads: the Android LevelPlay App Key lives in `AdsManager.AppKey` (single
   source of truth, from the LevelPlay dashboard — a Unity Ads-shaped game
-  id there fails init with 2110); iOS keys are placeholders. Ads are opt-in: declining keeps LevelPlay uninitialized on later
-  launches and blocks ad loads/shows. Settings → Ads privacy re-opens the choice.
-  Interstitial unit `Interstitial_Android` plus rewarded unit
-  `Rewarded_Android` powers the save-your-streak offer. Production CMP/mediation
-  compliance is an external release setting and must match `docs/privacy.html`.
+  id there fails init with 2110); iOS keys are placeholders. Ads are opt-in:
+  declining keeps LevelPlay uninitialized on later launches and blocks ad
+  loads/shows. Settings → Ads privacy re-opens the choice. Interstitial unit
+  `Interstitial_Android` plus rewarded unit `Rewarded_Android` powers the
+  save-your-streak offer. Production CMP/mediation compliance is an external
+  release setting and must match `docs/privacy.html`.
 - Force update: optional PlayFab TitleData key `minVersion` (e.g. `0.2.0`)
   blocks older builds with a store-link dialog. It reuses the PvP PlayFab
   session. Missing key / no authenticated PlayFab session / offline remains
@@ -197,16 +233,16 @@ graphic above approved artwork.
   `playfab/cloudscript.js` have no dependencies (pure Node built-ins).
 - The three headless CI jobs from `.github/workflows/ci.yml` are the ones you can
   reproduce locally. Run them from the repo root:
-  - `static-checks`: `node --check` on the JS files plus the grep/`node` integrity
-    guards (server-authoritative PlayFab, privacy.html byte-copy, empty
-    `HOLReleaseConfig.json`, dependency pinning, `.meta` presence).
+  - `static-checks`: `node --check` on the JS files plus the grep/`node`
+    integrity guards (server-authoritative PlayFab, privacy.html byte-copy,
+    empty `HOLReleaseConfig.json`, dependency pinning, `.meta` presence).
   - `rules-tests`: `node --check playfab/cloudscript.js` then
     `node --test tools/test/*.test.mjs` (the glob form is required; the bare
-    directory does not resolve). This drives the real production CloudScript in an
-    in-memory Shared Group sandbox — the fastest way to exercise PvP end to end
-    without Unity or PlayFab.
+    directory does not resolve). This drives the real production CloudScript in
+    an in-memory Shared Group sandbox — the fastest way to exercise PvP end to
+    end without Unity or PlayFab.
   - `provisioner-test` (from `services/provisioner/`): `npm test` then
     `npm run check`. Node must be `>=22 <23`.
 - The `check-license`, `test`, and `build` CI jobs will always fail here because
-  the Unity secrets are absent; that is expected and not something to "fix" in the
-  VM.
+  the Unity secrets are absent; that is expected and not something to "fix" in
+  the VM.
