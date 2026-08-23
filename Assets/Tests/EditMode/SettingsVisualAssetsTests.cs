@@ -82,13 +82,22 @@ public sealed class SettingsVisualAssetsTests
     }
 
     [Test]
-    public void SettingsPresentationTypesExistInProductionAssembly()
+    public void SettingsUsesOneCurrentProductionOwnerAndRetiredProceduralTypesAreAbsent()
     {
         Assert.That(RuntimeType("SettingsVisuals"), Is.Not.Null);
-        Assert.That(RuntimeType("SettingsSurfaceGraphic"), Is.Not.Null);
-        Assert.That(RuntimeType("SettingsIconGraphic"), Is.Not.Null);
-        Assert.That(RuntimeType("SettingsButtonFeedback"), Is.Not.Null);
-        Assert.That(RuntimeType("SettingsToggleGraphic"), Is.Not.Null);
+        Assert.That(RuntimeType("SettingsButtonFeedback"), Is.Not.Null,
+            "Additive pressed-state feedback remains part of the current Settings owner.");
+
+        foreach (string retiredType in new[]
+        {
+            "SettingsSurfaceGraphic",
+            "SettingsIconGraphic",
+            "SettingsToggleGraphic"
+        })
+        {
+            Assert.That(RuntimeType(retiredType), Is.Null,
+                "Retired procedural Settings type returned: " + retiredType);
+        }
     }
 
     [Test]
