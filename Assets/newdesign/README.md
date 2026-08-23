@@ -25,7 +25,7 @@ Legacy Converging Light remains available only as secondary atmospheric language
 
 ## Main Menu fidelity
 
-`MainMenuHomeVisuals` owns Home composition and existing navigation. `MainMenuHomeFidelityEnforcer` runs after the Home build and restores the authoritative Phase 2A / exact-reference sprites as the visible base artwork, preserving alpha `1`, `_9s` slicing and existing button callbacks while disabling only procedural replacement graphics that cover approved assets.
+`MainMenuHomeVisuals` owns Home composition and existing navigation. `MainMenuProductionAssetFidelity` is the single focused post-build fidelity guard: it restores the authoritative Phase 2A / exact-reference sprites as the visible base artwork, preserves alpha `1`, `_9s` slicing and existing button callbacks, and removes procedural replacement graphics that cover approved assets. Do not add a second Home fidelity writer.
 
 ## Asset rules
 
