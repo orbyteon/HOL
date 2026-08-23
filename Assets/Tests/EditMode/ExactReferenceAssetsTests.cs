@@ -447,6 +447,25 @@ public class ExactReferenceAssetsTests
     }
 
     [Test]
+    public void SoloBoardProductionFramesLoad()
+    {
+        foreach (string resource in new[]
+        {
+            "mainmenu/mainmenu_tip_frame_9s",
+            "mainmenu/mainmenu_cta_blue_9s",
+            "phase2a/hol_cta_magenta_r2_9s",
+            "mainmenu/mainmenu_cta_gold_9s"
+        })
+        {
+            var sprite = Resources.Load<Sprite>(resource);
+            Assert.That(sprite, Is.Not.Null, resource);
+            Vector4 border = sprite.border;
+            Assert.That(border.x + border.y + border.z + border.w,
+                Is.GreaterThan(0f), resource + " must remain a real 9-slice.");
+        }
+    }
+
+    [Test]
     public void SoloSearchPresentationUsesProductionArtWithoutRadarProceduralTypes()
     {
         Assert.IsNotNull(RuntimeType("SoloSearchVisuals"));
