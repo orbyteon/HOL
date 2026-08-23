@@ -82,7 +82,7 @@ public class MenuManager : MonoBehaviour
         {
             backHintLabel = RuntimeUI.CreateText(matchmaking.panelGame.transform,
                 "BackExitHint", "", 26, new Vector2(0f, -760f), new Vector2(820f, 60f),
-                ConsumerTokens.WithAlpha(ConsumerTokens.TextPrimary, 0.85f));
+                HolUiStateColors.WithAlpha(HolUiStateColors.TextPrimary, 0.85f));
             backHintLabel.raycastTarget = false;
         }
 

@@ -20,7 +20,7 @@ using TMPro;
 public class ExtrasRuntimeWiring : MonoBehaviour
 {
     // Functional fallback colors only; current screen owners assign production sprites.
-    static readonly Color Neutral = ConsumerTokens.SurfaceElevated;
+    static readonly Color Neutral = HolUiStateColors.SurfaceElevated;
     static readonly Color DarkLabel = new Color(0.10f, 0.09f, 0.18f);
 
     TMP_Text disclosurePlay;

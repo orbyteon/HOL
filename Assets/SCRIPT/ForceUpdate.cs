@@ -116,7 +116,7 @@ public class ForceUpdate : MonoBehaviour
     void ShowBlockingDialog()
     {
         var panel = RuntimeUI.FullscreenPanel(transform, "ForceUpdatePanel",
-            ConsumerTokens.WithAlpha(ConsumerTokens.Background0, 0.96f));
+            HolUiStateColors.WithAlpha(HolUiStateColors.Background0, 0.96f));
 
         var card = RuntimeUI.CreateProductionFrame(panel.transform, "Card", Vector2.zero,
             new Vector2(640f, 560f), "mainmenu/mainmenu_cta_gold_9s", 2f);
@@ -128,14 +128,14 @@ public class ForceUpdate : MonoBehaviour
         // screen's one action that matters.
         var update = RuntimeUI.CreateButton(card.transform, "ConfirmUpdateButton",
             L10n.Get("update_now"), new Vector2(0f, -110f), new Vector2(420f, 100f),
-            ConsumerTokens.Gold, ConsumerTokens.WithAlpha(ConsumerTokens.Surface, 1f));
+            HolUiStateColors.Gold, HolUiStateColors.WithAlpha(HolUiStateColors.Surface, 1f));
         RuntimeUI.ApplyProductionSprite(update.GetComponent<Image>(),
             "mainmenu/mainmenu_cta_gold_9s", Image.Type.Sliced, false, 2f);
         update.onClick.AddListener(OpenStore);
 
         var quit = RuntimeUI.CreateButton(card.transform, "QuitButton",
             L10n.Get("quit"), new Vector2(0f, -220f), new Vector2(420f, 100f),
-            ConsumerTokens.SurfaceElevated);
+            HolUiStateColors.SurfaceElevated);
         RuntimeUI.ApplyProductionSprite(quit.GetComponent<Image>(),
             "mainmenu/mainmenu_tip_frame_9s", Image.Type.Sliced, false, 2f);
         quit.onClick.AddListener(Application.Quit);

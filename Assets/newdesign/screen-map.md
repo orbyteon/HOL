@@ -1,27 +1,28 @@
-# HOL screen map
+# HOL production screen ownership map
 
-This map keeps the new consumer-first visual direction aligned with the existing runtime architecture.
+This map documents the current one-screen/one-presentation-owner architecture.
+Approved references and screen-specific production sprites remain the visual source of truth.
 
-| New design surface | Existing owner |
-|---|---|
-| Splash / loading | `SplashLoader`, `SplashDesign` |
-| Home / mode selection | `MenuManager`, `RuntimeUI`, `ExtrasRuntimeWiring` |
-| Create/join room | `PvpRuntimeUI`, `PvpGameController` |
-| Matchmaking | `FakeMatchmaking` |
-| Secret number / duel | `NumberManager`, `GameManager`, `DuelRules` |
-| Signals / reactions | `PvP/Signals.cs`, `PvpGameController` |
-| Result / rematch | `GameManager`, `PvpGameController`, `GameEvents` |
-| Profile / stats | `GameStats`, `SavePlayerName`, `DailyStreak` |
-| Ads consent / rewarded flow | `ConsentManager`, `AdsManager` |
-| Language switching | `Localization/L10n.cs`, `LocalizedText` |
-| Motion / feedback | `UIJuice/*`, `Haptics`, screen-specific `Design/*` owners |
+| Production surface | Presentation owner | Functional/state owner |
+|---|---|---|
+| Splash / loading | `SplashDesign` | `SplashLoader` |
+| Home / mode selection | `MainMenuHomeVisuals` | `MenuManager`, runtime entry wiring |
+| Solo entry / PanelPlay | `MainMenuPlayVisuals` | `MenuManager`, `FakeMatchmaking` |
+| Private Room landing | `PrivateRoomVisuals` | `PvpGameController`, `PvpRuntimeUI` functional roots |
+| Private Room prebattle | `PvpRuntimeUI` screen-local production helpers | `PvpGameController` |
+| Solo duel board | `HolDuelBoardLayout` | `NumberManager`, `GameManager`, `DuelRules` |
+| PvP duel / result / terminal | `PvpRuntimeUI` screen-local production helpers | `PvpGameController` |
+| Settings | `SettingsVisuals` | `MenuManager`, localization/settings controllers |
+| Daily Hunt | `DailyHuntVisuals` | `DailyHunt` |
+| Solo search fallback | `SoloSearchVisuals` | `FakeMatchmaking` |
+| Consent / force update | controller-local production surfaces | `ConsentManager`, `ForceUpdate` |
+| Motion / feedback | additive `UIJuice/*` only | existing Button callbacks/controllers |
 
-## Rules
+## Production rules
 
-- Keep the central `ΠΑΙΞΕ` action visually dominant.
-- Use gold only for the primary CTA.
-- Use cyan/blue for secondary actions and navigation.
-- Use magenta for opponent/negative states, never for ordinary destructive confirmation without clear copy.
-- Keep interstitial ads post-match only.
-- Keep rewarded ad dialogs explicit about the reward before the player watches.
-- All copy must be localization-keyed in `L10n.cs`.
+- One screen has one presentation owner; no late global recolor/reskin passes.
+- Approved sprites render visibly at alpha `1`; `_9s` assets use `Image.Type.Sliced`.
+- `RuntimeUI` provides neutral construction/localization/safe-area infrastructure only.
+- `HolUiStateColors` is limited to dynamic text/state colors; it never selects or recolors artwork.
+- All user-facing copy is localization-keyed in `L10n.cs` and validated in EN/EL.
+- Final acceptance uses native-resolution captures compared with the approved reference.

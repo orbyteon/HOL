@@ -61,7 +61,7 @@ public class ConsentManager : MonoBehaviour
         var panel = CreateUIObject("ConsentPanel", transform);
         Stretch(panel);
         var bg = panel.AddComponent<Image>();
-        bg.color = ConsumerTokens.WithAlpha(ConsumerTokens.Background0, 0.92f);
+        bg.color = HolUiStateColors.WithAlpha(HolUiStateColors.Background0, 0.92f);
         bg.raycastTarget = true;
 
         // The first dialog a new player ever sees, so it is the first place
@@ -74,12 +74,12 @@ public class ConsentManager : MonoBehaviour
         Localize(message, "consent_message");
 
         var yes = CreateButton(card.transform, "YesButton", L10n.Get("yes"),
-            new Vector2(0f, -80f), ConsumerTokens.Cyan, new Color(0.10f, 0.09f, 0.18f));
+            new Vector2(0f, -80f), HolUiStateColors.Cyan, new Color(0.10f, 0.09f, 0.18f));
         yes.onClick.AddListener(AcceptPersonalized);
         Localize(yes.GetComponentInChildren<TMP_Text>(true), "yes");
 
         var no = CreateButton(card.transform, "NoButton", L10n.Get("no"),
-            new Vector2(0f, -170f), ConsumerTokens.SurfaceElevated);
+            new Vector2(0f, -170f), HolUiStateColors.SurfaceElevated);
         no.onClick.AddListener(DeclinePersonalized);
         Localize(no.GetComponentInChildren<TMP_Text>(true), "no");
 

@@ -42,9 +42,8 @@ including:
 - `settings/`
 - `splash/`
 
-Generic historical theme surfaces under `design/` are migration-only until all
-remaining consumers have been moved to current screen-specific production art;
-they are not an approved source for new work.
+`Resources/design/` contains only the current localized PvP signal icon set.
+The retired generic background/panel/button theme surfaces have been deleted.
 
 ## Integration targets
 

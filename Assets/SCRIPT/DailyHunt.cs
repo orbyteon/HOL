@@ -96,7 +96,7 @@ public class DailyHunt : MonoBehaviour
     public static DailyHunt Attach(Transform canvas, AdsManager adsManager)
     {
         var panel = RuntimeUI.FullscreenPanel(canvas, "DailyHuntPanel",
-            ConsumerTokens.WithAlpha(ConsumerTokens.Background0, 0.92f));
+            HolUiStateColors.WithAlpha(HolUiStateColors.Background0, 0.92f));
 
         var hunt = panel.AddComponent<DailyHunt>();
         hunt.ads = adsManager;
@@ -108,7 +108,7 @@ public class DailyHunt : MonoBehaviour
 
         var entry = RuntimeUI.CreateButton(canvas, "DailyHuntButton",
             L10n.Get("daily_hunt"), new Vector2(0f, -740f), new Vector2(460f, 90f),
-            ConsumerTokens.Cyan, DarkLabel);
+            HolUiStateColors.Cyan, DarkLabel);
         RuntimeUI.ApplyProductionSprite(entry.GetComponent<Image>(),
             "mainmenu/mainmenu_cta_blue_9s", Image.Type.Sliced, false, 2f);
         RuntimeUI.Localize(entry, "daily_hunt");
@@ -129,13 +129,13 @@ public class DailyHunt : MonoBehaviour
             new Vector2(920f, 1340f), "mainmenu/mainmenu_tip_frame_9s", 2f);
 
         title = RuntimeUI.CreateText(transform, "Title", "", 46,
-            new Vector2(0f, 550f), new Vector2(780f, 80f), ConsumerTokens.Gold);
+            new Vector2(0f, 550f), new Vector2(780f, 80f), HolUiStateColors.Gold);
 
         status = RuntimeUI.CreateText(transform, "Status", "", 32,
             new Vector2(0f, 400f), new Vector2(780f, 150f));
 
         trailText = RuntimeUI.CreateText(transform, "Trail", "", 44,
-            new Vector2(0f, 200f), new Vector2(800f, 80f), ConsumerTokens.Cyan);
+            new Vector2(0f, 200f), new Vector2(800f, 80f), HolUiStateColors.Cyan);
 
         input = RuntimeUI.CreateInputField(transform, "GuessInput",
             L10n.Get("number_placeholder"), new Vector2(0f, 40f), new Vector2(420f, 96f));
@@ -146,28 +146,28 @@ public class DailyHunt : MonoBehaviour
         // and gold marks it as the screen's one action that matters.
         guessButton = RuntimeUI.CreateButton(transform, "SubmitGuessButton",
             L10n.Get("pvp_guess"), new Vector2(0f, -110f), new Vector2(460f, 96f),
-            ConsumerTokens.Gold, DarkLabel);
+            HolUiStateColors.Gold, DarkLabel);
         RuntimeUI.Localize(guessButton, "pvp_guess");
         guessButton.onClick.AddListener(SubmitGuess);
 
         reviveButton = RuntimeUI.CreateButton(transform, "ReviveButton",
             L10n.Get("second_chance", ReviveGuesses), new Vector2(0f, -260f),
-            new Vector2(620f, 96f), ConsumerTokens.Gold, DarkLabel);
+            new Vector2(620f, 96f), HolUiStateColors.Gold, DarkLabel);
         reviveLabel = reviveButton.GetComponentInChildren<TMP_Text>();
         reviveButton.onClick.AddListener(OnRevivePressed);
 
         shareButton = RuntimeUI.CreateButton(transform, "ShareButton",
             L10n.Get("share_result"), new Vector2(0f, -260f), new Vector2(460f, 96f),
-            ConsumerTokens.Cyan, DarkLabel);
+            HolUiStateColors.Cyan, DarkLabel);
         RuntimeUI.Localize(shareButton, "share_result");
         shareButton.onClick.AddListener(OnSharePressed);
 
         streakText = RuntimeUI.CreateText(transform, "Streak", "", 28,
-            new Vector2(0f, -410f), new Vector2(600f, 44f), ConsumerTokens.TextSecondary);
+            new Vector2(0f, -410f), new Vector2(600f, 44f), HolUiStateColors.TextSecondary);
 
         var close = RuntimeUI.CreateButton(transform, "CloseButton",
             L10n.Get("back"), new Vector2(0f, -540f), new Vector2(300f, 84f),
-            ConsumerTokens.SurfaceElevated);
+            HolUiStateColors.SurfaceElevated);
         RuntimeUI.Localize(close, "back");
         close.onClick.AddListener(Close);
     }

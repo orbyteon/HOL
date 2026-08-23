@@ -466,7 +466,7 @@ public class GameManager : MonoBehaviour
 
         var btn = RuntimeUI.CreateButton(stopGameButton.transform.parent, "LockButton",
             L10n.Get("lock"), Vector2.zero, new Vector2(320f, 84f),
-            ConsumerTokens.Cyan, ConsumerTokens.WithAlpha(ConsumerTokens.Surface, 1f));
+            HolUiStateColors.Cyan, HolUiStateColors.WithAlpha(HolUiStateColors.Surface, 1f));
 
         var stopRect = (RectTransform)stopGameButton.transform;
         var rect = (RectTransform)btn.transform;
@@ -551,7 +551,7 @@ public class GameManager : MonoBehaviour
 
         var btn = RuntimeUI.CreateButton(stopGameButton.transform.parent, "SaveStreakButton",
             L10n.Get("save_streak_ad", streak), Vector2.zero, new Vector2(560f, 90f),
-            ConsumerTokens.Gold, ConsumerTokens.WithAlpha(ConsumerTokens.Surface, 1f));
+            HolUiStateColors.Gold, HolUiStateColors.WithAlpha(HolUiStateColors.Surface, 1f));
 
         var stopRect = (RectTransform)stopGameButton.transform;
         var rect = (RectTransform)btn.transform;
