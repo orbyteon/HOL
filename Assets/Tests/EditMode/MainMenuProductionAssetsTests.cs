@@ -1,3 +1,5 @@
+using System;
+using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -50,13 +52,22 @@ public sealed class MainMenuProductionAssetsTests
     }
 
     [Test]
-    public void RejectedCloudBackgroundIsNotTheReferenceResource()
+    public void CurrentHomeAndPlayOwnersNeverLoadRejectedCloudBackground()
     {
-        var revision3 = Resources.Load<Sprite>("phase2a/hol_neon_reference_bg_r3");
-        var rejected = Resources.Load<Sprite>("mainmenu/mainmenu_bg_stairs_clouds");
-        Assert.That(revision3, Is.Not.Null);
-        Assert.That(rejected, Is.Not.Null);
-        Assert.That(revision3, Is.Not.SameAs(rejected));
+        const string rejected = "mainmenu/mainmenu_bg_stairs_clouds";
+        foreach (string typeName in new[] { "MainMenuHomeVisuals", "MainMenuPlayVisuals" })
+        {
+            Type type = RuntimeType(typeName);
+            var field = type.GetField("LoadedResources",
+                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null, typeName + ".LoadedResources");
+            var resources = field.GetValue(null) as string[];
+            Assert.That(resources, Is.Not.Null);
+            Assert.That(resources, Does.Not.Contain(rejected),
+                typeName + " must not restore the rejected cloud/stairs background.");
+            Assert.That(resources, Does.Contain("phase2a/hol_neon_reference_bg_r3"),
+                typeName + " must use the approved Revision 3 background.");
+        }
     }
 
     [TestCase("phase2a/hol_menu_boy_arms_crossed_r3")]
@@ -106,8 +117,7 @@ public sealed class MainMenuProductionAssetsTests
             "home_tip_title", "home_tip_body", "splash_loading"
         };
         Assert.That(expected.Length, Is.EqualTo(keys.Length));
-        SetLanguage(System.Enum.ToObject(
-            RuntimeType("L10n").GetNestedType("Language"), language));
+        SetLanguage(Enum.ToObject(RuntimeType("L10n").GetNestedType("Language"), language));
         for (int i = 0; i < keys.Length; i++)
             Assert.That(GetCopy(keys[i]), Is.EqualTo(expected[i]), keys[i]);
     }
@@ -124,9 +134,9 @@ public sealed class MainMenuProductionAssetsTests
             .Invoke(null, new[] { language });
     }
 
-    static System.Type RuntimeType(string name)
+    static Type RuntimeType(string name)
     {
-        var type = System.Type.GetType(name + ", Assembly-CSharp");
+        var type = Type.GetType(name + ", Assembly-CSharp");
         Assert.That(type, Is.Not.Null, name);
         return type;
     }
