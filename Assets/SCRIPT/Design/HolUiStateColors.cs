@@ -1,10 +1,9 @@
 using UnityEngine;
 
-// Compatibility colors for dynamic text/state that cannot be baked into an
-// approved sprite (status copy, live numbers, player/opponent state, etc.).
-// These values are NOT a global theme and must never be used to recolor or
-// replace approved production artwork.
-public static class ConsumerTokens
+// Current live UI state colors for values that cannot be baked into approved
+// artwork (status copy, numbers, player/opponent state, accessibility text).
+// This is not a theme selector and must never recolor or replace production art.
+public static class HolUiStateColors
 {
     public static readonly Color Background0 = Hex(0x07, 0x09, 0x1C);
     public static readonly Color Surface = Hex(0x17, 0x1B, 0x46);
