@@ -12,10 +12,12 @@ This file prevents older asset generations and generic runtime fallbacks from si
 - `Resources/phase2a/hol_menu_girl_forward_fist_r3.png`
 - `Resources/reference/mascot_6_exact.png`
 - `Resources/reference/mascot_7_exact.png`
+- `Resources/reference/player_cyan_exact.png`
 - `Resources/phase2a/hol_cta_gold_r2_9s.png`
 - `Resources/phase2a/hol_cta_blue_r2_9s.png`
 - `Resources/phase2a/hol_cta_magenta_r2_9s.png`
 - `Resources/phase2a/hol_player_chip_r2_9s.png`
+- `Resources/phase2a/hol_tip_frame_r2_9s.png`
 - `Resources/phase2a/hol_settings_gear_r2.png`
 - `Resources/phase2a/hol_mode_solo_r2.png`
 - `Resources/phase2a/hol_mode_private_r2.png`
@@ -27,6 +29,7 @@ This file prevents older asset generations and generic runtime fallbacks from si
 **Legacy / fallback only for Home**
 
 - `Resources/mainmenu/mainmenu_bg_stairs_clouds.png`
+- `Resources/mainmenu/mainmenu_tip_frame_9s.png`
 - generic `Assets/UI/bg_menu_1080x1920.png`
 - procedural CTA/chip/icon geometry when the authoritative production asset above is available
 
