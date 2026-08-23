@@ -77,11 +77,6 @@ jobs:
           settings = settings.replace(
               old_refresh,
               'musicStateText.text = musicToggle.isOn ? L10n.Get("yes") : L10n.Get("no");', 1)
-          old_initial = 'musicStateText = AddText(track.transform, "SettingsMusicState", "ON", 28,'
-          require(old_initial in settings, 'Settings initial music-state line changed')
-          settings = settings.replace(
-              old_initial,
-              'musicStateText = AddText(track.transform, "SettingsMusicState", L10n.Get("yes"), 28,', 1)
           settings_path.write_text(settings, encoding='utf-8')
 
           runtime_path = Path('Assets/SCRIPT/RuntimeUI/RuntimeUI.cs')
