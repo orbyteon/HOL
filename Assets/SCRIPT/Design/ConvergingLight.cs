@@ -1,44 +1,55 @@
 using UnityEngine;
-using UnityEngine.UI;
-using TMPro;
 
-// Converging Light (design/philosophy.md) — shared palette and runtime
-// texture helpers for the design layer (SplashDesign, DesignRuntimeWiring).
-// Everything is generated from code: no art assets, no scene surgery.
+// TEMPORARY SOURCE-COMPATIBILITY SHIM.
+//
+// The Converging Light visual system is retired. Existing callers are being
+// migrated to screen-specific production owners. Until the last caller is gone,
+// this class exposes only generic layout/color helpers and an approved current
+// background fallback. It MUST NOT generate theme decoration, recolor screens or
+// create drifting-number fields.
 public static class ConvergingLight
 {
-    // Palette canon: layered indigo depth, one cyan-to-magenta seam of light,
-    // muted gold reserved for the single most important mark, near-white text.
-    public static readonly Color DepthTop = new Color(0.035f, 0.035f, 0.110f);
-    public static readonly Color DepthBottom = new Color(0.100f, 0.090f, 0.235f);
-    public static readonly Color Cyan = new Color(0.25f, 0.85f, 1f);
-    public static readonly Color Magenta = new Color(0.83f, 0.35f, 1f);
-    public static readonly Color Gold = new Color(1f, 0.78f, 0.34f);
-    public static readonly Color NearWhite = new Color(0.91f, 0.93f, 1f);
-    public static readonly Color TrackIndigo = new Color(0.16f, 0.15f, 0.26f);
-    public static readonly Color PanelIndigo = new Color(0.09f, 0.08f, 0.19f);
-    public static readonly Color ScrimIndigo = new Color(0.05f, 0.05f, 0.12f);
-    static Sprite depthGradientSprite;
+    // Compatibility aliases for dynamic text/state only. Approved sprites are
+    // never recolored from these values.
+    public static readonly Color DepthTop = ConsumerTokens.Background0;
+    public static readonly Color DepthBottom = ConsumerTokens.Surface;
+    public static readonly Color Cyan = ConsumerTokens.Cyan;
+    public static readonly Color Magenta = ConsumerTokens.Magenta;
+    public static readonly Color Gold = ConsumerTokens.Gold;
+    public static readonly Color NearWhite = ConsumerTokens.TextPrimary;
+    public static readonly Color TrackIndigo = ConsumerTokens.SurfaceElevated;
+    public static readonly Color PanelIndigo = ConsumerTokens.Surface;
+    public static readonly Color ScrimIndigo = ConsumerTokens.Background0;
+
+    const string CurrentBackgroundResource = "phase2a/hol_neon_reference_bg_r3";
+    static Sprite currentBackground;
 
     public static Sprite DepthGradientSprite
     {
         get
         {
-            if (depthGradientSprite == null)
-                depthGradientSprite = VerticalGradient(DepthTop, DepthBottom);
-            return depthGradientSprite;
+            if (currentBackground != null) return currentBackground;
+            currentBackground = Resources.Load<Sprite>(CurrentBackgroundResource);
+            if (currentBackground == null)
+            {
+                Debug.LogError("[UI Migration] Missing approved Resources/" +
+                    CurrentBackgroundResource + ".");
+                currentBackground = VerticalGradient(DepthTop, DepthBottom);
+            }
+            return currentBackground;
         }
     }
 
-    public static Color WithAlpha(Color c, float a)
+    public static Color WithAlpha(Color color, float alpha)
     {
-        c.a = a;
-        return c;
+        return ConsumerTokens.WithAlpha(color, alpha);
     }
 
-    // 1 x height vertical gradient (top -> bottom) as a sprite.
-    public static Sprite VerticalGradient(Color top, Color bottom, int height = 256)
+    // Generic utility retained only for small non-art surfaces such as progress
+    // fills. Do not use it as a production screen/background replacement.
+    public static Sprite VerticalGradient(Color top, Color bottom, int height = 32)
     {
+        height = Mathf.Max(2, height);
         var tex = new Texture2D(1, height, TextureFormat.RGBA32, false);
         tex.wrapMode = TextureWrapMode.Clamp;
         tex.filterMode = FilterMode.Bilinear;
@@ -48,12 +59,13 @@ public static class ConvergingLight
             tex.SetPixel(0, y, Color.Lerp(bottom, top, t));
         }
         tex.Apply();
-        return Sprite.Create(tex, new Rect(0, 0, 1, height), new Vector2(0.5f, 0.5f));
+        return Sprite.Create(tex, new Rect(0, 0, 1, height),
+            new Vector2(0.5f, 0.5f));
     }
 
-    // width x 1 horizontal gradient (left -> right) as a sprite.
-    public static Sprite HorizontalGradient(Color left, Color right, int width = 512)
+    public static Sprite HorizontalGradient(Color left, Color right, int width = 32)
     {
+        width = Mathf.Max(2, width);
         var tex = new Texture2D(width, 1, TextureFormat.RGBA32, false);
         tex.wrapMode = TextureWrapMode.Clamp;
         tex.filterMode = FilterMode.Bilinear;
@@ -63,49 +75,25 @@ public static class ConvergingLight
             tex.SetPixel(x, 0, Color.Lerp(left, right, t));
         }
         tex.Apply();
-        return Sprite.Create(tex, new Rect(0, 0, width, 1), new Vector2(0.5f, 0.5f));
+        return Sprite.Create(tex, new Rect(0, 0, width, 1),
+            new Vector2(0.5f, 0.5f));
     }
 
-    // Centers `go` (created via RuntimeUI.CreateObject) at `pos` with `size`.
     public static void Center(GameObject go, Vector2 pos, Vector2 size)
     {
+        if (go == null) return;
         var rect = (RectTransform)go.transform;
-        rect.anchorMin = new Vector2(0.5f, 0.5f);
-        rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
         rect.sizeDelta = size;
         rect.anchoredPosition = pos;
+        rect.localScale = Vector3.one;
+        rect.localRotation = Quaternion.identity;
     }
 
-    // "Numbers are treated as texture and talisman rather than data — a faint
-    // field of them can fill a sky." Spawns low-alpha drifting digits under
-    // `parent`; each digit carries a NumberDrift. Positions are in the
-    // 1080x1920 reference space the canvases share.
+    // Retired decoration hook. Intentionally no-op so historical callers cannot
+    // reintroduce the drifting-number theme while migration is in progress.
     public static void NumberField(Transform parent, int count, float maxAlpha)
     {
-        var rng = new System.Random();
-        for (int i = 0; i < count; i++)
-        {
-            var go = RuntimeUI.CreateObject("n" + i, parent);
-            var rect = (RectTransform)go.transform;
-            rect.anchorMin = new Vector2(0.5f, 0.5f);
-            rect.anchorMax = new Vector2(0.5f, 0.5f);
-            rect.sizeDelta = new Vector2(60f, 60f);
-            rect.anchoredPosition = new Vector2(
-                Mathf.Lerp(-520f, 520f, (float)rng.NextDouble()),
-                Mathf.Lerp(-940f, 940f, (float)rng.NextDouble()));
-
-            var text = go.AddComponent<TextMeshProUGUI>();
-            text.text = rng.Next(0, 10).ToString();
-            text.fontSize = rng.Next(18, 44);
-            text.alignment = TextAlignmentOptions.Center;
-            text.color = WithAlpha(NearWhite,
-                Mathf.Lerp(maxAlpha * 0.4f, maxAlpha, (float)rng.NextDouble()));
-            text.raycastTarget = false;
-
-            var drift = go.AddComponent<NumberDrift>();
-            drift.velocity = new Vector2(
-                Mathf.Lerp(-6f, 6f, (float)rng.NextDouble()),
-                Mathf.Lerp(4f, 14f, (float)rng.NextDouble()));
-        }
     }
 }
