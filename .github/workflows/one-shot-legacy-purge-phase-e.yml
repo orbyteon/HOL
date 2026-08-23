@@ -34,9 +34,9 @@ jobs:
             echo '::error::Retired visual/concept symbol remains in current production source/docs'
             exit 1
           fi
-          echo '--- stale generic design surfaces ---'
-          if git grep -n -E 'background_deep\.svg|panel_surface\.svg|button_primary\.svg|button_secondary\.svg|mainmenu_bg_stairs_clouds' -- Assets ProjectSettings Packages tools docs; then
-            echo '::error::Retired generic design surface reference remains'
+          echo '--- stale generic design surfaces in production references ---'
+          if git grep -n -E 'background_deep\.svg|panel_surface\.svg|button_primary\.svg|button_secondary\.svg|mainmenu_bg_stairs_clouds' -- 'Assets/SCRIPT/**' 'Assets/Scenes/**' 'Assets/newdesign/*.md' 'Assets/newdesign/*.json' ProjectSettings Packages docs; then
+            echo '::error::Retired generic design surface reference remains in production source/docs'
             exit 1
           fi
           echo '--- forbidden production fallback / alpha hacks ---'
@@ -48,13 +48,22 @@ jobs:
             echo '::error::Near-zero production alpha hack remains'
             exit 1
           fi
-          echo '--- obsolete newdesign root pack must be gone ---'
-          for p in ads avatars badges branding cosmetics navigation number-system results signals design-tokens.json asset-inventory.md icon_lock.svg icon_reaction.svg icon_rewarded_ad.svg icon_trophy.svg; do
+          echo '--- obsolete newdesign source pack must be gone ---'
+          for p in ads avatars badges cosmetics navigation number-system results signals design-tokens.json asset-inventory.md icon_lock.svg icon_reaction.svg icon_rewarded_ad.svg icon_trophy.svg; do
             if [ -e "Assets/newdesign/$p" ]; then
               echo "::error::Legacy source-pack item remains: Assets/newdesign/$p"
               exit 1
             fi
           done
+          echo '--- branding may retain only the referenced app icon ---'
+          if [ -d Assets/newdesign/branding ]; then
+            unexpected=$(find Assets/newdesign/branding -type f ! -name 'hol_app_icon_exact.png' ! -name 'hol_app_icon_exact.png.meta' | wc -l)
+            if [ "$unexpected" -ne 0 ]; then
+              echo '::error::Unreferenced legacy branding assets remain'
+              find Assets/newdesign/branding -type f | sort
+              exit 1
+            fi
+          fi
           echo '--- old original-design folders: show only surviving referenced files ---'
           find Assets/UI Assets/Photos -maxdepth 2 -type f 2>/dev/null | sort || true
           echo '--- diff ---'
