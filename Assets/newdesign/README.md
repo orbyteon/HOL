@@ -1,19 +1,25 @@
-# HOL New Design
+# HOL New Design — Cartoon Theme
 
-Unity-ready design foundation for the consumer-first HOL UI.
+Unity-ready design foundation for the canonical HOL player-facing visual identity.
 
 ## Direction
 
-Friendly social game with a mature, polished presentation:
+HOL is a friendly competitive **cartoon number/brain game** with a polished 2.5D mobile-arcade presentation:
 
 - deep indigo/plum depth
+- expressive age-neutral cartoon characters and number mascots
+- chunky glossy controls with clear hierarchy
 - cyan-blue secondary actions
 - warm gold primary actions
-- restrained magenta opponent state
-- age-neutral illustrated avatars
-- witty microcopy
+- restrained magenta/violet competitive emphasis
+- numbers, chevrons, lightning, stars and sparse confetti as supporting motifs
+- strong Greek/English readability
 - no ads during active gameplay
 - rewarded ads always disclose the reward first
+
+The complete identity contract is `../../design/cartoon-theme.md` and the production asset authority map is `cartoon-theme-authority.md`.
+
+Converging Light is retained only as a **secondary atmospheric subsystem**. It may contribute deep indigo depth, subtle number fields, interval/chevron motifs and restrained neon glow, but it must not override approved cartoon artwork, chunky controls, typography hierarchy or user-approved compositions.
 
 ## Integration targets
 
@@ -26,8 +32,10 @@ Friendly social game with a mature, polished presentation:
 
 ## Asset set
 
-- `design-tokens.json`: palette, spacing, typography, states and monetization rules
-- SVG surfaces: background, panel, primary/secondary buttons
-- SVG icons: lock, trophy, reaction, rewarded ad
+- `design-tokens.json`: canonical palette, spacing, typography and visual-role rules
+- `cartoon-theme-authority.md`: screen-by-screen production asset authority
+- `Resources/reference/`: shared exact HOL identity art
+- `Resources/phase2a/`: current production Main Menu cartoon family
+- screen-specific `Resources/<screen>/` families for approved production surfaces
 
-These are source assets for the runtime-built UI. Keep all user-facing copy localized through `L10n.Get` and preserve the existing Converging Light palette contract.
+All user-facing copy remains localized through `L10n.Get` / `LocalizedText`. Approved sprites stay visible at alpha `1`; `_9s` artwork uses `Image.Type.Sliced`; procedural rendering is fallback/additive only when no approved production asset exists.
