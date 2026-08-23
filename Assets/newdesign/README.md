@@ -1,25 +1,18 @@
-# HOL New Design — Cartoon Theme
+# HOL New Design
 
-Unity-ready design foundation for the canonical HOL player-facing visual identity.
+Unity-ready design foundation for the consumer-first HOL UI.
 
-## Direction
+## Canonical direction
 
-HOL is a friendly competitive **cartoon number/brain game** with a polished 2.5D mobile-arcade presentation:
+HOL now follows the mandatory **HOL Cartoon Theme** defined in:
 
-- deep indigo/plum depth
-- expressive age-neutral cartoon characters and number mascots
-- chunky glossy controls with clear hierarchy
-- cyan-blue secondary actions
-- warm gold primary actions
-- restrained magenta/violet competitive emphasis
-- numbers, chevrons, lightning, stars and sparse confetti as supporting motifs
-- strong Greek/English readability
-- no ads during active gameplay
-- rewarded ads always disclose the reward first
+- `design/cartoon-theme.md`
+- `Assets/newdesign/cartoon-theme-authority.md`
+- `Assets/newdesign/design-tokens.json`
 
-The complete identity contract is `../../design/cartoon-theme.md` and the production asset authority map is `cartoon-theme-authority.md`.
+The intended product presentation is a polished 2.5D cartoon competitive number/brain game: expressive characters and number mascots, deep plum/indigo depth, large glossy arcade controls, bold readable typography, cyan/blue secondary actions, warm gold primary actions, restrained magenta opponent emphasis, and controlled number/chevron/lightning/star/confetti motifs.
 
-Converging Light is retained only as a **secondary atmospheric subsystem**. It may contribute deep indigo depth, subtle number fields, interval/chevron motifs and restrained neon glow, but it must not override approved cartoon artwork, chunky controls, typography hierarchy or user-approved compositions.
+Legacy Converging Light remains available only as secondary atmospheric language. It must not override approved cartoon production artwork or owned screen layouts.
 
 ## Integration targets
 
@@ -30,12 +23,16 @@ Converging Light is retained only as a **secondary atmospheric subsystem**. It m
 - `Assets/SCRIPT/AdsManager.cs`
 - `Assets/Scenes/MainMenu.unity`
 
-## Asset set
+## Main Menu fidelity
 
-- `design-tokens.json`: canonical palette, spacing, typography and visual-role rules
-- `cartoon-theme-authority.md`: screen-by-screen production asset authority
-- `Resources/reference/`: shared exact HOL identity art
-- `Resources/phase2a/`: current production Main Menu cartoon family
-- screen-specific `Resources/<screen>/` families for approved production surfaces
+`MainMenuHomeVisuals` owns Home composition and existing navigation. `MainMenuHomeFidelityEnforcer` runs after the Home build and restores the authoritative Phase 2A / exact-reference sprites as the visible base artwork, preserving alpha `1`, `_9s` slicing and existing button callbacks while disabling only procedural replacement graphics that cover approved assets.
 
-All user-facing copy remains localized through `L10n.Get` / `LocalizedText`. Approved sprites stay visible at alpha `1`; `_9s` artwork uses `Image.Type.Sliced`; procedural rendering is fallback/additive only when no approved production asset exists.
+## Asset rules
+
+- approved production artwork is the visual source of truth
+- `_9s` assets use `Image.Type.Sliced`
+- production sprites remain visible at alpha `1`
+- text stays separate and localized through `L10n`
+- procedural rendering is fallback/additive only when approved artwork exists
+- onboarding production artwork must be approved and committed before implementation
+- no procedural/mockup-only robot may be treated as a production mascot
