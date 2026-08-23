@@ -20,7 +20,8 @@ public sealed class PrivateRoomProductionAssetsTests
         "phase2a/hol_cta_magenta_r2_9s",
         "mainmenu/mainmenu_tip_frame_9s",
         "mainmenu/mainmenu_player_chip_frame_9s",
-        "mainmenu/mainmenu_icon_tip_bulb"
+        "mainmenu/mainmenu_icon_tip_bulb",
+        "mainmenu/mainmenu_icon_streak"
     };
 
     static readonly string[] RequiredFonts =
