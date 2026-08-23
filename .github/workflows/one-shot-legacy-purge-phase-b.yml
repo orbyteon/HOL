@@ -1,0 +1,316 @@
+name: One-shot legacy UI purge phase B
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout purge branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: refactor/remove-legacy-design-system
+          fetch-depth: 0
+
+      - name: Apply production-art migration
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          def require(cond, msg):
+              if not cond:
+                  raise SystemExit(msg)
+
+          # ------------------------------------------------------------------
+          # RuntimeUI remains theme-agnostic. This helper requires callers to
+          # provide the exact approved resource path; it chooses no theme.
+          runtime_path = Path('Assets/SCRIPT/RuntimeUI/RuntimeUI.cs')
+          runtime = runtime_path.read_text(encoding='utf-8')
+          marker = '''    // Every runtime-built label is TextMesh Pro, same as the scene's TMP\n'''
+          require(marker in runtime, 'RuntimeUI insertion marker changed')
+          if 'CreateProductionFrame(' not in runtime:
+              helper = '''    // Neutral infrastructure for a caller-owned production frame. The\n    // caller supplies the exact approved sprite path; RuntimeUI never chooses\n    // a visual language or substitutes generated artwork.\n    public static GameObject CreateProductionFrame(\n        Transform parent, string name, Vector2 position, Vector2 size,\n        string resourcePath, float pixelsPerUnitMultiplier = 2f)\n    {\n        var frame = CreateObject(name, parent);\n        Center(frame, position, size);\n        ClampToSafeArea((RectTransform)frame.transform, size, position);\n        var image = frame.AddComponent<Image>();\n        ApplyProductionSprite(image, resourcePath, Image.Type.Sliced, false,\n            pixelsPerUnitMultiplier);\n        image.raycastTarget = false;\n        return frame;\n    }\n\n'''
+              runtime = runtime.replace(marker, helper + marker, 1)
+          runtime_path.write_text(runtime, encoding='utf-8')
+
+          # ------------------------------------------------------------------
+          # PvP: stop constructing obsolete landing/create/join presentations,
+          # move remaining match/prebattle/result chrome to current production
+          # sprites, and keep current PrivateRoomVisuals as the one landing owner.
+          pvp_path = Path('Assets/SCRIPT/RuntimeUI/PvpRuntimeUI.cs')
+          pvp = pvp_path.read_text(encoding='utf-8')
+          pvp = pvp.replace('BuildPanelsLegacy(controller);', 'BuildMatchPanel(controller);')
+          pvp = pvp.replace('void BuildPanelsLegacy(PvpGameController controller)',
+                            'void BuildMatchPanel(PvpGameController controller)')
+
+          # Delete the old menu/create/join build section entirely. Match UI is
+          # retained and controller wiring is preserved below.
+          match_marker = '        // Match — laid out to the "HOL Consumer First" board'
+          method_head = '    void BuildMatchPanel(PvpGameController controller)\n    {\n'
+          require(method_head in pvp and match_marker in pvp,
+                  'PvpRuntimeUI match split markers changed')
+          start = pvp.index(method_head) + len(method_head)
+          match = pvp.index(match_marker, start)
+          pvp = pvp[:start] + '''        // Build only the live match surface here. Private Room landing and\n        // prebattle controls are built once by ReplacePrivateRoomPanels and\n        // presented by their dedicated current owner.\n''' + pvp[match:]
+
+          wiring_pattern = re.compile(
+              r'        // Wire the controller\.\n.*?        controller\.historyText = historyText;\n',
+              re.S)
+          replacement = '''        // Wire match state only. Private Room fields are assigned exactly once\n        // by ReplacePrivateRoomPanels below.\n        controller.matchPanel = matchPanel;\n        controller.guessInput = guessInput;\n        controller.opponentNameText = opponentText;\n        controller.turnText = turnText;\n        controller.roundText = roundText;\n        controller.historyText = historyText;\n'''
+          pvp, n = wiring_pattern.subn(replacement, pvp, count=1)
+          require(n == 1, 'PvpRuntimeUI legacy controller wiring block changed')
+
+          old_hooks = '''        // Button hooks.\n        createBtn.onClick.AddListener(() => ShowOnly(controller, createPanel));\n        joinBtn.onClick.AddListener(() => ShowOnly(controller, joinPanel));\n        closeBtn.onClick.AddListener(controller.ClosePvpMenu);\n        createGo.onClick.AddListener(controller.OnCreateRoomPressed);\n        copyBtn.onClick.AddListener(controller.OnCopyInvitePressed);\n        createBack.onClick.AddListener(controller.CancelRoomAndLeave);\n        joinGo.onClick.AddListener(controller.OnJoinRoomPressed);\n        joinBack.onClick.AddListener(controller.CancelRoomAndLeave);\n        guessBtn.onClick.AddListener(controller.OnSubmitGuessPressed);\n        lockBtn.onClick.AddListener(controller.OnLockTogglePressed);\n        leaveBtn.onClick.AddListener(controller.OnLeaveMatchPressed);\n'''
+          require(old_hooks in pvp, 'PvpRuntimeUI button-hook block changed')
+          pvp = pvp.replace(old_hooks, '''        // Match button hooks.\n        guessBtn.onClick.AddListener(controller.OnSubmitGuessPressed);\n        lockBtn.onClick.AddListener(controller.OnLockTogglePressed);\n        leaveBtn.onClick.AddListener(controller.OnLeaveMatchPressed);\n''', 1)
+
+          soft_pattern = re.compile(
+              r'        // Soft-keyboard Done .*?        guessInput\.onSubmit\.AddListener\(_ => controller\.OnSubmitGuessPressed\(\)\);\n',
+              re.S)
+          pvp, n = soft_pattern.subn('''        // Soft-keyboard Done submits the live guess flow.\n        guessInput.onSubmit.AddListener(_ => controller.OnSubmitGuessPressed());\n''', pvp, count=1)
+          require(n == 1, 'PvpRuntimeUI submit-hook block changed')
+
+          old_hidden = '''        // All panels start hidden; OpenPvpMenu shows the menu panel.\n        lockBtn.gameObject.SetActive(false);\n        signalsRoot.SetActive(false);\n        menuPanel.SetActive(false);\n        createPanel.SetActive(false);\n        joinPanel.SetActive(false);\n        matchPanel.SetActive(false);\n'''
+          require(old_hidden in pvp, 'PvpRuntimeUI initial visibility block changed')
+          pvp = pvp.replace(old_hidden, '''        // Match starts hidden; OpenPvpMenu is owned by the current Private Room flow.\n        lockBtn.gameObject.SetActive(false);\n        signalsRoot.SetActive(false);\n        matchPanel.SetActive(false);\n''', 1)
+
+          # Private Room landing: functional roots only. PrivateRoomVisuals owns
+          # every pixel and reuses these exact Button roots/listeners.
+          landing_pattern = re.compile(
+              r'        var menu = BuildPortraitPanel\(transform, "PvPMenuPanel"\);.*?'
+              r'        var prebattleCreate = BuildPrebattlePanel\("PvPCreatePanel", true\);',
+              re.S)
+          landing = '''        var menu = BuildPortraitPanel(transform, "PvPMenuPanel");\n        var create = RuntimeUI.CreateButton(menu.transform, "CreateButton",\n            L10n.Get("pvp_create_room"), Vector2.zero, new Vector2(360f, 104f),\n            ConsumerTokens.Cyan, DarkLabel);\n        var join = RuntimeUI.CreateButton(menu.transform, "JoinButton",\n            L10n.Get("pvp_join_room"), Vector2.zero, new Vector2(430f, 104f),\n            ConsumerTokens.Gold, DarkLabel);\n        var back = RuntimeUI.CreateButton(menu.transform, "BackButton",\n            L10n.Get("back"), Vector2.zero, new Vector2(86f, 86f),\n            ConsumerTokens.SurfaceElevated);\n        RuntimeUI.Localize(create, "pvp_create_room");\n        RuntimeUI.Localize(join, "pvp_join_room");\n        RuntimeUI.Localize(back, "back");\n\n        var prebattleCreate = BuildPrebattlePanel("PvPCreatePanel", true);'''
+          pvp, n = landing_pattern.subn(landing, pvp, count=1)
+          require(n == 1, 'PvpRuntimeUI Private Room landing block changed')
+
+          # Replace old global frame facade with screen-local helpers. First
+          # rewrite call sites; helper bodies are inserted afterwards so they do
+          # not recursively rewrite themselves.
+          pvp = pvp.replace('RuntimeUI.FullscreenPanel(', 'CreatePvpPanel(')
+          pvp = pvp.replace('RuntimeUI.CreateButton(', 'CreatePvpButton(')
+          pvp = pvp.replace('RuntimeUI.CreateInputField(', 'CreatePvpInput(')
+          pvp = pvp.replace('NeonFrame.Frame(', 'PvpFrame(')
+          pvp = pvp.replace('ForceProceduralButton(', 'StylePvpButton(')
+          pvp = re.sub(r'\n\s*NeonBackdrop\([^;]+\);', '', pvp)
+
+          # Replace obsolete helper block with current, screen-local art mapping.
+          helper_pattern = re.compile(
+              r'    // CreateButton swaps in the wired design sprites.*?'
+              r'    void BuildPanels\(PvpGameController controller\)', re.S)
+          pvp_helpers = '''    const string PvpBackgroundResource = "phase2a/hol_neon_reference_bg_r3";\n    const string PvpPurpleFrameResource = "mainmenu/mainmenu_tip_frame_9s";\n    const string PvpBlueFrameResource = "mainmenu/mainmenu_cta_blue_9s";\n    const string PvpMagentaFrameResource = "phase2a/hol_cta_magenta_r2_9s";\n    const string PvpGoldFrameResource = "mainmenu/mainmenu_cta_gold_9s";\n\n    static GameObject CreatePvpPanel(Transform parent, string name, Color fallback)\n    {\n        var panel = RuntimeUI.FullscreenPanel(parent, name, fallback);\n        var image = panel.GetComponent<Image>();\n        RuntimeUI.ApplyProductionSprite(image, PvpBackgroundResource,\n            Image.Type.Simple, false);\n        image.raycastTarget = true;\n        return panel;\n    }\n\n    static Button CreatePvpButton(Transform parent, string name, string label,\n        Vector2 position, Vector2 size, Color color, Color? labelColor = null)\n    {\n        var button = RuntimeUI.CreateButton(parent, name, label, position, size,\n            color, labelColor);\n        StylePvpButton(button, color);\n        return button;\n    }\n\n    static TMP_InputField CreatePvpInput(Transform parent, string name,\n        string placeholder, Vector2 position, Vector2 size, int characterLimit = 3,\n        TMP_InputField.ContentType contentType = TMP_InputField.ContentType.IntegerNumber)\n    {\n        var input = RuntimeUI.CreateInputField(parent, name, placeholder, position,\n            size, characterLimit, contentType);\n        var image = input.GetComponent<Image>();\n        RuntimeUI.ApplyProductionSprite(image, PvpPurpleFrameResource,\n            Image.Type.Sliced, false, 2f);\n        if (input.textComponent != null)\n            input.textComponent.color = ConsumerTokens.TextPrimary;\n        var placeholderText = input.placeholder as TMP_Text;\n        if (placeholderText != null)\n            placeholderText.color = ConsumerTokens.WithAlpha(\n                ConsumerTokens.TextSecondary, 0.82f);\n        return input;\n    }\n\n    static GameObject PvpFrame(Transform parent, string name, Vector2 position,\n        Vector2 size, Color accent, float fillAlpha = 0.85f, bool glow = true,\n        Color? fillColor = null)\n    {\n        return RuntimeUI.CreateProductionFrame(parent, name, position, size,\n            ResolvePvpFrameResource(accent, fillColor), 2f);\n    }\n\n    static void StylePvpButton(Button button, Color accent)\n    {\n        if (button == null) return;\n        var image = button.GetComponent<Image>();\n        if (image == null) return;\n        RuntimeUI.ApplyProductionSprite(image,\n            ResolvePvpFrameResource(accent, null), Image.Type.Sliced, false, 2f);\n        image.raycastTarget = true;\n        button.targetGraphic = image;\n    }\n\n    static string ResolvePvpFrameResource(Color accent, Color? fillColor)\n    {\n        if (ColorDistance(accent, ConsumerTokens.Gold) < 0.35f)\n            return PvpGoldFrameResource;\n        if (ColorDistance(accent, ConsumerTokens.Magenta) < 0.42f ||\n            (fillColor.HasValue &&\n             ColorDistance(fillColor.Value, ConsumerTokens.CardPink) < 0.45f))\n            return PvpMagentaFrameResource;\n        if (ColorDistance(accent, ConsumerTokens.Cyan) < 0.48f ||\n            ColorDistance(accent, ConsumerTokens.Blue) < 0.48f ||\n            ColorDistance(accent, ConsumerTokens.KeyBlue) < 0.52f ||\n            (fillColor.HasValue &&\n             ColorDistance(fillColor.Value, ConsumerTokens.CardBlue) < 0.50f))\n            return PvpBlueFrameResource;\n        return PvpPurpleFrameResource;\n    }\n\n    static float ColorDistance(Color a, Color b)\n    {\n        float dr = a.r - b.r;\n        float dg = a.g - b.g;\n        float db = a.b - b.b;\n        return Mathf.Sqrt(dr * dr + dg * dg + db * db);\n    }\n\n    void BuildPanels(PvpGameController controller)'''
+          pvp, n = helper_pattern.subn(pvp_helpers, pvp, count=1)
+          require(n == 1, 'PvpRuntimeUI legacy helper block changed')
+
+          # Remove stale retired-theme wording. Keep comments product-specific.
+          pvp = pvp.replace('    // Converging Light palette (design/philosophy.md): indigo depth, cyan and\n'
+                            '    // gold as the disciplined lights, near-white text. Gold is reserved for\n'
+                            '    // the single most important action on each screen (primary CTA).\n',
+                            '    // Dynamic state colors only. Production surfaces are approved sprites.\n')
+          pvp = pvp.replace('Gold stays reserved for the primary action (design/philosophy.md)',
+                            'Gold marks the primary action')
+          pvp_path.write_text(pvp, encoding='utf-8')
+
+          # ------------------------------------------------------------------
+          # Consent / Force Update / Daily Hunt: explicit current production art.
+          consent_path = Path('Assets/SCRIPT/ConsentManager.cs')
+          consent = consent_path.read_text(encoding='utf-8')
+          consent, n = re.subn(
+              r'        var card = NeonFrame\.Frame\(panel\.transform, "Card", Vector2\.zero,\n'
+              r'            new Vector2\(600f, 420f\), ConsumerTokens\.Cyan, 0\.97f, true,\n'
+              r'            ConsumerTokens\.Surface\);',
+              '        var card = RuntimeUI.CreateProductionFrame(panel.transform, "Card", Vector2.zero,\n'
+              '            new Vector2(600f, 420f), "mainmenu/mainmenu_tip_frame_9s", 2f);',
+              consent, count=1)
+          require(n == 1, 'Consent frame call changed')
+          old_img = '''        var image = go.AddComponent<Image>();\n        image.sprite = RuntimeUI.RoundedRectSprite;\n        image.type = Image.Type.Sliced;\n        image.color = color;\n\n        var button = go.AddComponent<Button>();\n'''
+          require(old_img in consent, 'Consent button surface block changed')
+          consent = consent.replace(old_img, '''        var image = go.AddComponent<Image>();\n        string resource = name == "YesButton"\n            ? "mainmenu/mainmenu_cta_blue_9s"\n            : "mainmenu/mainmenu_tip_frame_9s";\n        RuntimeUI.ApplyProductionSprite(image, resource, Image.Type.Sliced, false, 2f);\n\n        var button = go.AddComponent<Button>();\n''', 1)
+          consent_path.write_text(consent, encoding='utf-8')
+
+          force_path = Path('Assets/SCRIPT/ForceUpdate.cs')
+          force = force_path.read_text(encoding='utf-8')
+          force, n = re.subn(
+              r'        var card = NeonFrame\.Frame\(panel\.transform, "Card", Vector2\.zero,\n'
+              r'            new Vector2\(640f, 560f\), ConsumerTokens\.Gold, 0\.97f, true,\n'
+              r'            ConsumerTokens\.Surface\);',
+              '        var card = RuntimeUI.CreateProductionFrame(panel.transform, "Card", Vector2.zero,\n'
+              '            new Vector2(640f, 560f), "mainmenu/mainmenu_cta_gold_9s", 2f);',
+              force, count=1)
+          require(n == 1, 'ForceUpdate frame call changed')
+          update_anchor = '''        var update = RuntimeUI.CreateButton(card.transform, "ConfirmUpdateButton",\n            L10n.Get("update_now"), new Vector2(0f, -110f), new Vector2(420f, 100f),\n            ConsumerTokens.Gold, ConsumerTokens.WithAlpha(ConsumerTokens.Surface, 1f));\n'''
+          require(update_anchor in force, 'ForceUpdate primary button block changed')
+          force = force.replace(update_anchor, update_anchor + '''        RuntimeUI.ApplyProductionSprite(update.GetComponent<Image>(),\n            "mainmenu/mainmenu_cta_gold_9s", Image.Type.Sliced, false, 2f);\n''', 1)
+          quit_anchor = '''        var quit = RuntimeUI.CreateButton(card.transform, "QuitButton",\n            L10n.Get("quit"), new Vector2(0f, -220f), new Vector2(420f, 100f),\n            ConsumerTokens.SurfaceElevated);\n'''
+          require(quit_anchor in force, 'ForceUpdate quit button block changed')
+          force = force.replace(quit_anchor, quit_anchor + '''        RuntimeUI.ApplyProductionSprite(quit.GetComponent<Image>(),\n            "mainmenu/mainmenu_tip_frame_9s", Image.Type.Sliced, false, 2f);\n''', 1)
+          force_path.write_text(force, encoding='utf-8')
+
+          daily_path = Path('Assets/SCRIPT/DailyHunt.cs')
+          daily = daily_path.read_text(encoding='utf-8')
+          daily, n = re.subn(
+              r'        NeonFrame\.Frame\(transform, "Card", new Vector2\(0f, -10f\),\n'
+              r'            new Vector2\(920f, 1340f\), ConsumerTokens\.Cyan, 0\.985f, true,\n'
+              r'            ConsumerTokens\.Surface\);',
+              '        RuntimeUI.CreateProductionFrame(transform, "Card", new Vector2(0f, -10f),\n'
+              '            new Vector2(920f, 1340f), "mainmenu/mainmenu_tip_frame_9s", 2f);',
+              daily, count=1)
+          require(n == 1, 'DailyHunt frame call changed')
+          entry_anchor = '''        var entry = RuntimeUI.CreateButton(canvas, "DailyHuntButton",\n            L10n.Get("daily_hunt"), new Vector2(0f, -740f), new Vector2(460f, 90f),\n            ConsumerTokens.Cyan, DarkLabel);\n'''
+          require(entry_anchor in daily, 'DailyHunt entry block changed')
+          daily = daily.replace(entry_anchor, entry_anchor + '''        RuntimeUI.ApplyProductionSprite(entry.GetComponent<Image>(),\n            "mainmenu/mainmenu_cta_blue_9s", Image.Type.Sliced, false, 2f);\n''', 1)
+          daily_path.write_text(daily, encoding='utf-8')
+
+          # ------------------------------------------------------------------
+          # Private Room fidelity/ownership cleanup.
+          pr_path = Path('Assets/SCRIPT/Design/PrivateRoomVisuals.cs')
+          pr = pr_path.read_text(encoding='utf-8')
+          pr = pr.replace(
+              '    const string TipIconResource = "mainmenu/mainmenu_icon_tip_bulb";\n',
+              '    const string TipIconResource = "mainmenu/mainmenu_icon_tip_bulb";\n'
+              '    const string StreakIconResource = "mainmenu/mainmenu_icon_streak";\n', 1)
+          pr = pr.replace('        Sprite chevron = LoadRequired(BackChevronResource);\n',
+                          '        Sprite chevron = LoadRequired(BackChevronResource);\n'
+                          '        Sprite streakIcon = LoadRequired(StreakIconResource);\n', 1)
+          pr = pr.replace('            purple != null && chip != null && tip != null && chevron != null &&\n',
+                          '            purple != null && chip != null && tip != null && chevron != null &&\n'
+                          '            streakIcon != null &&\n', 1)
+          pr = pr.replace('        outer.color = new Color(0.80f, 0.68f, 1f, 0.70f);',
+                          '        outer.color = Color.white;', 1)
+          pr = pr.replace('        BuildTopBar(chip, avatar, purple, chevron);',
+                          '        BuildTopBar(chip, avatar, purple, chevron, streakIcon);', 1)
+          pr = pr.replace('    void BuildTopBar(Sprite chipSprite, Sprite avatar, Sprite pillSprite,\n        Sprite chevron)\n',
+                          '    void BuildTopBar(Sprite chipSprite, Sprite avatar, Sprite pillSprite,\n        Sprite chevron, Sprite streakIcon)\n', 1)
+          old_step = '        stepText.text = IsGreek ? "2. ΠΑΙΞΕ ΜΕ ΦΙΛΟ" : "2. PLAY WITH A FRIEND";'
+          require(old_step in pr, 'PrivateRoom step copy changed')
+          pr = pr.replace(old_step, '        RuntimeUI.Localize(stepText, "private_room_step");', 1)
+          streak_place = '''        Place(streakText.rectTransform, new Vector2(38f, -27f),\n            new Vector2(210f, 40f));\n'''
+          require(streak_place in pr, 'PrivateRoom streak layout changed')
+          pr = pr.replace(streak_place, '''        Place(streakText.rectTransform, new Vector2(55f, -27f),\n            new Vector2(120f, 40f));\n        var streakImage = EnsureImage(chip.transform, "PrivateRoomStreakIcon");\n        ConfigureImage(streakImage, streakIcon, true, Image.Type.Simple);\n        Place(streakImage.rectTransform, new Vector2(-20f, -27f),\n            new Vector2(44f, 44f));\n''', 1)
+          old_refresh = '''        if (stepText != null)\n            stepText.text = IsGreek ? "2. ΠΑΙΞΕ ΜΕ ΦΙΛΟ" : "2. PLAY WITH A FRIEND";\n'''
+          require(old_refresh in pr, 'PrivateRoom refresh step copy changed')
+          pr = pr.replace(old_refresh, '''        if (stepText != null)\n            stepText.text = L10n.Get("private_room_step");\n''', 1)
+          pr = pr.replace('        streakText.text = "🔥 " + GameStats.CurrentStreak;',
+                          '        streakText.text = GameStats.CurrentStreak.ToString();', 1)
+          label_line = '        var label = button.GetComponentInChildren<TMP_Text>(true);\n'
+          require(label_line in pr, 'PrivateRoom ConfigureButtonLabel lookup changed')
+          pr = pr.replace(label_line,
+                          '        var label = DirectChild(button.transform, "PrivateRoomActionLabel")?.GetComponent<TMP_Text>();\n', 1)
+          pr = pr.replace('            label = EnsureText(button.transform, "Label", size, displayFont,\n',
+                          '            label = EnsureText(button.transform, "PrivateRoomActionLabel", size, displayFont,\n', 1)
+          old_clear = '''    static void ClearButtonPresentation(Transform root)\n    {\n        if (root == null) return;\n        for (int i = root.childCount - 1; i >= 0; i--)\n            RuntimeUI.DestroyNow(root.GetChild(i).gameObject);\n    }\n'''
+          require(old_clear in pr, 'PrivateRoom clear helper changed')
+          pr = pr.replace(old_clear, '''    static void ClearButtonPresentation(Transform root)\n    {\n        if (root == null) return;\n        for (int i = root.childCount - 1; i >= 0; i--)\n        {\n            var child = root.GetChild(i);\n            child.gameObject.SetActive(false);\n            child.SetParent(null, false);\n            RuntimeUI.DestroyNow(child.gameObject);\n        }\n    }\n''', 1)
+          pr_path.write_text(pr, encoding='utf-8')
+
+          # Localized step label uses the canonical table in both languages.
+          l10n_path = Path('Assets/SCRIPT/Localization/L10n.cs')
+          l10n = l10n_path.read_text(encoding='utf-8')
+          if '"private_room_step"' not in l10n:
+              anchor = '        { "private_room_title", new[] { "PLAY WITH A FRIEND", "ΠΑΙΞΕ ΜΕ ΦΙΛΟ" } },\n'
+              require(anchor in l10n, 'L10n private-room anchor changed')
+              l10n = l10n.replace(anchor, anchor +
+                  '        { "private_room_step", new[] { "2. PLAY WITH A FRIEND", "2. ΠΑΙΞΕ ΜΕ ΦΙΛΟ" } },\n', 1)
+          l10n_path.write_text(l10n, encoding='utf-8')
+
+          # ------------------------------------------------------------------
+          # Tests/docs that still required the deleted serialization shim or tried
+          # to install removed runtime owners are updated to current ownership.
+          exact_path = Path('Assets/Tests/EditMode/ExactReferenceAssetsTests.cs')
+          exact = exact_path.read_text(encoding='utf-8')
+          shim_pattern = re.compile(
+              r'    \[Test\]\n    public void SerializedLegacyThemeShimHasNoRuntimeThemeLifecycle\(\)\n    \{.*?\n    \}\n',
+              re.S)
+          exact, n = shim_pattern.subn('''    [Test]\n    public void RuntimeUiInfrastructureExistsWithoutSerializedGlobalThemeOwner()\n    {\n        Assert.IsNotNull(RuntimeType("RuntimeUI"));\n        Assert.IsNull(System.Type.GetType("DesignRuntimeWiring, Assembly-CSharp"));\n    }\n''', exact, count=1)
+          require(n == 1, 'ExactReferenceAssets serialized-shim test changed')
+          exact_path.write_text(exact, encoding='utf-8')
+
+          splash_test_path = Path('Assets/Tests/PlayMode/SplashAuthoritativeVisualsPlayModeTests.cs')
+          splash_test = splash_test_path.read_text(encoding='utf-8')
+          for line in [
+              '        InstallRuntimePresenter("ExactReferenceVisuals");\n',
+              '        InstallRuntimePresenter("AttachmentReskinVisuals");\n',
+              '        InstallRuntimePresenter("AttachmentReskinPolish");\n',
+              '        InstallRuntimePresenter("AttachmentReskinCanvasBindings");\n',
+          ]:
+              splash_test = splash_test.replace(line, '')
+          for line in [
+              '        Assert.That(FindInScene(scene, RuntimeType("ExactReferenceVisuals")), Is.Null);\n',
+              '        Assert.That(FindInScene(scene, RuntimeType("AttachmentReskinVisuals")), Is.Null);\n',
+              '        Assert.That(FindInScene(scene, RuntimeType("AttachmentReskinPolish")), Is.Null);\n',
+              '        Assert.That(FindInScene(scene, RuntimeType("AttachmentReskinCanvasBindings")), Is.Null);\n',
+          ]:
+              splash_test = splash_test.replace(line, '')
+          splash_test = re.sub(
+              r'    static void InstallRuntimePresenter\(string typeName\)\n    \{.*?\n    \}\n\n',
+              '', splash_test, count=1, flags=re.S)
+          splash_test_path.write_text(splash_test, encoding='utf-8')
+
+          screen_map = Path('Assets/newdesign/screen-map.md')
+          if screen_map.exists():
+              text = screen_map.read_text(encoding='utf-8')
+              text = text.replace('`UIJuice/*`, `Haptics`, `DesignRuntimeWiring`',
+                                  '`UIJuice/*`, `Haptics`, screen-specific `Design/*` owners')
+              screen_map.write_text(text, encoding='utf-8')
+
+          # The compatibility facade is no longer needed after all runtime callers
+          # move to caller-selected production resources.
+          neon = Path('Assets/SCRIPT/Design/NeonFrame.cs')
+          neon_meta = Path('Assets/SCRIPT/Design/NeonFrame.cs.meta')
+          require(neon.exists(), 'NeonFrame already missing before phase B')
+          neon.unlink()
+          if neon_meta.exists(): neon_meta.unlink()
+
+          Path('.github/workflows/one-shot-legacy-purge-phase-b.yml').unlink()
+          PY
+
+      - name: Audit phase B residue
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '--- retired runtime classes in production source ---'
+          if git grep -n -E 'ConvergingLight|DesignRuntimeWiring|NeonFrame|NumberDrift|AttachmentReskin|ExactReferenceVisuals' -- 'Assets/SCRIPT/**/*.cs' 'Assets/Scenes/*.unity'; then
+            echo '::error::Retired runtime theme symbol remains in production source'
+            exit 1
+          fi
+          echo '--- obsolete private-room landing child names ---'
+          if git grep -n -E 'FriendArt|GirlArt|DoorArt|JoinTitle|CodeCaption' -- Assets/SCRIPT/RuntimeUI/PvpRuntimeUI.cs; then
+            echo '::error::Obsolete Private Room landing presentation still constructed by PvpRuntimeUI'
+            exit 1
+          fi
+          echo '--- old build-then-replace pattern ---'
+          if git grep -n 'BuildPanelsLegacy' -- Assets/SCRIPT; then
+            echo '::error::Legacy PvP screen builder remains'
+            exit 1
+          fi
+          echo '--- near-zero production alpha hacks ---'
+          if git grep -n -E 'color\s*=\s*new Color\([^\n]*0\.00[12]f\)' -- 'Assets/SCRIPT/**/*.cs'; then
+            echo '::error::Near-zero production alpha hack remains'
+            exit 1
+          fi
+          echo '--- RoundedRect production call sites (informational for next gate) ---'
+          git grep -n 'RuntimeUI.RoundedRectSprite' -- 'Assets/SCRIPT/**/*.cs' || true
+          echo '--- diff ---'
+          git status --short
+
+      - name: Commit phase B migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          git commit -m 'refactor(ui): remove remaining shared frame theme and legacy PvP landing'
+          git fetch origin refactor/remove-legacy-design-system
+          git rebase origin/refactor/remove-legacy-design-system
+          git push origin HEAD:refactor/remove-legacy-design-system
