@@ -116,7 +116,7 @@ public class ForceUpdate : MonoBehaviour
     void ShowBlockingDialog()
     {
         var panel = RuntimeUI.FullscreenPanel(transform, "ForceUpdatePanel",
-            ConvergingLight.WithAlpha(ConvergingLight.ScrimIndigo, 0.96f));
+            ConsumerTokens.WithAlpha(ConsumerTokens.Background0, 0.96f));
 
         var card = NeonFrame.Frame(panel.transform, "Card", Vector2.zero,
             new Vector2(640f, 560f), ConsumerTokens.Gold, 0.97f, true,
@@ -129,7 +129,7 @@ public class ForceUpdate : MonoBehaviour
         // screen's one action that matters.
         var update = RuntimeUI.CreateButton(card.transform, "ConfirmUpdateButton",
             L10n.Get("update_now"), new Vector2(0f, -110f), new Vector2(420f, 100f),
-            ConsumerTokens.Gold, ConvergingLight.WithAlpha(ConvergingLight.PanelIndigo, 1f));
+            ConsumerTokens.Gold, ConsumerTokens.WithAlpha(ConsumerTokens.Surface, 1f));
         update.onClick.AddListener(OpenStore);
 
         var quit = RuntimeUI.CreateButton(card.transform, "QuitButton",

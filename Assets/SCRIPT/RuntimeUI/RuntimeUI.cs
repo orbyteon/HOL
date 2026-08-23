@@ -121,6 +121,43 @@ public static class RuntimeUI
         rect.offsetMax = Vector2.zero;
     }
 
+    public static void Center(GameObject go, Vector2 position, Vector2 size)
+    {
+        if (go == null) return;
+        var rect = (RectTransform)go.transform;
+        rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = position;
+        rect.sizeDelta = size;
+        rect.localRotation = Quaternion.identity;
+        rect.localScale = Vector3.one;
+    }
+
+    static Sprite solidSprite;
+    public static Sprite SolidSprite
+    {
+        get
+        {
+            if (solidSprite != null) return solidSprite;
+            var texture = new Texture2D(1, 1, TextureFormat.RGBA32, false);
+            texture.SetPixel(0, 0, Color.white);
+            texture.Apply();
+            solidSprite = Sprite.Create(texture, new Rect(0, 0, 1, 1),
+                new Vector2(0.5f, 0.5f));
+            return solidSprite;
+        }
+    }
+
+    public static Sprite LoadProductionSprite(string resourcePath)
+    {
+        if (string.IsNullOrWhiteSpace(resourcePath)) return null;
+        var sprite = Resources.Load<Sprite>(resourcePath);
+        if (sprite == null)
+            Debug.LogError("HOL UI: missing approved production sprite Resources/" +
+                resourcePath + ".");
+        return sprite;
+    }
+
     public static GameObject FullscreenPanel(Transform parent, string name, Color color)
     {
         var panel = CreateObject(name, parent);

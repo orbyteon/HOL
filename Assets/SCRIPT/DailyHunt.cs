@@ -96,7 +96,7 @@ public class DailyHunt : MonoBehaviour
     public static DailyHunt Attach(Transform canvas, AdsManager adsManager)
     {
         var panel = RuntimeUI.FullscreenPanel(canvas, "DailyHuntPanel",
-            ConvergingLight.WithAlpha(ConsumerTokens.Background0, 0.92f));
+            ConsumerTokens.WithAlpha(ConsumerTokens.Background0, 0.92f));
 
         var hunt = panel.AddComponent<DailyHunt>();
         hunt.ads = adsManager;

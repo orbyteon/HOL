@@ -61,7 +61,7 @@ public class ConsentManager : MonoBehaviour
         var panel = CreateUIObject("ConsentPanel", transform);
         Stretch(panel);
         var bg = panel.AddComponent<Image>();
-        bg.color = ConvergingLight.WithAlpha(ConsumerTokens.Background0, 0.92f);
+        bg.color = ConsumerTokens.WithAlpha(ConsumerTokens.Background0, 0.92f);
         bg.raycastTarget = true;
 
         // The first dialog a new player ever sees, so it is the first place

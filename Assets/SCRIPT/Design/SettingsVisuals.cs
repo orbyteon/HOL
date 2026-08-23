@@ -406,7 +406,7 @@ public sealed class SettingsVisuals : MonoBehaviour
                 musicToggle.isOn ? GoldButtonResource : NeutralButtonResource, 2f);
             if (musicStateText != null)
             {
-                musicStateText.text = musicToggle.isOn ? "ON" : "OFF";
+                musicStateText.text = musicToggle.isOn ? L10n.Get("yes") : L10n.Get("no");
                 musicStateText.color = musicToggle.isOn ? DarkInk : NearWhite;
             }
         }

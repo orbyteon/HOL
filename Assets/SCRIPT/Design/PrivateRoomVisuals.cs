@@ -173,6 +173,13 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
             return;
         }
 
+        // These Button roots come from PvpRuntimeUI because the controller owns
+        // their callbacks. Their historical child art/text is presentation only
+        // and must not survive beneath this sole production owner.
+        ClearButtonPresentation(createButton.transform);
+        ClearButtonPresentation(joinButton.transform);
+        ClearButtonPresentation(backButton.transform);
+
         HideLegacyPresentation(panel, createButton.transform, joinButton.transform,
             backButton.transform);
 
@@ -534,6 +541,13 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
         foreach (var button in root.GetComponentsInChildren<Button>(true))
             if (button != create && button != join) return button;
         return null;
+    }
+
+    static void ClearButtonPresentation(Transform root)
+    {
+        if (root == null) return;
+        for (int i = root.childCount - 1; i >= 0; i--)
+            RuntimeUI.DestroyNow(root.GetChild(i).gameObject);
     }
 
     static void HideButtonLabels(Transform root)

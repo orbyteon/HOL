@@ -17,7 +17,7 @@ public class PvpRuntimeUI : MonoBehaviour
     // Converging Light palette (design/philosophy.md): indigo depth, cyan and
     // gold as the disciplined lights, near-white text. Gold is reserved for
     // the single most important action on each screen (primary CTA).
-    static readonly Color PanelColor = ConvergingLight.WithAlpha(ConsumerTokens.Background0, 0.97f);
+    static readonly Color PanelColor = ConsumerTokens.WithAlpha(ConsumerTokens.Background0, 0.97f);
     static readonly Color Accent = ConsumerTokens.Gold;
     static readonly Color AccentBlue = ConsumerTokens.Cyan;
     static readonly Color Neutral = ConsumerTokens.SurfaceElevated;
@@ -96,7 +96,7 @@ public class PvpRuntimeUI : MonoBehaviour
         RuntimeUI.Stretch(backdrop);
 
         var image = backdrop.AddComponent<Image>();
-        image.sprite = ConvergingLight.DepthGradientSprite;
+        image.sprite = RuntimeUI.LoadProductionSprite("phase2a/hol_neon_reference_bg_r3");
         image.type = Image.Type.Simple;
         image.raycastTarget = false;
     }
@@ -145,7 +145,7 @@ public class PvpRuntimeUI : MonoBehaviour
             0.9f, true, ConsumerTokens.Surface);
         var codeCaption = RuntimeUI.CreateText(codeFrame.transform, "CodeCaption",
             L10n.Get("pvp_enter_code"), 28, new Vector2(0f, 90f), new Vector2(700f, 50f),
-            ConvergingLight.WithAlpha(ConvergingLight.NearWhite, 0.7f));
+            ConsumerTokens.WithAlpha(ConsumerTokens.TextPrimary, 0.7f));
         var codeText = RuntimeUI.CreateText(codeFrame.transform, "RoomCode", "-----", 96,
             new Vector2(0f, -25f), new Vector2(700f, 140f));
 
@@ -157,7 +157,7 @@ public class PvpRuntimeUI : MonoBehaviour
         // stranded on a background.
         var statusFrame = NeonFrame.Frame(createPanel.transform, "StatusFrame",
             new Vector2(0f, -380f), new Vector2(860f, 150f),
-            ConvergingLight.WithAlpha(ConsumerTokens.Magenta, 0.5f), 0.7f,
+            ConsumerTokens.WithAlpha(ConsumerTokens.Magenta, 0.5f), 0.7f,
             true, ConsumerTokens.Surface);
         var createStatus = RuntimeUI.CreateText(statusFrame.transform, "Status", "", 32,
             Vector2.zero, new Vector2(800f, 130f));
@@ -355,7 +355,7 @@ public class PvpRuntimeUI : MonoBehaviour
             if (icon != null)
             {
                 var iconGo = RuntimeUI.CreateObject("Icon", signalBtn.transform);
-                ConvergingLight.Center(iconGo, new Vector2(-135f, 0f), new Vector2(40f, 40f));
+                RuntimeUI.Center(iconGo, new Vector2(-135f, 0f), new Vector2(40f, 40f));
                 var iconImage = iconGo.AddComponent<Image>();
                 iconImage.sprite = icon;
                 iconImage.preserveAspect = true;
@@ -463,7 +463,7 @@ public class PvpRuntimeUI : MonoBehaviour
         var sprite = Resources.Load<Sprite>(resource);
         if (sprite == null) return null;
         var go = RuntimeUI.CreateObject(name, parent);
-        ConvergingLight.Center(go, position, size);
+        RuntimeUI.Center(go, position, size);
         var image = go.AddComponent<Image>();
         image.sprite = sprite;
         image.preserveAspect = true;
@@ -490,7 +490,7 @@ public class PvpRuntimeUI : MonoBehaviour
             new Vector2(-330f, 0f), new Vector2(72f, 72f));
         AddLocalizedText(card.transform, "TipText", "private_room_tip", 26,
             new Vector2(90f, 0f), new Vector2(620f, 140f),
-            ConvergingLight.NearWhite);
+            ConsumerTokens.TextPrimary);
     }
 
     void BuildResultOverlay(PvpGameController controller, GameObject matchPanel)
@@ -498,13 +498,13 @@ public class PvpRuntimeUI : MonoBehaviour
         var root = RuntimeUI.CreateObject("ResultVisualRoot", matchPanel.transform);
         RuntimeUI.Stretch(root);
         var background = root.AddComponent<Image>();
-        background.sprite = ConvergingLight.DepthGradientSprite;
+        background.sprite = RuntimeUI.LoadProductionSprite("phase2a/hol_neon_reference_bg_r3");
         background.color = Color.white;
         background.raycastTarget = true;
 
         AddLocalizedText(root.transform, "PageTitle", "result_page_title", 28,
             new Vector2(-345f, 825f), new Vector2(330f, 62f),
-            ConvergingLight.NearWhite);
+            ConsumerTokens.TextPrimary);
         AddSprite(root.transform, "Logo", "reference/hol_logo_exact",
             new Vector2(0f, 790f), new Vector2(330f, 150f));
 
@@ -520,7 +520,7 @@ public class PvpRuntimeUI : MonoBehaviour
 
         var confettiGo = RuntimeUI.CreateObject(
             "ResultConfettiLayer", root.transform);
-        ConvergingLight.Center(confettiGo, new Vector2(0f, 250f),
+        RuntimeUI.Center(confettiGo, new Vector2(0f, 250f),
             new Vector2(10f, 10f));
         var confetti = confettiGo.AddComponent<ConfettiBurst>();
         confetti.pieces = 48;
@@ -532,7 +532,7 @@ public class PvpRuntimeUI : MonoBehaviour
         confetti.radial = true;
 
         var pop = RuntimeUI.CreateObject("ResultPopTarget", root.transform);
-        ConvergingLight.Center(pop, new Vector2(0f, 260f),
+        RuntimeUI.Center(pop, new Vector2(0f, 260f),
             new Vector2(1000f, 900f));
         RuntimeUI.ClampToSafeArea((RectTransform)pop.transform,
             new Vector2(1000f, 900f), new Vector2(0f, 260f));
@@ -559,14 +559,14 @@ public class PvpRuntimeUI : MonoBehaviour
             ConsumerTokens.Magenta, 0.72f, false, ConsumerTokens.Surface);
         AddLocalizedText(attempts.transform, "Heading", "result_attempts", 24,
             new Vector2(0f, 175f), new Vector2(350f, 50f),
-            ConvergingLight.NearWhite);
+            ConsumerTokens.TextPrimary);
 
         var playerColumn = NeonFrame.Frame(attempts.transform, "PlayerAttempts",
             new Vector2(-92f, 0f), new Vector2(170f, 290f),
             ConsumerTokens.Cyan, 0.78f, false, ConsumerTokens.CardBlue);
         AddLocalizedText(playerColumn.transform, "Role", "you", 20,
             new Vector2(0f, 105f), new Vector2(145f, 38f),
-            ConvergingLight.NearWhite);
+            ConsumerTokens.TextPrimary);
         var playerAttempts = RuntimeUI.CreateText(playerColumn.transform,
             "Value", "0", 76, new Vector2(0f, 10f),
             new Vector2(145f, 110f), ConsumerTokens.Cyan);
@@ -580,7 +580,7 @@ public class PvpRuntimeUI : MonoBehaviour
             false, ConsumerTokens.CardPink);
         AddLocalizedText(opponentColumn.transform, "Role",
             "prebattle_opponent", 18, new Vector2(0f, 105f),
-            new Vector2(155f, 38f), ConvergingLight.NearWhite);
+            new Vector2(155f, 38f), ConsumerTokens.TextPrimary);
         var opponentAttempts = RuntimeUI.CreateText(opponentColumn.transform,
             "Value", "0", 76, new Vector2(0f, 10f),
             new Vector2(145f, 110f), ConsumerTokens.Magenta);
@@ -593,7 +593,7 @@ public class PvpRuntimeUI : MonoBehaviour
 
         var revealed = RuntimeUI.CreateText(attempts.transform,
             "RevealedNumber", "", 22, new Vector2(0f, -185f),
-            new Vector2(350f, 52f), ConvergingLight.NearWhite);
+            new Vector2(350f, 52f), ConsumerTokens.TextPrimary);
 
         var rematchCard = NeonFrame.Frame(root.transform, "RematchCard",
             new Vector2(0f, -365f), new Vector2(850f, 230f),
@@ -602,7 +602,7 @@ public class PvpRuntimeUI : MonoBehaviour
             new Vector2(850f, 230f), new Vector2(0f, -365f));
         AddLocalizedText(rematchCard.transform, "Heading",
             "result_rematch_heading", 24, new Vector2(0f, 82f),
-            new Vector2(780f, 42f), ConvergingLight.NearWhite);
+            new Vector2(780f, 42f), ConsumerTokens.TextPrimary);
         var rematchSecret = RuntimeUI.CreateInputField(rematchCard.transform,
             "RematchSecret", L10n.Get("rematch_prompt"),
             new Vector2(0f, 27f), new Vector2(760f, 64f));
@@ -628,7 +628,7 @@ public class PvpRuntimeUI : MonoBehaviour
             new Vector2(760f, 310f), new Vector2(0f, -690f));
         AddLocalizedText(reactionCard.transform, "Heading",
             "result_reactions", 23, new Vector2(0f, 125f),
-            new Vector2(700f, 40f), ConvergingLight.NearWhite);
+            new Vector2(700f, 40f), ConsumerTokens.TextPrimary);
         var resultSignalFeed = RuntimeUI.CreateText(reactionCard.transform,
             "SignalFeed", "", 17, new Vector2(0f, 88f),
             new Vector2(680f, 30f), ConsumerTokens.TextSecondary);
@@ -702,7 +702,7 @@ public class PvpRuntimeUI : MonoBehaviour
         var root = RuntimeUI.CreateObject("PvpTerminalRoot", matchPanel.transform);
         RuntimeUI.Stretch(root);
         var background = root.AddComponent<Image>();
-        background.sprite = ConvergingLight.DepthGradientSprite;
+        background.sprite = RuntimeUI.LoadProductionSprite("phase2a/hol_neon_reference_bg_r3");
         background.color = Color.white;
         background.raycastTarget = true;
 
@@ -714,7 +714,7 @@ public class PvpRuntimeUI : MonoBehaviour
             ConsumerTokens.Gold);
         var message = RuntimeUI.CreateText(card.transform, "Message", "", 30,
             new Vector2(0f, 20f), new Vector2(700f, 150f),
-            ConvergingLight.NearWhite);
+            ConsumerTokens.TextPrimary);
         var exit = RuntimeUI.CreateButton(card.transform, "TerminalExitButton",
             L10n.Get("result_exit"), new Vector2(0f, -155f),
             new Vector2(420f, 86f), ConsumerTokens.Cyan, DarkLabel);
@@ -757,15 +757,15 @@ public class PvpRuntimeUI : MonoBehaviour
 
         AddLocalizedText(root, "PageTitle", "prebattle_title", 30,
             new Vector2(-245f, 820f), new Vector2(430f, 62f),
-            ConvergingLight.NearWhite);
+            ConsumerTokens.TextPrimary);
         AddSprite(root, "Logo", "reference/hol_logo_exact",
             new Vector2(0f, 625f), new Vector2(440f, 210f));
         AddLocalizedText(root, "YourLabel", "prebattle_you", 24,
             new Vector2(-280f, 455f), new Vector2(360f, 52f),
-            ConvergingLight.NearWhite);
+            ConsumerTokens.TextPrimary);
         AddLocalizedText(root, "OpponentLabel", "prebattle_opponent", 24,
             new Vector2(280f, 455f), new Vector2(360f, 52f),
-            ConvergingLight.NearWhite);
+            ConsumerTokens.TextPrimary);
 
         var left = NeonFrame.Frame(root, "YouCard",
             new Vector2(-275f, 235f), new Vector2(430f, 430f),
@@ -775,7 +775,7 @@ public class PvpRuntimeUI : MonoBehaviour
         var playerName = AddLocalizedText(left.transform, "Name",
             "player_default", 28,
             new Vector2(0f, -160f), new Vector2(360f, 58f),
-            ConvergingLight.NearWhite);
+            ConsumerTokens.TextPrimary);
         left.AddComponent<PlayerNameLabel>().target = playerName;
 
         var right = NeonFrame.Frame(root, "OpponentCard",
@@ -786,7 +786,7 @@ public class PvpRuntimeUI : MonoBehaviour
         parts.opponentStatus = AddLocalizedText(right.transform, "Status",
             "prebattle_waiting_short", 26,
             new Vector2(0f, -160f), new Vector2(360f, 58f),
-            ConvergingLight.NearWhite);
+            ConsumerTokens.TextPrimary);
         AddSprite(root, "VsBurst", "reference/board_vs_burst_exact",
             new Vector2(0f, 235f), new Vector2(180f, 180f));
 
@@ -798,7 +798,7 @@ public class PvpRuntimeUI : MonoBehaviour
             ConsumerTokens.Cyan);
         AddLocalizedText(rule.transform, "Rule", "prebattle_rule", 24,
             new Vector2(-125f, -30f), new Vector2(560f, 90f),
-            ConvergingLight.NearWhite);
+            ConsumerTokens.TextPrimary);
         AddSprite(rule.transform, "Rocket", "reference/board_rocket_exact",
             new Vector2(300f, 0f), new Vector2(170f, 170f));
 
@@ -815,7 +815,7 @@ public class PvpRuntimeUI : MonoBehaviour
                 0.82f, false, ConsumerTokens.Surface);
             AddLocalizedText(code.transform, "Caption", "pvp_enter_code",
                 18, new Vector2(0f, 24f), new Vector2(390f, 34f),
-                ConvergingLight.WithAlpha(ConvergingLight.NearWhite, 0.72f));
+                ConsumerTokens.WithAlpha(ConsumerTokens.TextPrimary, 0.72f));
             parts.codeText = RuntimeUI.CreateText(code.transform, "RoomCode",
                 "-----", 44, new Vector2(0f, -20f),
                 new Vector2(390f, 52f));
@@ -897,14 +897,14 @@ public class PvpRuntimeUI : MonoBehaviour
         var menu = BuildPortraitPanel(transform, "PvPMenuPanel");
         AddLocalizedText(menu.transform, "PageTitle",
             "private_room_title", 30, new Vector2(0f, 800f),
-            new Vector2(720f, 70f), ConvergingLight.NearWhite);
+            new Vector2(720f, 70f), ConsumerTokens.TextPrimary);
         AddSprite(menu.transform, "Logo", "reference/hol_logo_exact",
             new Vector2(0f, 620f), new Vector2(500f, 240f));
         var ribbon = NeonFrame.Frame(menu.transform, "TitleRibbon",
             new Vector2(0f, 365f), new Vector2(900f, 130f),
             ConsumerTokens.Magenta, 0.92f, true, ConsumerTokens.CardPink);
         AddLocalizedText(ribbon.transform, "Title", "private_room_title", 48,
-            Vector2.zero, new Vector2(860f, 110f), ConvergingLight.NearWhite);
+            Vector2.zero, new Vector2(860f, 110f), ConsumerTokens.TextPrimary);
 
         var create = RuntimeUI.CreateButton(menu.transform, "CreateButton",
             L10n.Get("pvp_create_room"), new Vector2(0f, 40f),
@@ -916,7 +916,7 @@ public class PvpRuntimeUI : MonoBehaviour
             new Vector2(-70f, 4f), new Vector2(190f, 180f));
         AddLocalizedText(create.transform, "Hint", "private_room_create_hint", 25,
             new Vector2(245f, 54f), new Vector2(300f, 84f),
-            ConvergingLight.NearWhite);
+            ConsumerTokens.TextPrimary);
         RuntimeUI.Localize(create, "pvp_create_room");
 
         var join = RuntimeUI.CreateButton(menu.transform, "JoinButton",
@@ -930,10 +930,10 @@ public class PvpRuntimeUI : MonoBehaviour
             new Vector2(-250f, 20f), new Vector2(220f, 190f));
         AddLocalizedText(join.transform, "JoinTitle", "private_room_join_title", 30,
             new Vector2(220f, 78f), new Vector2(400f, 72f),
-            ConvergingLight.NearWhite);
+            ConsumerTokens.TextPrimary);
         AddLocalizedText(join.transform, "CodeCaption", "pvp_enter_code", 22,
             new Vector2(220f, -8f), new Vector2(360f, 48f),
-            ConvergingLight.WithAlpha(ConvergingLight.NearWhite, 0.75f));
+            ConsumerTokens.WithAlpha(ConsumerTokens.TextPrimary, 0.75f));
         RuntimeUI.Localize(join, "pvp_join_room");
 
         AddRoomTip(menu.transform, new Vector2(0f, -720f));
