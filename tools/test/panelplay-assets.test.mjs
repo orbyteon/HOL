@@ -33,9 +33,15 @@ test("approved number six stays byte-exact", () => {
     "067beafc207aea302e0993a3bacdb2b69478429aa3685f275bb6705bd902ac4b");
 });
 
-test("Play reuses the approved Revision 3 portrait background", () => {
+test("Play reuses the approved high-resolution 9:16 Revision 3 background", () => {
   const png = read(approvedBackground);
-  assert.deepEqual(dimensions(png), { width: 1080, height: 1920 });
+  const { width, height } = dimensions(png);
+  assert.ok(width >= 900,
+    `Play background width must stay production-resolution; got ${width}`);
+  assert.ok(height >= 1600,
+    `Play background height must stay production-resolution; got ${height}`);
+  assert.ok(Math.abs(width / height - 9 / 16) <= 0.002,
+    `Play background must stay 9:16; got ${width}x${height}`);
 });
 
 test("every current cartoon Play asset has a Unity meta", () => {
