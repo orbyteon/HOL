@@ -20,8 +20,8 @@ missing so a skipped compile cannot look green.
   `SmartHooks/` (`GameEvents`, `DailyStreak`, `Haptics`),
   `UIJuice/` (`ButtonJuice`, `PanelAnimator`, `ConfettiBurst`, …),
   `RuntimeUI/` (`RuntimeUI` factory + runtime wiring components),
-  `Design/` (screen-specific presentation owners plus legacy Converging Light
-  atmosphere/fallbacks).
+  `Design/` (HOL Cartoon Theme production presentation plus legacy
+  Converging Light atmospheric/fallback systems).
 - `Assets/Editor/ReleaseBuildGuard.cs` — release-only fail-closed validation
   activated by `-holReleaseBuild` in the signed-AAB workflow.
 - `services/provisioner/` — Azure Functions first-install account provisioner;
@@ -44,38 +44,34 @@ missing so a skipped compile cannot look green.
 
 ## Conventions (follow these)
 
-### HOL Cartoon Theme Contract — Mandatory
+### HOL Cartoon Theme — Mandatory Product Visual Identity
 
-`design/cartoon-theme.md` is the canonical product visual-identity contract and
-`Assets/newdesign/cartoon-theme-authority.md` is the production asset authority
-map. They apply repository-wide to Splash, Onboarding, Main Menu, Settings,
-Solo, PvP, Private Room, Daily Hunt, results, profile surfaces, consent/ads UI,
-and every future player-facing screen.
+The canonical visual identity is defined in `design/cartoon-theme.md`, with
+machine-readable tokens in `Assets/newdesign/design-tokens.json` and production
+asset authority in `Assets/newdesign/cartoon-theme-authority.md`.
 
-HOL is a polished **2.5D cartoon competitive number/brain game**. The product
-identity is expressive characters and number mascots, chunky glossy mobile
-arcade controls, thick readable silhouettes, deep plum/indigo depth, controlled
-cyan/blue/magenta/violet accents, warm gold primary CTA hierarchy, and sparse
-numbers/chevrons/lightning/stars/confetti as supporting motifs.
+HOL is a polished 2.5D cartoon competitive number/brain game: expressive
+characters and number mascots, thick readable silhouettes, large glossy arcade
+controls, deep plum/indigo depth, cyan/blue secondary actions, gold primary CTA,
+restrained magenta competitive/opponent emphasis, and controlled number,
+chevron, lightning, star and confetti motifs.
 
-- Do not import RideCore language into HOL: no cars, tracks, garages, racing HUDs,
-  motorsport badges, or vehicle-progression motifs.
-- Do not use generic hearts as filler decoration. Hearts require explicit
-  semantic purpose and approval for the target feature.
-- Converging Light is **secondary atmosphere only**. Keep its depth, subtle
-  number fields, interval/chevron ideas and restrained neon glow where useful,
-  but it must never override approved cartoon art, chunky controls, production
-  typography, character hierarchy, or user-approved screen composition.
-- When sources disagree, precedence is: current user-approved screen/reference →
-  approved production art → `design/cartoon-theme.md` →
-  `Assets/newdesign/design-tokens.json` → legacy Converging Light/fallbacks.
-- One screen should converge toward one authoritative presentation owner.
-  Generic/legacy runtime restyle layers must defer once a screen-specific
-  production visual root exists.
-- Onboarding is the actual interactive player-setup flow, not a marketing board.
-  It must inherit the same HOL cartoon identity as the Main Menu. Until approved
-  onboarding art is committed, do not invent substitute production characters
-  or a procedural robot.
+Do not import RideCore visual language. Cars, racing tracks, garages, motorsport
+HUD motifs and vehicle progression have no place in HOL.
+
+Legacy Converging Light remains a secondary atmospheric/fallback subsystem only.
+It may provide deep indigo depth, subtle number fields, thin interval marks and
+restrained cyan/magenta glow, but it must never override approved cartoon
+characters, production sprites, chunky controls, typography hierarchy or screen
+composition.
+
+When visual sources conflict, precedence is:
+
+1. user-approved reference for the active phase;
+2. approved production artwork matching that reference;
+3. `design/cartoon-theme.md`;
+4. `Assets/newdesign/design-tokens.json` / `ConsumerTokens.cs`;
+5. legacy Converging Light and procedural fallbacks.
 
 ### HOL Production UI Asset Fidelity Contract — Mandatory
 
@@ -121,6 +117,28 @@ sprite assignment, normal-state alpha `1`, `Image.Type.Sliced` for `_9s`
 assets, callback preservation, and the absence of a procedural replacement
 graphic above approved artwork.
 
+For Main Menu Home specifically, `MainMenuHomeVisuals` remains the composition
+and navigation owner, while `MainMenuHomeFidelityEnforcer` is the focused
+post-build fidelity guard. The guard may restore approved sprites, alpha and
+slice mode and disable procedural replacement graphics inside `HomeVisualRoot`;
+it must never create or replace buttons, change callbacks/navigation, or mutate
+gameplay state.
+
+### HOL Typography, Readability & Layout Fidelity Contract — Mandatory
+
+The approved 1080×1920 reference is the layout source of truth for every HOL
+screen. Before implementation, measure visible bounds, centers, spacing,
+alignment, text regions and safe-area relationships. Reproduce those proportions
+at the reference viewport and preserve them responsively.
+
+Typography is judged by the player's screen, not by whether the source font is
+loaded. Headings, CTA labels, body copy and data-entry text must remain readable,
+properly scaled, correctly wrapped and clearly positioned in both Greek and
+English. Do not solve fit problems by shrinking text until it technically fits.
+Use the approved display/body TMP family for the screen when provided, keep
+localized copy live, and validate native-resolution captures at the end of the
+phase.
+
 - **Every `.cs` and folder needs a committed `.meta`.** Scripts without
   metas got random GUIDs per machine in the past; don't let it happen
   again. MonoImporter metas use the standard block, new GUID per file.
@@ -130,9 +148,9 @@ graphic above approved artwork.
   and reuse the ConsentManager block as the template.
 - **Prefer runtime wiring over scene surgery** for new UI: the
   `RuntimeUI/` components (`PvpRuntimeUI`, `ExtrasRuntimeWiring`,
-  `JuiceRuntimeWiring`) and screen-specific `Design/` owners build/attach UI
-  after `Start`, so runtime-built panels are covered too. Runtime wiring is not
-  permission to replace approved production art with procedural approximations.
+  `JuiceRuntimeWiring`) and screen-specific production presentation owners build
+  or attach UI one frame after `Start`, so runtime-built panels are covered too.
+  Generic/legacy wiring must defer to an owned production visual root.
 - **All user-facing strings go through `L10n.Get(key)`** with both EN and
   EL entries in `Assets/SCRIPT/Localization/L10n.cs`. Never add hardcoded
   English UI text. Formatted entries take args: `L10n.Get("key", arg)`.
@@ -140,19 +158,18 @@ graphic above approved artwork.
   `LocalizedText` (TMP) or `LocalizedLegacyText` (legacy `Text`) with the
   key instead of baking `L10n.Get` at build time — the
   `RuntimeUI.Localize*(..., key)` helpers do this in one call.
-- **UI colors follow the HOL Cartoon Theme tokens** in
-  `Assets/newdesign/design-tokens.json` / `ConsumerTokens.cs`: deep plum/indigo
-  depth, cyan/blue secondary actions, controlled magenta/violet competitive
-  accents, warm gold primary CTA, green success and warm near-white text.
-  `design/philosophy.md` remains useful for restrained atmospheric detail but
-  does not override the Cartoon Theme hierarchy.
+- **UI colors follow the HOL Cartoon Theme tokens.** Gold is reserved for the
+  highest-priority CTA; cyan/blue are secondary/navigation; magenta is selective
+  competitive/opponent emphasis; violet is supporting depth; green is success.
+  Near-white text sits on deep plum/indigo surfaces. Do not let legacy palette
+  rules override approved production artwork.
 - **The duel rules live in two places and must stay in step.**
-  `Assets/SCRIPT/DuelRules.cs` (solo) and `playfab/cloudscript.js` (PlayFab,
-  server-authoritative) implement the same round/last-licks/Lock machine. Change
-  one, change the other, and update both test suites —
-  `Assets/Tests/EditMode/DuelRulesTests.cs` and `tools/test/cloudscript.test.mjs`
-  cover the same cases on each side. `DuelRules` deliberately has no UnityEngine
-  reference so it stays testable.
+  `Assets/SCRIPT/DuelRules.cs` (solo) and
+  `playfab/cloudscript.js` (PlayFab, server-authoritative) implement the same
+  round/last-licks/Lock machine. Change one, change the other, and update both
+  test suites — `Assets/Tests/EditMode/DuelRulesTests.cs` and
+  `tools/test/cloudscript.test.mjs` cover the same cases on each side.
+  `DuelRules` deliberately has no UnityEngine reference so it stays testable.
 - **Signals carry an index, never text.** `Signals.Table` order is protocol and
   the server validates against its length: append only, never reorder or remove.
   Keeping the vocabulary closed is what keeps HOL free of user-generated
@@ -203,12 +220,11 @@ graphic above approved artwork.
   project number in the production config.
 - Ads: the Android LevelPlay App Key lives in `AdsManager.AppKey` (single
   source of truth, from the LevelPlay dashboard — a Unity Ads-shaped game
-  id there fails init with 2110); iOS keys are placeholders. Ads are opt-in:
-  declining keeps LevelPlay uninitialized on later launches and blocks ad
-  loads/shows. Settings → Ads privacy re-opens the choice. Interstitial unit
-  `Interstitial_Android` plus rewarded unit `Rewarded_Android` powers the
-  save-your-streak offer. Production CMP/mediation compliance is an external
-  release setting and must match `docs/privacy.html`.
+  id there fails init with 2110); iOS keys are placeholders. Ads are opt-in: declining keeps LevelPlay uninitialized on later
+  launches and blocks ad loads/shows. Settings → Ads privacy re-opens the choice.
+  Interstitial unit `Interstitial_Android` plus rewarded unit
+  `Rewarded_Android` powers the save-your-streak offer. Production CMP/mediation
+  compliance is an external release setting and must match `docs/privacy.html`.
 - Force update: optional PlayFab TitleData key `minVersion` (e.g. `0.2.0`)
   blocks older builds with a store-link dialog. It reuses the PvP PlayFab
   session. Missing key / no authenticated PlayFab session / offline remains
@@ -233,16 +249,16 @@ graphic above approved artwork.
   `playfab/cloudscript.js` have no dependencies (pure Node built-ins).
 - The three headless CI jobs from `.github/workflows/ci.yml` are the ones you can
   reproduce locally. Run them from the repo root:
-  - `static-checks`: `node --check` on the JS files plus the grep/`node`
-    integrity guards (server-authoritative PlayFab, privacy.html byte-copy,
-    empty `HOLReleaseConfig.json`, dependency pinning, `.meta` presence).
+  - `static-checks`: `node --check` on the JS files plus the grep/`node` integrity
+    guards (server-authoritative PlayFab, privacy.html byte-copy, empty
+    `HOLReleaseConfig.json`, dependency pinning, `.meta` presence).
   - `rules-tests`: `node --check playfab/cloudscript.js` then
     `node --test tools/test/*.test.mjs` (the glob form is required; the bare
-    directory does not resolve). This drives the real production CloudScript in
-    an in-memory Shared Group sandbox — the fastest way to exercise PvP end to
-    end without Unity or PlayFab.
+    directory does not resolve). This drives the real production CloudScript in an
+    in-memory Shared Group sandbox — the fastest way to exercise PvP end to end
+    without Unity or PlayFab.
   - `provisioner-test` (from `services/provisioner/`): `npm test` then
     `npm run check`. Node must be `>=22 <23`.
 - The `check-license`, `test`, and `build` CI jobs will always fail here because
-  the Unity secrets are absent; that is expected and not something to "fix" in
-  the VM.
+  the Unity secrets are absent; that is expected and not something to "fix" in the
+  VM.
