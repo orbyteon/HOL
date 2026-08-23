@@ -19,11 +19,10 @@ using TMPro;
 //   9. Settings -> difficulty selector (Easy/Normal/Hard/Adaptive).
 public class ExtrasRuntimeWiring : MonoBehaviour
 {
-    // Converging Light palette (design/philosophy.md).
+    // Functional fallback colors only; current screen owners assign production sprites.
     static readonly Color Neutral = ConsumerTokens.SurfaceElevated;
     static readonly Color DarkLabel = new Color(0.10f, 0.09f, 0.18f);
 
-    TMP_Text statsLabel;
     TMP_Text disclosurePlay;
 
     void Start()
@@ -44,7 +43,6 @@ public class ExtrasRuntimeWiring : MonoBehaviour
         WireLanguageButtons();
         WireConsentSettings();
         WireDifficultyButtons();
-        AddStatsLabel();
         AddDisclosureLabels();
         LocalizeSceneTexts();
     }
@@ -174,6 +172,7 @@ public class ExtrasRuntimeWiring : MonoBehaviour
         var button = RuntimeUI.CreateButton(menu.settingsPanel.transform,
             "AdsPrivacyButton", L10n.Get("ads_privacy"),
             new Vector2(0f, -680f), new Vector2(360f, 80f), Neutral);
+        ApplyWiringSprite(button, "mainmenu/mainmenu_cta_blue_9s");
         button.onClick.AddListener(consent.ReopenConsent);
         RuntimeUI.Localize(button, "ads_privacy");
     }
@@ -186,8 +185,6 @@ public class ExtrasRuntimeWiring : MonoBehaviour
     // choice is tinted gold.
 
     const string DifficultyPrefKey = "AIDifficulty"; // mirrors GameManager
-
-    static readonly Color Gold = ConsumerTokens.Gold;
 
     readonly Button[] difficultyButtons = new Button[4];
 
@@ -209,6 +206,7 @@ public class ExtrasRuntimeWiring : MonoBehaviour
             var button = RuntimeUI.CreateButton(menu.settingsPanel.transform,
                 "Difficulty" + i, L10n.Get(keys[i]),
                 new Vector2(-300f + i * 200f, -860f), new Vector2(180f, 70f), Neutral);
+            ApplyWiringSprite(button, "mainmenu/mainmenu_tip_frame_9s");
             button.onClick.AddListener(() => SetDifficulty(difficulty));
             RuntimeUI.Localize(button, keys[i]);
             difficultyButtons[i] = button;
@@ -294,6 +292,7 @@ public class ExtrasRuntimeWiring : MonoBehaviour
         var cancel = RuntimeUI.CreateButton(mm.searchingPanel.transform,
             "CancelButton", L10n.Get("cancel"),
             new Vector2(0f, -420f), new Vector2(300f, 80f), Neutral);
+        ApplyWiringSprite(cancel, "mainmenu/mainmenu_cta_blue_9s");
         cancel.onClick.AddListener(mm.CancelSearch);
         RuntimeUI.Localize(cancel, "cancel");
     }
@@ -318,12 +317,14 @@ public class ExtrasRuntimeWiring : MonoBehaviour
         englishButton = RuntimeUI.CreateButton(menu.settingsPanel.transform,
             "EnglishButton", L10n.Get("language_english"),
             new Vector2(-130f, -560f), new Vector2(220f, 80f), Neutral);
+        ApplyWiringSprite(englishButton, "mainmenu/mainmenu_tip_frame_9s");
         englishButton.onClick.AddListener(selector.SetEnglish);
         RuntimeUI.Localize(englishButton, "language_english");
 
         greekButton = RuntimeUI.CreateButton(menu.settingsPanel.transform,
             "GreekButton", L10n.Get("language_greek"),
             new Vector2(130f, -560f), new Vector2(220f, 80f), Neutral);
+        ApplyWiringSprite(greekButton, "mainmenu/mainmenu_tip_frame_9s");
         greekButton.onClick.AddListener(selector.SetGreek);
         RuntimeUI.Localize(greekButton, "language_greek");
 
@@ -346,54 +347,25 @@ public class ExtrasRuntimeWiring : MonoBehaviour
 
     static void TintSelectable(Button button, bool selected)
     {
-        if (button == null)
-            return;
-
-        var image = button.GetComponent<Image>();
-        if (image != null)
-            image.color = selected ? Gold : Neutral;
+        if (button == null) return;
+        ApplyWiringSprite(button, selected
+            ? "mainmenu/mainmenu_cta_gold_9s"
+            : "mainmenu/mainmenu_tip_frame_9s");
 
         var label = button.GetComponentInChildren<TMP_Text>();
         if (label != null)
             label.color = selected ? DarkLabel : new Color(0.91f, 0.93f, 1f);
     }
 
-    // --- 4. Stats label ------------------------------------------------------
-
-    void AddStatsLabel()
+    static void ApplyWiringSprite(Button button, string resource)
     {
-        var menu = FindObjectOfType<MenuManager>();
-        if (menu == null || menu.mainMenuPanel == null)
-            return;
-
-        statsLabel = RuntimeUI.CreateText(menu.mainMenuPanel.transform,
-            "StatsLabel", "", 28,
-            new Vector2(0f, 820f), new Vector2(700f, 90f),
-            new Color(0.91f, 0.93f, 1f, 0.8f));
-
-        RefreshStats();
-        L10n.OnLanguageChanged += RefreshStats;
-        GameEvents.OnMatchEnded += OnMatchEnded;
-    }
-
-    void OnMatchEnded(bool playerWon, int guesses)
-    {
-        RefreshStats();
-    }
-
-    void RefreshStats()
-    {
-        string summary = L10n.Get("stats_wins") + ": " + GameStats.Wins +
-            "   " + L10n.Get("stats_losses") + ": " + GameStats.Losses +
-            "\n" + L10n.Get("stats_streak") + ": " + GameStats.CurrentStreak +
-            "   " + L10n.Get("stats_best") + ": " + GameStats.BestStreak;
-
-        // Fewest-guesses win: tracked since launch but never surfaced.
-        if (GameStats.BestWinningGuesses > 0)
-            summary += "\n" + L10n.Get("stats_fastest_win", GameStats.BestWinningGuesses);
-
-        if (statsLabel != null)
-            statsLabel.text = summary;
+        if (button == null) return;
+        var image = button.GetComponent<Image>();
+        if (image == null) return;
+        RuntimeUI.ApplyProductionSprite(image, resource, Image.Type.Sliced,
+            false, 2f);
+        image.raycastTarget = true;
+        button.targetGraphic = image;
     }
 
     // --- 5. Simulated-opponent disclosure -----------------------------------
@@ -426,10 +398,8 @@ public class ExtrasRuntimeWiring : MonoBehaviour
 
     void OnDestroy()
     {
-        L10n.OnLanguageChanged -= RefreshStats;
         L10n.OnLanguageChanged -= RefreshDisclosure;
         L10n.OnLanguageChanged -= RefreshLanguageButtons;
         L10n.OnLanguageChanged -= RefreshLegacySceneTexts;
-        GameEvents.OnMatchEnded -= OnMatchEnded;
     }
 }
