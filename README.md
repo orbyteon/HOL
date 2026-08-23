@@ -2,188 +2,174 @@
 
 [![CI](https://github.com/orbyteon/HOL/actions/workflows/ci.yml/badge.svg)](https://github.com/orbyteon/HOL/actions/workflows/ci.yml)
 
-A mobile **"Higher or Lower" number-guessing duel** built in Unity for Android.
+A mobile **Higher or Lower number-duel game** built in Unity for Android.
 
 You and an opponent each pick a secret number between **1 and 100**, then take turns guessing each other's number. After every guess you're told whether to go *higher* or *lower*. A round gives both sides one guess, so an opening correct guess can still be answered before the result is decided.
 
-HOL includes a solo mode against a lightweight on-device AI and a live PlayFab PvP mode for room-code duels with a friend.
+HOL includes solo play against a lightweight on-device AI and live PlayFab PvP room-code duels with a friend.
 
 ## Features
 
 - Turn-based Higher/Lower guessing against an AI opponent
-- **Duel rules that reward play, not turn order** — a coin-flip opener, equal
-  turns (the responder always answers the opener's winning guess), and a
-  once-per-match **Lock** that wins a tie if you are right and forfeits your
-  next turn if you are wrong
-- **Signals** — a fixed set of six quick messages in PvP, sent by index and
-  read in each player's own language (no free-form chat, so nothing to moderate)
-- **Server-authoritative PvP duels** with room-code invites through PlayFab
-- **Converging Light design** (`design/philosophy.md`) — indigo depth gradients, drifting number fields, a cyan→magenta seam, gold reserved for primary actions; animated splash with logo bloom and a loading hairline
-- **English + native Greek** localization with live language switching; first launch follows the device language
-- **Difficulty modes** — Easy / Normal / Hard / Adaptive (the AI tunes itself to your recent win rate), selectable in Settings
-- **Persistent stats** — wins/losses, current + best streak, best winning guess-count (`PlayerPrefs`); solo and PvP matches both count
-- **Perfect-run celebration** — win in 7 guesses or fewer and the game calls it out
-- **Rewarded "save your streak"** — lose with a streak of 2+ and you can watch a rewarded ad to keep it alive (`Rewarded_Android` LevelPlay unit)
-- Daily-play streak, haptics on win/lose, and a `GameEvents` hub for analytics/notifications
-- Simulated online matchmaking (searching screen, occasional "opponent not found")
-- Randomized opponent names for a multiplayer feel
-- Player name entry and a music on/off toggle, saved between sessions
-- Full sound coverage: looping music, click on every button, opponent-found stinger, win/lose stingers (solo and PvP)
-- Interstitial ads via Unity LevelPlay (ironSource), shown at match end with a frequency cap
-- **Force-update gate** — PlayFab TitleData `minVersion` blocks outdated builds with a store link; fails open when the backend isn't configured
-- First-launch ads-consent dialog (zero setup — builds itself from code)
-- Android back button handled everywhere — including mid-match exit (solo)
+- **Fair duel rules** with a coin-flip opener, equal turns and a once-per-match **Lock** mechanic
+- **Signals** — six fixed PvP quick messages sent by index and localized on each client
+- **Server-authoritative PvP** with room-code invites through PlayFab CloudScript
+- **Production cartoon UI** — approved production sprites and screen references are the visual source of truth; each screen has one presentation owner, large mobile-first CTAs and readable EN/EL typography
+- **English + native Greek** localization with live language switching
+- **Difficulty modes** — Easy / Normal / Hard / Adaptive
+- **Persistent stats** — wins/losses, current + best streak and best winning guess-count
+- Perfect-run celebration and rewarded **save your streak** flow
+- Daily-play streak and haptics on win/lose
+- Simulated solo matchmaking presentation and randomized opponent names
+- Player name entry and persistent music settings
+- Interstitial and rewarded ads via Unity LevelPlay
+- **Force-update gate** using PlayFab TitleData `minVersion`
+- First-launch ads consent and in-game Ads Privacy settings
+- Android back-button handling across supported flows
 
 ## Gameplay
 
-1. A splash screen leads into the main menu (tap to skip).
-2. Press **Play** — matchmaking begins (ads show at match end, not here).
-3. Once an "opponent" is found, enter your secret number (1–100).
-4. Take turns: when the opponent guesses, answer **Higher**, **Lower**, or **Correct** relative to your secret number. When it's your turn, guess theirs — a live range label and guess history help you play optimally.
-5. A round is one guess each. Finding the number first does not end the duel on
-   its own — your opponent still answers, so the win goes to whoever needed
-   fewer guesses, not to whoever moved first.
-6. Once per match you can **Lock** a guess. Right, and it takes a tied round;
-   wrong, and you forfeit your next turn. If a round ties with both sides
-   locked or neither, it's an honest draw.
+1. A splash screen leads into the main menu.
+2. Choose solo play or a private-room PvP duel.
+3. Enter your secret number from 1–100.
+4. Take turns guessing while the live range and history help narrow the answer.
+5. Each round gives both players an equal chance to answer, so moving first does not decide the match.
+6. Once per match you can use the **Lock**: a correct locked guess can break a tied round, while a wrong Lock forfeits your next turn.
 
-Both players binary-searching 1–100 need the same number of guesses about 27% of
-the time, which is why the equal-turns rule matters: without it the player who
-moved first won 63.7% of duels regardless of skill. The Lock is what settles the
-ties — and what makes the endgame a decision rather than arithmetic.
+For a live PvP duel, create a room and share the five-character invite code, or join with a friend's code. Rematches keep the same room. Hints, turn order, Lock state and results are adjudicated server-side by `playfab/cloudscript.js`.
 
-For a **live PvP duel**, create a room and share the 5-letter invite code, or join with a friend's code. When a duel ends, either player can offer a **rematch** — commit a new secret number and the next match is dealt in the same room, so the code only ever gets shared once. Hints, turn order, the Lock and the result are all adjudicated server-side by `playfab/cloudscript.js`. Mid-match you can send **Signals** — six fixed phrases, capped per match — so the duel has a voice without the game carrying user-generated text.
+## Production UI architecture
 
-The AI narrows its range with a midpoint (binary-search) strategy, guessing randomly at a difficulty-dependent rate to feel less mechanical. Who goes first is decided by a coin flip each round. Difficulty also sets how well the opponent uses its Lock: Easy over-commits it, Hard stakes it only on a certain guess.
+The approved cartoon HOL references and production sprites are the sole visual source of truth.
+
+- `Assets/SCRIPT/RuntimeUI/` contains theme-agnostic construction and wiring infrastructure.
+- `Assets/SCRIPT/Design/` contains screen-specific production presentation owners.
+- `Assets/newdesign/Resources/` contains approved art grouped by current screen/family, including `reference`, `phase2a`, `mainmenu`, `settings`, `splash` and the active PvP signal icon set.
+- Production sprites stay visibly rendered at alpha `1`; `_9s` sprites use authored borders and `Image.Type.Sliced`.
+- One screen has one presentation owner. Global theme passes, stacked reskins and procedural replacements for approved artwork are prohibited by `AGENTS.md` and CI integrity gates.
+- Final acceptance is based on native-resolution side-by-side comparison with approved references in both English and Greek.
 
 ## Tech stack
 
-- **Engine:** Unity `2022.3.62f3` (LTS)
+- **Engine:** Unity `2022.3.62f3` LTS
 - **Target platform:** Android (target API 36)
 - **UI:** Unity UGUI + TextMesh Pro
-- **Ads:** Unity LevelPlay (ironSource) `9.5.0` — interstitial ads
-- **Persistence:** `PlayerPrefs` (player name, music setting)
-- **Language:** C#
+- **PvP:** PlayFab Legacy CloudScript, server-authoritative room state
+- **Ads:** Unity LevelPlay `9.5.0`
+- **Persistence:** `PlayerPrefs`
+- **Language:** C# + Node.js tooling/tests
 
 ## Getting started
 
 ### Requirements
 
-- Unity **2022.3.62f3** (or a matching 2022.3 LTS release)
-- Android build support module (for building to device)
+- Unity **2022.3.62f3** or matching 2022.3 LTS environment
+- Android Build Support module
 
 ### Open the project
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/orbyteon/HOL.git
-   ```
-2. Open the project folder in Unity Hub using Unity `2022.3.62f3`.
-3. Let Unity resolve packages on first import (LevelPlay and the mobile dependency resolver may run additional setup).
+1. Clone the repository.
+2. Open the project folder in Unity Hub with Unity `2022.3.62f3`.
+3. Let Unity resolve packages on first import.
 
 ### Run
 
-- Open `Assets/Scenes/SplashScene.unity` and press **Play** in the editor to start from the beginning, or open `Assets/Scenes/MainMenu.unity` to jump straight to the menu.
+Open `Assets/Scenes/SplashScene.unity` and press **Play** to start from the beginning, or open `Assets/Scenes/MainMenu.unity` to jump directly to the main scene.
 
 ### Build for Android
 
 1. **File → Build Settings → Android**, then **Switch Platform**.
-2. Ensure both scenes are in the build list, in order: `SplashScene`, then `MainMenu`.
-3. Build (APK or App Bundle). The mobile dependency resolver handles the required Android libraries for the ads SDK.
+2. Keep the build scenes ordered as `SplashScene`, then `MainMenu`.
+3. Build an APK/AAB as appropriate. Production release builds follow `docs/release-checklist.md` and the guarded GitHub workflows.
 
 ## Project structure
 
-```
+```text
 HOL/
 ├── Assets/
-│   ├── SCRIPT/        # Gameplay C# scripts
-│   ├── Scenes/        # SplashScene, MainMenu
-│   ├── Photos/        # Image assets
-│   ├── MUSIC/         # Audio
-│   ├── Plugins/       # Native / plugin libraries
-│   ├── LevelPlay/     # Ads SDK integration
-│   └── TextMesh Pro/
-├── Packages/          # Unity package manifest
-└── ProjectSettings/   # Unity project configuration
+│   ├── Scenes/                 # SplashScene, MainMenu
+│   ├── SCRIPT/
+│   │   ├── Design/             # screen-specific production visual owners
+│   │   ├── RuntimeUI/          # neutral runtime UI/wiring infrastructure
+│   │   ├── Localization/
+│   │   ├── PvP/
+│   │   ├── SmartHooks/
+│   │   └── UIJuice/
+│   ├── newdesign/Resources/    # approved production art
+│   ├── MUSIC/
+│   └── Plugins/
+├── Packages/
+├── ProjectSettings/
+├── playfab/                    # server-authoritative CloudScript
+├── services/provisioner/       # first-install production provisioner
+├── tools/                      # tests, deployment and release tooling
+└── docs/                       # privacy, release and store documentation
 ```
 
-The game uses only two scenes. All gameplay (menu, settings, matchmaking, and the match itself) lives inside `MainMenu` as toggled UI panels.
+The game uses two scenes. Main menu, settings, solo, private-room PvP and match panels live in `MainMenu` as controller-owned flows with dedicated presentation owners where required.
 
-## Scripts
+## Key scripts
 
 | Script | Responsibility |
 |---|---|
-| `DuelRules.cs` | The duel state machine — rounds, equal turns, the Lock, draws. Pure C#, no Unity dependency; mirrored server-side by `playfab/cloudscript.js` |
-| `GameManager.cs` | Core game loop: secret numbers, AI guessing (difficulty + adaptive), turns, stats, win/lose, match-end ads |
-| `NumberManager.cs` | Validates the player's number, starts the round, routes player guesses |
-| `AdsManager.cs` | LevelPlay init (consent-gated), interstitial lifecycle, frequency cap, init retry |
-| `ConsentManager.cs` | First-launch ads-consent dialog; builds its own UI from code if unwired |
-| `FakeMatchmaking.cs` | Simulated opponent search (cancellable, animated) |
-| `PvP/Signals.cs` | The closed six-entry quick-chat vocabulary; ids are protocol, so append only |
-| `MenuManager.cs` | Menu/settings/play panel switching; Android back-button handling |
-| `MusicSettings.cs` | Music on/off toggle, persisted via `PlayerPrefs` |
-| `SavePlayerName.cs` | Saves the player name to `PlayerPrefs` |
-| `SplashLoader.cs` | Splash timer → loads `MainMenu`; tap to skip |
-| `BlinkText.cs` | Blinking-text UI helper |
-| `QuitGame.cs` | Quits the application |
-| `GameStats.cs` | Persistent W/L, streaks, best guess-count, rolling win-rate window |
-| `ForceUpdate.cs` | PlayFab TitleData `minVersion` gate with blocking store-link dialog (fail-open) |
-| `Localization/L10n.cs` | EN/EL string table + language persistence |
-| `Localization/LocalizedText.cs` | Drop-in component: TMP_Text follows the selected language |
-| `Localization/LanguageSelector.cs` | Settings-language picker hooks |
-| `SmartHooks/GameEvents.cs` | Static event hub (match ended, daily streak) |
-| `SmartHooks/DailyStreak.cs` | Daily-play streak counter |
-| `SmartHooks/Haptics.cs` | Win/lose haptic feedback |
-| `PvP/PvpBackend.cs` | Abstract PvP room transport |
-| `PvP/PlayFabPvpClient.cs` | PlayFab REST client; all room mutations are adjudicated by CloudScript |
-| `PvP/PvpGameController.cs` | PvP UI orchestration on top of `PvpBackend` |
-| `RuntimeUI/RuntimeUI.cs` | Code-only UI factory (labels, buttons, inputs) |
-| `RuntimeUI/PvpRuntimeUI.cs` | Builds the whole PvP interface at runtime + entry button |
-| `RuntimeUI/ExtrasRuntimeWiring.cs` | Runtime wiring: rematch, search cancel, language buttons, ads-privacy, stats, disclosures, scene-label localization |
-| `RuntimeUI/JuiceRuntimeWiring.cs` | Attaches UIJuice components at runtime (buttons, panels, confetti) |
-| `UIJuice/` | `ButtonJuice` (press squash), `PanelAnimator` (fade+rise), `ConfettiBurst` (win celebration), `PulseText`, `AnimatedEllipsis` |
-| `Design/ConvergingLight.cs` | Palette + gradient/texture canon (indigo depth, cyan/gold accents) |
-| `Design/SplashDesign.cs` | Builds the animated splash (logo bloom, loading hairline) from code |
-| `Design/DesignRuntimeWiring.cs` | Applies the Converging Light layer to runtime-built panels |
-| `Design/NumberDrift.cs` | Drifting background number fields |
+| `DuelRules.cs` | Pure duel state machine: rounds, equal turns, Lock and draws; mirrored server-side |
+| `GameManager.cs` | Solo game loop, AI, turns, stats and match-end flow |
+| `NumberManager.cs` | Secret-number validation and player guess routing |
+| `MenuManager.cs` | Main menu/settings/play navigation and Android back handling |
+| `AdsManager.cs` | LevelPlay initialization and ad lifecycle |
+| `ConsentManager.cs` | Ads-consent flow |
+| `ForceUpdate.cs` | PlayFab `minVersion` update gate |
+| `Localization/L10n.cs` | EN/EL string table and language persistence |
+| `PvP/PvpBackend.cs` | PvP transport abstraction |
+| `PvP/PlayFabPvpClient.cs` | PlayFab REST/CloudScript client |
+| `PvP/PvpGameController.cs` | PvP orchestration and real callbacks/state |
+| `RuntimeUI/RuntimeUI.cs` | Theme-agnostic UI infrastructure |
+| `RuntimeUI/PvpRuntimeUI.cs` | PvP functional runtime hierarchy and controller controls |
+| `RuntimeUI/ExtrasRuntimeWiring.cs` | Functional runtime bindings and disclosures |
+| `Design/MainMenuHomeVisuals.cs` | Main-menu production presentation owner |
+| `Design/MainMenuPlayVisuals.cs` | Play-selection production presentation owner |
+| `Design/PrivateRoomVisuals.cs` | Private-room production presentation owner |
+| `Design/PrivateRoomVisualsInstaller.cs` | Sole lifecycle bridge that attaches the Private Room owner |
+| `Design/SettingsVisuals.cs` | Settings production presentation owner |
+| `Design/DailyHuntVisuals.cs` | Daily Hunt production presentation owner |
+| `Design/SoloSearchVisuals.cs` | Solo search production presentation owner |
+| `Design/SplashDesign.cs` | Splash production presentation owner |
+| `UIJuice/` | Additive interaction feedback only |
+
+## Testing and CI
+
+The repository enforces production correctness with:
+
+- static integrity and release-boundary checks
+- Node.js duel-rule and provisioner tests
+- Unity EditMode tests
+- Android compile build
+- PlayMode tests after green CI on the same commit
+- a dedicated production visual-integrity workflow that rejects retired visual architecture, visual graveyard folders, near-zero-alpha sprite hiding and rejected generic surfaces
+
+See `docs/ci-policy.md` for ordering and cost controls.
 
 ## Release docs
 
-- `docs/release-checklist.md` — ordered go-live checklist (Unity smoke test → PlayFab → keystore → dashboards → privacy hosting → token rotation)
-- `docs/store-listing.md` — paste-ready Play Store listing copy (EN + EL) and release notes
-- `docs/privacy.html` — privacy policy, ready for static hosting
+- `docs/release-checklist.md` — ordered go-live checklist
+- `docs/store-listing.md` — Play Store copy and release notes
+- `docs/privacy.html` — privacy policy
 
 ## Configuration
 
-Ad settings are constants at the top of `Assets/SCRIPT/AdsManager.cs`:
+Production configuration remains fail-closed and secret-free in git. Signed release workflows inject required public production values only in their temporary Actions workspace. Never commit Title Secret Keys, keystores, passwords or other credentials.
 
-- **LevelPlay App Key:** `AdsManager.AppKey` — the ironSource App Key from
-  LevelPlay dashboard → Apps → HOL. Not a Unity Ads game id: that
-  look-alike credential fails init with error 2110, which is exactly what
-  every pre-vc5 build shipped. The constant is the single source of truth;
-  don't copy its value into docs, where it goes stale.
-- **Interstitial ad unit:** `Interstitial_Android` (an `Interstitial_iOS` unit is selected automatically on iOS builds via `#if UNITY_IOS` — create it in the LevelPlay dashboard before shipping iOS)
-- **Rewarded ad unit:** `Rewarded_Android` (same `#if UNITY_IOS` pattern with `Rewarded_iOS`) — powers the save-your-streak offer; create it in the dashboard or the offer silently never appears
+### PvP backend
 
-Replace these with your own LevelPlay credentials before publishing.
-
-### PvP backend setup
-
-PvP uses **PlayFab exclusively**. One-time setup:
-
-1. developer.playfab.com → create a Studio + Title, copy the **Title ID** (4–6 hex chars).
-2. Configure the production environment described in `docs/release-checklist.md`, then run **Deploy PlayFab Production** from `main`. The workflow publishes and verifies `playfab/cloudscript.js`, enforces the Shared Group API deny policy, and creates or updates the five-minute expired-room cleanup task.
-3. Paste the Title ID into `PvpRuntimeUI.playFabTitleId` (Inspector on the `PvpRuntimeUI` object — it's copied onto the backend component created at startup).
-
-Every room mutation uses a revision-fenced server lock. Brief contention is retried by the client; abandoned waiting, active, and completed rooms expire after 30 minutes, six hours, and 15 minutes respectively, then the scheduled cleanup removes them.
+PvP uses PlayFab exclusively. Production room mutations go through CloudScript, and clients do not directly mutate Shared Group state. Deployment and validation steps are documented in `docs/release-checklist.md`.
 
 ### Ads consent
 
-On first launch the game shows a consent dialog (`ConsentManager`) before initializing the ads SDK; the choice is stored in `PlayerPrefs` under `AdsConsent` and passed to LevelPlay via `LevelPlayPrivacySettings.SetGDPRConsent` (requires `com.unity.services.levelplay` ≥ 9.5.0, set in `Packages/manifest.json`). The choice can be changed any time in-game via **Settings → Ads privacy**. The privacy policy lives at `docs/privacy.html` — enable GitHub Pages on this repo to host it and link that URL in the Play Console.
+The first-launch consent flow runs before LevelPlay initialization. The stored choice can be changed later from **Settings → Ads privacy**. Data-practice documentation must stay aligned with `docs/privacy.html`.
 
 ### Release signing
 
-The project builds with the debug key by default. Before a Play Console upload, generate a **dedicated HOL release keystore** (Player Settings → Keystore Manager → Create New), back it up offline, and never commit it (`*.keystore` is gitignored). Do not reuse a keystore from another title.
+Use a dedicated HOL upload keystore and the guarded signed-release workflow. Keep the keystore backed up offline and never commit it.
 
 ## License
 
