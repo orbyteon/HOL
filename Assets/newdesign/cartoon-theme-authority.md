@@ -36,8 +36,8 @@ This file prevents older asset generations and generic runtime fallbacks from si
 **Runtime ownership**
 
 - `MainMenuHomeVisuals` remains the Home composition/navigation owner.
-- `MainMenuHomeFidelityEnforcer` is the focused production-fidelity guard. It restores approved Home sprites to visible alpha `1`, uses `Image.Type.Sliced` for `_9s`, disables procedural replacement graphics that cover those assets, and must never replace callbacks, navigation, or gameplay state.
-- Legacy/global visual writers must defer to `HomeVisualRoot`.
+- `MainMenuProductionAssetFidelity` is the single focused production-fidelity guard. It restores approved Home sprites to visible alpha `1`, uses `Image.Type.Sliced` for `_9s`, removes procedural replacement graphics that cover those assets, and must never replace callbacks, navigation, or gameplay state.
+- Do not add a second Home fidelity/restyle writer. Legacy/global visual writers must defer to `HomeVisualRoot`.
 
 ## SPLASH
 
