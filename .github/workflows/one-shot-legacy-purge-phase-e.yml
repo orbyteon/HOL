@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  patch:
+  diagnose:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
@@ -19,55 +19,60 @@ jobs:
           ref: refactor/remove-legacy-design-system
           fetch-depth: 0
 
-      - name: Audit and purge legacy asset graveyards
-        run: python3 .github/scripts/legacy_purge_e.py
-
-      - name: Strict post-purge audit
+      - name: Diagnose synthetic GUID references
         shell: bash
         run: |
           set -euo pipefail
-          echo '--- retired runtime and old concept names ---'
-          if git grep -n -E 'ConvergingLight|DesignRuntimeWiring|NeonFrame|NumberDrift|AttachmentReskin|ExactReferenceVisuals|FrameGeometry|ConsumerTokens|HOL Consumer First' -- 'Assets/SCRIPT/**/*.cs' 'Assets/Scenes/*.unity' 'Assets/newdesign/*.md' 'Assets/newdesign/*.json'; then
-            echo '::error::Retired visual/concept symbol remains in current production source/docs'
-            exit 1
-          fi
-          echo '--- stale generic design surfaces ---'
-          if git grep -n -E 'background_deep\.svg|panel_surface\.svg|button_primary\.svg|button_secondary\.svg|mainmenu_bg_stairs_clouds' -- Assets ProjectSettings Packages tools docs; then
-            echo '::error::Retired generic design surface reference remains'
-            exit 1
-          fi
-          echo '--- forbidden production fallback / alpha hacks ---'
-          if git grep -n 'RuntimeUI.RoundedRectSprite' -- 'Assets/SCRIPT/**/*.cs' ':!Assets/SCRIPT/RuntimeUI/RuntimeUI.cs'; then
-            echo '::error::Production screen still uses procedural fallback'
-            exit 1
-          fi
-          if git grep -n -E 'new Color\([^\n;]*,\s*0\.00[12]f\s*\)' -- 'Assets/SCRIPT/**/*.cs'; then
-            echo '::error::Near-zero production alpha hack remains'
-            exit 1
-          fi
-          echo '--- obsolete newdesign root pack must be gone ---'
-          for p in ads avatars badges branding cosmetics navigation number-system results signals design-tokens.json asset-inventory.md icon_lock.svg icon_reaction.svg icon_rewarded_ad.svg icon_trophy.svg; do
-            if [ -e "Assets/newdesign/$p" ]; then
-              echo "::error::Legacy source-pack item remains: Assets/newdesign/$p"
-              exit 1
-            fi
-          done
-          echo '--- old original-design folders: show only surviving referenced files ---'
-          find Assets/UI Assets/Photos -maxdepth 2 -type f 2>/dev/null | sort || true
-          echo '--- diff ---'
-          git status --short
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
 
-      - name: Commit phase E purge
-        shell: bash
+          targets = [
+              Path('Assets/newdesign/avatars/frame_neutral.svg.meta'),
+              Path('Assets/newdesign/avatars/state_disconnected.svg.meta'),
+          ]
+          for meta in targets:
+              text = meta.read_text(encoding='utf-8')
+              m = re.search(r'(?m)^guid:\s*([0-9a-f]{32})\s*$', text)
+              if not m:
+                  raise SystemExit(f'No GUID in {meta}')
+              guid = m.group(1)
+              print(f'=== {meta} -> {guid} ===')
+              owners = []
+              for other in Path('Assets').rglob('*.meta'):
+                  try:
+                      body = other.read_text(encoding='utf-8')
+                  except UnicodeDecodeError:
+                      continue
+                  if re.search(rf'(?m)^guid:\s*{re.escape(guid)}\s*$', body):
+                      owners.append(other.as_posix())
+              print('owners:')
+              for owner in owners:
+                  print('  ', owner)
+              print('reference contexts:')
+              for base in [Path('Assets'), Path('ProjectSettings'), Path('Packages')]:
+                  if not base.exists():
+                      continue
+                  for candidate in base.rglob('*'):
+                      if not candidate.is_file() or candidate.suffix == '.meta':
+                          continue
+                      try:
+                          body = candidate.read_text(encoding='utf-8')
+                      except (UnicodeDecodeError, OSError):
+                          continue
+                      if guid not in body:
+                          continue
+                      lines = body.splitlines()
+                      for i, line in enumerate(lines):
+                          if guid in line:
+                              lo = max(0, i - 3)
+                              hi = min(len(lines), i + 4)
+                              print(f'--- {candidate}:{i+1} ---')
+                              for j in range(lo, hi):
+                                  print(f'{j+1}: {lines[j]}')
+          PY
+
+      - name: Stop before deletion
         run: |
-          set -euo pipefail
-          rm -f .github/workflows/one-shot-legacy-purge-phase-e.yml
-          rm -f .github/scripts/legacy_purge_e.py
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A
-          git diff --cached --check
-          git commit -m 'refactor(ui): purge obsolete design source packs and rename state colors'
-          git fetch origin refactor/remove-legacy-design-system
-          git rebase origin/refactor/remove-legacy-design-system
-          git push origin HEAD:refactor/remove-legacy-design-system
+          echo 'Diagnostic-only pass complete; inspect contexts before any destructive purge.'
+          exit 1
