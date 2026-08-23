@@ -170,13 +170,17 @@ test("Private Room remains owned by current production art and real room-code in
   assert.equal(source.includes("0.002f"), false);
 });
 
-test("current design documentation cannot reinstate the retired concept", () => {
-  for (const relative of ["Assets/newdesign/README.md", "Assets/newdesign/screen-map.md", "AGENTS.md"]) {
+test("current design docs cannot reinstate retired visual doctrine", () => {
+  for (const relative of ["Assets/newdesign/README.md", "Assets/newdesign/screen-map.md"]) {
     const text = read(relative);
     assert.equal(text.includes("HOL Consumer First"), false, relative);
     assert.equal(text.includes("Converging Light"), false, relative);
     assert.equal(text.includes("DesignRuntimeWiring"), false, relative);
   }
+
+  const agents = read("AGENTS.md");
+  assert.match(agents, /Visual Ownership & Legacy Theme Purge Contract/);
+  assert.match(agents, /Do not add or restore/);
 });
 
 test("temporary purge workflows and scripts are never production dependencies", () => {
