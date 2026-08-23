@@ -15,6 +15,7 @@ public sealed class MainMenuProductionAssetFidelity : MonoBehaviour
 {
     const string GoldCtaResource = "phase2a/hol_cta_gold_r2_9s";
     const string BlueCtaResource = "phase2a/hol_cta_blue_r2_9s";
+    const string MagentaCtaResource = "phase2a/hol_cta_magenta_r2_9s";
     const string ChipResource = "phase2a/hol_player_chip_r2_9s";
     const string TipResource = "phase2a/hol_tip_frame_r2_9s";
     const string GearResource = "phase2a/hol_settings_gear_r2";
@@ -95,6 +96,7 @@ public sealed class MainMenuProductionAssetFidelity : MonoBehaviour
 
         var gold = LoadRequired(GoldCtaResource);
         var blue = LoadRequired(BlueCtaResource);
+        var magenta = LoadRequired(MagentaCtaResource);
         var chip = LoadRequired(ChipResource);
         var tip = LoadRequired(TipResource);
         var gear = LoadRequired(GearResource);
@@ -102,17 +104,18 @@ public sealed class MainMenuProductionAssetFidelity : MonoBehaviour
         var privateIcon = LoadRequired(PrivateIconResource);
         var dailyIcon = LoadRequired(DailyIconResource);
 
-        if (gold == null || blue == null || chip == null || tip == null ||
-            gear == null || avatar == null || privateIcon == null || dailyIcon == null)
+        if (gold == null || blue == null || magenta == null || chip == null ||
+            tip == null || gear == null || avatar == null || privateIcon == null ||
+            dailyIcon == null)
             return false;
 
         bool ok = true;
         ok &= ApplyCta(canvasRoot, "ButtonPlay", gold);
         ok &= ApplyCta(canvasRoot, "ButtonPvP", blue);
-        // Keep the current approved Home composition: Daily uses the gold Phase
-        // 2A frame in MainMenuHomeVisuals. Theme-role changes are a separate
-        // visual-approval decision, not part of this fidelity correction.
-        ok &= ApplyCta(canvasRoot, "DailyHuntButton", gold);
+        // Gold is reserved for the single dominant action. Daily Hunt uses the
+        // approved magenta Phase 2A surface so the hierarchy stays cartoon,
+        // colorful and immediately readable without competing with PLAY.
+        ok &= ApplyCta(canvasRoot, "DailyHuntButton", magenta);
         ok &= ApplyGear(canvasRoot, gear);
         ok &= ApplyPlayerChip(canvasRoot, chip, avatar);
         ok &= ApplyTip(canvasRoot, tip);
