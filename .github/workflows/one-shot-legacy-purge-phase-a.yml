@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - refactor/remove-legacy-design-system
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
@@ -30,9 +33,6 @@ jobs:
               if not cond:
                   raise SystemExit(msg)
 
-          # 1) Remove the no-op DesignRuntimeWiring component from MainMenu YAML,
-          # then remove its compatibility script/meta. The script GUID is read
-          # from the meta so this cannot accidentally target another component.
           meta_path = Path('Assets/SCRIPT/Design/DesignRuntimeWiring.cs.meta')
           scene_path = Path('Assets/Scenes/MainMenu.unity')
           require(meta_path.exists(), 'DesignRuntimeWiring meta missing before scene cleanup')
@@ -59,8 +59,6 @@ jobs:
           Path('Assets/SCRIPT/Design/DesignRuntimeWiring.cs').unlink()
           meta_path.unlink()
 
-          # 2) Private Room: keep the real Button roots/listeners, delete every
-          # old visual child before the sole current owner builds its content.
           pr_path = Path('Assets/SCRIPT/Design/PrivateRoomVisuals.cs')
           pr = pr_path.read_text(encoding='utf-8')
           anchor = '''        if (createButton == null || joinButton == null || backButton == null)\n        {\n            Debug.LogError("[PrivateRoomVisuals] Create/Join/Back controls are missing.");\n            IsReady = false;\n            return;\n        }\n\n'''
@@ -72,8 +70,6 @@ jobs:
           pr = pr.replace(method_anchor, clear_method + method_anchor, 1)
           pr_path.write_text(pr, encoding='utf-8')
 
-          # 3) Settings: localize the music state with existing EN/EL yes/no
-          # entries instead of hard-coded English ON/OFF.
           settings_path = Path('Assets/SCRIPT/Design/SettingsVisuals.cs')
           settings = settings_path.read_text(encoding='utf-8')
           old_refresh = 'musicStateText.text = musicToggle.isOn ? "ON" : "OFF";'
@@ -88,9 +84,6 @@ jobs:
               'musicStateText = AddText(track.transform, "SettingsMusicState", L10n.Get("yes"), 28,', 1)
           settings_path.write_text(settings, encoding='utf-8')
 
-          # 4) Move generic layout/color call sites away from the retired
-          # ConvergingLight class. RuntimeUI owns neutral layout utilities only;
-          # ConsumerTokens owns dynamic text/state colors, never sprite tinting.
           runtime_path = Path('Assets/SCRIPT/RuntimeUI/RuntimeUI.cs')
           runtime = runtime_path.read_text(encoding='utf-8')
           stretch_anchor = '''    public static void Stretch(GameObject go)\n    {\n        var rect = (RectTransform)go.transform;\n        rect.anchorMin = Vector2.zero;\n        rect.anchorMax = Vector2.one;\n        rect.offsetMin = Vector2.zero;\n        rect.offsetMax = Vector2.zero;\n    }\n\n'''
