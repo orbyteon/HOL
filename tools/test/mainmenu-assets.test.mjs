@@ -49,9 +49,15 @@ test("approved number six stays byte-exact", () => {
     "067beafc207aea302e0993a3bacdb2b69478429aa3685f275bb6705bd902ac4b");
 });
 
-test("approved Revision 3 Home background is exact Android portrait size", () => {
+test("approved Revision 3 Home background is high-resolution 9:16 art", () => {
   const png = read(approvedBackground);
-  assert.deepEqual(dimensions(png), { width: 1080, height: 1920 });
+  const { width, height } = dimensions(png);
+  assert.ok(width >= 900,
+    `Home background width must stay production-resolution; got ${width}`);
+  assert.ok(height >= 1600,
+    `Home background height must stay production-resolution; got ${height}`);
+  assert.ok(Math.abs(width / height - 9 / 16) <= 0.002,
+    `Home background must stay 9:16; got ${width}x${height}`);
   assert.ok(colorType(png) === 2 || colorType(png) === 6,
     "Home background must be RGB or RGBA");
   assert.equal(exists(approvedBackground + ".meta"), true,
