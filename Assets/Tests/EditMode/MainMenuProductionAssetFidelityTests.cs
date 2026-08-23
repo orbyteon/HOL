@@ -23,7 +23,7 @@ public sealed class MainMenuProductionAssetFidelityTests
     [TearDown]
     public void TearDown()
     {
-        Object.DestroyImmediate(root);
+        UnityEngine.Object.DestroyImmediate(root);
     }
 
     [Test]
