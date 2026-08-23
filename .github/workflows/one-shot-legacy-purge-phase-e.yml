@@ -23,54 +23,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 - <<'PY'
-          from pathlib import Path
-          import re
-
-          targets = [
-              Path('Assets/newdesign/avatars/frame_neutral.svg.meta'),
-              Path('Assets/newdesign/avatars/state_disconnected.svg.meta'),
-          ]
-          for meta in targets:
-              text = meta.read_text(encoding='utf-8')
-              m = re.search(r'(?m)^guid:\s*([0-9a-f]{32})\s*$', text)
-              if not m:
-                  raise SystemExit(f'No GUID in {meta}')
-              guid = m.group(1)
-              print(f'=== {meta} -> {guid} ===')
-              owners = []
-              for other in Path('Assets').rglob('*.meta'):
-                  try:
-                      body = other.read_text(encoding='utf-8')
-                  except UnicodeDecodeError:
-                      continue
-                  if re.search(rf'(?m)^guid:\s*{re.escape(guid)}\s*$', body):
-                      owners.append(other.as_posix())
-              print('owners:')
-              for owner in owners:
-                  print('  ', owner)
-              print('reference contexts:')
-              for base in [Path('Assets'), Path('ProjectSettings'), Path('Packages')]:
-                  if not base.exists():
-                      continue
-                  for candidate in base.rglob('*'):
-                      if not candidate.is_file() or candidate.suffix == '.meta':
-                          continue
-                      try:
-                          body = candidate.read_text(encoding='utf-8')
-                      except (UnicodeDecodeError, OSError):
-                          continue
-                      if guid not in body:
-                          continue
-                      lines = body.splitlines()
-                      for i, line in enumerate(lines):
-                          if guid in line:
-                              lo = max(0, i - 3)
-                              hi = min(len(lines), i + 4)
-                              print(f'--- {candidate}:{i+1} ---')
-                              for j in range(lo, hi):
-                                  print(f'{j+1}: {lines[j]}')
-          PY
+          for guid in 10000000000000000000000000000001 10000000000000000000000000000003; do
+            echo "=== GUID $guid: meta owners ==="
+            git grep -n "^guid: $guid$" -- 'Assets/**/*.meta' || true
+            echo "=== GUID $guid: reference contexts ==="
+            git grep -n -C 3 "$guid" -- 'Assets/**/*.asset' 'Assets/**/*.prefab' 'Assets/**/*.unity' 'ProjectSettings/**' 'Packages/**' || true
+          done
 
       - name: Stop before deletion
         run: |
