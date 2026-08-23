@@ -124,7 +124,7 @@ public sealed class SettingsVisualsPlayModeTests
                     Find(root, "Difficulty" + i).GetComponent<Button>(),
                     i == 1 ? "mainmenu_cta_gold_9s" : "mainmenu_tip_frame_9s");
 
-            Assert.That(save.GetComponent<SettingsButtonFeedback>(), Is.Not.Null);
+            Assert.That(save.GetComponent(RuntimeType("SettingsButtonFeedback")), Is.Not.Null);
             Assert.That(Find(save.transform, "SettingsButtonStateOverlay"), Is.Not.Null);
 
             AssertDescendant(Find(root, "InputField (TMP)"), "SettingsNameRow");
