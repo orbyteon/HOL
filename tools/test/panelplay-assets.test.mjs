@@ -11,8 +11,13 @@ const dimensions = png => ({
   height: png.readUInt32BE(20),
 });
 
+const approvedBackground =
+  "Assets/newdesign/Resources/phase2a/hol_neon_reference_bg_r3.png";
+const rejectedCloudBackground =
+  "Assets/newdesign/Resources/mainmenu/mainmenu_bg_stairs_clouds.png";
+
 const playPngs = [
-  "Assets/newdesign/Resources/mainmenu/mainmenu_bg_stairs_clouds.png",
+  approvedBackground,
   "Assets/newdesign/Resources/mainmenu/mainmenu_deco_stars.png",
   "Assets/newdesign/Resources/mainmenu/mainmenu_cta_gold_9s.png",
   "Assets/newdesign/Resources/mainmenu/mainmenu_cta_blue_9s.png",
@@ -28,23 +33,22 @@ test("approved number six stays byte-exact", () => {
     "067beafc207aea302e0993a3bacdb2b69478429aa3685f275bb6705bd902ac4b");
 });
 
-test("Play reuses the Home stairs/clouds background", () => {
-  const png = read(
-    "Assets/newdesign/Resources/mainmenu/mainmenu_bg_stairs_clouds.png");
+test("Play reuses the approved Revision 3 portrait background", () => {
+  const png = read(approvedBackground);
   assert.deepEqual(dimensions(png), { width: 1080, height: 1920 });
 });
 
-test("every cartoon Play asset has a Unity meta", () => {
+test("every current cartoon Play asset has a Unity meta", () => {
   for (const path of playPngs) {
     assert.equal(exists(path), true, path);
     assert.equal(exists(path + ".meta"), true, path + ".meta");
   }
 });
 
-test("Play art stays out of splash/ and neon arcade", () => {
-  assert.equal(
-    exists("Assets/newdesign/Resources/splash/mainmenu_bg_stairs_clouds.png"),
-    false);
+test("rejected Play backgrounds and obsolete CTA stay deleted", () => {
+  assert.equal(exists(rejectedCloudBackground), false, rejectedCloudBackground);
+  assert.equal(exists(rejectedCloudBackground + ".meta"), false,
+    rejectedCloudBackground + ".meta");
   assert.equal(
     exists("Assets/newdesign/Resources/mainmenu/mainmenu_bg_night_arcade.png"),
     false);
@@ -53,12 +57,13 @@ test("Play art stays out of splash/ and neon arcade", () => {
     false);
 });
 
-test("Play owner source never loads splash resources", () => {
+test("Play owner uses current art and never loads splash or rejected background", () => {
   const owner = "Assets/SCRIPT/Design/MainMenuPlayVisuals.cs";
-  if (!exists(owner)) return;
+  assert.equal(exists(owner), true, owner);
   const source = read(owner).toString("utf8");
   assert.equal(source.includes('Resources.Load("splash/'), false);
   assert.equal(source.includes("splash/"), false);
-  assert.match(source, /mainmenu\/mainmenu_bg_stairs_clouds/);
+  assert.match(source, /phase2a\/hol_neon_reference_bg_r3/);
+  assert.equal(source.includes("mainmenu_bg_stairs_clouds"), false);
   assert.match(source, /reference\/hol_logo_exact/);
 });
