@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  diagnose:
+  patch:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
@@ -19,18 +19,59 @@ jobs:
           ref: refactor/remove-legacy-design-system
           fetch-depth: 0
 
-      - name: Diagnose synthetic GUID references
+      - name: Tighten GUID reference audit
+        run: python3 .github/scripts/fix_legacy_purge_e_refs.py
+
+      - name: Audit and purge legacy asset graveyards
+        run: python3 .github/scripts/legacy_purge_e.py
+
+      - name: Strict post-purge audit
         shell: bash
         run: |
           set -euo pipefail
-          for guid in 10000000000000000000000000000001 10000000000000000000000000000003; do
-            echo "=== GUID $guid: meta owners ==="
-            git grep -n "^guid: $guid$" -- 'Assets/**/*.meta' || true
-            echo "=== GUID $guid: reference contexts ==="
-            git grep -n -C 3 "$guid" -- 'Assets/**/*.asset' 'Assets/**/*.prefab' 'Assets/**/*.unity' 'ProjectSettings/**' 'Packages/**' || true
+          echo '--- retired runtime and old concept names ---'
+          if git grep -n -E 'ConvergingLight|DesignRuntimeWiring|NeonFrame|NumberDrift|AttachmentReskin|ExactReferenceVisuals|FrameGeometry|ConsumerTokens|HOL Consumer First' -- 'Assets/SCRIPT/**/*.cs' 'Assets/Scenes/*.unity' 'Assets/newdesign/*.md' 'Assets/newdesign/*.json'; then
+            echo '::error::Retired visual/concept symbol remains in current production source/docs'
+            exit 1
+          fi
+          echo '--- stale generic design surfaces ---'
+          if git grep -n -E 'background_deep\.svg|panel_surface\.svg|button_primary\.svg|button_secondary\.svg|mainmenu_bg_stairs_clouds' -- Assets ProjectSettings Packages tools docs; then
+            echo '::error::Retired generic design surface reference remains'
+            exit 1
+          fi
+          echo '--- forbidden production fallback / alpha hacks ---'
+          if git grep -n 'RuntimeUI.RoundedRectSprite' -- 'Assets/SCRIPT/**/*.cs' ':!Assets/SCRIPT/RuntimeUI/RuntimeUI.cs'; then
+            echo '::error::Production screen still uses procedural fallback'
+            exit 1
+          fi
+          if git grep -n -E 'new Color\([^\n;]*,\s*0\.00[12]f\s*\)' -- 'Assets/SCRIPT/**/*.cs'; then
+            echo '::error::Near-zero production alpha hack remains'
+            exit 1
+          fi
+          echo '--- obsolete newdesign root pack must be gone ---'
+          for p in ads avatars badges branding cosmetics navigation number-system results signals design-tokens.json asset-inventory.md icon_lock.svg icon_reaction.svg icon_rewarded_ad.svg icon_trophy.svg; do
+            if [ -e "Assets/newdesign/$p" ]; then
+              echo "::error::Legacy source-pack item remains: Assets/newdesign/$p"
+              exit 1
+            fi
           done
+          echo '--- old original-design folders: show only surviving referenced files ---'
+          find Assets/UI Assets/Photos -maxdepth 2 -type f 2>/dev/null | sort || true
+          echo '--- diff ---'
+          git status --short
 
-      - name: Stop before deletion
+      - name: Commit phase E purge
+        shell: bash
         run: |
-          echo 'Diagnostic-only pass complete; inspect contexts before any destructive purge.'
-          exit 1
+          set -euo pipefail
+          rm -f .github/workflows/one-shot-legacy-purge-phase-e.yml
+          rm -f .github/scripts/legacy_purge_e.py
+          rm -f .github/scripts/fix_legacy_purge_e_refs.py
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          git commit -m 'refactor(ui): purge obsolete design source packs and rename state colors'
+          git fetch origin refactor/remove-legacy-design-system
+          git rebase origin/refactor/remove-legacy-design-system
+          git push origin HEAD:refactor/remove-legacy-design-system
