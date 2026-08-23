@@ -120,6 +120,31 @@ public sealed class PrivateRoomProductionAssetsTests
     }
 
     [Test]
+    public void PrivateRoomInstallerIsTheOnlyRuntimeLifecycleOwner()
+    {
+        Type visuals = RuntimeType("PrivateRoomVisuals");
+        Type installer = RuntimeType("PrivateRoomVisualsInstaller");
+        Assert.That(visuals, Is.Not.Null);
+        Assert.That(installer, Is.Not.Null);
+
+        foreach (MethodInfo method in visuals.GetMethods(
+            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
+        {
+            object[] attributes = method.GetCustomAttributes(
+                typeof(RuntimeInitializeOnLoadMethodAttribute), false);
+            Assert.That(attributes, Is.Empty,
+                "PrivateRoomVisuals must not register its own runtime lifecycle hook: " + method.Name);
+        }
+
+        MethodInfo register = installer.GetMethod("Register",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.That(register, Is.Not.Null);
+        Assert.That(register.GetCustomAttributes(
+            typeof(RuntimeInitializeOnLoadMethodAttribute), false), Is.Not.Empty,
+            "PrivateRoomVisualsInstaller must remain the sole runtime lifecycle bridge.");
+    }
+
+    [Test]
     public void RetiredGenericThemeSurfacesCannotLoad()
     {
         string[] retired =
