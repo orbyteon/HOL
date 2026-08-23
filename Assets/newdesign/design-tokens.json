@@ -1,17 +1,16 @@
 {
   "name": "HOL Cartoon Theme",
   "version": "2.0.0",
-  "identity": {
-    "product": "friendly competitive cartoon number brain game",
-    "style": "polished 2.5D mobile arcade cartoon",
-    "atmosphere": "deep night-plum with controlled neon accents",
-    "legacyAtmosphere": "Converging Light may be used only as secondary seasoning"
+  "referenceViewport": {
+    "width": 1080,
+    "height": 1920,
+    "orientation": "portrait"
   },
   "colors": {
     "outline": "#140A22",
     "background0": "#12071F",
     "background1": "#241645",
-    "surface": "#2C1952",
+    "surface": "#241645",
     "surfaceElevated": "#3A2068",
     "cyan": "#40D9FF",
     "blue": "#2A8DFF",
@@ -20,64 +19,52 @@
     "gold": "#FFCA55",
     "success": "#8AD64F",
     "textPrimary": "#F5F0FF",
-    "textSecondary": "#C9BFE1",
-    "textMuted": "#8E82AE",
-    "ink": "#17102B"
+    "textSecondary": "#D7CCED",
+    "textMuted": "#9E90BA"
+  },
+  "roles": {
+    "primaryAction": "gold",
+    "secondaryAction": "cyan",
+    "navigation": "blue",
+    "opponentCompetitive": "magenta",
+    "supportingAccent": "violet",
+    "success": "success"
   },
   "gradient": {
     "accentStart": "#40D9FF",
     "accentEnd": "#E84791",
-    "angle": 35
+    "angle": 35,
+    "usage": "atmospheric_additive_only"
   },
   "layout": {
-    "referenceWidth": 1080,
-    "referenceHeight": 1920,
     "screenPadding": 48,
     "cardRadius": 28,
-    "buttonRadius": 24,
-    "controlHeight": 112,
+    "buttonRadius": 26,
+    "controlHeight": 132,
     "sectionGap": 28,
-    "touchTargetMin": 48
+    "touchTargetMin": 64
   },
   "typography": {
-    "heading": "HOL Menu Display SDF",
-    "body": "HOL Menu Body SDF",
-    "headingStyle": "bold friendly arcade readable",
-    "bodyStyle": "clean high-legibility",
-    "headingScale": 1.0,
-    "bodyScale": 0.78,
-    "letterSpacingHeading": -0.01
+    "displayResource": "phase2a/fonts/HOL Menu Display SDF",
+    "bodyResource": "phase2a/fonts/HOL Menu Body SDF",
+    "headingWeight": "bold_arcade",
+    "bodyWeight": "clean_readable",
+    "localized": true,
+    "languages": ["en", "el"]
   },
-  "motifs": [
-    "numbers",
-    "range intervals",
-    "chevrons",
-    "lightning",
-    "stars",
-    "sparse confetti",
-    "trophies",
-    "character expressions",
-    "number mascots"
-  ],
-  "rules": {
-    "goldRole": "primary_cta_only",
-    "cyanRole": "secondary_navigation_player",
-    "magentaRole": "opponent_competitive_emphasis",
-    "greenRole": "success_confirmation_only",
-    "genericHeartsAsDecoration": false,
-    "ridecoreMotifsAllowed": false,
-    "proceduralReplacementOfApprovedArt": false,
-    "approvedSpriteNormalAlpha": 1.0,
-    "nineSliceAssetsMustUseSliced": true,
-    "localizedTextSeparateFromArtwork": true
+  "motifs": {
+    "preferred": ["numbers", "chevrons", "lightning", "stars", "sparks", "confetti", "trophy", "mascots"],
+    "avoidAsFiller": ["hearts"],
+    "rideCoreMotifsForbidden": true
   },
-  "navigation": [
-    "home",
-    "solo",
-    "private_room",
-    "daily_hunt",
-    "settings"
-  ],
+  "rendering": {
+    "approvedAssetIsSourceOfTruth": true,
+    "normalAssetAlpha": 1.0,
+    "nineSliceSuffix": "_9s",
+    "nineSliceImageType": "Sliced",
+    "proceduralReplacementAllowed": false,
+    "additiveGlowAllowed": true
+  },
   "monetization": {
     "interstitial": "post_match_only",
     "rewarded": ["save_streak", "free_rematch"],
