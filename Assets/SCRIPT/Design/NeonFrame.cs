@@ -1,165 +1,116 @@
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using TMPro;
 
-// The framed panels the PvP screens are drawn from: a filled plate, a thin
-// accent border, and light escaping around it.
+// Migration compatibility facade for callers that still request a framed
+// runtime surface. The old implementation generated rounded-rectangle fill,
+// outline and glow textures from code. That visual system is retired.
 //
-// RuntimeUI already provides the filled rounded rectangle. What Converging
-// Light was missing for PvP is the border and the glow, which is where the
-// screens get their character. Both are generated from FrameGeometry rather
-// than imported, and both are nine-sliced from a single small texture, so a
-// screen full of frames costs two textures rather than one per panel.
+// Every frame now renders ONE approved production 9-slice sprite at alpha 1.
+// Callers are being migrated to screen-specific owners; once the last caller is
+// removed this compatibility class should be deleted/renamed as part of the
+// legacy-theme purge.
 public static class NeonFrame
 {
-    const int OutlineTex = 64;
-    const int OutlineRadius = 16;
-    const float OutlineThickness = 3f;
+    const string PurpleFrame = "mainmenu/mainmenu_tip_frame_9s";
+    const string BlueFrame = "mainmenu/mainmenu_cta_blue_9s";
+    const string MagentaFrame = "phase2a/hol_cta_magenta_r2_9s";
+    const string GoldFrame = "mainmenu/mainmenu_cta_gold_9s";
 
-    const int GlowTex = 96;
-    const int GlowInset = 16;   // how far the glow reaches beyond the frame
-    const int GlowRadius = 16;
+    // Kept only for source compatibility with old layout code. No generated
+    // halo exists anymore, so the real visual footprint equals the frame bounds.
+    public const float GlowPadding = 0f;
 
-    static Sprite outlineSprite;
-    static Sprite glowSprite;
-
-    // A hollow rounded rectangle: border only, transparent within.
-    public static Sprite OutlineSprite
-    {
-        get
-        {
-            if (outlineSprite == null) outlineSprite = BuildOutline();
-            return outlineSprite;
-        }
-    }
-
-    // A soft halo sitting outside the same shape, absent inside it, so it reads
-    // as light off the frame rather than a second border.
-    public static Sprite GlowSprite
-    {
-        get
-        {
-            if (glowSprite == null) glowSprite = BuildGlow();
-            return glowSprite;
-        }
-    }
-
-    static Sprite BuildOutline()
-    {
-        var tex = new Texture2D(OutlineTex, OutlineTex, TextureFormat.RGBA32, false);
-        tex.wrapMode = TextureWrapMode.Clamp;
-        tex.filterMode = FilterMode.Bilinear;
-
-        float half = OutlineTex * 0.5f;
-        for (int y = 0; y < OutlineTex; y++)
-        {
-            for (int x = 0; x < OutlineTex; x++)
-            {
-                float px = x + 0.5f - half;
-                float py = y + 0.5f - half;
-                float d = FrameGeometry.Distance(px, py, half, half, OutlineRadius);
-                float a = FrameGeometry.OutlineAlpha(d, OutlineThickness, 1f);
-                tex.SetPixel(x, y, new Color(1f, 1f, 1f, a));
-            }
-        }
-        tex.Apply();
-
-        // The slice border must clear the corner arc, or stretching a wide
-        // frame would smear the curve along its top and bottom edges.
-        int border = OutlineRadius + 4;
-        return Sprite.Create(tex, new Rect(0, 0, OutlineTex, OutlineTex),
-            new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect,
-            new Vector4(border, border, border, border));
-    }
-
-    static Sprite BuildGlow()
-    {
-        var tex = new Texture2D(GlowTex, GlowTex, TextureFormat.RGBA32, false);
-        tex.wrapMode = TextureWrapMode.Clamp;
-        tex.filterMode = FilterMode.Bilinear;
-
-        float half = GlowTex * 0.5f;
-        float shapeHalf = half - GlowInset;
-        for (int y = 0; y < GlowTex; y++)
-        {
-            for (int x = 0; x < GlowTex; x++)
-            {
-                float px = x + 0.5f - half;
-                float py = y + 0.5f - half;
-                float d = FrameGeometry.Distance(px, py, shapeHalf, shapeHalf, OutlineRadius);
-                float a = FrameGeometry.GlowAlpha(d, GlowRadius);
-                tex.SetPixel(x, y, new Color(1f, 1f, 1f, a));
-            }
-        }
-        tex.Apply();
-
-        int border = GlowInset + OutlineRadius + 4;
-        return Sprite.Create(tex, new Rect(0, 0, GlowTex, GlowTex),
-            new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect,
-            new Vector4(border, border, border, border));
-    }
-
-    // How much larger the glow object is than the frame it surrounds. Callers
-    // laying out by hand need this to know a frame's true visual footprint.
-    public const float GlowPadding = GlowInset * 2f;
-
-    // A framed plate: glow, fill, then border. Returns the frame object itself,
-    // so children added to it sit above the border and inside the padding.
-    // `fillColor` overrides the plate colour; the default stays the indigo panel so
-    // existing callers render unchanged.
-    public static GameObject Frame(Transform parent, string name, Vector2 pos, Vector2 size,
-                                   Color accent, float fillAlpha = 0.85f, bool glow = true,
-                                   Color? fillColor = null)
+    public static GameObject Frame(
+        Transform parent,
+        string name,
+        Vector2 pos,
+        Vector2 size,
+        Color accent,
+        float fillAlpha = 0.85f,
+        bool glow = true,
+        Color? fillColor = null)
     {
         var frame = RuntimeUI.CreateObject(name, parent);
-        ConvergingLight.Center(frame, pos, size);
+        Center(frame, pos, size);
         RuntimeUI.ClampToSafeArea((RectTransform)frame.transform, size, pos);
 
-        if (glow)
+        var image = frame.AddComponent<Image>();
+        string resource = ResolveFrameResource(accent, fillColor);
+        if (!RuntimeUI.ApplyProductionSprite(
+                image, resource, Image.Type.Sliced, false, 2f))
         {
-            var halo = RuntimeUI.CreateObject("Glow", frame.transform);
-            ConvergingLight.Center(halo, Vector2.zero, size + new Vector2(GlowPadding, GlowPadding));
-            var haloImage = halo.AddComponent<Image>();
-            haloImage.sprite = GlowSprite;
-            haloImage.type = Image.Type.Sliced;
-            haloImage.color = ConvergingLight.WithAlpha(accent, 0.30f);
-            haloImage.raycastTarget = false;
+            // Functional fallback only. Required-art tests must catch this
+            // before a production build is accepted.
+            image.sprite = RuntimeUI.RoundedRectSprite;
+            image.type = Image.Type.Sliced;
+            image.color = fillColor ?? ConsumerTokens.Surface;
         }
-
-        var fill = RuntimeUI.CreateObject("Fill", frame.transform);
-        RuntimeUI.Stretch(fill);
-        var fillImage = fill.AddComponent<Image>();
-        fillImage.sprite = RuntimeUI.RoundedRectSprite;
-        fillImage.type = Image.Type.Sliced;
-        fillImage.color = ConvergingLight.WithAlpha(fillColor ?? ConvergingLight.PanelIndigo, fillAlpha);
-        fillImage.raycastTarget = false;
-
-        var border = RuntimeUI.CreateObject("Border", frame.transform);
-        RuntimeUI.Stretch(border);
-        var borderImage = border.AddComponent<Image>();
-        borderImage.sprite = OutlineSprite;
-        borderImage.type = Image.Type.Sliced;
-        borderImage.color = accent;
-        borderImage.raycastTarget = false;
-
+        image.raycastTarget = false;
         return frame;
     }
 
-    // One cell of the match-stat row: a small caption over a large value.
-    // The caption is the label the player reads once; the value is what they
-    // glance back at, so it carries the weight and the accent.
-    public static TextMeshProUGUI StatChip(Transform parent, string name, Vector2 pos, Vector2 size,
-                                           string caption, string value, Color accent)
+    public static TextMeshProUGUI StatChip(
+        Transform parent,
+        string name,
+        Vector2 pos,
+        Vector2 size,
+        string caption,
+        string value,
+        Color accent)
     {
-        var frame = Frame(parent, name, pos, size, ConvergingLight.WithAlpha(accent, 0.55f),
-                          0.55f, false);
+        var frame = Frame(parent, name, pos, size, accent, 1f, false);
 
-        RuntimeUI.CreateText(frame.transform, "Caption", caption, 22,
-            new Vector2(0f, size.y * 0.26f), new Vector2(size.x - 16f, size.y * 0.4f),
-            ConvergingLight.WithAlpha(ConvergingLight.NearWhite, 0.65f));
+        RuntimeUI.CreateText(
+            frame.transform,
+            "Caption",
+            caption,
+            22,
+            new Vector2(0f, size.y * 0.26f),
+            new Vector2(size.x - 16f, size.y * 0.4f),
+            ConsumerTokens.WithAlpha(ConsumerTokens.TextPrimary, 0.78f));
 
-        return RuntimeUI.CreateText(frame.transform, "Value", value, 44,
-            new Vector2(0f, -size.y * 0.18f), new Vector2(size.x - 16f, size.y * 0.5f),
+        return RuntimeUI.CreateText(
+            frame.transform,
+            "Value",
+            value,
+            44,
+            new Vector2(0f, -size.y * 0.18f),
+            new Vector2(size.x - 16f, size.y * 0.5f),
             accent);
+    }
+
+    static string ResolveFrameResource(Color accent, Color? fillColor)
+    {
+        // We select an approved sprite family; we never tint/repaint it.
+        if (Distance(accent, ConsumerTokens.Gold) < 0.35f)
+            return GoldFrame;
+        if (Distance(accent, ConsumerTokens.Magenta) < 0.42f ||
+            (fillColor.HasValue && Distance(fillColor.Value, ConsumerTokens.CardPink) < 0.45f))
+            return MagentaFrame;
+        if (Distance(accent, ConsumerTokens.Cyan) < 0.48f ||
+            Distance(accent, ConsumerTokens.Blue) < 0.48f ||
+            (fillColor.HasValue && Distance(fillColor.Value, ConsumerTokens.CardBlue) < 0.50f))
+            return BlueFrame;
+        return PurpleFrame;
+    }
+
+    static float Distance(Color a, Color b)
+    {
+        float dr = a.r - b.r;
+        float dg = a.g - b.g;
+        float db = a.b - b.b;
+        return Mathf.Sqrt(dr * dr + dg * dg + db * db);
+    }
+
+    static void Center(GameObject go, Vector2 pos, Vector2 size)
+    {
+        var rect = (RectTransform)go.transform;
+        rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = pos;
+        rect.sizeDelta = size;
+        rect.localRotation = Quaternion.identity;
+        rect.localScale = Vector3.one;
     }
 }
