@@ -1,8 +1,8 @@
 # CLAUDE.md
 
 HOL — Unity 2022.3 Android number-duel game. Solo vs adaptive AI plus live
-PvP over PlayFab CloudScript, EN/EL localization, LevelPlay ads, Consumer
-First design built at runtime from code.
+PvP over PlayFab CloudScript, EN/EL localization, LevelPlay ads, and the
+approved production cartoon UI with one presentation owner per screen.
 
 ## Working loop (owner's standing rule — follow for every change)
 
@@ -38,10 +38,15 @@ First design built at runtime from code.
 - `docs/privacy.html` and `services/provisioner/static/privacy.html` are
   byte-identical twins (CI enforces both directions). The live
   `/api/privacy` page changes only on a provisioner deploy, not on merge.
-- Every `.cs` under `Assets/` has a committed `.meta`. The SVGs under
+- Every `.cs` under `Assets/` has a committed `.meta`. The signal icons under
   `Assets/newdesign/Resources/design/` are load-bearing at runtime
   (`Resources.Load`, held green by an EditMode test).
 - Every user-facing string goes through `L10n`, with EN **and** EL entries.
+- Approved production sprites and screen references are the visual source of
+  truth. `RuntimeUI` is neutral infrastructure; one screen has one presentation
+  owner. Do not add global theme writers, stacked reskins, or procedural
+  replacements for approved artwork. `AGENTS.md` contains the mandatory visual
+  fidelity, typography/layout and ownership contracts.
 - PlayFab clients call only `ExecuteCloudScript` — the server is the sole
   PvP authority. `Signals.Table` is append-only and must match
   `SIGNAL_COUNT` in `playfab/cloudscript.js`.
@@ -52,9 +57,10 @@ First design built at runtime from code.
 
 ## Where things live
 
-- Release order and gates: `docs/release-checklist.md` (order is
-  load-bearing — client, then minVersion, then CloudScript).
-- Play Console answers (Data safety, release notes): `docs/store-listing.md`.
+- Production art: `Assets/newdesign/Resources/`, grouped by current screen/family.
+- Screen presentation owners: `Assets/SCRIPT/Design/`.
+- Theme-agnostic runtime infrastructure: `Assets/SCRIPT/RuntimeUI/`.
+- Release order and gates: `docs/release-checklist.md`.
+- Play Console answers: `docs/store-listing.md`.
 - Keep `CHANGELOG.md`'s Unreleased section current with every merged change.
-- Rules/fairness harness: `tools/test/` (seeded simulations reproduce the
-  documented win-rate figures exactly).
+- Rules/fairness harness: `tools/test/`.

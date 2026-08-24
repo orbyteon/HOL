@@ -28,10 +28,6 @@ public sealed class SplashAuthoritativeVisualsPlayModeTests
     [UnityTest]
     public IEnumerator RealSplashSceneHasOneSafeAreaAwareVisualOwner()
     {
-        InstallRuntimePresenter("ExactReferenceVisuals");
-        InstallRuntimePresenter("AttachmentReskinVisuals");
-        InstallRuntimePresenter("AttachmentReskinPolish");
-        InstallRuntimePresenter("AttachmentReskinCanvasBindings");
 
         yield return SceneManager.LoadSceneAsync("SplashScene", LoadSceneMode.Single);
         yield return null;
@@ -41,10 +37,6 @@ public sealed class SplashAuthoritativeVisualsPlayModeTests
 
         var splashDesign = FindInScene(scene, RuntimeType("SplashDesign"));
         Assert.That(splashDesign, Is.Not.Null);
-        Assert.That(FindInScene(scene, RuntimeType("ExactReferenceVisuals")), Is.Null);
-        Assert.That(FindInScene(scene, RuntimeType("AttachmentReskinVisuals")), Is.Null);
-        Assert.That(FindInScene(scene, RuntimeType("AttachmentReskinPolish")), Is.Null);
-        Assert.That(FindInScene(scene, RuntimeType("AttachmentReskinCanvasBindings")), Is.Null);
 
         var canvases = ComponentsInScene<Canvas>(scene);
         Assert.That(canvases, Has.Count.EqualTo(1), "Splash must reuse its one scene-authored Canvas.");
@@ -374,14 +366,6 @@ public sealed class SplashAuthoritativeVisualsPlayModeTests
             new Rect(60f, 80f, 900f, 1600f), screenWidth, screenHeight);
 
         Assert.That(result, Is.EqualTo(new Rect(0f, 0f, 1f, 1f)));
-    }
-
-    static void InstallRuntimePresenter(string typeName)
-    {
-        var install = RuntimeType(typeName).GetMethod(
-            "Install", BindingFlags.Static | BindingFlags.NonPublic);
-        Assert.That(install, Is.Not.Null, "Missing runtime installer for " + typeName);
-        install.Invoke(null, null);
     }
 
     static object[] RequiredSprites()

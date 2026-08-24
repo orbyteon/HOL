@@ -4,8 +4,8 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
-// Sole PanelPlay presentation owner on MainMenu. Restyles Back, Find
-// Challenger, and the simulated-opponents disclosure in place.
+// Sole PanelPlay presentation owner on MainMenu. Restyles the real Back and
+// Find Challenger controls in place using approved production sprites.
 [DefaultExecutionOrder(1700)]
 public sealed class MainMenuPlayVisuals : MonoBehaviour
 {
@@ -16,7 +16,9 @@ public sealed class MainMenuPlayVisuals : MonoBehaviour
     public const string DisclosureName = "PlayDisclosure";
     public const string FindIconName = "PlayFindIcon";
 
-    const string BackgroundResource = "mainmenu/mainmenu_bg_stairs_clouds";
+    // The previous cloud/stairs file is explicitly rejected by the production
+    // asset tests. Use the current approved 9:16 HOL arcade background instead.
+    const string BackgroundResource = "phase2a/hol_neon_reference_bg_r3";
     const string DecoStarsResource = "mainmenu/mainmenu_deco_stars";
     const string LogoResource = "reference/hol_logo_exact";
     const string GoldCtaResource = "mainmenu/mainmenu_cta_gold_9s";
@@ -26,6 +28,7 @@ public sealed class MainMenuPlayVisuals : MonoBehaviour
     const string BulbIconResource = "mainmenu/mainmenu_icon_tip_bulb";
 
     static readonly Color Ink = new Color(0.09f, 0.06f, 0.22f, 1f);
+    static readonly Color NearWhite = new Color(0.96f, 0.97f, 1f, 1f);
     const float ReferenceWidth = 1080f;
     const float ReferenceHeight = 1920f;
 
@@ -129,7 +132,11 @@ public sealed class MainMenuPlayVisuals : MonoBehaviour
 
         var panel = menu.panelPlay.transform;
         var panelImage = menu.panelPlay.GetComponent<Image>();
-        if (panelImage != null) panelImage.enabled = false;
+        if (panelImage != null)
+        {
+            panelImage.enabled = false;
+            panelImage.raycastTarget = false;
+        }
 
         var exactLogo = DeepFind(panel, "ExactPlayLogo");
         if (exactLogo != null) exactLogo.gameObject.SetActive(false);
@@ -150,32 +157,48 @@ public sealed class MainMenuPlayVisuals : MonoBehaviour
 
         var logoImage = EnsureImage(safe, LogoName);
         ConfigureImage(logoImage, logo, true);
-        Place(logoImage.rectTransform, new Vector2(0f, 520f), new Vector2(640f, 360f));
+        Place(logoImage.rectTransform, new Vector2(0f, 520f),
+            new Vector2(640f, 360f));
 
         RestyleCta(safe, "ButtonChallenger", gold, FindIconResource, FindIconName,
-            "find_challenger", new Vector2(0f, 40f), new Vector2(860f, 150f), true);
+            "find_challenger", new Vector2(0f, 40f),
+            new Vector2(860f, 150f), true);
         RestyleCta(safe, "ButtonBack", cyan, null, null,
-            "back", new Vector2(0f, -140f), new Vector2(860f, 128f), false);
+            "back", new Vector2(0f, -140f),
+            new Vector2(860f, 128f), false);
         RestyleDisclosure(safe, panel, tipFrame);
     }
 
     void RestyleCta(
         Transform safe, string buttonName, Sprite frame, string iconResource,
-        string iconName, string l10nKey, Vector2 position, Vector2 size, bool goldLabel)
+        string iconName, string l10nKey, Vector2 position, Vector2 size,
+        bool goldLabel)
     {
         var button = FindButton(buttonName);
         if (button == null) return;
         Reparent(button.transform, safe);
         Place((RectTransform)button.transform, position, size);
         var image = button.GetComponent<Image>();
-        if (image != null)
-        {
-            image.sprite = frame;
-            image.color = Color.white;
-            image.type = Image.Type.Sliced;
-            image.preserveAspect = false;
-            image.raycastTarget = true;
-        }
+        if (image == null) image = button.gameObject.AddComponent<Image>();
+        image.enabled = true;
+        image.sprite = frame;
+        image.color = Color.white;
+        image.type = Image.Type.Sliced;
+        image.pixelsPerUnitMultiplier = 2f;
+        image.preserveAspect = false;
+        image.raycastTarget = true;
+        button.targetGraphic = image;
+
+        var colors = button.colors;
+        colors.normalColor = Color.white;
+        colors.highlightedColor = Color.white;
+        colors.selectedColor = Color.white;
+        colors.pressedColor = new Color(0.80f, 0.84f, 0.94f, 1f);
+        colors.disabledColor = new Color(0.55f, 0.56f, 0.64f, 0.72f);
+        colors.colorMultiplier = 1f;
+        colors.fadeDuration = 0.06f;
+        button.transition = Selectable.Transition.ColorTint;
+        button.colors = colors;
 
         if (!string.IsNullOrEmpty(iconResource) && !string.IsNullOrEmpty(iconName))
         {
@@ -184,7 +207,8 @@ public sealed class MainMenuPlayVisuals : MonoBehaviour
             {
                 var iconImage = EnsureImage(button.transform, iconName);
                 ConfigureImage(iconImage, icon, true);
-                Place(iconImage.rectTransform, new Vector2(-320f, 0f), new Vector2(88f, 88f));
+                Place(iconImage.rectTransform, new Vector2(-320f, 0f),
+                    new Vector2(88f, 88f));
             }
         }
 
@@ -195,7 +219,8 @@ public sealed class MainMenuPlayVisuals : MonoBehaviour
         label.alignment = TextAlignmentOptions.Center;
         RuntimeUI.ConfigureText(label, ResponsiveTextRole.Action,
             goldLabel ? 48f : 40f);
-        Place(label.rectTransform, new Vector2(36f, 0f), new Vector2(size.x - 180f, size.y - 24f));
+        Place(label.rectTransform, new Vector2(36f, 0f),
+            new Vector2(size.x - 180f, size.y - 24f));
         SetLocalized(label, l10nKey);
     }
 
@@ -209,15 +234,18 @@ public sealed class MainMenuPlayVisuals : MonoBehaviour
         card.sprite = frame;
         card.color = Color.white;
         card.type = Image.Type.Sliced;
+        card.pixelsPerUnitMultiplier = 2f;
         card.raycastTarget = false;
-        Place(card.rectTransform, new Vector2(0f, -520f), new Vector2(920f, 200f));
+        Place(card.rectTransform, new Vector2(0f, -520f),
+            new Vector2(920f, 200f));
 
         var bulb = LoadOptional(BulbIconResource);
         if (bulb != null)
         {
             var icon = EnsureImage(card.transform, "PlayDisclosureBulb");
             ConfigureImage(icon, bulb, true);
-            Place(icon.rectTransform, new Vector2(-380f, 0f), new Vector2(72f, 72f));
+            Place(icon.rectTransform, new Vector2(-380f, 0f),
+                new Vector2(72f, 72f));
         }
 
         TMP_Text body;
@@ -225,17 +253,19 @@ public sealed class MainMenuPlayVisuals : MonoBehaviour
         {
             Reparent(labelTransform, card.transform);
             body = labelTransform.GetComponent<TMP_Text>();
-            if (body == null) body = EnsureTmp(labelTransform, "DisclosureLabel", 26f);
+            if (body == null)
+                body = EnsureTmp(labelTransform, "DisclosureLabel", 26f);
         }
         else
         {
             body = EnsureTmp(card.transform, "DisclosureLabel", 26f);
         }
 
-        body.color = ConvergingLight.NearWhite;
+        body.color = NearWhite;
         body.alignment = TextAlignmentOptions.Left;
         body.raycastTarget = false;
-        Place(body.rectTransform, new Vector2(40f, 0f), new Vector2(760f, 140f));
+        Place(body.rectTransform, new Vector2(40f, 0f),
+            new Vector2(760f, 140f));
         SetLocalized(body, "simulated_opponents");
     }
 
@@ -244,7 +274,8 @@ public sealed class MainMenuPlayVisuals : MonoBehaviour
         if (sprite == null) return;
         var image = EnsureImage(safe, name);
         ConfigureImage(image, sprite, false);
-        Place(image.rectTransform, Vector2.zero, new Vector2(ReferenceWidth, ReferenceHeight));
+        Place(image.rectTransform, Vector2.zero,
+            new Vector2(ReferenceWidth, ReferenceHeight));
     }
 
     Button FindButton(string name)
@@ -257,6 +288,7 @@ public sealed class MainMenuPlayVisuals : MonoBehaviour
     {
         if (child.parent != parent)
             child.SetParent(parent, false);
+        child.gameObject.SetActive(true);
         child.SetAsLastSibling();
     }
 
@@ -273,12 +305,14 @@ public sealed class MainMenuPlayVisuals : MonoBehaviour
 
     static TMP_Text EnsureTmp(Transform parent, string name, float size)
     {
-        var rect = parent.name == name ? parent as RectTransform : EnsureRect(parent, name);
+        var rect = parent.name == name
+            ? parent as RectTransform
+            : EnsureRect(parent, name);
         var tmp = rect.GetComponent<TextMeshProUGUI>();
         if (tmp == null) tmp = rect.gameObject.AddComponent<TextMeshProUGUI>();
         tmp.fontSize = size;
         tmp.raycastTarget = false;
-        tmp.color = ConvergingLight.NearWhite;
+        tmp.color = NearWhite;
         RuntimeUI.ConfigureText(tmp, ResponsiveTextRole.Body, size);
         return tmp;
     }
@@ -314,7 +348,11 @@ public sealed class MainMenuPlayVisuals : MonoBehaviour
     static RectTransform EnsureRect(Transform parent, string name)
     {
         var existing = DirectChild(parent, name) as RectTransform;
-        if (existing != null) return existing;
+        if (existing != null)
+        {
+            existing.gameObject.SetActive(true);
+            return existing;
+        }
         return (RectTransform)RuntimeUI.CreateObject(name, parent).transform;
     }
 
@@ -328,6 +366,7 @@ public sealed class MainMenuPlayVisuals : MonoBehaviour
 
     static void ConfigureImage(Image image, Sprite sprite, bool preserveAspect)
     {
+        image.enabled = true;
         image.sprite = sprite;
         image.color = Color.white;
         image.type = Image.Type.Simple;

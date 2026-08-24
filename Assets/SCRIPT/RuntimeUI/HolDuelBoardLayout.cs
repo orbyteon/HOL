@@ -14,6 +14,11 @@ using UnityEngine.UI;
 public sealed class HolDuelBoardLayout : MonoBehaviour
 {
     const string BackspaceCommand = "BACKSPACE";
+    const string SoloPurpleFrameResource = "mainmenu/mainmenu_tip_frame_9s";
+    const string SoloBlueFrameResource = "mainmenu/mainmenu_cta_blue_9s";
+    const string SoloMagentaFrameResource = "phase2a/hol_cta_magenta_r2_9s";
+    const string SoloGoldFrameResource = "mainmenu/mainmenu_cta_gold_9s";
+
 
     static readonly Color CardBlue = new Color(0.08f, 0.28f, 0.68f, 0.96f);
     static readonly Color CardPink = new Color(0.72f, 0.08f, 0.34f, 0.96f);
@@ -115,11 +120,50 @@ public sealed class HolDuelBoardLayout : MonoBehaviour
         rect.localScale = Vector3.one;
     }
 
-    static void MakeDecorative(Image image)
+    static void MakeDecorative(Image image, string resource)
     {
+        if (image == null) return;
+        RuntimeUI.ApplyProductionSprite(image, resource, Image.Type.Sliced,
+            false, 2f);
         image.raycastTarget = false;
-        image.type = Image.Type.Sliced;
-        image.sprite = RuntimeUI.RoundedRectSprite;
+    }
+
+    static string ResolveCardResource(Color color)
+    {
+        if (ColorDistance(color, CardPink) < 0.35f)
+            return SoloMagentaFrameResource;
+        if (ColorDistance(color, CardBlue) < 0.35f)
+            return SoloBlueFrameResource;
+        if (ColorDistance(color, Gold) < 0.35f)
+            return SoloGoldFrameResource;
+        return SoloPurpleFrameResource;
+    }
+
+    static float ColorDistance(Color a, Color b)
+    {
+        float dr = a.r - b.r;
+        float dg = a.g - b.g;
+        float db = a.b - b.b;
+        return Mathf.Sqrt(dr * dr + dg * dg + db * db);
+    }
+
+    static void StyleSoloButton(Button button, string resource, Color labelColor)
+    {
+        if (button == null) return;
+        var image = button.GetComponent<Image>();
+        if (image == null) image = button.gameObject.AddComponent<Image>();
+        RuntimeUI.ApplyProductionSprite(image, resource, Image.Type.Sliced,
+            false, 2f);
+        image.raycastTarget = true;
+        button.targetGraphic = image;
+        var label = button.GetComponentInChildren<TMP_Text>(true);
+        if (label != null)
+        {
+            label.color = labelColor;
+            label.fontStyle = FontStyles.Bold;
+            label.alignment = TextAlignmentOptions.Center;
+            label.raycastTarget = false;
+        }
     }
 
     void CenterRoot(RectTransform rect, Vector2 size, Vector2 position)
@@ -137,8 +181,7 @@ public sealed class HolDuelBoardLayout : MonoBehaviour
         var rect = (RectTransform)card.transform;
         CenterRoot(rect, size, position);
         var image = card.AddComponent<Image>();
-        image.color = color;
-        MakeDecorative(image);
+        MakeDecorative(image, ResolveCardResource(color));
         return card;
     }
 
@@ -156,6 +199,7 @@ public sealed class HolDuelBoardLayout : MonoBehaviour
         var back = RuntimeUI.CreateButton(board, "DuelBack", L10n.Get("back"),
             new Vector2(-438f, 790f), new Vector2(118f, 92f), new Color(0.26f, 0.10f, 0.60f, 1f),
             NearWhite);
+        StyleSoloButton(back, SoloPurpleFrameResource, NearWhite);
         CenterRoot((RectTransform)back.transform, new Vector2(118f, 92f), new Vector2(-438f, 790f));
         RuntimeUI.Localize(back, "back");
         if (menuManager != null)
@@ -200,10 +244,15 @@ public sealed class HolDuelBoardLayout : MonoBehaviour
             var image = input.GetComponent<Image>();
             if (image != null)
             {
-                image.sprite = RuntimeUI.RoundedRectSprite;
-                image.type = Image.Type.Sliced;
-                image.color = new Color(0.05f, 0.04f, 0.18f, 1f);
+                RuntimeUI.ApplyProductionSprite(image, SoloPurpleFrameResource,
+                    Image.Type.Sliced, false, 2f);
+                image.raycastTarget = true;
             }
+            if (input.textComponent != null)
+                input.textComponent.color = NearWhite;
+            var inputPlaceholder = input.placeholder as TMP_Text;
+            if (inputPlaceholder != null)
+                inputPlaceholder.color = Muted;
         }
 
         if (numberManager != null && numberManager.playerNumberText != null)
@@ -276,6 +325,15 @@ public sealed class HolDuelBoardLayout : MonoBehaviour
         var child = FindChild(name);
         if (child == null) return;
         CenterRoot(child, size, position);
+        var button = child.GetComponent<Button>();
+        if (button == null) return;
+        if (name == "ButtonCORRECT")
+            StyleSoloButton(button, SoloGoldFrameResource,
+                new Color(0.15f, 0.08f, 0.04f, 1f));
+        else if (name == "ButtonLOWER")
+            StyleSoloButton(button, SoloMagentaFrameResource, NearWhite);
+        else
+            StyleSoloButton(button, SoloBlueFrameResource, NearWhite);
     }
 
     RectTransform FindChild(string name)
@@ -301,6 +359,7 @@ public sealed class HolDuelBoardLayout : MonoBehaviour
             var button = RuntimeUI.CreateButton(keypadRoot.transform, "Key_" + keys[i], label,
                 new Vector2(-205f + column * 205f, 215f - row * 142f),
                 new Vector2(178f, 118f), KeyBlue, NearWhite);
+            StyleSoloButton(button, SoloBlueFrameResource, NearWhite);
             var text = button.GetComponentInChildren<TMP_Text>();
             if (text != null) text.fontSize = keys[i] == BackspaceCommand || keys[i] == "×" ? 38 : 48;
             button.onClick.AddListener(() => OnKeyPressed(keys[index]));
@@ -324,6 +383,8 @@ public sealed class HolDuelBoardLayout : MonoBehaviour
         }
 
         CenterRoot((RectTransform)submitControl.transform, new Vector2(660f, 112f), new Vector2(-180f, -850f));
+        StyleSoloButton(submitControl, SoloGoldFrameResource,
+            new Color(0.15f, 0.08f, 0.04f, 1f));
         var submitLabel = submitControl.GetComponentInChildren<TMP_Text>(true);
         if (submitLabel != null && submitLabel.GetComponent<LocalizedText>() == null)
             RuntimeUI.Localize(submitControl, "confirm");

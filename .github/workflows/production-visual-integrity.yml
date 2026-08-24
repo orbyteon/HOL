@@ -1,0 +1,50 @@
+name: Production Visual Integrity
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  visual-integrity:
+    name: Visual system integrity
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout merge ref for pull requests
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event_name == 'pull_request' && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.ref }}
+
+      - name: Enforce current production visual architecture
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          for retired_path in Assets/Photos Assets/Photos.meta Assets/UI Assets/UI.meta; do
+            if [ -e "$retired_path" ]; then
+              echo "::error file=$retired_path::Retired visual graveyard must not return to production Assets"
+              exit 1
+            fi
+          done
+
+          if grep -R -n -E 'ConvergingLight|DesignRuntimeWiring|NeonFrame|NumberDrift|FrameGeometry|ExactReferenceVisuals|AttachmentReskinVisuals|AttachmentReskinPolish|AttachmentReskinCanvasBindings' Assets/SCRIPT Assets/Scenes; then
+            echo "::error::Retired visual architecture symbol returned to production code/scene"
+            exit 1
+          fi
+
+          if grep -R -n -E '0\.002f' Assets/SCRIPT; then
+            echo "::error::Near-zero-alpha production sprite hiding returned"
+            exit 1
+          fi
+
+          for retired_surface in background_deep panel_surface button_primary button_secondary; do
+            if find Assets -type f -name "${retired_surface}.*" -print -quit | grep -q .; then
+              echo "::error::Retired generic design surface returned: ${retired_surface}"
+              exit 1
+            fi
+          done
+
+          if find Assets -type f -name 'mainmenu_bg_stairs_clouds*' -print -quit | grep -q .; then
+            echo "::error::Rejected cloud/stairs menu background returned"
+            exit 1
+          fi

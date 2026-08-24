@@ -17,7 +17,7 @@ runs:
       run: |
         set -euo pipefail
         conclusion="$(
-          gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs" \
+          gh api --method GET "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs" \
             -f head_sha="$SHA" \
             -f status=completed \
             -f per_page=1 \

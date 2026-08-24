@@ -2,9 +2,13 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
-// Shared helpers for building simple UI from code at runtime. Used by
-// PvpRuntimeUI and the zero-wire extras; keeps ConsentManager-style
-// construction in one place.
+// Shared, theme-agnostic helpers for runtime UI construction.
+//
+// IMPORTANT: this class owns infrastructure only (object creation, anchoring,
+// localization, input plumbing and neutral emergency fallbacks). It must never
+// choose the product theme or silently replace approved production artwork.
+// Screen-specific presentation owners are responsible for assigning approved
+// sprites and typography after construction.
 public static class RuntimeUI
 {
     // Scene click sound, discovered once per scene by JuiceRuntimeWiring.
@@ -34,10 +38,10 @@ public static class RuntimeUI
         return juice;
     }
 
-    // Shared rounded-rect sprite (white, transparent corners) so every
-    // runtime-built button/card/input has soft corners instead of hard
-    // squares. Generated once, cached; sliced so corners stay round at
-    // any size.
+    // Neutral fallback only. Approved production screens must replace this
+    // with their real sprite before becoming visible. Keeping one cached
+    // fallback prevents runtime-created controls from becoming unclickable
+    // while a required-art failure is being surfaced in logs/tests.
     static Sprite roundedSprite;
 
     public static Sprite RoundedRectSprite
@@ -60,7 +64,6 @@ public static class RuntimeUI
         {
             for (int x = 0; x < size; x++)
             {
-                // Distance outside the rounded corner circle, if any.
                 float cx = Mathf.Min(x, size - 1 - x);
                 float cy = Mathf.Min(y, size - 1 - y);
                 float alpha = 1f;
@@ -69,7 +72,7 @@ public static class RuntimeUI
                     float dx = radius - cx - 0.5f;
                     float dy = radius - cy - 0.5f;
                     float dist = Mathf.Sqrt(dx * dx + dy * dy);
-                    alpha = Mathf.Clamp01(radius + 0.5f - dist); // 1px anti-alias
+                    alpha = Mathf.Clamp01(radius + 0.5f - dist);
                 }
                 tex.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
             }
@@ -118,23 +121,100 @@ public static class RuntimeUI
         rect.offsetMax = Vector2.zero;
     }
 
+    public static void Center(GameObject go, Vector2 position, Vector2 size)
+    {
+        if (go == null) return;
+        var rect = (RectTransform)go.transform;
+        rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = position;
+        rect.sizeDelta = size;
+        rect.localRotation = Quaternion.identity;
+        rect.localScale = Vector3.one;
+    }
+
+    static Sprite solidSprite;
+    public static Sprite SolidSprite
+    {
+        get
+        {
+            if (solidSprite != null) return solidSprite;
+            var texture = new Texture2D(1, 1, TextureFormat.RGBA32, false);
+            texture.SetPixel(0, 0, Color.white);
+            texture.Apply();
+            solidSprite = Sprite.Create(texture, new Rect(0, 0, 1, 1),
+                new Vector2(0.5f, 0.5f));
+            return solidSprite;
+        }
+    }
+
+    public static Sprite LoadProductionSprite(string resourcePath)
+    {
+        if (string.IsNullOrWhiteSpace(resourcePath)) return null;
+        var sprite = Resources.Load<Sprite>(resourcePath);
+        if (sprite == null)
+            Debug.LogError("HOL UI: missing approved production sprite Resources/" +
+                resourcePath + ".");
+        return sprite;
+    }
+
     public static GameObject FullscreenPanel(Transform parent, string name, Color color)
     {
         var panel = CreateObject(name, parent);
         Stretch(panel);
         var image = panel.AddComponent<Image>();
-        var designBackground = DesignRuntimeWiring.BackgroundAsset;
-        image.sprite = designBackground != null ? designBackground : null;
-        image.type = designBackground != null ? Image.Type.Simple : Image.Type.Simple;
-        image.color = designBackground != null ? Color.white : color;
+        image.sprite = null;
+        image.type = Image.Type.Simple;
+        image.color = color;
         image.raycastTarget = true;
         return panel;
     }
 
+    // Production presentation owners should use this helper when a runtime
+    // control has an approved Resources sprite. It deliberately fails closed:
+    // no procedural substitute is painted over missing production art.
+    public static bool ApplyProductionSprite(Image image, string resourcePath,
+        Image.Type type = Image.Type.Simple, bool preserveAspect = false,
+        float pixelsPerUnitMultiplier = 1f)
+    {
+        if (image == null || string.IsNullOrWhiteSpace(resourcePath)) return false;
+        var sprite = Resources.Load<Sprite>(resourcePath);
+        if (sprite == null)
+        {
+            Debug.LogError("HOL UI: missing approved production sprite Resources/" +
+                resourcePath + ".");
+            return false;
+        }
+
+        image.enabled = true;
+        image.sprite = sprite;
+        image.type = type;
+        image.preserveAspect = preserveAspect;
+        image.pixelsPerUnitMultiplier = pixelsPerUnitMultiplier;
+        image.color = Color.white;
+        return true;
+    }
+
+    // Neutral infrastructure for a caller-owned production frame. The
+    // caller supplies the exact approved sprite path; RuntimeUI never chooses
+    // a visual language or substitutes generated artwork.
+    public static GameObject CreateProductionFrame(
+        Transform parent, string name, Vector2 position, Vector2 size,
+        string resourcePath, float pixelsPerUnitMultiplier = 2f)
+    {
+        var frame = CreateObject(name, parent);
+        Center(frame, position, size);
+        ClampToSafeArea((RectTransform)frame.transform, size, position);
+        var image = frame.AddComponent<Image>();
+        ApplyProductionSprite(image, resourcePath, Image.Type.Sliced, false,
+            pixelsPerUnitMultiplier);
+        image.raycastTarget = false;
+        return frame;
+    }
+
     // Every runtime-built label is TextMesh Pro, same as the scene's TMP
-    // labels and the input fields below — one text stack, one default font
-    // asset. The shared responsive policy keeps English and Greek inside
-    // their authored regions with bounded autosizing and vertical ellipsis.
+    // labels and the input fields below. The shared responsive policy keeps
+    // English and Greek inside their authored regions with bounded autosizing.
     public static TextMeshProUGUI CreateText(Transform parent, string name, string content,
         int fontSize, Vector2 position, Vector2 size, Color? color = null)
     {
@@ -149,9 +229,7 @@ public static class RuntimeUI
         var text = go.AddComponent<TextMeshProUGUI>();
         text.text = content;
         text.fontSize = fontSize;
-        // Converging Light (design/philosophy.md): white exists only as
-        // near-white, softened so it belongs to the night.
-        text.color = color ?? new Color(0.91f, 0.93f, 1f);
+        text.color = color ?? new Color(0.96f, 0.97f, 1f);
         text.alignment = TextAlignmentOptions.Center;
         ResponsiveTextPolicy.Configure(text, ResponsiveTextRole.Body, fontSize);
         return text;
@@ -169,17 +247,9 @@ public static class RuntimeUI
         ClampPageChild(rect, size, position);
 
         var image = go.AddComponent<Image>();
-        var primaryAsset = name.IndexOf("Play", System.StringComparison.OrdinalIgnoreCase) >= 0
-            || name.IndexOf("Start", System.StringComparison.OrdinalIgnoreCase) >= 0
-            || name.IndexOf("Confirm", System.StringComparison.OrdinalIgnoreCase) >= 0
-            || name.IndexOf("Save", System.StringComparison.OrdinalIgnoreCase) >= 0
-            || name.IndexOf("Submit", System.StringComparison.OrdinalIgnoreCase) >= 0;
-        var designAsset = primaryAsset
-            ? DesignRuntimeWiring.PrimaryButtonAsset
-            : DesignRuntimeWiring.SecondaryButtonAsset;
-        image.sprite = designAsset != null ? designAsset : RoundedRectSprite;
-        image.type = designAsset != null ? Image.Type.Simple : Image.Type.Sliced;
-        image.color = designAsset != null ? Color.white : color;
+        image.sprite = RoundedRectSprite;
+        image.type = Image.Type.Sliced;
+        image.color = color;
 
         var button = go.AddComponent<Button>();
         button.targetGraphic = image;
@@ -188,16 +258,12 @@ public static class RuntimeUI
         Stretch(text.gameObject);
         ResponsiveTextPolicy.Configure(text, ResponsiveTextRole.Action, 30f);
 
-        // Juice at creation time: buttons built after JuiceRuntimeWiring's
-        // one-shot startup pass would otherwise stay flat and silent.
         AttachJuice(button);
-
         return button;
     }
 
     // Numeric TMP input field built entirely from code. Pass contentType
-    // Standard for fields that must accept letters (e.g. PvP room codes —
-    // the backends normalize case, so plain Standard is enough).
+    // Standard for fields that must accept letters (e.g. PvP room codes).
     public static TMP_InputField CreateInputField(Transform parent, string name,
         string placeholder, Vector2 position, Vector2 size, int characterLimit = 3,
         TMP_InputField.ContentType contentType = TMP_InputField.ContentType.IntegerNumber)
@@ -219,7 +285,6 @@ public static class RuntimeUI
         input.contentType = contentType;
         input.characterLimit = characterLimit;
 
-        // Viewport (masked text area).
         var viewport = CreateObject("Text Area", go.transform);
         var viewportRect = (RectTransform)viewport.transform;
         viewportRect.anchorMin = Vector2.zero;
@@ -229,7 +294,6 @@ public static class RuntimeUI
         viewport.AddComponent<RectMask2D>();
         input.textViewport = viewportRect;
 
-        // Text.
         var textGo = CreateObject("Text", viewport.transform);
         Stretch(textGo);
         var text = textGo.AddComponent<TextMeshProUGUI>();
@@ -240,7 +304,6 @@ public static class RuntimeUI
         ResponsiveTextPolicy.Configure(text, ResponsiveTextRole.Input, 36f);
         input.textComponent = text;
 
-        // Placeholder.
         var phGo = CreateObject("Placeholder", viewport.transform);
         Stretch(phGo);
         var ph = phGo.AddComponent<TextMeshProUGUI>();
@@ -256,10 +319,6 @@ public static class RuntimeUI
 
     // ---------------------------------------------------------- live localization
 
-    // Runtime-built labels bake one language at construction time. Attaching
-    // a localizer with the L10n key makes them follow language changes live.
-    // Dynamic labels (room codes, statuses, results) stay plain text.
-
     public static void Localize(TMP_Text text, string key)
     {
         if (text == null) return;
@@ -267,14 +326,12 @@ public static class RuntimeUI
         loc.key = key;
     }
 
-    // Same, for a button's child label.
     public static void Localize(Button button, string key)
     {
         if (button == null) return;
         Localize(button.GetComponentInChildren<TMP_Text>(true), key);
     }
 
-    // Same, for an input field's placeholder.
     public static void LocalizePlaceholder(TMP_InputField input, string key)
     {
         if (input == null) return;
@@ -287,9 +344,6 @@ public static class RuntimeUI
         ResponsiveTextPolicy.Configure(text, role, configuredMaximum);
     }
 
-    // Unity forbids Object.Destroy from EditMode tests and editor scripts —
-    // that path must use DestroyImmediate. Play mode keeps the deferred
-    // Destroy so in-flight listeners cannot see a hole mid-frame.
     public static void DestroyNow(Object target)
     {
         if (target == null) return;
