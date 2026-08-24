@@ -16,6 +16,24 @@ test("Home preview workflow captures Main Menu, not Splash", () => {
   assert.doesNotMatch(workflow, /adb logcat -c/);
 });
 
+test("Home preview captures bilingual production viewport matrix", () => {
+  assert.match(workflow, /hol_capture_language/);
+  assert.match(workflow, /hol_capture_token/);
+  assert.match(workflow, /capture_variant en 1080 1920/);
+  assert.match(workflow, /capture_variant el 1080 1920/);
+  assert.match(workflow, /capture_variant en 1080 2400/);
+  assert.match(workflow, /capture_variant el 1080 2400/);
+  assert.match(workflow, /capture_variant en 1179 2556/);
+  assert.match(workflow, /capture_variant el 1179 2556/);
+  assert.match(workflow, /mainmenu-en-1080x1920\.png/);
+  assert.match(workflow, /mainmenu-el-1080x1920\.png/);
+  assert.match(workflow, /mainmenu-en-1080x2400\.png/);
+  assert.match(workflow, /mainmenu-el-1080x2400\.png/);
+  assert.match(workflow, /mainmenu-en-1179x2556\.png/);
+  assert.match(workflow, /mainmenu-el-1179x2556\.png/);
+  assert.match(workflow, /validate-mainmenu-screenshot\.mjs/);
+});
+
 test("Home preview APK stays development ARM64+x86_64 GLES3", () => {
   assert.match(workflow, /MainMenuPreviewBuild\.Build/);
   assert.match(workflow, /versioning: None/);
