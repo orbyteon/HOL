@@ -1,3 +1,4 @@
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -35,6 +36,8 @@ public sealed class SplashDesign : MonoBehaviour
     CanvasGroup mascotSixGroup;
     CanvasGroup mascotSevenGroup;
     Image progressFill;
+    Image progressGloss;
+    Image progressCap;
     float waitTime = 2.5f;
     float elapsed;
 
@@ -52,17 +55,23 @@ public sealed class SplashDesign : MonoBehaviour
 
         HideLegacyPresentation(canvas.transform);
 
-        var background = LoadSprite(BackgroundResource);
-        var decoStars = LoadSprite(DecoStarsResource);
-        var decoLightning = LoadSprite(DecoLightningResource);
-        var decoConfetti = LoadSprite(DecoConfettiResource);
-        var decoNumbers = LoadSprite(DecoNumbersResource);
-        var glow = LoadSprite(GlowResource);
-        var logo = LoadSprite(LogoResource);
-        var heroBoy = LoadSprite(HeroBoyResource);
-        var heroGirl = LoadSprite(HeroGirlResource);
-        var mascotSix = LoadSprite(MascotSixResource);
-        var mascotSeven = LoadSprite(MascotSevenResource);
+        var theme = HolTheme.Current;
+        if (theme == null || !theme.IsComplete)
+        {
+            Debug.LogError("[SplashDesign] Cartoon theme catalog is incomplete.");
+            return;
+        }
+        var background = theme.splash.background;
+        var decoStars = theme.splash.stars;
+        var decoLightning = theme.splash.lightning;
+        var decoConfetti = theme.splash.confetti;
+        var decoNumbers = theme.splash.numbers;
+        var glow = theme.splash.logoGlow;
+        var logo = theme.shared.logo;
+        var heroBoy = theme.splash.heroBoy;
+        var heroGirl = theme.splash.heroGirl;
+        var mascotSix = theme.shared.mascotSix;
+        var mascotSeven = theme.shared.mascotSeven;
 
         var visualRoot = EnsureRect(canvas.transform, "SplashVisualRoot");
         Stretch(visualRoot);
@@ -108,7 +117,7 @@ public sealed class SplashDesign : MonoBehaviour
         Place(sevenImage.rectTransform, new Vector2(340f, -420f), new Vector2(230f, 320f));
         mascotSevenRect = sevenImage.rectTransform;
 
-        BuildProgress(safeRoot);
+        BuildProgress(safeRoot, theme.splash.loadingTrack);
 
         logoGlowGroup = EnsureCanvasGroup(glowImage.gameObject);
         logoGroup = EnsureCanvasGroup(logoImage.gameObject);
@@ -135,6 +144,19 @@ public sealed class SplashDesign : MonoBehaviour
         {
             float target = Mathf.Clamp01(elapsed / Mathf.Max(0.0001f, waitTime));
             progressFill.fillAmount = Mathf.Max(progressFill.fillAmount, target);
+            if (progressGloss != null)
+                progressGloss.fillAmount = progressFill.fillAmount;
+            if (progressCap != null)
+            {
+                float width = Mathf.Max(0f, progressFill.rectTransform.rect.width);
+                float x = -width * 0.5f + width * progressFill.fillAmount;
+                progressCap.rectTransform.anchoredPosition = new Vector2(x, 0f);
+                progressCap.color = Color.Lerp(
+                    new Color(0.02f, 0.92f, 1f, 1f),
+                    new Color(0.04f, 0.35f, 1f, 1f),
+                    progressFill.fillAmount);
+                progressCap.gameObject.SetActive(progressFill.fillAmount > 0.001f);
+            }
         }
 
         float logoT = Mathf.Clamp01(elapsed / EntranceDuration);
@@ -166,22 +188,72 @@ public sealed class SplashDesign : MonoBehaviour
             new Vector2(ReferenceWidth, ReferenceHeight));
     }
 
-    void BuildProgress(Transform safeRoot)
+    void BuildProgress(Transform safeRoot, Sprite approvedTrack)
     {
+        // The safe root already owns the screen inset. Build this authored
+        // composition label directly beneath it so the generic runtime-page
+        // registrar does not apply a second safe-area placement pass.
+        var labelRect = EnsureRect(safeRoot, "SplashLoadingLabel");
+        Place(labelRect, new Vector2(0f, -665f), new Vector2(720f, 72f));
+        var label = labelRect.GetComponent<TextMeshProUGUI>();
+        if (label == null)
+            label = labelRect.gameObject.AddComponent<TextMeshProUGUI>();
+        label.text = L10n.Get("splash_loading");
+        label.fontSize = 42f;
+        label.color = Color.white;
+        label.alignment = TextAlignmentOptions.Center;
+        label.fontStyle = FontStyles.Normal;
+        label.fontWeight = FontWeight.Regular;
+        label.characterSpacing = 3f;
+        ResponsiveTextPolicy.Configure(label, ResponsiveTextRole.Heading, 42f);
+        CartoonTypography.Bind(label, HolTextRole.Emphasis);
+        RuntimeUI.Localize(label, "splash_loading");
+
         var track = EnsureImage(safeRoot, "SplashProgressTrack");
-        ConfigureImage(track, null, false);
-        track.color = new Color(0.10f, 0.06f, 0.28f, 0.92f);
-        Place(track.rectTransform, new Vector2(0f, -770f), new Vector2(480f, 8f));
+        ConfigureImage(track, approvedTrack, false);
+        track.type = Image.Type.Sliced;
+        track.color = Color.white;
+        Place(track.rectTransform, new Vector2(0f, -755f), new Vector2(760f, 116f));
 
         progressFill = EnsureImage(track.transform, "SplashProgressFill");
-        var gold = new Color(1f, 0.78f, 0.34f, 1f);
-        ConfigureImage(progressFill, ConvergingLight.VerticalGradient(gold, gold, 4), false);
+        var cyan = new Color(0.02f, 0.92f, 1f, 1f);
+        var blue = new Color(0.04f, 0.35f, 1f, 1f);
+        ConfigureImage(progressFill,
+            RoundedHorizontalGradient(cyan, blue, 512, 64, 32f), false);
         progressFill.color = Color.white;
         progressFill.type = Image.Type.Filled;
         progressFill.fillMethod = Image.FillMethod.Horizontal;
         progressFill.fillOrigin = 0;
         progressFill.fillAmount = 0f;
         Stretch(progressFill.rectTransform);
+        progressFill.rectTransform.offsetMin = new Vector2(56f, 42f);
+        progressFill.rectTransform.offsetMax = new Vector2(-56f, -42f);
+
+        progressGloss = EnsureImage(track.transform, "SplashProgressGloss");
+        ConfigureImage(progressGloss,
+            RoundedTopGloss(512, 64, 32f), false);
+        progressGloss.color = Color.white;
+        progressGloss.type = Image.Type.Filled;
+        progressGloss.fillMethod = Image.FillMethod.Horizontal;
+        progressGloss.fillOrigin = 0;
+        progressGloss.fillAmount = 0f;
+        Stretch(progressGloss.rectTransform);
+        progressGloss.rectTransform.offsetMin = new Vector2(56f, 42f);
+        progressGloss.rectTransform.offsetMax = new Vector2(-56f, -42f);
+
+        progressCap = EnsureImage(track.transform, "SplashProgressCap");
+        ConfigureImage(progressCap, RuntimeUI.RoundedRectSprite, false);
+        progressCap.type = Image.Type.Sliced;
+        progressCap.color = cyan;
+        Place(progressCap.rectTransform, Vector2.zero, new Vector2(32f, 32f));
+        progressCap.gameObject.SetActive(false);
+
+        var frame = EnsureImage(track.transform, "SplashProgressFrame");
+        ConfigureImage(frame, approvedTrack, false);
+        frame.type = Image.Type.Sliced;
+        frame.color = Color.white;
+        Stretch(frame.rectTransform);
+        frame.transform.SetAsLastSibling();
     }
 
     void ConfigureSafeArea(RectTransform safeRoot, RectTransform canvasRect)
@@ -332,6 +404,64 @@ public sealed class SplashDesign : MonoBehaviour
         image.type = Image.Type.Simple;
         image.preserveAspect = preserveAspect;
         image.raycastTarget = false;
+    }
+
+    static Sprite RoundedHorizontalGradient(
+        Color left, Color right, int width, int height, float radius)
+    {
+        return CreateRoundedGradientSprite(
+            "SplashProgressFillGradient", width, height, radius,
+            (x, y) => Color.Lerp(left, right, x));
+    }
+
+    static Sprite RoundedTopGloss(int width, int height, float radius)
+    {
+        return CreateRoundedGradientSprite(
+            "SplashProgressTopGloss", width, height, radius,
+            (x, y) => new Color(1f, 1f, 1f,
+                Mathf.Lerp(0.34f, 0.015f, y)));
+    }
+
+    static Sprite CreateRoundedGradientSprite(
+        string name, int width, int height, float radius,
+        System.Func<float, float, Color> sample)
+    {
+        var texture = new Texture2D(width, height, TextureFormat.RGBA32, false)
+        {
+            name = name + "Texture",
+            wrapMode = TextureWrapMode.Clamp,
+            filterMode = FilterMode.Bilinear,
+            hideFlags = HideFlags.DontSave
+        };
+        var pixels = new Color32[width * height];
+        float cy = (height - 1f) * 0.5f;
+        float leftCenter = radius;
+        float rightCenter = width - 1f - radius;
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                float dx = x < leftCenter
+                    ? leftCenter - x
+                    : x > rightCenter ? x - rightCenter : 0f;
+                float dy = Mathf.Abs(y - cy);
+                float alpha = Mathf.Clamp01(radius + 0.75f -
+                    Mathf.Sqrt(dx * dx + dy * dy));
+                Color color = sample(
+                    x / Mathf.Max(1f, width - 1f),
+                    1f - y / Mathf.Max(1f, height - 1f));
+                color.a *= alpha;
+                pixels[y * width + x] = color;
+            }
+        }
+        texture.SetPixels32(pixels);
+        texture.Apply(false, true);
+        var sprite = Sprite.Create(
+            texture, new Rect(0f, 0f, width, height),
+            new Vector2(0.5f, 0.5f), 100f);
+        sprite.name = name;
+        sprite.hideFlags = HideFlags.DontSave;
+        return sprite;
     }
 
     static void Place(RectTransform rect, Vector2 position, Vector2 size)

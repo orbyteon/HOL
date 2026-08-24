@@ -43,11 +43,16 @@ public sealed class SettingsVisualCapturePlayModeTests
 
             SetLanguage(0);
             yield return null;
-            Capture(canvas, output, "settings-en-1080x1920.png", 1080, 1920);
+            Capture(canvas, output, "settings-en-1080x1920.png", 1080, 1920,
+                new Rect(0f, 0f, 1080f, 1920f));
             SetLanguage(1);
             yield return null;
-            Capture(canvas, output, "settings-el-1080x1920.png", 1080, 1920);
-            Capture(canvas, output, "settings-el-720x1280.png", 720, 1280);
+            Capture(canvas, output, "settings-el-1080x1920.png", 1080, 1920,
+                new Rect(0f, 0f, 1080f, 1920f));
+            Capture(canvas, output, "settings-el-720x1280.png", 720, 1280,
+                new Rect(0f, 0f, 720f, 1280f));
+            Capture(canvas, output, "settings-el-1080x2400-cutout.png", 1080, 2400,
+                new Rect(0f, 120f, 1080f, 2160f));
         }
         finally
         {
@@ -60,7 +65,7 @@ public sealed class SettingsVisualCapturePlayModeTests
     }
 
     static void Capture(Canvas canvas, string directory, string fileName,
-        int width, int height)
+        int width, int height, Rect safeArea)
     {
         string path = Path.Combine(directory, fileName);
         if (File.Exists(path)) File.Delete(path);
@@ -89,7 +94,7 @@ public sealed class SettingsVisualCapturePlayModeTests
             canvas.worldCamera = camera;
             canvas.planeDistance = 10f;
             Canvas.ForceUpdateCanvases();
-            ApplySettingsSafeArea(canvas, width, height);
+            ApplySettingsSafeArea(canvas, width, height, safeArea);
             Canvas.ForceUpdateCanvases();
             Transform settingsRoot = Find(canvas.transform, "SettingsVisualRoot");
             Assert.That(settingsRoot, Is.Not.Null, "Missing SettingsVisualRoot.");
@@ -187,7 +192,8 @@ public sealed class SettingsVisualCapturePlayModeTests
             rightEdge.ToString("F2") + ".");
     }
 
-    static void ApplySettingsSafeArea(Canvas canvas, int width, int height)
+    static void ApplySettingsSafeArea(Canvas canvas, int width, int height,
+        Rect safeArea)
     {
         Transform safe = Find(canvas.transform, "SettingsSafeRoot");
         Assert.That(safe, Is.Not.Null);
@@ -199,7 +205,7 @@ public sealed class SettingsVisualCapturePlayModeTests
         var viewport = new Rect(0f, 0f, width, height);
         apply.Invoke(owner, new object[]
         {
-            viewport, viewport, new Vector2(1080f, 1920f)
+            viewport, safeArea, new Vector2(1080f, 1920f)
         });
     }
 

@@ -38,10 +38,10 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
     const string MascotSevenResource = "reference/mascot_7_exact";
     const string HeroBoyResource = "phase2a/hol_menu_boy_arms_crossed_r3";
     const string HeroGirlResource = "phase2a/hol_menu_girl_forward_fist_r3";
-    const string GoldCtaResource = "phase2a/hol_cta_gold_r2_9s";
-    const string BlueCtaResource = "phase2a/hol_cta_blue_r2_9s";
-    const string MagentaCtaResource = "phase2a/hol_cta_magenta_r2_9s";
-    const string ChipFrameResource = "phase2a/hol_player_chip_r2_9s";
+    const string GoldCtaResource = "mainmenu/mainmenu_cta_gold_9s";
+    const string BlueCtaResource = "mainmenu/mainmenu_cta_blue_9s";
+    const string MagentaCtaResource = "mainmenu/mainmenu_cta_magenta_9s";
+    const string ChipFrameResource = "mainmenu/mainmenu_player_chip_frame_9s";
     const string TipFrameResource = "mainmenu/mainmenu_tip_frame_9s";
     const string TipIconResource = "mainmenu/mainmenu_icon_tip_bulb";
     const string GearResource = "phase2a/hol_settings_gear_r2";
@@ -49,8 +49,6 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
     const string PrivateIconResource = "phase2a/hol_mode_private_r2";
     const string DailyIconResource = "phase2a/hol_mode_daily_r2";
     const string ChevronResource = "phase2a/hol_chevron_r2";
-    const string DisplayFontResource = "phase2a/fonts/HOL Menu Display SDF";
-    const string BodyFontResource = "phase2a/fonts/HOL Menu Body SDF";
 
     static readonly Color Ink = new Color(0.09f, 0.06f, 0.22f, 1f);
     static readonly Color GoldLight = new Color(1f, 0.68f, 0.08f, 1f);
@@ -70,7 +68,10 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
 
     public static readonly string[] LoadedFontResources =
     {
-        DisplayFontResource, BodyFontResource
+        "Themes/Cartoon/Fonts/Cartoon Montserrat ExtraBold SDF",
+        "Themes/Cartoon/Fonts/Cartoon Plus Jakarta Sans Medium SDF",
+        "Themes/Cartoon/Fonts/Cartoon Noto Sans ExtraBold SDF",
+        "Themes/Cartoon/Fonts/Cartoon Noto Sans Medium SDF"
     };
 
     RectTransform visualRoot;
@@ -87,8 +88,6 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
     RectTransform dailyButtonRect;
     RectTransform tipRect;
     TMP_Text chipText;
-    TMP_FontAsset displayFont;
-    TMP_FontAsset bodyFont;
     bool laidOut;
     bool compactLayout;
     int lastLayoutWidth = -1;
@@ -203,34 +202,35 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
             return;
         }
 
-        var background = LoadRequired(BackgroundResource);
-        var logo = LoadRequired(LogoResource);
-        var avatar = LoadRequired(AvatarResource);
-        var six = LoadRequired(MascotSixResource);
-        var seven = LoadRequired(MascotSevenResource);
-        var heroBoy = LoadRequired(HeroBoyResource);
-        var heroGirl = LoadRequired(HeroGirlResource);
-        var gold = LoadRequired(GoldCtaResource);
-        var cyan = LoadRequired(BlueCtaResource);
-        var magenta = LoadRequired(MagentaCtaResource);
-        var chipFrame = LoadRequired(ChipFrameResource);
-        var tipFrame = LoadRequired(TipFrameResource);
-        var tipIcon = LoadRequired(TipIconResource);
-        var gear = LoadRequired(GearResource);
-        var soloIcon = LoadRequired(SoloIconResource);
-        var privateIcon = LoadRequired(PrivateIconResource);
-        var dailyIcon = LoadRequired(DailyIconResource);
-        var chevron = LoadRequired(ChevronResource);
-        displayFont = Resources.Load<TMP_FontAsset>(DisplayFontResource);
-        bodyFont = Resources.Load<TMP_FontAsset>(BodyFontResource);
+        var theme = HolTheme.Current;
+        if (theme == null || !theme.IsComplete)
+        {
+            Debug.LogError("[MainMenuHomeVisuals] Cartoon theme catalog is incomplete.");
+            return;
+        }
+        var background = theme.home.background;
+        var logo = theme.shared.logo;
+        var avatar = theme.shared.playerPortrait;
+        var six = theme.shared.mascotSix;
+        var seven = theme.shared.mascotSeven;
+        var heroBoy = theme.home.heroBoy;
+        var heroGirl = theme.home.heroGirl;
+        var gold = theme.shared.primaryButton;
+        var cyan = theme.shared.secondaryBlueButton;
+        var magenta = theme.shared.secondaryMagentaButton;
+        var chipFrame = theme.shared.playerChip;
+        var tipFrame = theme.shared.neutralPanel;
+        var tipIcon = theme.home.tipIcon;
+        var gear = theme.home.settingsGear;
+        var soloIcon = theme.home.soloIcon;
+        var privateIcon = theme.home.privateRoomIcon;
+        var dailyIcon = theme.home.dailyHuntIcon;
+        var chevron = theme.shared.chevron;
 
         IsReady = RequiredArtReady(background, logo, avatar, six, seven,
             heroBoy, heroGirl,
             gold, cyan, magenta, chipFrame, tipFrame, tipIcon, gear, soloIcon,
-            privateIcon, dailyIcon, chevron) &&
-            displayFont != null && bodyFont != null;
-        if (displayFont == null || bodyFont == null)
-            Debug.LogError("[MainMenuHomeVisuals] Missing Phase 2A TMP font assets.");
+            privateIcon, dailyIcon, chevron);
         if (!IsReady) return;
 
         HideLegacyHome(canvas.transform);
@@ -282,12 +282,12 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
 
         RestyleGear(safeRoot, gear);
         BuildChip(safeRoot, chipFrame, avatar);
-        soloButtonRect = RestyleCta(safeRoot, "ButtonPlay", gold,
+        soloButtonRect = RestyleCta(safeRoot, "ButtonPlay", gold, null,
             "HomeSoloTitle", "home_solo_title", true);
         privateButtonRect = RestyleCta(safeRoot, "ButtonPvP", cyan,
-            "HomePrivateTitle", "home_private_title", false);
+            privateIcon, "HomePrivateTitle", "home_private_title", false);
         dailyButtonRect = RestyleCta(safeRoot, "DailyHuntButton", gold,
-            "HomeDailyTitle", "home_daily_title", false);
+            dailyIcon, "HomeDailyTitle", "home_daily_title", false);
         BuildTip(safeRoot, tipFrame, tipIcon);
         ApplyResponsiveLayout(true);
         RefreshChip();
@@ -306,27 +306,18 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
             image.sprite = gear;
             // Preserve the scene-authored Button hit target, but render the
             // approved unboxed cyan gear with live vector geometry.
-            image.color = new Color(1f, 1f, 1f, 0.002f);
+            image.color = Color.white;
             image.type = Image.Type.Simple;
             image.preserveAspect = true;
             image.raycastTarget = true;
         }
         HideChildLabels(button.transform);
-        HideChildGraphics(button.transform);
-
-        var symbol = EnsureRect(button.transform, "HomeSettingsGearSymbol");
-        Place(symbol, Vector2.zero, new Vector2(112f, 112f));
-        if (symbol.GetComponent<CanvasRenderer>() == null)
-            symbol.gameObject.AddComponent<CanvasRenderer>();
-        var graphic = symbol.GetComponent<MainMenuReferenceIconGraphic>();
-        if (graphic == null)
-            graphic = symbol.gameObject.AddComponent<MainMenuReferenceIconGraphic>();
-        graphic.Configure(MainMenuReferenceIconKind.Gear);
-        graphic.raycastTarget = false;
+        var obsolete = button.transform.Find("HomeSettingsGearSymbol");
+        if (obsolete != null) obsolete.gameObject.SetActive(false);
     }
 
     RectTransform RestyleCta(
-        Transform safe, string buttonName, Sprite frame,
+        Transform safe, string buttonName, Sprite frame, Sprite iconSprite,
         string titleName, string titleKey, bool primary)
     {
         var button = FindButton(buttonName);
@@ -343,10 +334,11 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
             image.sprite = frame;
             // Keep the scene-authored Image as the Button hit target while the
             // deterministic chamfered surface below owns visible rendering.
-            image.color = new Color(1f, 1f, 1f, 0.002f);
-            image.type = Image.Type.Simple;
+            image.color = Color.white;
+            image.type = Image.Type.Sliced;
             image.preserveAspect = false;
             image.raycastTarget = true;
+            button.targetGraphic = image;
         }
 
         Color accent = primary
@@ -355,7 +347,7 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         ConfigureCtaMaterial(button, frame, accent, primary);
 
         var title = EnsureTmp(button.transform, titleName, primary ? 76f : 48f);
-        ApplyDisplayFont(title);
+        ApplyFont(title, primary ? HolTextRole.PrimaryCta : HolTextRole.SecondaryCta);
         title.fontSize = primary ? 76f : 48f;
         title.color = Ink;
         title.alignment = primary
@@ -368,7 +360,7 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         RuntimeUI.ConfigureText(title, ResponsiveTextRole.Action,
             primary ? 76f : 48f);
         title.enableWordWrapping = !primary;
-        ApplyDisplayFont(title);
+        ApplyFont(title, primary ? HolTextRole.PrimaryCta : HolTextRole.SecondaryCta);
         title.characterSpacing = primary ? -2f : -1f;
         Place(title.rectTransform,
             primary ? Vector2.zero : new Vector2(52f, 0f),
@@ -378,18 +370,10 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
 
         if (!primary)
         {
-            var iconRect = EnsureRect(button.transform,
+            var icon = EnsureImage(button.transform,
                 buttonName == "ButtonPvP" ? PrivateIconName : DailyIconName);
-            Place(iconRect, new Vector2(-154f, 0f), new Vector2(128f, 128f));
-            if (iconRect.GetComponent<CanvasRenderer>() == null)
-                iconRect.gameObject.AddComponent<CanvasRenderer>();
-            var iconGraphic = iconRect.GetComponent<MainMenuReferenceIconGraphic>();
-            if (iconGraphic == null)
-                iconGraphic = iconRect.gameObject.AddComponent<MainMenuReferenceIconGraphic>();
-            iconGraphic.Configure(buttonName == "ButtonPvP"
-                ? MainMenuReferenceIconKind.PrivateRoom
-                : MainMenuReferenceIconKind.DailyHunt);
-            iconGraphic.raycastTarget = false;
+            ConfigureImage(icon, iconSprite, true);
+            Place(icon.rectTransform, new Vector2(-154f, 0f), new Vector2(128f, 128f));
         }
         return rect;
     }
@@ -408,49 +392,26 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         button.transition = Selectable.Transition.ColorTint;
         button.colors = colors;
 
-        var surface = button.GetComponent<MainMenuCtaLuminousSurface>();
-        if (surface == null)
-            surface = button.gameObject.AddComponent<MainMenuCtaLuminousSurface>();
-        surface.Configure(frame, accent, primary);
+        var oldSurface = button.transform.Find("HomeCtaInnerLight");
+        if (oldSurface != null) oldSurface.gameObject.SetActive(false);
     }
 
     void BuildChip(Transform safe, Sprite frame, Sprite avatar)
     {
         var chip = EnsureImage(safe, ChipName);
         chip.sprite = frame;
-        chip.color = new Color(1f, 1f, 1f, 0.002f);
-        chip.type = Image.Type.Simple;
+        chip.color = Color.white;
+        chip.type = Image.Type.Sliced;
         chip.raycastTarget = false;
         Place(chip.rectTransform, new Vector2(360f, 820f), new Vector2(330f, 120f));
         chipRect = chip.rectTransform;
 
-        var surface = EnsureRect(chip.transform, "HomePlayerChipSurface");
-        Stretch(surface);
-        surface.SetAsFirstSibling();
-        if (surface.GetComponent<CanvasRenderer>() == null)
-            surface.gameObject.AddComponent<CanvasRenderer>();
-        var surfaceGraphic = surface.GetComponent<MainMenuPlayerChipGraphic>();
-        if (surfaceGraphic == null)
-            surfaceGraphic = surface.gameObject.AddComponent<MainMenuPlayerChipGraphic>();
-        surfaceGraphic.raycastTarget = false;
-
         var avatarImage = EnsureImage(chip.transform, "HomePlayerAvatar");
         ConfigureImage(avatarImage, avatar, true);
-        avatarImage.color = new Color(1f, 1f, 1f, 0.002f);
         Place(avatarImage.rectTransform, new Vector2(-105f, -1f), new Vector2(78f, 78f));
 
-        var avatarSymbol = EnsureRect(chip.transform, "HomePlayerAvatarSymbol");
-        Place(avatarSymbol, new Vector2(-105f, -1f), new Vector2(78f, 78f));
-        if (avatarSymbol.GetComponent<CanvasRenderer>() == null)
-            avatarSymbol.gameObject.AddComponent<CanvasRenderer>();
-        var avatarGraphic = avatarSymbol.GetComponent<MainMenuReferenceIconGraphic>();
-        if (avatarGraphic == null)
-            avatarGraphic = avatarSymbol.gameObject.AddComponent<MainMenuReferenceIconGraphic>();
-        avatarGraphic.Configure(MainMenuReferenceIconKind.Player);
-        avatarGraphic.raycastTarget = false;
-
         chipText = EnsureTmp(chip.transform, ChipTextName, 27f);
-        ApplyDisplayFont(chipText);
+        ApplyFont(chipText, HolTextRole.Emphasis);
         chipText.alignment = TextAlignmentOptions.MidlineLeft;
         chipText.color = ConvergingLight.NearWhite;
         chipText.raycastTarget = false;
@@ -478,7 +439,7 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         Place(icon.rectTransform, new Vector2(-365f, 0f), new Vector2(104f, 104f));
 
         var title = EnsureTmp(tip.transform, "HomeTipTitle", 34f);
-        ApplyDisplayFont(title);
+        ApplyFont(title, HolTextRole.SectionHeading);
         title.color = CyanLight;
         title.alignment = TextAlignmentOptions.MidlineLeft;
         Place(title.rectTransform, new Vector2(72f, 35f), new Vector2(620f, 52f));
@@ -486,7 +447,7 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         AddTextShadow(title, 0.72f);
 
         var body = EnsureTmp(tip.transform, "HomeTipBody", 28f);
-        ApplyBodyFont(body, true);
+        ApplyFont(body, HolTextRole.Body);
         body.color = ConvergingLight.NearWhite;
         body.alignment = TextAlignmentOptions.Left;
         body.enableAutoSizing = true;
@@ -619,18 +580,13 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         shadow.useGraphicAlpha = true;
     }
 
-    void ApplyDisplayFont(TMP_Text text)
+    static void ApplyFont(TMP_Text text, HolTextRole role)
     {
-        if (displayFont != null) text.font = displayFont;
+        CartoonTypography.Bind(text, role);
         text.fontStyle = FontStyles.Normal;
-        text.fontWeight = FontWeight.Bold;
-    }
-
-    void ApplyBodyFont(TMP_Text text, bool semibold)
-    {
-        if (bodyFont != null) text.font = bodyFont;
-        text.fontStyle = semibold ? FontStyles.Bold : FontStyles.Normal;
-        text.fontWeight = semibold ? FontWeight.SemiBold : FontWeight.Regular;
+        text.fontWeight = role == HolTextRole.Body || role == HolTextRole.Small
+            ? FontWeight.Regular
+            : FontWeight.Bold;
     }
 
     static bool RequiredArtReady(params Sprite[] sprites)

@@ -45,6 +45,25 @@ public static class L10n
         return s;
     }
 
+    // Deterministic production-font baking consumes the real localization
+    // corpus rather than maintaining a second, drift-prone character list.
+    public static IEnumerable<string> AllProductionStrings
+    {
+        get
+        {
+            foreach (var pair in Table.Values)
+                for (int i = 0; i < pair.Length; i++)
+                    yield return pair[i];
+        }
+    }
+
+    public static IEnumerable<string> ProductionStrings(Language language)
+    {
+        int index = (int)language;
+        foreach (var pair in Table.Values)
+            yield return pair[index];
+    }
+
     // { English, Greek }
     static readonly Dictionary<string, string[]> Table = new Dictionary<string, string[]>
     {

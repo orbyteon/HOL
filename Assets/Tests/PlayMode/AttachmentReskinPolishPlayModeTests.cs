@@ -64,24 +64,25 @@ public sealed class AttachmentReskinPolishPlayModeTests
         Assert.That(homeTip.sprite.name, Does.Contain("tip_frame"),
             "Polish must not restyle Home chrome owned by MainMenuHomeVisuals.");
         Assert.That(homeTip.GetComponent<Outline>(), Is.Null);
-        var referenceIconType = RuntimeType("MainMenuReferenceIconGraphic");
         var privateIcon = Find(canvas.transform, "HomePrivateIcon");
         var dailyIcon = Find(canvas.transform, "HomeDailyIcon");
         Assert.That(privateIcon, Is.Not.Null,
             "The Home composition requires a private-room symbol.");
         Assert.That(dailyIcon, Is.Not.Null,
             "The Home composition requires a Daily Hunt symbol.");
-        Assert.That(privateIcon.GetComponent(referenceIconType), Is.Not.Null);
-        Assert.That(dailyIcon.GetComponent(referenceIconType), Is.Not.Null);
-        Assert.That(privateIcon.GetComponent<Image>(), Is.Null,
-            "The reference people symbol must not regress to the padded sticker PNG.");
-        Assert.That(dailyIcon.GetComponent<Image>(), Is.Null,
-            "The reference lightning symbol must not regress to the padded sticker PNG.");
-        Canvas.ForceUpdateCanvases();
-        Assert.That((privateIcon.GetComponent(referenceIconType) as Graphic)
-            .canvasRenderer.GetMesh().vertexCount, Is.GreaterThan(40));
-        Assert.That((dailyIcon.GetComponent(referenceIconType) as Graphic)
-            .canvasRenderer.GetMesh().vertexCount, Is.GreaterThan(7));
+        var privateImage = privateIcon.GetComponent<Image>();
+        var dailyImage = dailyIcon.GetComponent<Image>();
+        Assert.That(privateImage, Is.Not.Null);
+        Assert.That(dailyImage, Is.Not.Null);
+        Assert.That(privateImage.sprite.name, Is.EqualTo("hol_mode_private_r2"));
+        Assert.That(dailyImage.sprite.name, Is.EqualTo("hol_mode_daily_r2"));
+        Assert.That(privateImage.color.a, Is.EqualTo(1f).Within(0.0001f));
+        Assert.That(dailyImage.color.a, Is.EqualTo(1f).Within(0.0001f));
+        var referenceIconType = RuntimeType("MainMenuReferenceIconGraphic");
+        Assert.That(privateIcon.GetComponent(referenceIconType), Is.Null,
+            "Approved production artwork must not be replaced by procedural graphics.");
+        Assert.That(dailyIcon.GetComponent(referenceIconType), Is.Null,
+            "Approved production artwork must not be replaced by procedural graphics.");
         Assert.That(Find(canvas.transform, "HomePrivateTitle"), Is.Not.Null);
         Assert.That(Find(canvas.transform, "HomeDailyTitle"), Is.Not.Null);
         Assert.That(Find(canvas.transform, "BoardHomeLogo"), Is.Null);

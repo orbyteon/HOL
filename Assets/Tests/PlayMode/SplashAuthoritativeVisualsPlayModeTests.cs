@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using NUnit.Framework;
+using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
@@ -72,16 +73,47 @@ public sealed class SplashAuthoritativeVisualsPlayModeTests
             "SplashHeroGirl",
             "SplashMascotSix",
             "SplashMascotSeven",
+            "SplashLoadingLabel",
             "SplashProgressTrack");
 
         var progressTrack = DirectChild(safeRoot, "SplashProgressTrack");
         Assert.That(progressTrack, Is.Not.Null);
-        AssertDirectChildren(progressTrack, "SplashProgressFill");
+        AssertDirectChildren(progressTrack, "SplashProgressFill",
+            "SplashProgressGloss", "SplashProgressCap", "SplashProgressFrame");
         var progressFill = DirectChild(progressTrack, "SplashProgressFill").GetComponent<Image>();
         Assert.That(progressFill, Is.Not.Null);
         Assert.That(progressFill.sprite, Is.Not.Null,
             "A filled Image needs a sprite for fillAmount to affect its mesh.");
+        Assert.That(progressFill.sprite.name,
+            Is.EqualTo("SplashProgressFillGradient"));
         Assert.That(progressFill.type, Is.EqualTo(Image.Type.Filled));
+        var progressGloss = DirectChild(progressTrack, "SplashProgressGloss")
+            .GetComponent<Image>();
+        Assert.That(progressGloss.sprite.name,
+            Is.EqualTo("SplashProgressTopGloss"));
+        Assert.That(progressGloss.type, Is.EqualTo(Image.Type.Filled));
+        var progressCap = DirectChild(progressTrack, "SplashProgressCap")
+            .GetComponent<Image>();
+        Assert.That(progressCap.sprite, Is.Not.Null);
+        Assert.That(progressCap.type, Is.EqualTo(Image.Type.Sliced));
+        var progressFrame = DirectChild(progressTrack, "SplashProgressFrame")
+            .GetComponent<Image>();
+        Assert.That(progressFrame.sprite.name,
+            Is.EqualTo("hol_loading_track_r2_9s"));
+        Assert.That(progressFrame.type, Is.EqualTo(Image.Type.Sliced));
+        Assert.That(progressFrame.color.a, Is.EqualTo(1f).Within(0.0001f));
+        Assert.That(progressFrame.transform.GetSiblingIndex(),
+            Is.EqualTo(progressTrack.childCount - 1),
+            "The approved loading frame must render above additive fill effects.");
+        var trackImage = progressTrack.GetComponent<Image>();
+        Assert.That(trackImage.sprite.name, Is.EqualTo("hol_loading_track_r2_9s"));
+        Assert.That(trackImage.color.a, Is.EqualTo(1f).Within(0.0001f));
+        Assert.That(trackImage.type, Is.EqualTo(Image.Type.Sliced));
+        var loadingLabel = DirectChild(safeRoot, "SplashLoadingLabel")
+            .GetComponent<TMP_Text>();
+        Assert.That(loadingLabel, Is.Not.Null);
+        Assert.That(loadingLabel.text, Is.Not.Empty);
+        Assert.That(loadingLabel.font.name, Does.Contain("Plus Jakarta Sans"));
 
         var expectedLayout = new[]
         {
@@ -105,8 +137,10 @@ public sealed class SplashAuthoritativeVisualsPlayModeTests
                 new Vector2(-340f, -420f), new Vector2(240f, 320f)),
             new LayoutExpectation("SplashMascotSeven",
                 new Vector2(340f, -420f), new Vector2(230f, 320f)),
+            new LayoutExpectation("SplashLoadingLabel",
+                new Vector2(0f, -665f), new Vector2(720f, 72f)),
             new LayoutExpectation("SplashProgressTrack",
-                new Vector2(0f, -770f), new Vector2(480f, 8f))
+                new Vector2(0f, -755f), new Vector2(760f, 116f))
         };
         foreach (var expected in expectedLayout)
             AssertLayout(safeRoot, expected.Name, expected.Position, expected.Size);
@@ -193,14 +227,20 @@ public sealed class SplashAuthoritativeVisualsPlayModeTests
         Assert.That(progress, Is.Not.Null);
         var fill = progress.GetComponent<Image>();
         Assert.That(fill, Is.Not.Null);
+        var cap = FindByName(scene, "SplashProgressCap").GetComponent<Image>();
+        Assert.That(cap, Is.Not.Null);
 
         float previous = fill.fillAmount;
+        float previousCapX = cap.rectTransform.anchoredPosition.x;
         float deadline = Time.realtimeSinceStartup + 2.6f;
         while (Time.realtimeSinceStartup < deadline)
         {
             yield return null;
             Assert.That(fill.fillAmount, Is.GreaterThanOrEqualTo(previous));
+            Assert.That(cap.rectTransform.anchoredPosition.x,
+                Is.GreaterThanOrEqualTo(previousCapX - Tolerance));
             previous = fill.fillAmount;
+            previousCapX = cap.rectTransform.anchoredPosition.x;
         }
         Assert.That(fill.fillAmount, Is.EqualTo(1f).Within(Tolerance));
     }

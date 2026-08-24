@@ -112,6 +112,11 @@ public enum ResponsiveTextRole
     Compact
 }
 
+// Explicit opt-out for compact production controls whose approved label must
+// remain on one line. The shared language repaint honors this marker instead
+// of re-enabling wrapping after a presenter has deliberately disabled it.
+public sealed class ResponsiveNoWrapText : MonoBehaviour { }
+
 /// <summary>
 /// One bounded TMP policy for English and Greek. Existing configured font
 /// sizes remain the maximum; autosizing may only shrink to the explicit floor,
@@ -162,7 +167,8 @@ public static class ResponsiveTextPolicy
         text.fontSizeMin = preserveExistingMinimum
             ? Mathf.Min(maximum, text.fontSizeMin)
             : Mathf.Min(maximum, Mathf.Max(absoluteFloor, maximum * factor));
-        text.enableWordWrapping = role != ResponsiveTextRole.Input;
+        text.enableWordWrapping = role != ResponsiveTextRole.Input &&
+                                  text.GetComponent<ResponsiveNoWrapText>() == null;
         text.overflowMode = TextOverflowModes.Ellipsis;
     }
 

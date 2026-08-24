@@ -1,0 +1,79 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ee6a8955639949a4a7572e5d777132d4, type: 3}
+  m_Name: CartoonThemeCatalog
+  m_EditorClassIdentifier:
+  typography:
+    montserratExtraBold: {fileID: 11400000, guid: 91cd7b34b4e64aa4abbc5fdcfc811a56, type: 2}
+    montserratBold: {fileID: 11400000, guid: ce14b428e03ca254f931ee0790ea9a4b, type: 2}
+    plusJakartaSemiBold: {fileID: 11400000, guid: 1254b1ba2d602364499de8ae8348dd3b, type: 2}
+    plusJakartaMedium: {fileID: 11400000, guid: 42b3ff9c7ab184548a62865ff36d5ae1, type: 2}
+    plusJakartaRegular: {fileID: 11400000, guid: 3a539ed6e4724fd4da514c0893fb8dcd, type: 2}
+    notoSansExtraBold: {fileID: 11400000, guid: 1df88f86485d1d4479fb9e7c7c6d64c5, type: 2}
+    notoSansBold: {fileID: 11400000, guid: 94124a568319c9c4d9daaa223f39a625, type: 2}
+    notoSansSemiBold: {fileID: 11400000, guid: 027a4c8178c09a842a833ad3fd73a9ed, type: 2}
+    notoSansMedium: {fileID: 11400000, guid: c6e094524bdec044e9e556d0bb90fa35, type: 2}
+    notoSansRegular: {fileID: 11400000, guid: d9c9b6fc012fd9c41a22a756977fb734, type: 2}
+  shared:
+    logo: {fileID: 21300000, guid: 8e2864a8bfdd4c189b6a35f205a58dde, type: 3}
+    mascotSix: {fileID: 21300000, guid: 51fb46ab22cc43d1af5528a7d33eb334, type: 3}
+    mascotSeven: {fileID: 21300000, guid: 07ea74f5b58d4e8181230e83a9596b25, type: 3}
+    mascotThree: {fileID: 21300000, guid: 4b85f35177594801b71026fa9e83a7ee, type: 3}
+    heroBoy: {fileID: 21300000, guid: 982f75543e8b4957ab7d703953007a42, type: 3}
+    heroGirl: {fileID: 21300000, guid: 1d158f1d18d44752ba5f92af90bccb6f, type: 3}
+    playerPortrait: {fileID: 21300000, guid: e48f89b0bb0743f9a913f37e184c5cc8, type: 3}
+    opponent: {fileID: 21300000, guid: 34c21d8d58b54355957e06c88c559ba8, type: 3}
+    primaryButton: {fileID: 21300000, guid: f0874a1226d44f9fbf0f169315332a9c, type: 3}
+    secondaryBlueButton: {fileID: 21300000, guid: c7ece060c94147ca80e85a04fb370c53, type: 3}
+    secondaryMagentaButton: {fileID: 21300000, guid: ea0750f3a6a5455db20d725f16c93a47, type: 3}
+    neutralPanel: {fileID: 21300000, guid: 3b4aaab144c84ae6b4bef6028e820f35, type: 3}
+    playerChip: {fileID: 21300000, guid: 528cdd3570534688ab0e3051be6e0dd4, type: 3}
+    chevron: {fileID: 21300000, guid: f9a8831004471894291c0a18adeb13fb, type: 3}
+    backButton: {fileID: 0}
+  splash:
+    background: {fileID: 21300000, guid: c87a30bc68dc464e95883902e8e35a4e, type: 3}
+    heroBoy: {fileID: 21300000, guid: 676e8feda9b941ddab82783595f96ad8, type: 3}
+    heroGirl: {fileID: 21300000, guid: 50d1b6b992914bfa95f1f71dacbafbb1, type: 3}
+    stars: {fileID: 21300000, guid: d58d963efcc148d695ab6617eb9f8f12, type: 3}
+    lightning: {fileID: 21300000, guid: ae3bfc554b3047659d021de250768f70, type: 3}
+    confetti: {fileID: 21300000, guid: bb6192018de448408ba65ce14ceb900c, type: 3}
+    numbers: {fileID: 21300000, guid: 20a59c24c83246f18525db40b9be2dde, type: 3}
+    logoGlow: {fileID: 21300000, guid: 669dcb8162264d2f85e1ececcd60ab3e, type: 3}
+    loadingTrack: {fileID: 21300000, guid: fcb021cfe54281b4bb8c48d3f35d31ae, type: 3}
+  home:
+    background: {fileID: 21300000, guid: c1071e21fb9d4d5780423b4fa2082ffb, type: 3}
+    heroBoy: {fileID: 21300000, guid: 2de326f9defc4959a0561e7df8f9d4c9, type: 3}
+    heroGirl: {fileID: 21300000, guid: 47219a2208a84c7b87df322623021677, type: 3}
+    settingsGear: {fileID: 21300000, guid: ee9cf40cf3ebb41468a6c0334c6230d4, type: 3}
+    soloIcon: {fileID: 21300000, guid: 1a220f5001dcfb14ca9a1213b755d9a2, type: 3}
+    privateRoomIcon: {fileID: 21300000, guid: 69482754a340ef24cb5ab1eeca3a3615, type: 3}
+    dailyHuntIcon: {fileID: 21300000, guid: 5c6674a21ddf03d4293c7789d725201d, type: 3}
+    streakIcon: {fileID: 21300000, guid: f878b68a8c99426584dab50366807784, type: 3}
+    tipIcon: {fileID: 21300000, guid: 9447131739194602ae58382e78a83629, type: 3}
+  settings:
+    background: {fileID: 21300000, guid: f11eaa0aa2644d548a4eff39aec76855, type: 3}
+    playerIcon: {fileID: 21300000, guid: 053d1bd395874d05b591154e775daa6f, type: 3}
+    languageIcon: {fileID: 21300000, guid: 5f55667f593f41d2a6cd2e7261ade7b4, type: 3}
+    musicIcon: {fileID: 21300000, guid: aeb7ffa16c244639a0bca7db5f6a275f, type: 3}
+    difficultyIcon: {fileID: 21300000, guid: a50449eb534f41ed9c359649106ff3ad, type: 3}
+    privacyIcon: {fileID: 21300000, guid: 4d807d7322834ec6adb4db06d1d78695, type: 3}
+    blueButton: {fileID: 21300000, guid: c7ece060c94147ca80e85a04fb370c53, type: 3}
+    goldButton: {fileID: 21300000, guid: f0874a1226d44f9fbf0f169315332a9c, type: 3}
+    neutralButton: {fileID: 21300000, guid: 3b4aaab144c84ae6b4bef6028e820f35, type: 3}
+    playerChip: {fileID: 21300000, guid: 528cdd3570534688ab0e3051be6e0dd4, type: 3}
+    chevron: {fileID: 21300000, guid: f9a8831004471894291c0a18adeb13fb, type: 3}
+  referenceResolution: {x: 1080, y: 1920}
+  safeMargin: 48
+  compactGap: 16
+  standardGap: 24
+  sectionGap: 40
+  minimumTouchTarget: 88

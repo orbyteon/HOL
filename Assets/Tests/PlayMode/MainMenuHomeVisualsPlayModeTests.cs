@@ -105,11 +105,8 @@ public sealed class MainMenuHomeVisualsPlayModeTests
             .Invoke(owner, new object[] { 1080, true });
         Assert.That(settings.GetComponent<Image>().sprite, Is.SameAs(
             Resources.Load<Sprite>("phase2a/hol_settings_gear_r2")));
-        var referenceIconType = RuntimeType("MainMenuReferenceIconGraphic");
-        var gearSymbol = Find(settings.transform, "HomeSettingsGearSymbol");
-        Assert.That(gearSymbol, Is.Not.Null);
-        Assert.That(gearSymbol.GetComponent(referenceIconType), Is.Not.Null,
-            "Settings must use the unboxed cyan reference gear.");
+        Assert.That(settings.GetComponent<Image>().color.a,
+            Is.EqualTo(1f).Within(0.0001f));
         var playRect = play.transform as RectTransform;
         var pvpRect = pvp.transform as RectTransform;
         var huntRect = hunt.transform as RectTransform;
@@ -142,21 +139,18 @@ public sealed class MainMenuHomeVisualsPlayModeTests
         Assert.That(play.GetComponent<Image>().sprite.name, Does.Contain("gold"));
         Assert.That(pvp.GetComponent<Image>().sprite.name, Does.Contain("blue"));
         Assert.That(hunt.GetComponent<Image>().sprite.name, Does.Contain("gold"));
-        var luminousType = RuntimeType("MainMenuCtaLuminousSurface");
-        var chamferedType = RuntimeType("MainMenuChamferedCtaGraphic");
         foreach (var button in new[] { play, pvp, hunt })
         {
-            Assert.That(button.GetComponent(luminousType), Is.Not.Null,
-                button.name + " must use the live luminous CTA material.");
-            var surface = Find(button.transform, "HomeCtaInnerLight");
-            Assert.That(surface, Is.Not.Null);
-            Assert.That(surface.GetComponent(chamferedType), Is.Not.Null,
-                button.name + " must render the approved chamfered CTA silhouette.");
-            Canvas.ForceUpdateCanvases();
-            var surfaceGraphic = surface.GetComponent(chamferedType) as Graphic;
-            Assert.That(surfaceGraphic.canvasRenderer.GetMesh().vertexCount,
-                Is.GreaterThan(50),
-                button.name + " chamfered material must contribute visible mesh geometry.");
+            var image = button.GetComponent<Image>();
+            Assert.That(image.color.a, Is.EqualTo(1f).Within(0.0001f),
+                button.name + " approved production artwork must be visible.");
+            Assert.That(image.type, Is.EqualTo(Image.Type.Sliced),
+                button.name + " must preserve its approved nine-slice borders.");
+            Assert.That(button.targetGraphic, Is.SameAs(image));
+            foreach (var graphic in button.GetComponentsInChildren<Graphic>(true))
+                Assert.That(graphic.GetType().Name,
+                    Is.Not.EqualTo("MainMenuChamferedCtaGraphic"),
+                    button.name + " must not place a procedural replacement over approved artwork.");
             Assert.That(Find(button.transform, "HomeCtaTopGloss"), Is.Null,
                 "The native frame owns its curved gloss; no flat overlay may cover it.");
             Assert.That(Find(button.transform, "HomeCtaMovingSheen"), Is.Null,
@@ -171,36 +165,32 @@ public sealed class MainMenuHomeVisualsPlayModeTests
         var dailyIcon = Find(hunt.transform, "HomeDailyIcon");
         Assert.That(privateIcon, Is.Not.Null);
         Assert.That(dailyIcon, Is.Not.Null);
-        Assert.That(privateIcon.GetComponent(referenceIconType), Is.Not.Null);
-        Assert.That(dailyIcon.GetComponent(referenceIconType), Is.Not.Null);
-        Assert.That(privateIcon.GetComponent<Image>(), Is.Null,
-            "The reference people symbol must not reuse the padded sticker PNG.");
-        Assert.That(dailyIcon.GetComponent<Image>(), Is.Null,
-            "The reference lightning symbol must not reuse the padded sticker PNG.");
+        Assert.That(privateIcon.GetComponent<Image>().sprite.name,
+            Is.EqualTo("hol_mode_private_r2"));
+        Assert.That(dailyIcon.GetComponent<Image>().sprite.name,
+            Is.EqualTo("hol_mode_daily_r2"));
+        Assert.That(privateIcon.GetComponent<Image>().color.a, Is.EqualTo(1f));
+        Assert.That(dailyIcon.GetComponent<Image>().color.a, Is.EqualTo(1f));
         Assert.That(((RectTransform)privateIcon).sizeDelta.x, Is.GreaterThanOrEqualTo(120f));
         Assert.That(((RectTransform)dailyIcon).sizeDelta.x, Is.GreaterThanOrEqualTo(120f));
         Assert.That(Find(play.transform, "HomeActionChevron"), Is.Null);
         Assert.That(Find(pvp.transform, "HomeActionChevron"), Is.Null);
         Assert.That(Find(hunt.transform, "HomeActionChevron"), Is.Null,
             "The authoritative reference buttons do not contain chevrons.");
-        Canvas.ForceUpdateCanvases();
-        Assert.That((privateIcon.GetComponent(referenceIconType) as Graphic)
-            .canvasRenderer.GetMesh().vertexCount, Is.GreaterThan(40));
-        Assert.That((dailyIcon.GetComponent(referenceIconType) as Graphic)
-            .canvasRenderer.GetMesh().vertexCount, Is.GreaterThan(7));
-
-        var chipSurface = Find(canvas.transform, "HomePlayerChipSurface");
-        var avatarSymbol = Find(canvas.transform, "HomePlayerAvatarSymbol");
-        Assert.That(chipSurface, Is.Not.Null);
-        Assert.That(chipSurface.GetComponent(RuntimeType("MainMenuPlayerChipGraphic")),
-            Is.Not.Null);
-        Assert.That(avatarSymbol, Is.Not.Null);
-        Assert.That(avatarSymbol.GetComponent(referenceIconType), Is.Not.Null);
+        var chipImage = Find(canvas.transform, "HomePlayerChip").GetComponent<Image>();
+        var avatarImage = Find(canvas.transform, "HomePlayerAvatar").GetComponent<Image>();
+        Assert.That(chipImage.color.a, Is.EqualTo(1f));
+        Assert.That(chipImage.type, Is.EqualTo(Image.Type.Sliced));
+        Assert.That(chipImage.sprite.name, Is.EqualTo("mainmenu_player_chip_frame_9s"));
+        Assert.That(avatarImage.color.a, Is.EqualTo(1f));
+        Assert.That(avatarImage.sprite.name, Is.EqualTo("player_cyan_exact"));
+        Assert.That(Find(canvas.transform, "HomePlayerChipSurface"), Is.Null);
+        Assert.That(Find(canvas.transform, "HomePlayerAvatarSymbol"), Is.Null);
 
         var displayFont = Resources.Load<TMP_FontAsset>(
-            "phase2a/fonts/HOL Menu Display SDF");
+            "Themes/Cartoon/Fonts/Cartoon Montserrat ExtraBold SDF");
         var bodyFont = Resources.Load<TMP_FontAsset>(
-            "phase2a/fonts/HOL Menu Body SDF");
+            "Themes/Cartoon/Fonts/Cartoon Plus Jakarta Sans Medium SDF");
         Assert.That(displayFont, Is.Not.Null);
         Assert.That(bodyFont, Is.Not.Null);
         Assert.That(displayFont.atlasPopulationMode,
@@ -210,9 +200,11 @@ public sealed class MainMenuHomeVisualsPlayModeTests
         Assert.That(Find(play.transform, "HomeSoloTitle").GetComponent<TMP_Text>().font,
             Is.SameAs(displayFont));
         Assert.That(Find(pvp.transform, "HomePrivateTitle").GetComponent<TMP_Text>().font,
-            Is.SameAs(displayFont));
+            Is.SameAs(Resources.Load<TMP_FontAsset>(
+                "Themes/Cartoon/Fonts/Cartoon Montserrat Bold SDF")));
         Assert.That(Find(hunt.transform, "HomeDailyTitle").GetComponent<TMP_Text>().font,
-            Is.SameAs(displayFont));
+            Is.SameAs(Resources.Load<TMP_FontAsset>(
+                "Themes/Cartoon/Fonts/Cartoon Montserrat Bold SDF")));
         Assert.That(Find(play.transform, "HomeSoloSubtitle"), Is.Null);
         Assert.That(Find(pvp.transform, "HomePrivateSubtitle"), Is.Null);
         Assert.That(Find(hunt.transform, "HomeDailySubtitle"), Is.Null,

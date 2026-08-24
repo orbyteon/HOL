@@ -203,6 +203,13 @@ public sealed class SettingsVisualsPlayModeTests
                 "mainmenu_tip_frame_9s");
 
             var adaptive = Find(root, "Difficulty3").GetComponent<Button>();
+            var adaptiveLabel = adaptive.GetComponentInChildren<TMP_Text>(true);
+            Assert.That(adaptiveLabel.enableWordWrapping, Is.False,
+                "Compact difficulty labels must stay single-line after language repaint.");
+            Assert.That(adaptiveLabel.text, Is.EqualTo("Προσαρμοστικό"));
+            adaptiveLabel.ForceMeshUpdate();
+            Assert.That(adaptiveLabel.isTextOverflowing, Is.False,
+                "The complete Greek adaptive label must remain visible at phone width.");
             adaptive.onClick.Invoke();
             yield return null;
             Assert.That(PlayerPrefs.GetInt("AIDifficulty", -1), Is.EqualTo(3),

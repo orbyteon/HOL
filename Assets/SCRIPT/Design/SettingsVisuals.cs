@@ -29,8 +29,6 @@ public sealed class SettingsVisuals : MonoBehaviour
     const string PlayerChipResource = "mainmenu/mainmenu_player_chip_frame_9s";
     const string ChevronResource = "phase2a/hol_chevron_r2";
     const string ButtonStateOverlayName = "SettingsButtonStateOverlay";
-    const string DisplayFontResource = "phase2a/fonts/HOL Menu Display SDF";
-    const string BodyFontResource = "phase2a/fonts/HOL Menu Body SDF";
     const string DifficultyPrefKey = "AIDifficulty";
     const float ReferenceWidth = 1080f;
     const float ReferenceHeight = 1920f;
@@ -44,8 +42,7 @@ public sealed class SettingsVisuals : MonoBehaviour
     RectTransform safeRoot;
     RectTransform shell;
     MenuManager menu;
-    TMP_FontAsset displayFont;
-    TMP_FontAsset bodyFont;
+    CartoonThemeCatalog theme;
     TMP_Text chipName;
     TMP_Text chipStreak;
     SettingsToggleGraphic musicVisual;
@@ -138,8 +135,13 @@ public sealed class SettingsVisuals : MonoBehaviour
     {
         if (built || menu == null || menu.settingsPanel == null) return;
         built = true;
-        displayFont = Resources.Load<TMP_FontAsset>(DisplayFontResource);
-        bodyFont = Resources.Load<TMP_FontAsset>(BodyFontResource);
+        theme = HolTheme.Current;
+        if (theme == null || !theme.IsComplete)
+        {
+            Debug.LogError("[SettingsVisuals] Cartoon theme catalog is incomplete.");
+            built = false;
+            return;
+        }
 
         var page = menu.settingsPanel.transform as RectTransform;
         if (page != null) page.localScale = Vector3.one;
@@ -165,7 +167,7 @@ public sealed class SettingsVisuals : MonoBehaviour
                 canvas.transform as RectTransform,
                 new Vector2(ReferenceWidth, ReferenceHeight));
 
-        AddSprite(safeRoot, "SettingsLogo", LogoResource,
+        AddSprite(safeRoot, "SettingsLogo", theme.shared.logo,
             new Vector2(0f, 740f), new Vector2(500f, 255f));
         BuildBackButton();
         BuildPlayerChip();
@@ -178,7 +180,7 @@ public sealed class SettingsVisuals : MonoBehaviour
 
     void AddBackground(Transform parent)
     {
-        var sprite = Resources.Load<Sprite>(BackgroundResource);
+        var sprite = theme.settings.background;
         var go = RuntimeUI.CreateObject("SettingsReferenceBackground", parent);
         RuntimeUI.Stretch(go);
         var image = go.AddComponent<Image>();
@@ -196,7 +198,7 @@ public sealed class SettingsVisuals : MonoBehaviour
         Seat(back.transform, safeRoot, new Vector2(-455f, 812f),
             new Vector2(124f, 124f));
         StyleButton(back, SettingsSurfaceKind.BackButton, false, 30f);
-        var icon = AddSprite(back.transform, "BackIcon", ChevronResource,
+        var icon = AddSprite(back.transform, "BackIcon", theme.settings.chevron,
             Vector2.zero, new Vector2(62f, 78f));
         if (icon != null)
             icon.rectTransform.localScale = new Vector3(-1f, 1f, 1f);
@@ -209,22 +211,24 @@ public sealed class SettingsVisuals : MonoBehaviour
         PlaceLocal(go.transform as RectTransform, new Vector2(356f, 812f),
             new Vector2(345f, 124f));
         var chip = go.AddComponent<Image>();
-        chip.sprite = Resources.Load<Sprite>(PlayerChipResource);
+        chip.sprite = theme.settings.playerChip;
         chip.type = Image.Type.Sliced;
         chip.pixelsPerUnitMultiplier = 1f;
         chip.preserveAspect = false;
         chip.color = Color.white;
         chip.raycastTarget = false;
 
-        AddSprite(go.transform, "PlayerAvatar", "reference/player_cyan_exact",
+        AddSprite(go.transform, "PlayerAvatar", theme.shared.playerPortrait,
             new Vector2(-126f, -2f), new Vector2(76f, 82f));
 
         chipName = AddText(go.transform, "PlayerName", "", 31,
             new Vector2(35f, 23f), new Vector2(210f, 46f), NearWhite,
-            TextAlignmentOptions.Center, ResponsiveTextRole.Heading, bodyFont);
+            TextAlignmentOptions.Center, ResponsiveTextRole.Heading,
+            HolTextRole.Emphasis);
         chipStreak = AddText(go.transform, "Streak", "", 30,
             new Vector2(55f, -27f), new Vector2(120f, 40f), NearWhite,
-            TextAlignmentOptions.Left, ResponsiveTextRole.Action, bodyFont);
+            TextAlignmentOptions.Left, ResponsiveTextRole.Action,
+            HolTextRole.LiveNumber);
         AddIcon(go.transform, "StreakFlame", SettingsIconKind.Flame,
             new Vector2(-20f, -27f), new Vector2(44f, 44f));
     }
@@ -240,7 +244,8 @@ public sealed class SettingsVisuals : MonoBehaviour
         surface.raycastTarget = false;
         AddLocalized(title.transform, "TitleText", "settings_title_display", 58,
             Vector2.zero, new Vector2(460f, 86f), NearWhite,
-            TextAlignmentOptions.Center, ResponsiveTextRole.Heading, displayFont);
+            TextAlignmentOptions.Center, ResponsiveTextRole.Heading,
+            HolTextRole.Hero);
         AddIcon(safeRoot, "SettingsTitleStarLeft", SettingsIconKind.Star,
             new Vector2(-340f, 540f), new Vector2(92f, 92f));
         AddIcon(safeRoot, "SettingsTitleStarRight", SettingsIconKind.Star,
@@ -274,11 +279,12 @@ public sealed class SettingsVisuals : MonoBehaviour
         var surface = row.AddComponent<SettingsSurfaceGraphic>();
         surface.Configure(SettingsSurfaceKind.Row, false);
         surface.raycastTarget = false;
-        AddSprite(row.transform, name + "Icon", IconResource(icon),
+        AddSprite(row.transform, name + "Icon", IconSprite(icon),
             new Vector2(-365f, 0f), new Vector2(128f, 128f));
         var label = AddLocalized(row.transform, name + "Label", key, labelSize,
             new Vector2(-105f, labelY), new Vector2(360f, 64f), NearWhite,
-            TextAlignmentOptions.Left, ResponsiveTextRole.Heading, displayFont);
+            TextAlignmentOptions.Left, ResponsiveTextRole.Heading,
+            HolTextRole.SectionHeading);
         label.enableWordWrapping = false;
         return rect;
     }
@@ -348,18 +354,18 @@ public sealed class SettingsVisuals : MonoBehaviour
         Vector2[] positions =
         {
             new Vector2(-209f, -43f), new Vector2(-46f, -43f),
-            new Vector2(117f, -43f), new Vector2(296f, -43f)
+            new Vector2(117f, -43f), new Vector2(314f, -43f)
         };
         for (int i = 0; i < difficultyButtons.Length; i++)
         {
             var button = Find<Button>(menu.settingsPanel.transform,
                 "Difficulty" + i);
             difficultyButtons[i] = button;
-            float width = i == 3 ? 188f : i == 1 ? 156f : 142f;
+            float width = i == 3 ? 224f : i == 1 ? 156f : 142f;
             Seat(button == null ? null : button.transform, row, positions[i],
                 new Vector2(width, 82f));
             StyleButton(button, SettingsSurfaceKind.NeutralChoice, false,
-                i == 3 ? 22f : 27f);
+                i == 3 ? 20f : 27f);
             if (button != null)
                 button.onClick.AddListener(RefreshPresentation);
         }
@@ -380,9 +386,9 @@ public sealed class SettingsVisuals : MonoBehaviour
 
     void BuildMascots()
     {
-        AddSprite(safeRoot, "SettingsMascotSix", MascotSixResource,
+        AddSprite(safeRoot, "SettingsMascotSix", theme.shared.mascotSix,
             new Vector2(-385f, -745f), new Vector2(270f, 310f));
-        AddSprite(safeRoot, "SettingsMascotSeven", MascotSevenResource,
+        AddSprite(safeRoot, "SettingsMascotSeven", theme.shared.mascotSeven,
             new Vector2(385f, -745f), new Vector2(270f, 310f));
     }
 
@@ -392,9 +398,9 @@ public sealed class SettingsVisuals : MonoBehaviour
         // AttachmentReskinVisuals may perform a generic late pass when the
         // hierarchy signature changes. Reassert the approved production sprites
         // directly on the real controls; they remain the visible source of truth.
-        SetButtonArtwork(Find<Button>(root, "Buttonback"), NeutralButtonResource);
-        SetButtonArtwork(Find<Button>(root, "Buttonsave"), BlueButtonResource);
-        SetButtonArtwork(Find<Button>(root, "AdsPrivacyButton"), BlueButtonResource);
+        SetButtonArtwork(Find<Button>(root, "Buttonback"), theme.settings.neutralButton);
+        SetButtonArtwork(Find<Button>(root, "Buttonsave"), theme.settings.blueButton);
+        SetButtonArtwork(Find<Button>(root, "AdsPrivacyButton"), theme.settings.blueButton);
 
         string storedPlayerName = PlayerPrefs.GetString("PlayerName", "");
         bool hasStoredPlayerName = !string.IsNullOrWhiteSpace(storedPlayerName);
@@ -405,7 +411,7 @@ public sealed class SettingsVisuals : MonoBehaviour
         if (chipStreak != null) chipStreak.text = GameStats.CurrentStreak.ToString();
         var input = Find<TMP_InputField>(root, "InputField (TMP)");
         if (input != null)
-            SetProductionImage(input.GetComponent<Image>(), NeutralButtonResource);
+            SetProductionImage(input.GetComponent<Image>(), theme.settings.neutralButton);
         if (input != null && !input.isFocused &&
             (!hasStoredPlayerName || string.IsNullOrWhiteSpace(input.text)))
             input.SetTextWithoutNotify(playerName);
@@ -428,12 +434,12 @@ public sealed class SettingsVisuals : MonoBehaviour
         var image = input.GetComponent<Image>();
         if (image != null)
         {
-            SetProductionImage(image, NeutralButtonResource);
+            SetProductionImage(image, theme.settings.neutralButton);
             image.raycastTarget = true;
         }
         if (input.textComponent != null)
         {
-            input.textComponent.font = bodyFont;
+            CartoonTypography.Bind(input.textComponent, HolTextRole.Body);
             input.textComponent.fontSize = 32f;
             input.textComponent.fontStyle = FontStyles.Normal;
             input.textComponent.color = NearWhite;
@@ -444,7 +450,7 @@ public sealed class SettingsVisuals : MonoBehaviour
         var placeholder = input.placeholder as TMP_Text;
         if (placeholder != null)
         {
-            placeholder.font = bodyFont;
+            CartoonTypography.Bind(placeholder, HolTextRole.Small);
             placeholder.fontSize = 30f;
             placeholder.color = new Color(0.78f, 0.80f, 0.92f, 0.82f);
             placeholder.alignment = TextAlignmentOptions.MidlineLeft;
@@ -455,9 +461,9 @@ public sealed class SettingsVisuals : MonoBehaviour
         float fontSize)
     {
         if (button == null) return;
-        string artwork = kind == SettingsSurfaceKind.CyanButton
-            ? BlueButtonResource
-            : selected ? GoldButtonResource : NeutralButtonResource;
+        Sprite artwork = kind == SettingsSurfaceKind.CyanButton
+            ? theme.settings.blueButton
+            : selected ? theme.settings.goldButton : theme.settings.neutralButton;
         SetButtonArtwork(button, artwork);
         var overlay = EnsureButtonStateOverlay(button);
         BindFeedback(button, overlay);
@@ -476,13 +482,16 @@ public sealed class SettingsVisuals : MonoBehaviour
                 textRect.localScale = Vector3.one;
                 textRect.localRotation = Quaternion.identity;
             }
-            text.font = displayFont;
+            CartoonTypography.Bind(text, HolTextRole.SecondaryCta);
             text.fontSize = fontSize;
-            text.fontStyle = FontStyles.Bold;
+            text.fontStyle = FontStyles.Normal;
+            text.fontWeight = FontWeight.Regular;
             text.color = selected ? DarkInk : NearWhite;
             text.alignment = TextAlignmentOptions.Center;
             ResponsiveTextPolicy.Configure(text, ResponsiveTextRole.Action,
                 fontSize);
+            if (text.GetComponent<ResponsiveNoWrapText>() == null)
+                text.gameObject.AddComponent<ResponsiveNoWrapText>();
             text.enableWordWrapping = false;
             text.margin = new Vector4(8f, 3f, 8f, 3f);
             text.overflowMode = TextOverflowModes.Ellipsis;
@@ -515,17 +524,19 @@ public sealed class SettingsVisuals : MonoBehaviour
     void SetButtonSelection(Button button, bool selected)
     {
         if (button == null) return;
-        SetButtonArtwork(button, selected ? GoldButtonResource : NeutralButtonResource);
+        SetButtonArtwork(button, selected
+            ? theme.settings.goldButton
+            : theme.settings.neutralButton);
         var text = button.GetComponentInChildren<TMP_Text>(true);
         if (text != null) text.color = selected ? DarkInk : NearWhite;
     }
 
-    static void SetButtonArtwork(Button button, string resource)
+    static void SetButtonArtwork(Button button, Sprite sprite)
     {
         if (button == null) return;
         var image = button.GetComponent<Image>();
         if (image == null) return;
-        SetProductionImage(image, resource);
+        SetProductionImage(image, sprite);
         image.raycastTarget = true;
         button.targetGraphic = image;
         button.transition = Selectable.Transition.ColorTint;
@@ -551,10 +562,9 @@ public sealed class SettingsVisuals : MonoBehaviour
         }
     }
 
-    static void SetProductionImage(Image image, string resource)
+    static void SetProductionImage(Image image, Sprite sprite)
     {
         if (image == null) return;
-        var sprite = Resources.Load<Sprite>(resource);
         if (sprite == null) return;
         image.enabled = true;
         image.sprite = sprite;
@@ -617,10 +627,10 @@ public sealed class SettingsVisuals : MonoBehaviour
     TMP_Text AddLocalized(Transform parent, string name, string key,
         int size, Vector2 position, Vector2 dimensions, Color color,
         TextAlignmentOptions alignment, ResponsiveTextRole role,
-        TMP_FontAsset font)
+        HolTextRole fontRole)
     {
         var text = AddText(parent, name, L10n.Get(key), size, position,
-            dimensions, color, alignment, role, font);
+            dimensions, color, alignment, role, fontRole);
         RuntimeUI.Localize(text, key);
         return text;
     }
@@ -628,23 +638,23 @@ public sealed class SettingsVisuals : MonoBehaviour
     static TMP_Text AddText(Transform parent, string name, string content,
         int size, Vector2 position, Vector2 dimensions, Color color,
         TextAlignmentOptions alignment, ResponsiveTextRole role,
-        TMP_FontAsset font)
+        HolTextRole fontRole)
     {
         var text = RuntimeUI.CreateText(parent, name, content, size,
             position, dimensions, color);
-        text.font = font;
+        CartoonTypography.Bind(text, fontRole);
         text.alignment = alignment;
-        text.fontStyle = FontStyles.Bold;
+        text.fontStyle = FontStyles.Normal;
+        text.fontWeight = FontWeight.Regular;
         EnsureTextShadow(text, new Color(0.01f, 0f, 0.05f, 0.68f),
             new Vector2(2f, -3f));
         ResponsiveTextPolicy.Configure(text, role, size);
         return text;
     }
 
-    static Image AddSprite(Transform parent, string name, string resource,
+    static Image AddSprite(Transform parent, string name, Sprite sprite,
         Vector2 position, Vector2 size)
     {
-        var sprite = Resources.Load<Sprite>(resource);
         if (sprite == null) return null;
         var go = RuntimeUI.CreateObject(name, parent);
         PlaceLocal(go.transform as RectTransform, position, size);
@@ -655,16 +665,16 @@ public sealed class SettingsVisuals : MonoBehaviour
         return image;
     }
 
-    static string IconResource(SettingsIconKind kind)
+    Sprite IconSprite(SettingsIconKind kind)
     {
         switch (kind)
         {
-            case SettingsIconKind.Player: return PlayerIconResource;
-            case SettingsIconKind.Globe: return LanguageIconResource;
-            case SettingsIconKind.Music: return MusicIconResource;
-            case SettingsIconKind.Brain: return DifficultyIconResource;
-            case SettingsIconKind.Shield: return PrivacyIconResource;
-            default: return string.Empty;
+            case SettingsIconKind.Player: return theme.settings.playerIcon;
+            case SettingsIconKind.Globe: return theme.settings.languageIcon;
+            case SettingsIconKind.Music: return theme.settings.musicIcon;
+            case SettingsIconKind.Brain: return theme.settings.difficultyIcon;
+            case SettingsIconKind.Shield: return theme.settings.privacyIcon;
+            default: return null;
         }
     }
 
@@ -681,18 +691,9 @@ public sealed class SettingsVisuals : MonoBehaviour
 
     bool ControlsReady()
     {
+        var catalog = HolTheme.Current;
         if (menu == null || menu.settingsPanel == null ||
-            Resources.Load<Sprite>(BackgroundResource) == null ||
-            Resources.Load<Sprite>(PlayerIconResource) == null ||
-            Resources.Load<Sprite>(LanguageIconResource) == null ||
-            Resources.Load<Sprite>(MusicIconResource) == null ||
-            Resources.Load<Sprite>(DifficultyIconResource) == null ||
-            Resources.Load<Sprite>(PrivacyIconResource) == null ||
-            Resources.Load<Sprite>(BlueButtonResource) == null ||
-            Resources.Load<Sprite>(GoldButtonResource) == null ||
-            Resources.Load<Sprite>(NeutralButtonResource) == null ||
-            Resources.Load<Sprite>(PlayerChipResource) == null ||
-            Resources.Load<Sprite>(ChevronResource) == null)
+            catalog == null || !catalog.IsComplete)
             return false;
         var panel = menu.settingsPanel.transform;
         return Find<Button>(panel, "Buttonback") != null &&
