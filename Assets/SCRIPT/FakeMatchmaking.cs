@@ -86,7 +86,7 @@ public class FakeMatchmaking : MonoBehaviour
     }
 
     // Back and the large Cancel CTA share this single cancellation path. It
-    // invalidates every deferred callback before hiding either presentation.
+    // invalidates the one owned deferred callback before hiding presentation.
     public void CancelSearch()
     {
         StopPendingTransition();
@@ -101,13 +101,10 @@ public class FakeMatchmaking : MonoBehaviour
 
     void StopPendingTransition()
     {
-        if (preparationRoutine != null)
-        {
-            StopCoroutine(preparationRoutine);
-            preparationRoutine = null;
-        }
+        if (preparationRoutine == null) return;
 
-        StopAllCoroutines();
+        StopCoroutine(preparationRoutine);
+        preparationRoutine = null;
     }
 
     void ResetSearchPresentation(bool visible)
