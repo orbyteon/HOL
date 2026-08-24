@@ -33,6 +33,35 @@ public sealed class MainMenuCapturePlayModeTests
         Assert.That(actual, Is.EqualTo(expected));
     }
 
+    [TestCase("en", 0)]
+    [TestCase("english", 0)]
+    [TestCase("EL", 1)]
+    [TestCase("greek", 1)]
+    [TestCase(null, 0)]
+    [TestCase("unsupported", 0)]
+    public void CaptureLanguageIsDeterministic(string requestedLanguage, int expected)
+    {
+        var method = RuntimeType("MainMenuCaptureBootstrap").GetMethod(
+            "ResolveCaptureLanguage", StaticFlags);
+        Assert.That(method, Is.Not.Null);
+        object actual = method.Invoke(null, new object[] { requestedLanguage });
+        Assert.That(Convert.ToInt32(actual), Is.EqualTo(expected));
+    }
+
+    [TestCase(null, "HOL_MAINMENU_CAPTURE_READY")]
+    [TestCase("", "HOL_MAINMENU_CAPTURE_READY")]
+    [TestCase("en-1080x1920", "HOL_MAINMENU_CAPTURE_READY:en-1080x1920")]
+    [TestCase(" el 1179x2556! ", "HOL_MAINMENU_CAPTURE_READY:el1179x2556")]
+    public void CaptureMarkerTokenIsSafeAndVariantSpecific(
+        string token, string expected)
+    {
+        var method = RuntimeType("MainMenuCaptureBootstrap").GetMethod(
+            "BuildReadyMarker", StaticFlags);
+        Assert.That(method, Is.Not.Null);
+        Assert.That((string)method.Invoke(null, new object[] { token }),
+            Is.EqualTo(expected));
+    }
+
     [UnityTest]
     public IEnumerator NoCaptureIntentLeavesMainMenuHierarchyUntouched()
     {
