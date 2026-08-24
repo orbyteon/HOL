@@ -28,6 +28,11 @@ public class FakeMatchmaking : MonoBehaviour
 
     public void StartSearch()
     {
+        // A second tap while the blocking modal is already active is a no-op.
+        // The one owned readiness routine remains authoritative and cannot be
+        // replaced by another callback in the same frame.
+        if (IsPreparing) return;
+
         StopPendingTransition();
 
         if (panelGame == null)
