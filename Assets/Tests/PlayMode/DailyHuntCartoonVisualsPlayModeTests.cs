@@ -25,6 +25,13 @@ public sealed class DailyHuntCartoonVisualsPlayModeTests
         "DailyHuntPendingRevive",
     };
 
+    static readonly Vector2Int[] PortraitViewports =
+    {
+        new Vector2Int(1080, 1920),
+        new Vector2Int(1080, 2400),
+        new Vector2Int(1179, 2556),
+    };
+
     [UnitySetUp]
     public IEnumerator SetUp()
     {
@@ -68,8 +75,8 @@ public sealed class DailyHuntCartoonVisualsPlayModeTests
         Assert.That(CountInScene(RuntimeType("DailyHuntVisuals")), Is.EqualTo(1));
 
         Invoke(hunt, "Open");
-        yield return null;
-        yield return null;
+        yield return new WaitForSecondsRealtime(0.36f);
+        yield return new WaitForEndOfFrame();
         Assert.That(hunt.gameObject.activeInHierarchy, Is.True);
 
         Transform root = Find(hunt.transform, "DailyHuntVisualRoot");
@@ -130,9 +137,13 @@ public sealed class DailyHuntCartoonVisualsPlayModeTests
         AssertRect(root, "DailyMascotSeven",
             new Vector2(420f, -805f), new Vector2(250f, 285f));
 
-        AssertSprite(root, "DailyCalendarTarget", "cartoon/cartoon_daily_calendar");
-        AssertSprite(root, "DailyRewardChest", "cartoon/cartoon_reward_chest");
+        AssertSprite(root, "DailyCalendarTarget", "phase2a/hol_mode_daily_r2");
+        AssertSprite(root, "DailyRewardChest", "mainmenu/mainmenu_icon_daily_hunt");
         AssertSprite(root, "DailyLogo", "reference/hol_logo_exact");
+        Assert.That(Resources.Load<Sprite>("cartoon/cartoon_daily_calendar"), Is.Null,
+            "The retired code-drawn calendar approximation must not return.");
+        Assert.That(Resources.Load<Sprite>("cartoon/cartoon_reward_chest"), Is.Null,
+            "The retired code-drawn reward approximation must not return.");
 
         foreach (Graphic graphic in root.GetComponentsInChildren<Graphic>(true))
         {
@@ -171,16 +182,26 @@ public sealed class DailyHuntCartoonVisualsPlayModeTests
             Find(root, "DailyRewardHeading").GetComponent<TMP_Text>().text,
             Is.EqualTo(Localized("stats_streak").ToUpperInvariant()));
 
-        SetLanguage("Greek");
-        yield return null;
-        Assert.That(
-            Find(root, "DailyChallengeHeading").GetComponent<TMP_Text>().text,
-            Is.EqualTo(Localized("home_daily_title")));
-        Assert.That(
-            Find(root, "DailyRewardHeading").GetComponent<TMP_Text>().text,
-            Is.EqualTo(Localized("stats_streak").ToUpperInvariant()));
+        foreach (Vector2Int viewport in PortraitViewports)
+        {
+            Screen.SetResolution(viewport.x, viewport.y, false);
+            for (int frame = 0; frame < 3; frame++)
+                yield return new WaitForEndOfFrame();
+
+            foreach (string language in new[] { "English", "Greek" })
+            {
+                SetLanguage(language);
+                for (int frame = 0; frame < 2; frame++)
+                    yield return new WaitForEndOfFrame();
+                Canvas.ForceUpdateCanvases();
+                AssertResponsiveViewport(root, viewport, language);
+            }
+        }
+
         SetLanguage("English");
-        yield return null;
+        Screen.SetResolution(1080, 1920, false);
+        for (int frame = 0; frame < 3; frame++)
+            yield return new WaitForEndOfFrame();
 
         TMP_InputField input = Find(root, "GuessInput")
             .GetComponent<TMP_InputField>();
@@ -214,6 +235,67 @@ public sealed class DailyHuntCartoonVisualsPlayModeTests
         yield return null;
         Assert.That(hunt.gameObject.activeSelf, Is.False,
             "The top-left Back control lost the real Close callback.");
+    }
+
+    static void AssertResponsiveViewport(
+        Transform root,
+        Vector2Int viewport,
+        string language)
+    {
+        foreach (string name in new[]
+        {
+            "CloseButton",
+            "DailyPlayerChip",
+            "DailyLogo",
+            "DailyTitleRibbon",
+            "DailyChallengeCard",
+            "DailyRewardCard",
+            "DailyMascotSix",
+            "DailyMascotSeven",
+        })
+        {
+            AssertInsideScreen(
+                Find(root, name) as RectTransform,
+                viewport,
+                language + " / " + name);
+        }
+
+        foreach (string name in new[]
+        {
+            "Title",
+            "DailyChallengeHeading",
+            "Status",
+            "DailyRewardHeading",
+            "Streak",
+            "DailyPlayerName",
+            "DailyPlayerWins",
+        })
+        {
+            TMP_Text text = Find(root, name).GetComponent<TMP_Text>();
+            text.ForceMeshUpdate();
+            Assert.That(text.isTextOverflowing, Is.False,
+                language + " / " + viewport + " / " + name + " overflowed.");
+            Assert.That(text.fontSize, Is.GreaterThanOrEqualTo(20f),
+                language + " / " + viewport + " / " + name + " became unreadable.");
+        }
+    }
+
+    static void AssertInsideScreen(
+        RectTransform rect,
+        Vector2Int viewport,
+        string context)
+    {
+        Assert.That(rect, Is.Not.Null, context);
+        var corners = new Vector3[4];
+        rect.GetWorldCorners(corners);
+        foreach (Vector3 corner in corners)
+        {
+            Vector2 screen = RectTransformUtility.WorldToScreenPoint(null, corner);
+            Assert.That(screen.x, Is.GreaterThanOrEqualTo(-2f), context + " left clipped.");
+            Assert.That(screen.y, Is.GreaterThanOrEqualTo(-2f), context + " bottom clipped.");
+            Assert.That(screen.x, Is.LessThanOrEqualTo(viewport.x + 2f), context + " right clipped.");
+            Assert.That(screen.y, Is.LessThanOrEqualTo(viewport.y + 2f), context + " top clipped.");
+        }
     }
 
     static void AssertSprite(Transform root, string name, string resource)
