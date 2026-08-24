@@ -5,11 +5,13 @@ using NUnit.Framework;
 using TMPro;
 using UnityEngine;
 using UnityEngine.TestTools;
+using UnityEngine.UI;
 
 public sealed class SoloModeClarityTests
 {
     Type transitionType;
     Type l10nType;
+    Type layoutType;
     GameObject host;
     GameObject searchingPanel;
     GameObject panelGame;
@@ -22,6 +24,7 @@ public sealed class SoloModeClarityTests
     {
         transitionType = RuntimeType("FakeMatchmaking");
         l10nType = RuntimeType("L10n");
+        layoutType = RuntimeType("HolDuelBoardLayout");
         initialLanguage = l10nType.GetProperty(
             "Current", BindingFlags.Public | BindingFlags.Static)
             .GetValue(null, null);
@@ -39,11 +42,9 @@ public sealed class SoloModeClarityTests
         searchingText = textObject.AddComponent<TextMeshProUGUI>();
 
         transition = host.AddComponent(transitionType);
-        SetField("searchingPanel", searchingPanel);
-        SetField("panelGame", panelGame);
-        SetField("searchingText", searchingText);
-        SetField("preparationSeconds", 0.03f);
-        SetField("readyHoldSeconds", 0.02f);
+        SetField(transition, "searchingPanel", searchingPanel);
+        SetField(transition, "panelGame", panelGame);
+        SetField(transition, "searchingText", searchingText);
         searchingPanel.SetActive(false);
         panelGame.SetActive(false);
     }
@@ -56,25 +57,28 @@ public sealed class SoloModeClarityTests
     }
 
     [UnityTest]
-    public IEnumerator SoloEntryUsesOneTruthfulDeterministicAiPreparation()
+    public IEnumerator SoloEntryWaitsOnlyForTheRealLocalBoard()
     {
         Assert.That(transitionType.GetMethod(
             "PrepareComputerChallenger",
             BindingFlags.Instance | BindingFlags.NonPublic), Is.Not.Null,
             "Solo should own exactly one explicit AI preparation routine.");
 
+        MakeBoardReady();
         Invoke("StartSearch");
-        Assert.That(searchingPanel.activeSelf, Is.True);
-        Assert.That(panelGame.activeSelf, Is.False);
-        Assert.That(GetProperty<bool>("IsPreparing"), Is.True);
-        Assert.That(searchingText.text, Does.Contain("AI"));
 
-        yield return new WaitForSecondsRealtime(0.08f);
+        Assert.That(searchingPanel.activeSelf, Is.True);
+        Assert.That(panelGame.activeSelf, Is.True,
+            "The real local board must initialize immediately behind the modal.");
+        Assert.That(GetProperty<bool>("IsPreparing"), Is.True);
+        Assert.That(searchingText.text, Is.EqualTo(GetCopy("solo_ai_ready")));
+
+        yield return new WaitForEndOfFrame();
         yield return null;
 
         Assert.That(searchingPanel.activeSelf, Is.False);
         Assert.That(panelGame.activeSelf, Is.True,
-            "The deterministic preparation must always enter the local AI board.");
+            "A ready local board must be revealed without an artificial timer.");
         Assert.That(GetProperty<bool>("IsPreparing"), Is.False);
     }
 
@@ -83,24 +87,34 @@ public sealed class SoloModeClarityTests
     {
         Invoke("StartSearch");
         Assert.That(searchingPanel.activeSelf, Is.True);
+        Assert.That(panelGame.activeSelf, Is.True);
+        Assert.That(searchingText.text, Is.EqualTo(GetCopy("solo_ai_preparing")));
+
         Invoke("CancelSearch");
         Assert.That(searchingPanel.activeSelf, Is.False);
         Assert.That(panelGame.activeSelf, Is.False);
         Assert.That(GetProperty<bool>("IsPreparing"), Is.False);
 
-        yield return new WaitForSecondsRealtime(0.08f);
+        yield return null;
+        yield return null;
         Assert.That(panelGame.activeSelf, Is.False,
             "A cancelled preparation must not reopen gameplay later.");
 
         Invoke("StartSearch");
         Invoke("StartSearch");
         Assert.That(searchingPanel.activeSelf, Is.True);
-        Assert.That(panelGame.activeSelf, Is.False);
-        yield return new WaitForSecondsRealtime(0.08f);
+        Assert.That(panelGame.activeSelf, Is.True);
+        Assert.That(GetProperty<bool>("IsPreparing"), Is.True);
+
+        MakeBoardReady();
         yield return null;
+        yield return new WaitForEndOfFrame();
+        yield return null;
+
         Assert.That(searchingPanel.activeSelf, Is.False);
         Assert.That(panelGame.activeSelf, Is.True,
-            "Repeated entry must resolve once without a stale transition.");
+            "Repeated entry must resolve once when the actual board becomes ready.");
+        Assert.That(GetProperty<bool>("IsPreparing"), Is.False);
     }
 
     [Test]
@@ -110,6 +124,8 @@ public sealed class SoloModeClarityTests
             "Play Solo vs AI",
             "Play now vs AI",
             "Solo starts right away against a computer challenger.",
+            "PREPARING AI OPPONENT",
+            "AI OPPONENT READY!",
             "Private Room",
             "Play with a friend");
 
@@ -117,6 +133,8 @@ public sealed class SoloModeClarityTests
             "Παίξε Solo με AI",
             "Παίξε Solo με AI",
             "Το Solo ξεκινά αμέσως με αντίπαλο τον υπολογιστή.",
+            "ΠΡΟΕΤΟΙΜΑΣΙΑ AI ΑΝΤΙΠΑΛΟΥ",
+            "Ο AI ΑΝΤΙΠΑΛΟΣ ΕΙΝΑΙ ΕΤΟΙΜΟΣ!",
             "Ιδιωτικό δωμάτιο",
             "Παίξε με φίλο");
     }
@@ -126,6 +144,8 @@ public sealed class SoloModeClarityTests
         string solo,
         string start,
         string disclosure,
+        string preparing,
+        string ready,
         string privateRoom,
         string friend)
     {
@@ -136,10 +156,30 @@ public sealed class SoloModeClarityTests
         Assert.That(GetCopy("play_solo"), Is.EqualTo(solo));
         Assert.That(GetCopy("find_challenger"), Is.EqualTo(start));
         Assert.That(GetCopy("simulated_opponents"), Is.EqualTo(disclosure));
+        Assert.That(GetCopy("solo_ai_preparing"), Is.EqualTo(preparing));
+        Assert.That(GetCopy("solo_ai_ready"), Is.EqualTo(ready));
         Assert.That(GetCopy("private_room"), Is.EqualTo(privateRoom));
         Assert.That(GetCopy("private_room_title"), Is.EqualTo(friend));
         Assert.That(GetCopy("find_challenger"), Is.Not.EqualTo(privateRoom));
         Assert.That(GetCopy("simulated_opponents"), Is.Not.EqualTo(friend));
+    }
+
+    void MakeBoardReady()
+    {
+        Component layout = panelGame.GetComponent(layoutType);
+        if (layout == null)
+            layout = panelGame.AddComponent(layoutType);
+        ((Behaviour)layout).enabled = false;
+
+        var keypad = new GameObject("TestKeypad", typeof(RectTransform));
+        keypad.transform.SetParent(panelGame.transform, false);
+        var submitObject = new GameObject(
+            "TestSubmit", typeof(RectTransform), typeof(CanvasRenderer),
+            typeof(Image), typeof(Button));
+        submitObject.transform.SetParent(panelGame.transform, false);
+
+        SetField(layout, "keypadRoot", keypad);
+        SetField(layout, "submitControl", submitObject.GetComponent<Button>());
     }
 
     string GetCopy(string key)
@@ -167,11 +207,16 @@ public sealed class SoloModeClarityTests
 
     void SetField(string name, object value)
     {
-        FieldInfo field = transitionType.GetField(
+        SetField(transition, name, value);
+    }
+
+    static void SetField(Component target, string name, object value)
+    {
+        FieldInfo field = target.GetType().GetField(
             name, BindingFlags.Instance | BindingFlags.Public |
                   BindingFlags.NonPublic);
         Assert.That(field, Is.Not.Null, name);
-        field.SetValue(transition, value);
+        field.SetValue(target, value);
     }
 
     void Invoke(string method)
