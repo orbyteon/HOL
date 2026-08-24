@@ -6,7 +6,8 @@ public sealed class SplashProductionAssetsTests
     [TestCase("reference/hol_logo_exact")]
     [TestCase("reference/mascot_6_exact")]
     [TestCase("reference/mascot_7_exact")]
-    [TestCase("splash/splash_bg_stairs_clouds")]
+    [TestCase("phase2a/hol_neon_arena_bg_r2")]
+    [TestCase("phase2a/hol_loading_track_r2_9s")]
     [TestCase("splash/splash_logo_glow")]
     [TestCase("splash/splash_deco_stars")]
     [TestCase("splash/splash_deco_lightning")]
@@ -21,11 +22,13 @@ public sealed class SplashProductionAssetsTests
     }
 
     [Test]
-    public void BackgroundIsNativePortraitResolution()
+    public void Revision2BackgroundIsHighResolutionNineBySixteen()
     {
-        Sprite sprite = Resources.Load<Sprite>("splash/splash_bg_stairs_clouds");
-        Assert.That(sprite.texture.width, Is.EqualTo(1080));
-        Assert.That(sprite.texture.height, Is.EqualTo(1920));
+        Sprite sprite = Resources.Load<Sprite>("phase2a/hol_neon_arena_bg_r2");
+        Assert.That(sprite.texture.width, Is.GreaterThanOrEqualTo(900));
+        Assert.That(sprite.texture.height, Is.GreaterThanOrEqualTo(1600));
+        Assert.That((float)sprite.texture.width / sprite.texture.height,
+            Is.EqualTo(9f / 16f).Within(0.002f));
     }
 
     [Test]

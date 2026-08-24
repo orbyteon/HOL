@@ -1,3 +1,4 @@
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -6,35 +7,25 @@ using UnityEngine.UI;
 [DefaultExecutionOrder(-2000)]
 public sealed class SplashDesign : MonoBehaviour
 {
-    const string BackgroundResource = "splash/splash_bg_stairs_clouds";
-    const string DecoStarsResource = "splash/splash_deco_stars";
-    const string DecoLightningResource = "splash/splash_deco_lightning";
-    const string DecoConfettiResource = "splash/splash_deco_confetti";
-    const string DecoNumbersResource = "splash/splash_deco_numbers";
-    const string GlowResource = "splash/splash_logo_glow";
+    const string BackgroundResource = "phase2a/hol_neon_arena_bg_r2";
+    const string LoadingTrackResource = "phase2a/hol_loading_track_r2_9s";
     const string LogoResource = "reference/hol_logo_exact";
     const string HeroBoyResource = "splash/splash_char_boy";
     const string HeroGirlResource = "splash/splash_char_girl";
-    const string MascotSixResource = "reference/mascot_6_exact";
-    const string MascotSevenResource = "reference/mascot_7_exact";
 
     const float ReferenceWidth = 1080f;
     const float ReferenceHeight = 1920f;
     const float EntranceDuration = 0.65f;
-    const float SevenDelay = 0.08f;
+    const float HeroDelay = 0.08f;
 
     RectTransform logoRect;
     RectTransform heroBoyRect;
     RectTransform heroGirlRect;
-    RectTransform mascotSixRect;
-    RectTransform mascotSevenRect;
-    CanvasGroup logoGlowGroup;
     CanvasGroup logoGroup;
     CanvasGroup heroBoyGroup;
     CanvasGroup heroGirlGroup;
-    CanvasGroup mascotSixGroup;
-    CanvasGroup mascotSevenGroup;
     Image progressFill;
+    Image progressCap;
     float waitTime = 2.5f;
     float elapsed;
 
@@ -53,16 +44,10 @@ public sealed class SplashDesign : MonoBehaviour
         HideLegacyPresentation(canvas.transform);
 
         var background = LoadSprite(BackgroundResource);
-        var decoStars = LoadSprite(DecoStarsResource);
-        var decoLightning = LoadSprite(DecoLightningResource);
-        var decoConfetti = LoadSprite(DecoConfettiResource);
-        var decoNumbers = LoadSprite(DecoNumbersResource);
-        var glow = LoadSprite(GlowResource);
+        var loadingTrack = LoadSprite(LoadingTrackResource);
         var logo = LoadSprite(LogoResource);
         var heroBoy = LoadSprite(HeroBoyResource);
         var heroGirl = LoadSprite(HeroGirlResource);
-        var mascotSix = LoadSprite(MascotSixResource);
-        var mascotSeven = LoadSprite(MascotSevenResource);
 
         var visualRoot = EnsureRect(canvas.transform, "SplashVisualRoot");
         Stretch(visualRoot);
@@ -70,60 +55,38 @@ public sealed class SplashDesign : MonoBehaviour
         var backgroundImage = EnsureImage(visualRoot, "SplashBackground");
         Stretch(backgroundImage.rectTransform);
         ConfigureImage(backgroundImage, background, false);
+        backgroundImage.color = Color.white;
 
         var safeRoot = EnsureRect(visualRoot, "SplashSafeAreaRoot");
         ConfigureSafeArea(safeRoot, (RectTransform)canvas.transform);
 
-        BuildDeco(safeRoot, "SplashDecoStars", decoStars);
-        BuildDeco(safeRoot, "SplashDecoLightning", decoLightning);
-        BuildDeco(safeRoot, "SplashDecoConfetti", decoConfetti);
-        BuildDeco(safeRoot, "SplashDecoNumbers", decoNumbers);
-
-        var glowImage = EnsureImage(safeRoot, "SplashLogoGlow");
-        ConfigureImage(glowImage, glow, true);
-        Place(glowImage.rectTransform, new Vector2(0f, 280f), new Vector2(960f, 620f));
-
         var logoImage = EnsureImage(safeRoot, "SplashLogo");
         ConfigureImage(logoImage, logo, true);
-        Place(logoImage.rectTransform, new Vector2(0f, 280f), new Vector2(820f, 546f));
+        Place(logoImage.rectTransform, new Vector2(0f, 570f), new Vector2(760f, 506f));
         logoRect = logoImage.rectTransform;
 
         var boyImage = EnsureImage(safeRoot, "SplashHeroBoy");
         ConfigureImage(boyImage, heroBoy, true);
-        Place(boyImage.rectTransform, new Vector2(-155f, -40f), new Vector2(380f, 460f));
+        Place(boyImage.rectTransform, new Vector2(-205f, 20f), new Vector2(515f, 630f));
         heroBoyRect = boyImage.rectTransform;
 
         var girlImage = EnsureImage(safeRoot, "SplashHeroGirl");
         ConfigureImage(girlImage, heroGirl, true);
-        Place(girlImage.rectTransform, new Vector2(155f, -40f), new Vector2(380f, 460f));
+        Place(girlImage.rectTransform, new Vector2(205f, 20f), new Vector2(515f, 630f));
         heroGirlRect = girlImage.rectTransform;
 
-        var sixImage = EnsureImage(safeRoot, "SplashMascotSix");
-        ConfigureImage(sixImage, mascotSix, true);
-        Place(sixImage.rectTransform, new Vector2(-340f, -420f), new Vector2(240f, 320f));
-        mascotSixRect = sixImage.rectTransform;
+        BuildProgress(safeRoot, loadingTrack);
 
-        var sevenImage = EnsureImage(safeRoot, "SplashMascotSeven");
-        ConfigureImage(sevenImage, mascotSeven, true);
-        Place(sevenImage.rectTransform, new Vector2(340f, -420f), new Vector2(230f, 320f));
-        mascotSevenRect = sevenImage.rectTransform;
-
-        BuildProgress(safeRoot);
-
-        logoGlowGroup = EnsureCanvasGroup(glowImage.gameObject);
         logoGroup = EnsureCanvasGroup(logoImage.gameObject);
         heroBoyGroup = EnsureCanvasGroup(boyImage.gameObject);
         heroGirlGroup = EnsureCanvasGroup(girlImage.gameObject);
-        mascotSixGroup = EnsureCanvasGroup(sixImage.gameObject);
-        mascotSevenGroup = EnsureCanvasGroup(sevenImage.gameObject);
         SetEntranceState();
 
         var loader = FindInScene<SplashLoader>();
         if (loader != null && loader.waitTime > 0f)
             waitTime = loader.waitTime;
 
-        ApplyRequiredArtReadiness(
-            background, glow, logo, heroBoy, heroGirl, mascotSix, mascotSeven);
+        ApplyRequiredArtReadiness(background, logo, heroBoy, heroGirl, loadingTrack);
     }
 
     void Update()
@@ -135,20 +98,28 @@ public sealed class SplashDesign : MonoBehaviour
         {
             float target = Mathf.Clamp01(elapsed / Mathf.Max(0.0001f, waitTime));
             progressFill.fillAmount = Mathf.Max(progressFill.fillAmount, target);
+            if (progressCap != null)
+            {
+                float shown = progressFill.fillAmount;
+                progressCap.enabled = shown > 0.01f;
+                progressCap.color = Color.Lerp(
+                    new Color(0.05f, 0.80f, 1f, 1f),
+                    new Color(1f, 0.12f, 0.76f, 1f), shown);
+                var capRect = progressCap.rectTransform;
+                capRect.anchorMin = capRect.anchorMax = new Vector2(shown, 0.5f);
+                capRect.anchoredPosition = new Vector2(
+                    Mathf.Lerp(19f, -19f, shown), 0f);
+            }
         }
 
         float logoT = Mathf.Clamp01(elapsed / EntranceDuration);
-        float sixT = logoT;
-        float sevenT = Mathf.Clamp01((elapsed - SevenDelay) / EntranceDuration);
+        float girlT = Mathf.Clamp01((elapsed - HeroDelay) / EntranceDuration);
 
         ApplyEntrance(logoGroup, logoRect, logoT, 0.86f);
-        if (logoGlowGroup != null) logoGlowGroup.alpha = EaseOut(logoT);
         ApplyEntrance(heroBoyGroup, heroBoyRect, logoT, 0.92f);
-        ApplyEntrance(heroGirlGroup, heroGirlRect, logoT, 0.92f);
-        ApplyEntrance(mascotSixGroup, mascotSixRect, sixT, 0.92f);
-        ApplyEntrance(mascotSevenGroup, mascotSevenRect, sevenT, 0.92f);
+        ApplyEntrance(heroGirlGroup, heroGirlRect, girlT, 0.92f);
 
-        IsSettled = logoT >= 1f && sixT >= 1f && sevenT >= 1f;
+        IsSettled = logoT >= 1f && girlT >= 1f;
         if (IsSettled && logoRect != null)
         {
             float breathe = 1f + Mathf.Sin(Time.unscaledTime * 1.6f) * 0.01f;
@@ -156,32 +127,54 @@ public sealed class SplashDesign : MonoBehaviour
         }
     }
 
-    static void BuildDeco(Transform safeRoot, string name, Sprite sprite)
+    void BuildProgress(Transform safeRoot, Sprite trackFrame)
     {
-        var image = EnsureImage(safeRoot, name);
-        ConfigureImage(image, sprite, false);
-        Place(
-            image.rectTransform,
-            Vector2.zero,
-            new Vector2(ReferenceWidth, ReferenceHeight));
-    }
+        var label = EnsureTmp(safeRoot, "SplashLoadingText", 38f);
+        label.fontStyle = FontStyles.Bold;
+        label.alignment = TextAlignmentOptions.Center;
+        label.color = ConvergingLight.NearWhite;
+        label.characterSpacing = 1f;
+        Place(label.rectTransform, new Vector2(0f, -650f), new Vector2(800f, 70f));
+        SetLocalized(label, "splash_loading");
+        var labelShadow = label.GetComponent<Shadow>();
+        if (labelShadow == null) labelShadow = label.gameObject.AddComponent<Shadow>();
+        labelShadow.effectColor = new Color(0.02f, 0.01f, 0.14f, 0.78f);
+        labelShadow.effectDistance = new Vector2(3f, -4f);
 
-    void BuildProgress(Transform safeRoot)
-    {
         var track = EnsureImage(safeRoot, "SplashProgressTrack");
-        ConfigureImage(track, null, false);
-        track.color = new Color(0.10f, 0.06f, 0.28f, 0.92f);
-        Place(track.rectTransform, new Vector2(0f, -770f), new Vector2(480f, 8f));
+        ConfigureImage(track, trackFrame, false);
+        track.type = Image.Type.Simple;
+        track.color = Color.white;
+        Place(track.rectTransform, new Vector2(0f, -742f), new Vector2(860f, 145f));
 
-        progressFill = EnsureImage(track.transform, "SplashProgressFill");
-        var gold = new Color(1f, 0.78f, 0.34f, 1f);
-        ConfigureImage(progressFill, ConvergingLight.VerticalGradient(gold, gold, 4), false);
+        var interior = EnsureImage(track.transform, "SplashProgressInterior");
+        ConfigureImage(interior, RuntimeUI.RoundedRectSprite, false);
+        interior.type = Image.Type.Sliced;
+        interior.color = new Color(0.025f, 0.02f, 0.12f, 0.90f);
+        Place(interior.rectTransform, new Vector2(0f, -2f), new Vector2(735f, 52f));
+
+        progressFill = EnsureImage(interior.transform, "SplashProgressFill");
+        ConfigureImage(progressFill, ConvergingLight.HorizontalGradient(
+            new Color(0.05f, 0.80f, 1f, 1f),
+            new Color(1f, 0.12f, 0.76f, 1f), 256), false);
         progressFill.color = Color.white;
         progressFill.type = Image.Type.Filled;
         progressFill.fillMethod = Image.FillMethod.Horizontal;
         progressFill.fillOrigin = 0;
         progressFill.fillAmount = 0f;
         Stretch(progressFill.rectTransform);
+        progressFill.rectTransform.offsetMin = new Vector2(5f, 5f);
+        progressFill.rectTransform.offsetMax = new Vector2(-5f, -5f);
+
+        progressCap = EnsureImage(interior.transform, "SplashProgressCap");
+        ConfigureImage(progressCap, RuntimeUI.RoundedRectSprite, false);
+        progressCap.type = Image.Type.Sliced;
+        progressCap.enabled = false;
+        var progressCapRect = progressCap.rectTransform;
+        progressCapRect.anchorMin = progressCapRect.anchorMax = new Vector2(0f, 0.5f);
+        progressCapRect.pivot = new Vector2(0.5f, 0.5f);
+        progressCapRect.anchoredPosition = new Vector2(19f, 0f);
+        progressCapRect.sizeDelta = new Vector2(38f, 38f);
     }
 
     void ConfigureSafeArea(RectTransform safeRoot, RectTransform canvasRect)
@@ -194,17 +187,12 @@ public sealed class SplashDesign : MonoBehaviour
     {
         elapsed = 0f;
         IsSettled = false;
-        if (logoGlowGroup != null) logoGlowGroup.alpha = 0f;
         if (logoGroup != null) logoGroup.alpha = 0f;
         if (heroBoyGroup != null) heroBoyGroup.alpha = 0f;
         if (heroGirlGroup != null) heroGirlGroup.alpha = 0f;
-        if (mascotSixGroup != null) mascotSixGroup.alpha = 0f;
-        if (mascotSevenGroup != null) mascotSevenGroup.alpha = 0f;
         SetScale(logoRect, 0.86f);
         SetScale(heroBoyRect, 0.92f);
         SetScale(heroGirlRect, 0.92f);
-        SetScale(mascotSixRect, 0.92f);
-        SetScale(mascotSevenRect, 0.92f);
     }
 
     static void ApplyEntrance(
@@ -226,25 +214,22 @@ public sealed class SplashDesign : MonoBehaviour
     }
 
     void ApplyRequiredArtReadiness(
-        Sprite background, Sprite glow, Sprite logo, Sprite heroBoy, Sprite heroGirl,
-        Sprite mascotSix, Sprite mascotSeven)
+        Sprite background, Sprite logo, Sprite heroBoy, Sprite heroGirl,
+        Sprite loadingTrack)
     {
-        IsReady = RequiredArtReady(
-            background, glow, logo, heroBoy, heroGirl, mascotSix, mascotSeven);
+        IsReady = RequiredArtReady(background, logo, heroBoy, heroGirl, loadingTrack);
         if (!IsReady) IsSettled = false;
     }
 
     static bool RequiredArtReady(
-        Sprite background, Sprite glow, Sprite logo, Sprite heroBoy, Sprite heroGirl,
-        Sprite mascotSix, Sprite mascotSeven)
+        Sprite background, Sprite logo, Sprite heroBoy, Sprite heroGirl,
+        Sprite loadingTrack)
     {
         return background != null &&
-               glow != null &&
                logo != null &&
                heroBoy != null &&
                heroGirl != null &&
-               mascotSix != null &&
-               mascotSeven != null;
+               loadingTrack != null;
     }
 
     static Rect NormalizedSafeArea(Rect safe, float width, float height)
@@ -323,6 +308,29 @@ public sealed class SplashDesign : MonoBehaviour
         group.interactable = false;
         group.blocksRaycasts = false;
         return group;
+    }
+
+    static TMP_Text EnsureTmp(Transform parent, string name, float size)
+    {
+        var rect = EnsureRect(parent, name);
+        var tmp = rect.GetComponent<TextMeshProUGUI>();
+        if (tmp == null) tmp = rect.gameObject.AddComponent<TextMeshProUGUI>();
+        tmp.fontSize = size;
+        tmp.raycastTarget = false;
+        RuntimeUI.ConfigureText(tmp, ResponsiveTextRole.Body, size);
+        return tmp;
+    }
+
+    static void SetLocalized(TMP_Text text, string key)
+    {
+        var localized = text.GetComponent<LocalizedText>();
+        if (localized == null)
+        {
+            RuntimeUI.Localize(text, key);
+            localized = text.GetComponent<LocalizedText>();
+        }
+        if (localized != null) localized.key = key;
+        text.text = L10n.Get(key);
     }
 
     static void ConfigureImage(Image image, Sprite sprite, bool preserveAspect)

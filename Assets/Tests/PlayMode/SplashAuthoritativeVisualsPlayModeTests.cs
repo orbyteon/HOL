@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using NUnit.Framework;
+using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
@@ -62,86 +63,69 @@ public sealed class SplashAuthoritativeVisualsPlayModeTests
         Assert.That(background, Is.Not.Null);
         Assert.That(safeRoot, Is.Not.Null);
         AssertDirectChildren(safeRoot,
-            "SplashDecoStars",
-            "SplashDecoLightning",
-            "SplashDecoConfetti",
-            "SplashDecoNumbers",
-            "SplashLogoGlow",
             "SplashLogo",
             "SplashHeroBoy",
             "SplashHeroGirl",
-            "SplashMascotSix",
-            "SplashMascotSeven",
+            "SplashLoadingText",
             "SplashProgressTrack");
 
         var progressTrack = DirectChild(safeRoot, "SplashProgressTrack");
         Assert.That(progressTrack, Is.Not.Null);
-        AssertDirectChildren(progressTrack, "SplashProgressFill");
-        var progressFill = DirectChild(progressTrack, "SplashProgressFill").GetComponent<Image>();
+        AssertDirectChildren(progressTrack, "SplashProgressInterior");
+        var progressInterior = DirectChild(progressTrack, "SplashProgressInterior");
+        AssertDirectChildren(progressInterior, "SplashProgressFill", "SplashProgressCap");
+        var progressFill = DirectChild(progressInterior, "SplashProgressFill").GetComponent<Image>();
         Assert.That(progressFill, Is.Not.Null);
         Assert.That(progressFill.sprite, Is.Not.Null,
             "A filled Image needs a sprite for fillAmount to affect its mesh.");
         Assert.That(progressFill.type, Is.EqualTo(Image.Type.Filled));
+        Assert.That(progressTrack.GetComponent<Image>().sprite, Is.SameAs(
+            Resources.Load<Sprite>("phase2a/hol_loading_track_r2_9s")));
+        Assert.That(progressTrack.GetComponent<Outline>(), Is.Null);
+        var loading = DirectChild(safeRoot, "SplashLoadingText")
+            .GetComponent<TMP_Text>();
+        Assert.That(loading, Is.Not.Null);
+        Assert.That(loading.text, Is.EqualTo(LocalizedCopy("splash_loading")));
 
         var expectedLayout = new[]
         {
-            new LayoutExpectation("SplashDecoStars",
-                Vector2.zero, new Vector2(1080f, 1920f)),
-            new LayoutExpectation("SplashDecoLightning",
-                Vector2.zero, new Vector2(1080f, 1920f)),
-            new LayoutExpectation("SplashDecoConfetti",
-                Vector2.zero, new Vector2(1080f, 1920f)),
-            new LayoutExpectation("SplashDecoNumbers",
-                Vector2.zero, new Vector2(1080f, 1920f)),
-            new LayoutExpectation("SplashLogoGlow",
-                new Vector2(0f, 280f), new Vector2(960f, 620f)),
             new LayoutExpectation("SplashLogo",
-                new Vector2(0f, 280f), new Vector2(820f, 546f)),
+                new Vector2(0f, 570f), new Vector2(760f, 506f)),
             new LayoutExpectation("SplashHeroBoy",
-                new Vector2(-155f, -40f), new Vector2(380f, 460f)),
+                new Vector2(-205f, 20f), new Vector2(515f, 630f)),
             new LayoutExpectation("SplashHeroGirl",
-                new Vector2(155f, -40f), new Vector2(380f, 460f)),
-            new LayoutExpectation("SplashMascotSix",
-                new Vector2(-340f, -420f), new Vector2(240f, 320f)),
-            new LayoutExpectation("SplashMascotSeven",
-                new Vector2(340f, -420f), new Vector2(230f, 320f)),
+                new Vector2(205f, 20f), new Vector2(515f, 630f)),
+            new LayoutExpectation("SplashLoadingText",
+                new Vector2(0f, -650f), new Vector2(800f, 70f)),
             new LayoutExpectation("SplashProgressTrack",
-                new Vector2(0f, -770f), new Vector2(480f, 8f))
+                new Vector2(0f, -742f), new Vector2(860f, 145f))
         };
         foreach (var expected in expectedLayout)
             AssertLayout(safeRoot, expected.Name, expected.Position, expected.Size);
 
         var boy = (RectTransform)DirectChild(safeRoot, "SplashHeroBoy");
         var girl = (RectTransform)DirectChild(safeRoot, "SplashHeroGirl");
-        var six = (RectTransform)DirectChild(safeRoot, "SplashMascotSix");
-        var seven = (RectTransform)DirectChild(safeRoot, "SplashMascotSeven");
         Assert.That(boy.anchoredPosition.x, Is.LessThan(0f));
         Assert.That(girl.anchoredPosition.x, Is.GreaterThan(0f));
         Assert.That(boy.anchoredPosition.x, Is.LessThan(girl.anchoredPosition.x));
-        Assert.That(six.anchoredPosition.x, Is.LessThan(seven.anchoredPosition.x));
 
         AssertPreservesAspect(safeRoot, "SplashLogo");
         AssertPreservesAspect(safeRoot, "SplashHeroBoy");
         AssertPreservesAspect(safeRoot, "SplashHeroGirl");
-        AssertPreservesAspect(safeRoot, "SplashMascotSix");
-        AssertPreservesAspect(safeRoot, "SplashMascotSeven");
 
-        AssertDecoUsesAuthoringBox(safeRoot, "SplashDecoStars");
-        AssertDecoUsesAuthoringBox(safeRoot, "SplashDecoLightning");
-        AssertDecoUsesAuthoringBox(safeRoot, "SplashDecoConfetti");
-        AssertDecoUsesAuthoringBox(safeRoot, "SplashDecoNumbers");
+        Assert.That(DirectChild(safeRoot, "SplashArenaBackdrop"), Is.Null);
+        Assert.That(DirectChild(safeRoot, "SplashDecoStars"), Is.Null);
+        Assert.That(DirectChild(safeRoot, "SplashDecoLightning"), Is.Null);
+        Assert.That(DirectChild(safeRoot, "SplashDecoConfetti"), Is.Null);
+        Assert.That(DirectChild(safeRoot, "SplashDecoNumbers"), Is.Null);
 
-        AssertSprite(visualRoot, "SplashBackground", "splash/splash_bg_stairs_clouds");
-        AssertSprite(safeRoot, "SplashDecoStars", "splash/splash_deco_stars");
-        AssertSprite(safeRoot, "SplashDecoLightning", "splash/splash_deco_lightning");
-        AssertSprite(safeRoot, "SplashDecoConfetti", "splash/splash_deco_confetti");
-        AssertSprite(safeRoot, "SplashDecoNumbers", "splash/splash_deco_numbers");
-        AssertSprite(safeRoot, "SplashLogoGlow", "splash/splash_logo_glow");
+        AssertSprite(visualRoot, "SplashBackground", "phase2a/hol_neon_arena_bg_r2");
+        Assert.That(DirectChild(safeRoot, "SplashLogoGlow"), Is.Null);
         AssertSprite(safeRoot, "SplashLogo", "reference/hol_logo_exact");
         AssertSprite(safeRoot, "SplashHeroBoy", "splash/splash_char_boy");
         AssertSprite(safeRoot, "SplashHeroGirl", "splash/splash_char_girl");
-        AssertSprite(safeRoot, "SplashMascotSix", "reference/mascot_6_exact");
-        AssertSprite(safeRoot, "SplashMascotSeven", "reference/mascot_7_exact");
+        Assert.That(DirectChild(safeRoot, "SplashMascotSix"), Is.Null);
+        Assert.That(DirectChild(safeRoot, "SplashMascotSeven"), Is.Null);
 
         foreach (var image in visualRoot.GetComponentsInChildren<Image>(true))
             Assert.That(image.raycastTarget, Is.False,
@@ -176,6 +160,12 @@ public sealed class SplashAuthoritativeVisualsPlayModeTests
 
         yield return new WaitForSecondsRealtime(0.75f);
         Assert.That((bool)settled.GetValue(splashDesign, null), Is.True);
+    }
+
+    static string LocalizedCopy(string key)
+    {
+        return (string)RuntimeType("L10n").GetMethod("Get")
+            .Invoke(null, new object[] { key, new object[0] });
     }
 
     [UnityTest]
@@ -278,7 +268,7 @@ public sealed class SplashAuthoritativeVisualsPlayModeTests
     }
 
     [Test]
-    public void RequiredArtReadyNeedsAllSevenApprovedSprites()
+    public void RequiredArtReadyNeedsAllFiveApprovedSprites()
     {
         var sprites = RequiredSprites();
         for (int i = 0; i < sprites.Length; i++)
@@ -388,13 +378,11 @@ public sealed class SplashAuthoritativeVisualsPlayModeTests
     {
         return new object[]
         {
-            Resources.Load<Sprite>("splash/splash_bg_stairs_clouds"),
-            Resources.Load<Sprite>("splash/splash_logo_glow"),
+            Resources.Load<Sprite>("phase2a/hol_neon_arena_bg_r2"),
             Resources.Load<Sprite>("reference/hol_logo_exact"),
             Resources.Load<Sprite>("splash/splash_char_boy"),
             Resources.Load<Sprite>("splash/splash_char_girl"),
-            Resources.Load<Sprite>("reference/mascot_6_exact"),
-            Resources.Load<Sprite>("reference/mascot_7_exact")
+            Resources.Load<Sprite>("phase2a/hol_loading_track_r2_9s")
         };
     }
 
