@@ -105,12 +105,12 @@ public sealed class MainMenuPlayVisualsPlayModeTests
         Assert.That(searching.activeSelf, Is.False);
         Assert.That(Find(canvas.transform, "HomeVisualRoot").gameObject.activeSelf, Is.True);
 
-        // The separate online route remains the real Private Room flow and
-        // still exposes the existing Create and Join actions.
-        var privateRoom = Find(canvas.transform, "ButtonPvP").GetComponent<Button>();
-        Assert.That(privateRoom.GetComponentInChildren<TMP_Text>(true).text,
-            Is.EqualTo(LocalizedCopy("home_private_title")));
-        privateRoom.onClick.Invoke();
+        // The PvP Duel Home entry remains routed to the real room-based online
+        // flow and still exposes the existing Create and Join actions.
+        var pvpEntry = Find(canvas.transform, "ButtonPvP").GetComponent<Button>();
+        Assert.That(pvpEntry.GetComponentInChildren<TMP_Text>(true).text,
+            Is.EqualTo(LocalizedCopy("pvp_duel")));
+        pvpEntry.onClick.Invoke();
         yield return null;
         var pvp = Object.FindObjectOfType(RuntimeType("PvpGameController")) as Component;
         Assert.That(pvp, Is.Not.Null);
