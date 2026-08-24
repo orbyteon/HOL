@@ -128,7 +128,8 @@ public sealed class ResponsiveUIFoundationPlayModeTests
                 }
                 AssertSafeRoot(homeSafe, viewport, safe, canvasSize,
                     "Buttonsettings", "ButtonPlay", "ButtonPvP",
-                    "DailyHuntButton", "HomeTipCard");
+                    "ButtonPrivateRoom", "DailyHuntButton",
+                    "HomeSpeechBubble", "HomeDailyPromo");
                 AssertSafeRoot(playSafe, viewport, safe, canvasSize,
                     "ButtonChallenger", "ButtonBack", "PlayDisclosure");
             }
