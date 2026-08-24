@@ -3,27 +3,75 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
-// Presentation-only fallback owner for the simulated Solo search panel.
-// FakeMatchmaking retains timing/state/callback ownership. This screen uses only
-// approved cartoon production sprites; the old generated radar visual is gone.
+// Sole presentation owner for the truthful Solo-vs-AI preparation screen.
+// FakeMatchmaking owns the deterministic transition/cancellation lifecycle;
+// this class only composes approved modular sprites around the real status and
+// Cancel control.
+[DefaultExecutionOrder(2500)]
 public sealed class SoloSearchVisuals : MonoBehaviour
 {
+    public const string VisualRootName = "SoloSearchVisualRoot";
+    public const string SafeRootName = "SoloSearchSafeRoot";
+
     const string BackgroundResource = "phase2a/hol_neon_reference_bg_r3";
     const string LogoResource = "reference/hol_logo_exact";
-    const string TitleFrameResource = "phase2a/hol_cta_magenta_r2_9s";
-    const string CardResource = "mainmenu/mainmenu_cta_blue_9s";
-    const string CancelResource = "mainmenu/mainmenu_cta_blue_9s";
-    const string PlayerResource = "reference/player_cyan_exact";
-    const string OpponentResource = "reference/char_girl_exact";
-    const string VsResource = "reference/board_vs_burst_exact";
-    const string RocketResource = "reference/board_rocket_exact";
+    const string PlayerResource = "reference/char_boy_exact";
+    const string AvatarResource = "reference/player_cyan_exact";
     const string MascotSixResource = "reference/mascot_6_exact";
     const string MascotSevenResource = "reference/mascot_7_exact";
+    const string RadarBaseResource = "cartoon/cartoon_radar_base";
+    const string RadarSweepResource = "cartoon/cartoon_radar_sweep";
+    const string StarsResource = "mainmenu/mainmenu_deco_stars";
+    const string ConfettiResource = "mainmenu/mainmenu_deco_confetti";
+    const string PurpleFrameResource = "mainmenu/mainmenu_tip_frame_9s";
+    const string BlueFrameResource = "phase2a/hol_cta_blue_r2_9s";
+    const string ChipFrameResource = "phase2a/hol_player_chip_r2_9s";
+    const string BackChevronResource = "phase2a/hol_chevron_r2";
+    const string StreakIconResource = "mainmenu/mainmenu_icon_streak";
+    const string DisplayFontResource = "phase2a/fonts/HOL Menu Display SDF";
+    const string BodyFontResource = "phase2a/fonts/HOL Menu Body SDF";
 
-    static readonly Color NearWhite = new Color(0.96f, 0.97f, 1f, 1f);
+    const float ReferenceWidth = 1080f;
+    const float ReferenceHeight = 1920f;
 
+    static readonly Color NearWhite = new Color(0.985f, 0.975f, 1f, 1f);
+    static readonly Color Cyan = new Color(0.20f, 0.94f, 1f, 1f);
+    static readonly Color Ink = new Color(0.08f, 0.04f, 0.17f, 1f);
+    static readonly Color Gold = new Color(1f, 0.80f, 0.20f, 1f);
+
+    public static readonly string[] LoadedResources =
+    {
+        BackgroundResource,
+        LogoResource,
+        PlayerResource,
+        AvatarResource,
+        MascotSixResource,
+        MascotSevenResource,
+        RadarBaseResource,
+        RadarSweepResource,
+        StarsResource,
+        ConfettiResource,
+        PurpleFrameResource,
+        BlueFrameResource,
+        ChipFrameResource,
+        BackChevronResource,
+        StreakIconResource,
+    };
+
+    FakeMatchmaking matchmaking;
+    RectTransform visualRoot;
+    RectTransform safeRoot;
+    TMP_FontAsset displayFont;
+    TMP_FontAsset bodyFont;
+    TMP_Text chipName;
+    TMP_Text chipStreak;
+    TMP_Text titleText;
+    TMP_Text modeBadgeText;
     Button cancelButton;
-    bool cancelStyled;
+    Button backButton;
+    float nextChipRefresh;
+
+    public bool IsReady { get; private set; }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     static void Bootstrap()
@@ -35,214 +83,574 @@ public sealed class SoloSearchVisuals : MonoBehaviour
     static void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
         if (!scene.IsValid() || !scene.isLoaded) return;
-        var matchmaking = Object.FindObjectOfType<FakeMatchmaking>();
-        Install(matchmaking);
+
+        var owner = FindInScene<FakeMatchmaking>(scene);
+        Install(owner);
     }
 
-    public static void Install(FakeMatchmaking matchmaking)
+    public static void Install(FakeMatchmaking owner)
     {
-        if (matchmaking == null || matchmaking.searchingPanel == null) return;
-        var panel = matchmaking.searchingPanel.transform;
-        if (panel.GetComponent<SoloSearchVisuals>() == null)
-            panel.gameObject.AddComponent<SoloSearchVisuals>();
+        if (owner == null || owner.searchingPanel == null) return;
+
+        if (owner.searchingPanel.GetComponent<SoloSearchVisuals>() == null)
+            owner.searchingPanel.AddComponent<SoloSearchVisuals>();
     }
 
     void Awake()
     {
+        matchmaking = FindObjectOfType<FakeMatchmaking>(true);
         Build();
+    }
+
+    void OnEnable()
+    {
+        L10n.OnLanguageChanged += RefreshCopy;
+        RefreshCopy();
+    }
+
+    void OnDisable()
+    {
+        L10n.OnLanguageChanged -= RefreshCopy;
     }
 
     void LateUpdate()
     {
-        if (cancelButton == null)
-            cancelButton = Find<Button>(transform, "CancelButton");
-        if (cancelButton == null) return;
-        if (!cancelStyled)
-        {
-            StyleCancel(cancelButton);
-            cancelStyled = true;
-        }
-        var rect = cancelButton.transform as RectTransform;
-        if (rect == null) return;
-        Place(rect, new Vector2(0f, -680f), new Vector2(480f, 100f));
-        RuntimeUI.ClampToSafeArea(rect, rect.sizeDelta, rect.anchoredPosition);
+        if (!IsReady || Time.unscaledTime < nextChipRefresh) return;
+        nextChipRefresh = Time.unscaledTime + 0.25f;
+        RefreshPlayerChip();
     }
 
     void Build()
     {
-        if (transform.Find("SoloSearchVisualRoot") != null) return;
-
-        var canvasGroup = GetComponent<CanvasGroup>();
-        if (canvasGroup == null) canvasGroup = gameObject.AddComponent<CanvasGroup>();
-        canvasGroup.alpha = 1f;
-        canvasGroup.interactable = true;
-        canvasGroup.blocksRaycasts = true;
-
-        var root = RuntimeUI.CreateObject("SoloSearchVisualRoot", transform);
-        RuntimeUI.Stretch(root);
-        root.transform.SetAsFirstSibling();
-
-        var background = root.AddComponent<Image>();
-        SetSimpleSprite(background, BackgroundResource, false);
-        background.raycastTarget = false;
-
-        AddSprite(root.transform, "Logo", LogoResource,
-            new Vector2(0f, 700f), new Vector2(430f, 220f));
-
-        var ribbon = AddFrame(root.transform, "TitleRibbon", TitleFrameResource,
-            new Vector2(0f, 510f), new Vector2(860f, 120f));
-        var ribbonTitle = RuntimeUI.CreateText(ribbon.transform, "Title",
-            L10n.Get("solo_search_title"), 44, Vector2.zero,
-            new Vector2(800f, 95f), NearWhite);
-        ribbonTitle.fontStyle = FontStyles.Bold;
-        RuntimeUI.Localize(ribbonTitle, "solo_search_title");
-
-        var card = AddFrame(root.transform, "SearchCard", CardResource,
-            new Vector2(0f, 100f), new Vector2(920f, 650f));
-        AddSprite(card.transform, "Player", PlayerResource,
-            new Vector2(-285f, 25f), new Vector2(340f, 390f));
-        AddSprite(card.transform, "Opponent", OpponentResource,
-            new Vector2(285f, 25f), new Vector2(340f, 390f));
-        AddSprite(card.transform, "VsBurst", VsResource,
-            new Vector2(0f, 80f), new Vector2(170f, 170f));
-        AddSprite(card.transform, "Rocket", RocketResource,
-            new Vector2(0f, -180f), new Vector2(190f, 190f));
-
-        var matchmaking = Object.FindObjectOfType<FakeMatchmaking>();
-        var searchText = matchmaking == null ? null : matchmaking.searchingText;
-        if (searchText != null)
+        if (transform.Find(VisualRootName) != null)
         {
-            searchText.transform.SetParent(card.transform, false);
-            searchText.gameObject.SetActive(true);
-            searchText.fontSize = 38f;
-            searchText.enableAutoSizing = true;
-            searchText.fontSizeMin = 28f;
-            searchText.fontSizeMax = 38f;
-            searchText.color = NearWhite;
-            searchText.alignment = TextAlignmentOptions.Center;
-            Place(searchText.rectTransform, new Vector2(0f, -250f),
-                new Vector2(650f, 100f));
+            IsReady = true;
+            return;
         }
 
-        AddSprite(root.transform, "MascotSix", MascotSixResource,
-            new Vector2(-420f, -790f), new Vector2(190f, 220f));
-        AddSprite(root.transform, "MascotSeven", MascotSevenResource,
-            new Vector2(420f, -790f), new Vector2(190f, 220f));
+        matchmaking = matchmaking ?? FindObjectOfType<FakeMatchmaking>(true);
+        if (matchmaking == null)
+        {
+            Debug.LogError("[SoloSearchVisuals] Missing FakeMatchmaking owner.");
+            return;
+        }
 
-        // Old reference/reskin objects may still exist in a historical scene
-        // serialization. Hide them; do not layer on top of current production.
-        SetActive(Find<Transform>(transform, "ExactSearchingLogo"), false);
-        SetActive(Find<Transform>(transform, "ExactSearchingPlayer"), false);
-        SetActive(Find<Transform>(transform, "ExactSearchingOpponent"), false);
-        SetActive(Find<Transform>(transform, "ExactSearchingVs"), false);
-        SetActive(Find<Transform>(transform, "Radar"), false);
+        displayFont = Resources.Load<TMP_FontAsset>(DisplayFontResource);
+        bodyFont = Resources.Load<TMP_FontAsset>(BodyFontResource);
+
+        Sprite background = LoadRequired(BackgroundResource);
+        Sprite logo = LoadRequired(LogoResource);
+        Sprite player = LoadRequired(PlayerResource);
+        Sprite avatar = LoadRequired(AvatarResource);
+        Sprite six = LoadRequired(MascotSixResource);
+        Sprite seven = LoadRequired(MascotSevenResource);
+        Sprite radarBase = LoadRequired(RadarBaseResource);
+        Sprite radarSweep = LoadRequired(RadarSweepResource);
+        Sprite stars = LoadRequired(StarsResource);
+        Sprite confetti = LoadRequired(ConfettiResource);
+        Sprite purple = LoadRequired(PurpleFrameResource);
+        Sprite blue = LoadRequired(BlueFrameResource);
+        Sprite chip = LoadRequired(ChipFrameResource);
+        Sprite chevron = LoadRequired(BackChevronResource);
+        Sprite streak = LoadRequired(StreakIconResource);
+
+        IsReady = ArtReady(
+            background, logo, player, avatar, six, seven, radarBase,
+            radarSweep, stars, confetti, purple, blue, chip, chevron,
+            streak) && displayFont != null && bodyFont != null;
+
+        if (!IsReady)
+        {
+            Debug.LogError(
+                "[SoloSearchVisuals] Required production artwork/fonts are missing.");
+            return;
+        }
+
+        var group = GetComponent<CanvasGroup>();
+        if (group == null)
+            group = gameObject.AddComponent<CanvasGroup>();
+        group.alpha = 1f;
+        group.interactable = true;
+        group.blocksRaycasts = true;
+
+        var legacyImage = GetComponent<Image>();
+        if (legacyImage != null)
+        {
+            legacyImage.enabled = false;
+            legacyImage.raycastTarget = false;
+        }
+
+        cancelButton = Find<Button>(transform, "CancelButton");
+        if (cancelButton == null)
+        {
+            cancelButton = RuntimeUI.CreateButton(
+                transform, "CancelButton", L10n.Get("cancel"),
+                Vector2.zero, new Vector2(520f, 110f), Color.white,
+                Ink);
+            cancelButton.onClick.AddListener(matchmaking.CancelSearch);
+        }
+        ClearButtonPresentation(cancelButton.transform);
+
+        visualRoot = (RectTransform)RuntimeUI.CreateObject(
+            VisualRootName, transform).transform;
+        Stretch(visualRoot);
+        visualRoot.SetAsFirstSibling();
+
+        var backgroundImage = EnsureImage(visualRoot, "SearchBackground");
+        Stretch(backgroundImage.rectTransform);
+        ConfigureImage(
+            backgroundImage, background, false, Image.Type.Simple);
+        // The full-screen modal background intentionally blocks underlying Home
+        // input while preparation is active.
+        backgroundImage.raycastTarget = true;
+
+        var starsImage = EnsureImage(visualRoot, "SearchStars");
+        Stretch(starsImage.rectTransform);
+        ConfigureImage(starsImage, stars, false, Image.Type.Simple);
+
+        var confettiImage = EnsureImage(visualRoot, "SearchConfetti");
+        Stretch(confettiImage.rectTransform);
+        ConfigureImage(confettiImage, confetti, false, Image.Type.Simple);
+
+        var outer = EnsureImage(visualRoot, "SearchOuterFrame");
+        ConfigureImage(outer, purple, false, Image.Type.Sliced);
+        outer.pixelsPerUnitMultiplier = 2f;
+        Place(outer.rectTransform, Vector2.zero, new Vector2(1032f, 1872f));
+
+        safeRoot = EnsureRect(visualRoot, SafeRootName);
+        Stretch(safeRoot);
+        Canvas canvas = GetComponentInParent<Canvas>();
+        if (canvas != null)
+        {
+            ResponsiveSafeAreaRoot.Attach(
+                safeRoot, canvas.transform as RectTransform,
+                new Vector2(ReferenceWidth, ReferenceHeight));
+        }
+
+        BuildTopBar(safeRoot, purple, chip, avatar, chevron, streak);
+
+        var logoImage = EnsureImage(safeRoot, "SearchLogo");
+        ConfigureImage(logoImage, logo, true, Image.Type.Simple);
+        Place(
+            logoImage.rectTransform, new Vector2(0f, 690f),
+            new Vector2(585f, 310f));
+
+        var ribbon = EnsureImage(safeRoot, "SearchTitleRibbon");
+        ConfigureImage(ribbon, purple, false, Image.Type.Sliced);
+        ribbon.pixelsPerUnitMultiplier = 2f;
+        Place(
+            ribbon.rectTransform, new Vector2(0f, 495f),
+            new Vector2(900f, 150f));
+
+        titleText = EnsureText(
+            ribbon.transform, "SearchTitle", 58f, displayFont, NearWhite,
+            TextAlignmentOptions.Center);
+        StretchText(titleText.rectTransform, 50f, 20f);
+        ConfigureDisplayText(titleText, 40f, 58f);
+        SetLocalized(titleText, "solo_search_title");
+
+        var card = EnsureImage(safeRoot, "SearchCard");
+        ConfigureImage(card, blue, false, Image.Type.Sliced);
+        card.pixelsPerUnitMultiplier = 2f;
+        Place(
+            card.rectTransform, new Vector2(0f, 70f),
+            new Vector2(940f, 650f));
+
+        var playerImage = EnsureImage(card.transform, "SearchPlayer");
+        ConfigureImage(playerImage, player, true, Image.Type.Simple);
+        Place(
+            playerImage.rectTransform, new Vector2(-305f, -10f),
+            new Vector2(365f, 440f));
+
+        modeBadgeText = EnsureText(
+            card.transform, "SearchModeBadge", 24f, bodyFont, Cyan,
+            TextAlignmentOptions.Center);
+        Place(
+            modeBadgeText.rectTransform, new Vector2(-302f, 245f),
+            new Vector2(300f, 46f));
+        ConfigureBodyText(modeBadgeText, 20f, 25f);
+
+        var radarRoot = EnsureRect(card.transform, "SearchRadarRoot");
+        Place(
+            radarRoot, new Vector2(35f, 25f), new Vector2(340f, 340f));
+
+        var radarBaseImage = EnsureImage(radarRoot, "SearchRadarBase");
+        Stretch(radarBaseImage.rectTransform);
+        ConfigureImage(
+            radarBaseImage, radarBase, true, Image.Type.Simple);
+
+        var radarSweepImage = EnsureImage(radarRoot, "SearchRadarSweep");
+        Stretch(radarSweepImage.rectTransform);
+        ConfigureImage(
+            radarSweepImage, radarSweep, true, Image.Type.Simple);
+        radarSweepImage.gameObject.AddComponent<CartoonRadarSweep>();
+
+        TMP_Text status = matchmaking.searchingText;
+        if (status == null)
+        {
+            status = EnsureText(
+                card.transform, "SearchStatus", 34f, displayFont,
+                NearWhite, TextAlignmentOptions.Center);
+            matchmaking.searchingText = status;
+        }
+        else
+        {
+            status.transform.SetParent(card.transform, false);
+            status.gameObject.SetActive(true);
+            status.name = "SearchStatus";
+        }
+
+        status.font = displayFont;
+        status.fontStyle = FontStyles.Bold;
+        status.color = NearWhite;
+        status.alignment = TextAlignmentOptions.Center;
+        Place(
+            status.rectTransform, new Vector2(310f, -15f),
+            new Vector2(270f, 190f));
+        ConfigureDisplayText(status, 27f, 36f);
+
+        var ellipsis = status.GetComponent<AnimatedEllipsis>();
+        if (ellipsis == null)
+            ellipsis = status.gameObject.AddComponent<AnimatedEllipsis>();
+        ellipsis.text = status;
+        ellipsis.stepSeconds = 0.32f;
+
+        Reparent(cancelButton.transform, safeRoot);
+        StyleButton(cancelButton, blue, Ink);
+        Place(
+            (RectTransform)cancelButton.transform, new Vector2(0f, -500f),
+            new Vector2(520f, 112f));
+        ConfigureButtonLabel(cancelButton, "cancel", 44f, Ink);
+
+        var sixImage = EnsureImage(safeRoot, "SearchMascotSix");
+        ConfigureImage(sixImage, six, true, Image.Type.Simple);
+        Place(
+            sixImage.rectTransform, new Vector2(-410f, -790f),
+            new Vector2(265f, 300f));
+
+        var sevenImage = EnsureImage(safeRoot, "SearchMascotSeven");
+        ConfigureImage(sevenImage, seven, true, Image.Type.Simple);
+        Place(
+            sevenImage.rectTransform, new Vector2(410f, -790f),
+            new Vector2(265f, 300f));
+
+        HideLegacyPresentation();
+        RefreshCopy();
+        RefreshPlayerChip();
     }
 
-    static GameObject AddFrame(Transform parent, string name, string resource,
-        Vector2 position, Vector2 size)
+    void BuildTopBar(
+        Transform safe,
+        Sprite purple,
+        Sprite chip,
+        Sprite avatar,
+        Sprite chevron,
+        Sprite streak)
     {
-        var go = RuntimeUI.CreateObject(name, parent);
-        Place(go.transform as RectTransform, position, size);
-        var image = go.AddComponent<Image>();
-        SetSlicedSprite(image, resource, 2f);
-        image.raycastTarget = false;
-        return go;
+        backButton = RuntimeUI.CreateButton(
+            safe, "SearchBackButton", string.Empty,
+            new Vector2(-484f, 842f), new Vector2(90f, 90f),
+            Color.white, NearWhite);
+        backButton.onClick.AddListener(matchmaking.CancelSearch);
+        StyleButton(backButton, purple, NearWhite);
+        HideButtonLabels(backButton.transform);
+
+        var backIcon = EnsureImage(backButton.transform, "SearchBackIcon");
+        ConfigureImage(backIcon, chevron, true, Image.Type.Simple);
+        Place(
+            backIcon.rectTransform, Vector2.zero, new Vector2(46f, 58f));
+        backIcon.rectTransform.localScale = new Vector3(-1f, 1f, 1f);
+
+        var playerChip = EnsureImage(safe, "SearchPlayerChip");
+        ConfigureImage(playerChip, chip, false, Image.Type.Sliced);
+        playerChip.pixelsPerUnitMultiplier = 2f;
+        Place(
+            playerChip.rectTransform, new Vector2(350f, 842f),
+            new Vector2(365f, 118f));
+
+        var avatarImage = EnsureImage(
+            playerChip.transform, "SearchPlayerAvatar");
+        ConfigureImage(avatarImage, avatar, true, Image.Type.Simple);
+        Place(
+            avatarImage.rectTransform, new Vector2(-126f, 0f),
+            new Vector2(84f, 84f));
+
+        chipName = EnsureText(
+            playerChip.transform, "SearchPlayerName", 29f, bodyFont,
+            NearWhite, TextAlignmentOptions.Center);
+        Place(
+            chipName.rectTransform, new Vector2(44f, 23f),
+            new Vector2(205f, 40f));
+        chipName.enableAutoSizing = true;
+        chipName.fontSizeMin = 22f;
+        chipName.fontSizeMax = 30f;
+        chipName.overflowMode = TextOverflowModes.Ellipsis;
+
+        var streakIcon = EnsureImage(
+            playerChip.transform, "SearchStreakIcon");
+        ConfigureImage(streakIcon, streak, true, Image.Type.Simple);
+        Place(
+            streakIcon.rectTransform, new Vector2(-18f, -28f),
+            new Vector2(42f, 42f));
+
+        chipStreak = EnsureText(
+            playerChip.transform, "SearchStreak", 29f, bodyFont, Gold,
+            TextAlignmentOptions.Center);
+        Place(
+            chipStreak.rectTransform, new Vector2(62f, -28f),
+            new Vector2(120f, 40f));
     }
 
-    static void StyleCancel(Button button)
+    void RefreshCopy()
+    {
+        if (!IsReady) return;
+
+        if (modeBadgeText != null)
+        {
+            modeBadgeText.text = L10n.Current == L10n.Language.Greek
+                ? "SOLO • AI ΑΝΤΙΠΑΛΟΣ"
+                : "SOLO • AI OPPONENT";
+        }
+
+        RefreshPlayerChip();
+    }
+
+    void RefreshPlayerChip()
+    {
+        if (chipName == null || chipStreak == null) return;
+
+        string player = PlayerPrefs.GetString("PlayerName", "");
+        if (string.IsNullOrWhiteSpace(player))
+            player = L10n.Get("player_default");
+
+        chipName.text = player;
+        chipStreak.text = GameStats.CurrentStreak.ToString();
+    }
+
+    void ConfigureButtonLabel(
+        Button button,
+        string key,
+        float size,
+        Color color)
+    {
+        TMP_Text label = EnsureText(
+            button.transform, "SearchActionLabel", size, displayFont,
+            color, TextAlignmentOptions.Center);
+        StretchText(label.rectTransform, 28f, 14f);
+        ConfigureDisplayText(label, size - 10f, size);
+        SetLocalized(label, key);
+    }
+
+    static void StyleButton(Button button, Sprite sprite, Color labelColor)
     {
         if (button == null) return;
+
         var image = button.GetComponent<Image>();
-        if (image == null) image = button.gameObject.AddComponent<Image>();
-        SetSlicedSprite(image, CancelResource, 2f);
+        if (image == null)
+            image = button.gameObject.AddComponent<Image>();
+        image.enabled = true;
+        image.sprite = sprite;
+        image.type = Image.Type.Sliced;
+        image.pixelsPerUnitMultiplier = 2f;
+        image.preserveAspect = false;
+        image.color = Color.white;
         image.raycastTarget = true;
         button.targetGraphic = image;
+
         var colors = button.colors;
         colors.normalColor = Color.white;
         colors.highlightedColor = Color.white;
         colors.selectedColor = Color.white;
         colors.pressedColor = new Color(0.80f, 0.84f, 0.94f, 1f);
-        colors.disabledColor = new Color(0.55f, 0.56f, 0.64f, 0.72f);
+        colors.disabledColor = new Color(0.56f, 0.58f, 0.68f, 0.72f);
         colors.fadeDuration = 0.06f;
         colors.colorMultiplier = 1f;
         button.transition = Selectable.Transition.ColorTint;
         button.colors = colors;
+        RuntimeUI.AttachJuice(button);
 
-        var text = button.GetComponentInChildren<TMP_Text>(true);
-        if (text != null)
+        foreach (TMP_Text text in button.GetComponentsInChildren<TMP_Text>(true))
+            text.color = labelColor;
+    }
+
+    void HideLegacyPresentation()
+    {
+        foreach (string name in new[]
         {
-            text.gameObject.SetActive(true);
-            text.fontSize = 34f;
-            text.fontStyle = FontStyles.Bold;
-            text.color = NearWhite;
-            text.alignment = TextAlignmentOptions.Center;
+            "ExactSearchingLogo",
+            "ExactSearchingPlayer",
+            "ExactSearchingOpponent",
+            "ExactSearchingVs",
+            "Radar",
+            "Rocket",
+        })
+        {
+            Transform legacy = Find<Transform>(transform, name);
+            if (legacy != null && !IsDescendantOf(legacy, visualRoot))
+                legacy.gameObject.SetActive(false);
         }
     }
 
-    static T Find<T>(Transform parent, string name) where T : Component
+    static bool IsDescendantOf(Transform child, Transform parent)
     {
-        foreach (var item in parent.GetComponentsInChildren<T>(true))
-            if (item.name == name) return item;
-        return null;
+        while (child != null)
+        {
+            if (child == parent) return true;
+            child = child.parent;
+        }
+        return false;
     }
 
-    static void SetActive(Transform target, bool active)
+    static void ClearButtonPresentation(Transform root)
     {
-        if (target != null) target.gameObject.SetActive(active);
+        if (root == null) return;
+        for (int i = root.childCount - 1; i >= 0; i--)
+        {
+            Transform child = root.GetChild(i);
+            child.gameObject.SetActive(false);
+            child.SetParent(null, false);
+            RuntimeUI.DestroyNow(child.gameObject);
+        }
     }
 
-    static Image AddSprite(Transform parent, string name, string resource,
-        Vector2 position, Vector2 size)
+    static void HideButtonLabels(Transform root)
     {
-        var sprite = Resources.Load<Sprite>(resource);
+        foreach (TMP_Text text in root.GetComponentsInChildren<TMP_Text>(true))
+            text.gameObject.SetActive(false);
+        foreach (Text text in root.GetComponentsInChildren<Text>(true))
+            text.gameObject.SetActive(false);
+    }
+
+    static void ConfigureDisplayText(
+        TMP_Text text,
+        float minimum,
+        float maximum)
+    {
+        text.fontStyle = FontStyles.Bold;
+        text.enableAutoSizing = true;
+        text.fontSizeMin = minimum;
+        text.fontSizeMax = maximum;
+        text.enableWordWrapping = true;
+        text.overflowMode = TextOverflowModes.Overflow;
+        text.raycastTarget = false;
+
+        var shadow = text.GetComponent<Shadow>();
+        if (shadow == null)
+            shadow = text.gameObject.AddComponent<Shadow>();
+        shadow.effectColor = new Color(0.02f, 0.01f, 0.12f, 0.68f);
+        shadow.effectDistance = new Vector2(2f, -3f);
+        shadow.useGraphicAlpha = true;
+    }
+
+    static void ConfigureBodyText(
+        TMP_Text text,
+        float minimum,
+        float maximum)
+    {
+        text.enableAutoSizing = true;
+        text.fontSizeMin = minimum;
+        text.fontSizeMax = maximum;
+        text.enableWordWrapping = true;
+        text.overflowMode = TextOverflowModes.Overflow;
+        text.raycastTarget = false;
+    }
+
+    static void SetLocalized(TMP_Text text, string key)
+    {
+        var localized = text.GetComponent<LocalizedText>();
+        if (localized == null)
+        {
+            RuntimeUI.Localize(text, key);
+            localized = text.GetComponent<LocalizedText>();
+        }
+        if (localized != null)
+            localized.key = key;
+        text.text = L10n.Get(key);
+    }
+
+    static bool ArtReady(params Sprite[] sprites)
+    {
+        if (sprites == null || sprites.Length == 0) return false;
+        foreach (Sprite sprite in sprites)
+            if (sprite == null) return false;
+        return true;
+    }
+
+    static Sprite LoadRequired(string resource)
+    {
+        Sprite sprite = Resources.Load<Sprite>(resource);
         if (sprite == null)
-        {
             Debug.LogError("[SoloSearchVisuals] Missing Resources/" + resource + ".");
-            return null;
+        return sprite;
+    }
+
+    static RectTransform EnsureRect(Transform parent, string name)
+    {
+        Transform existing = DirectChild(parent, name);
+        if (existing is RectTransform rect)
+        {
+            rect.gameObject.SetActive(true);
+            return rect;
         }
-        var go = RuntimeUI.CreateObject(name, parent);
-        Place(go.transform as RectTransform, position, size);
-        var image = go.AddComponent<Image>();
-        image.sprite = sprite;
-        image.type = Image.Type.Simple;
-        image.preserveAspect = true;
-        image.color = Color.white;
-        image.raycastTarget = false;
+        return (RectTransform)RuntimeUI.CreateObject(name, parent).transform;
+    }
+
+    static Image EnsureImage(Transform parent, string name)
+    {
+        RectTransform rect = EnsureRect(parent, name);
+        var image = rect.GetComponent<Image>();
+        if (image == null)
+            image = rect.gameObject.AddComponent<Image>();
         return image;
     }
 
-    static void SetSimpleSprite(Image image, string resource, bool preserveAspect)
+    static TMP_Text EnsureText(
+        Transform parent,
+        string name,
+        float size,
+        TMP_FontAsset font,
+        Color color,
+        TextAlignmentOptions alignment)
     {
-        var sprite = Resources.Load<Sprite>(resource);
-        if (sprite == null)
-        {
-            Debug.LogError("[SoloSearchVisuals] Missing Resources/" + resource + ".");
-            return;
-        }
+        RectTransform rect = EnsureRect(parent, name);
+        var text = rect.GetComponent<TextMeshProUGUI>();
+        if (text == null)
+            text = rect.gameObject.AddComponent<TextMeshProUGUI>();
+        text.font = font;
+        text.fontSize = size;
+        text.fontStyle = FontStyles.Bold;
+        text.color = color;
+        text.alignment = alignment;
+        text.raycastTarget = false;
+        return text;
+    }
+
+    static void ConfigureImage(
+        Image image,
+        Sprite sprite,
+        bool preserveAspect,
+        Image.Type type)
+    {
         image.enabled = true;
         image.sprite = sprite;
-        image.type = Image.Type.Simple;
+        image.type = type;
         image.preserveAspect = preserveAspect;
         image.color = Color.white;
+        image.raycastTarget = false;
     }
 
-    static void SetSlicedSprite(Image image, string resource, float ppu)
+    static void Reparent(Transform child, Transform parent)
     {
-        var sprite = Resources.Load<Sprite>(resource);
-        if (sprite == null)
-        {
-            Debug.LogError("[SoloSearchVisuals] Missing Resources/" + resource + ".");
-            return;
-        }
-        image.enabled = true;
-        image.sprite = sprite;
-        image.type = Image.Type.Sliced;
-        image.pixelsPerUnitMultiplier = ppu;
-        image.preserveAspect = false;
-        image.color = Color.white;
+        if (child.parent != parent)
+            child.SetParent(parent, false);
+        child.gameObject.SetActive(true);
+        child.SetAsLastSibling();
     }
 
-    static void Place(RectTransform rect, Vector2 position, Vector2 size)
+    static void Place(
+        RectTransform rect,
+        Vector2 position,
+        Vector2 size)
     {
         if (rect == null) return;
         rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
@@ -251,5 +659,58 @@ public sealed class SoloSearchVisuals : MonoBehaviour
         rect.sizeDelta = size;
         rect.localRotation = Quaternion.identity;
         rect.localScale = Vector3.one;
+    }
+
+    static void Stretch(RectTransform rect)
+    {
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+        rect.localScale = Vector3.one;
+        rect.localRotation = Quaternion.identity;
+    }
+
+    static void StretchText(
+        RectTransform rect,
+        float horizontalInset,
+        float verticalInset)
+    {
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.offsetMin = new Vector2(horizontalInset, verticalInset);
+        rect.offsetMax = new Vector2(-horizontalInset, -verticalInset);
+        rect.localScale = Vector3.one;
+        rect.localRotation = Quaternion.identity;
+    }
+
+    static Transform DirectChild(Transform parent, string name)
+    {
+        if (parent == null) return null;
+        for (int i = 0; i < parent.childCount; i++)
+        {
+            Transform child = parent.GetChild(i);
+            if (child.name == name) return child;
+        }
+        return null;
+    }
+
+    static T Find<T>(Transform parent, string name) where T : Component
+    {
+        if (parent == null) return null;
+        foreach (T item in parent.GetComponentsInChildren<T>(true))
+            if (item.name == name) return item;
+        return null;
+    }
+
+    static T FindInScene<T>(Scene scene) where T : Component
+    {
+        if (!scene.IsValid()) return null;
+        foreach (GameObject root in scene.GetRootGameObjects())
+        {
+            T found = root.GetComponentInChildren<T>(true);
+            if (found != null) return found;
+        }
+        return null;
     }
 }
