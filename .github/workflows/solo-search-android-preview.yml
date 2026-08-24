@@ -1,0 +1,258 @@
+name: Solo Search Android Preview
+
+# Opt-in native Android visual acceptance for the truthful Solo-vs-AI
+# preparation screen. Captures deterministic English and Greek 1080x1920
+# screenshots from the real development APK after CI is green on the same head.
+
+on:
+  pull_request:
+    types: [labeled]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+
+concurrency:
+  group: hol-solo-search-preview-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  preflight:
+    name: Preflight
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.action == 'labeled' && github.event.label.name == 'preview-solo-search')
+    outputs:
+      checkout_ref: ${{ steps.merge_ref.outputs.ref }}
+    steps:
+      - name: Checkout actions for local composite steps
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: .github/actions
+          sparse-checkout-cone-mode: false
+
+      - name: Block draft pull requests
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event.pull_request.draft }}" = "true" ]; then
+            echo "::error::Mark the PR ready for review before requesting Android previews."
+            exit 1
+          fi
+
+      - name: Require green CI on PR head
+        uses: ./.github/actions/require-ci-green
+        with:
+          sha: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Resolve merge ref for pull requests
+        id: merge_ref
+        uses: ./.github/actions/resolve-pr-merge-ref
+        with:
+          sha: ${{ github.event.pull_request.head.sha || github.sha }}
+          branch: ${{ github.event.pull_request.head.ref || github.ref_name }}
+
+  build:
+    name: Build development capture APK
+    needs: preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout merge ref for pull requests
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.preflight.outputs.checkout_ref }}
+
+      - name: Require Unity credentials
+        shell: bash
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for name in UNITY_LICENSE UNITY_EMAIL UNITY_PASSWORD; do
+            test -n "${!name:-}" || { echo "::error::$name is not configured"; exit 1; }
+          done
+
+      - name: Free runner disk for Unity Android image
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/lib/android
+          docker system prune -af || true
+          sudo apt-get clean
+
+      - name: Cache Library
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: Library
+          key: Library-SoloSearch-Android-${{ hashFiles('Packages/manifest.json', 'Packages/packages-lock.json') }}
+          restore-keys: |
+            Library-MainMenu-Android-
+            Library-Android-
+            Library-
+
+      - name: Build Development ARM64 + x86_64 capture APK
+        uses: game-ci/unity-builder@d829bfc901f2347c8fe18898f06712b66916ef42 # v5.0.0
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          targetPlatform: Android
+          androidExportType: androidPackage
+          buildMethod: MainMenuPreviewBuild.Build
+          versioning: None
+
+      - name: Require exact APK output
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo chown -R "$(id -u):$(id -g)" build
+          test -f build/Android/HOL-mainmenu-debug.apk
+
+      - name: Transfer APK to emulator job
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: solo-search-preview-apk-transfer
+          path: build/Android/HOL-mainmenu-debug.apk
+          if-no-files-found: error
+          retention-days: 1
+
+  capture:
+    name: Capture Solo Search EN + EL at 1080x1920
+    needs: [preflight, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout merge ref for pull requests
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.preflight.outputs.checkout_ref }}
+
+      - name: Download exact debug APK
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: solo-search-preview-apk-transfer
+          path: build/Android
+
+      - name: Enable KVM acceleration
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -e /dev/kvm ]; then sudo chmod 0666 /dev/kvm; fi
+
+      - name: Prepare deterministic Solo Search capture script
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/solo-search-android-preview
+          cp build/Android/HOL-mainmenu-debug.apk \
+            artifacts/solo-search-android-preview/HOL-solo-search-debug.apk
+
+          cat > "$RUNNER_TEMP/solo-search-capture.sh" <<'CAPTURE_SCRIPT'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          apk="build/Android/HOL-mainmenu-debug.apk"
+          output="artifacts/solo-search-android-preview"
+          aapt_path="$(ls "$ANDROID_HOME"/build-tools/*/aapt | sort -V | tail -n 1)"
+          package_name=$("$aapt_path" dump badging "$apk" | sed -n "s/^package: name='\([^']*\)'.*/\1/p")
+          launch_activity=$("$aapt_path" dump badging "$apk" | sed -n "s/^launchable-activity: name='\([^']*\)'.*/\1/p")
+          test -n "$package_name"
+          test -n "$launch_activity"
+
+          wait_for_adb() {
+            for attempt in $(seq 1 60); do
+              if adb wait-for-device >/dev/null 2>&1 && [ "$(adb get-state 2>/dev/null || true)" = device ]; then
+                return 0
+              fi
+              sleep 1
+            done
+            return 1
+          }
+
+          wait_for_adb
+          adb shell input keyevent KEYCODE_WAKEUP || true
+          adb shell wm dismiss-keyguard || true
+          adb shell wm size 1080x1920
+          adb shell wm density 420
+          adb shell settings put secure immersive_mode_confirmations confirmed || true
+          adb install -r "$apk" > "$output/install.log" 2>&1
+
+          capture_language() {
+            lang="$1"
+            marker="$2"
+            png="$3"
+            start_log="$output/start-${lang}.log"
+            marker_log="$output/marker-${lang}.log"
+
+            adb shell am force-stop "$package_name" || true
+            adb shell am start -W -n "$package_name/$launch_activity" \
+              --es hol_capture_screen solosearch \
+              --es hol_capture_language "$lang" \
+              > "$start_log" 2>&1
+
+            ready=0
+            for attempt in $(seq 1 150); do
+              adb logcat -d -v threadtime > "$marker_log" 2>/dev/null || true
+              if grep -Fq "$marker" "$marker_log"; then
+                ready=1
+                break
+              fi
+              sleep 1
+            done
+            if [ "$ready" -ne 1 ]; then
+              echo "::error::Timed out waiting for $marker"
+              return 1
+            fi
+
+            adb exec-out screencap -p > "$output/$png"
+            test -s "$output/$png"
+            node tools/mainmenu/validate-mainmenu-screenshot.mjs "$output/$png"
+            adb shell uiautomator dump /sdcard/window.xml >/dev/null 2>&1 || true
+            adb pull /sdcard/window.xml "$output/ui-${lang}.xml" >/dev/null 2>&1 || true
+          }
+
+          capture_language en HOL_SOLOSEARCH_CAPTURE_READY_EN solo-search-en.png
+          capture_language el HOL_SOLOSEARCH_CAPTURE_READY_EL solo-search-el.png
+          adb logcat -d -v threadtime > "$output/logcat.txt" 2>&1 || true
+          {
+            adb shell wm size
+            adb shell wm density
+          } > "$output/display-size-density.txt" 2>&1 || true
+
+          (
+            cd "$output"
+            sha256sum HOL-solo-search-debug.apk solo-search-en.png solo-search-el.png > SHA256SUMS
+          )
+          CAPTURE_SCRIPT
+          chmod +x "$RUNNER_TEMP/solo-search-capture.sh"
+
+      - name: Boot API 35 x86_64 emulator and capture Solo Search
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          profile: pixel_2
+          cores: 2
+          ram-size: 4096M
+          heap-size: 576M
+          emulator-boot-timeout: 1200
+          emulator-options: "-no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -feature -Vulkan"
+          disable-animations: true
+          script: bash ${{ runner.temp }}/solo-search-capture.sh
+
+      - name: Upload complete Solo Search Android preview artifact
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hol-solo-search-android-preview
+          path: artifacts/solo-search-android-preview
+          if-no-files-found: error
+          retention-days: 3

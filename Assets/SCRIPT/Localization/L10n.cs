@@ -87,6 +87,10 @@ public static class L10n
         // matchmaking
         { "find_challenger",         new[] { "Play now vs AI", "Παίξε Solo με AI" } },
         { "solo_search_title",       new[] { "Find opponent", "Βρες αντίπαλο" } },
+        { "solo_ai_preparing",       new[] {
+            "PREPARING AI OPPONENT", "ΠΡΟΕΤΟΙΜΑΣΙΑ AI ΑΝΤΙΠΑΛΟΥ" } },
+        { "solo_ai_ready",           new[] {
+            "AI OPPONENT READY!", "Ο AI ΑΝΤΙΠΑΛΟΣ ΕΙΝΑΙ ΕΤΟΙΜΟΣ!" } },
         { "searching",               new[] { "Searching opponent", "Αναζήτηση αντιπάλου" } },
         { "opponent_found",          new[] { "Opponent found!", "Βρέθηκε αντίπαλος!" } },
         { "opponent_not_found",      new[] { "Opponent not found. Try again.", "Δεν βρέθηκε αντίπαλος. Δοκίμασε ξανά." } },
