@@ -235,30 +235,26 @@ language. Historical theme systems are retired and must not return.
   `ReleaseBuildGuard` enables/validates custom signing only for that build.
   Never commit the keystore or its passwords; keep an offline backup.
 
-## Cursor Cloud specific instructions
+## Reproducible validation environments
 
-- **Only the Node.js surface runs in the cloud VM.** Unity (EditMode/PlayMode
-  tests, Android compile) needs the licensed GameCI editor image and Unity
-  credential secrets, so it cannot be built or run here — GitHub Actions is the
-  authority for anything under `Assets/`. Don't try to install Unity/`mono`/`mcs`;
-  the `CLAUDE.md` stub-compile is a human-only local aid and its stubs are not in
-  the repo.
-- **The startup update script already runs `npm ci` for `services/provisioner`.**
-  Provisioner deps (`@azure/functions`, `google-auth-library`) are present after
-  startup; no reinstall is needed before running its tests. `tools/test/` and
-  `playfab/cloudscript.js` have no dependencies (pure Node built-ins).
-- The three headless CI jobs from `.github/workflows/ci.yml` are the ones you can
-  reproduce locally. Run them from the repo root:
-  - `static-checks`: `node --check` on the JS files plus the grep/`node` integrity
-    guards (server-authoritative PlayFab, privacy.html byte-copy, empty
-    `HOLReleaseConfig.json`, dependency pinning, `.meta` presence).
-  - `rules-tests`: `node --check playfab/cloudscript.js` then
-    `node --test tools/test/*.test.mjs` (the glob form is required; the bare
-    directory does not resolve). This drives the real production CloudScript in
-    an in-memory Shared Group sandbox — the fastest way to exercise PvP end to
-    end without Unity or PlayFab.
-  - `provisioner-test` (from `services/provisioner/`): `npm test` then
-    `npm run check`. Node must be `>=22 <23`.
-- Unity `check-license`, EditMode/PlayMode and Android build jobs require the
-  configured GitHub Actions Unity credentials. Their result is authoritative
-  for `Assets/` changes.
+- **Node-only validation must run without an IDE.** Use Node `>=22 <23`
+  for the provisioner and the repository's built-in Node test surfaces.
+- **Unity verification requires a licensed Unity 2022.3 Editor.** A licensed
+  local Editor or the configured GitHub Actions GameCI jobs may run EditMode,
+  PlayMode and Android compile checks. Do not infer a Unity pass from Node-only
+  checks or cached assemblies.
+- **Provisioner dependencies are explicit.** On a fresh checkout, run `npm ci`
+  from `services/provisioner/` before its tests. `tools/test/` and
+  `playfab/cloudscript.js` use Node built-ins and need no package install.
+- The three headless jobs from `.github/workflows/ci.yml` are reproducible from
+  the repository root:
+  - `static-checks`: run `node --check` on the JavaScript files plus the
+    grep/Node integrity guards for server authority, privacy parity, empty
+    `HOLReleaseConfig.json`, dependency pinning and `.meta` presence.
+  - `rules-tests`: run `node --check playfab/cloudscript.js`, then
+    `node --test tools/test/*.test.mjs`. The glob form is required.
+  - `provisioner-test`: from `services/provisioner/`, run `npm test`, then
+    `npm run check`.
+- Unity `check-license`, EditMode, PlayMode and Android build jobs require the
+  configured GitHub Actions Unity credentials. Their recorded results are the
+  authoritative CI evidence for pull requests.
