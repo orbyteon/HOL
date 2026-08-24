@@ -478,12 +478,14 @@ public sealed class DailyHuntVisualFidelityInstaller : MonoBehaviour
 
     static void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
-        if (!scene.IsValid() || !scene.isLoaded)
+        if (!scene.IsValid() || !scene.isLoaded || scene.name != "MainMenu")
             return;
 
         foreach (GameObject root in scene.GetRootGameObjects())
+        {
             if (root.GetComponentInChildren<DailyHuntVisualFidelityInstaller>(true) != null)
                 return;
+        }
 
         GameObject host = new GameObject(nameof(DailyHuntVisualFidelityInstaller));
         SceneManager.MoveGameObjectToScene(host, scene);
