@@ -61,9 +61,9 @@ public class FakeMatchmaking : MonoBehaviour
         if (foundSound != null)
             foundSound.Play();
 
-        // One render barrier lets the localized ready state settle without
-        // inventing a fixed waiting period. The board is already playable.
-        yield return new WaitForEndOfFrame();
+        // One engine update lets the localized ready state settle without a
+        // fixed waiting period and remains valid in both EditMode and PlayMode.
+        yield return null;
 
         if (!IsPreparing)
             yield break;
