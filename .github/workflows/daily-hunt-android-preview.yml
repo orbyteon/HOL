@@ -1,8 +1,8 @@
 name: Daily Hunt Android Preview
 
 # Opt-in native Android visual acceptance for the truthful Daily Hunt screen.
-# Captures deterministic English and Greek 1080x1920 screenshots from the real
-# development APK after CI is green on the exact same pull-request head.
+# Captures deterministic English and Greek screenshots from the exact real
+# development APK across the production portrait viewport matrix.
 
 on:
   pull_request:
@@ -125,10 +125,10 @@ jobs:
           retention-days: 1
 
   capture:
-    name: Capture Daily Hunt EN + EL at 1080x1920
+    name: Capture Daily Hunt EN + EL across 3 portrait viewports
     needs: [preflight, build]
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 45
     steps:
       - name: Checkout merge ref for pull requests
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -179,26 +179,31 @@ jobs:
           wait_for_adb
           adb shell input keyevent KEYCODE_WAKEUP || true
           adb shell wm dismiss-keyguard || true
-          adb shell wm size 1080x1920
-          adb shell wm density 420
           adb shell settings put secure immersive_mode_confirmations confirmed || true
           adb install -r "$apk" > "$output/install.log" 2>&1
 
-          capture_language() {
+          capture_viewport() {
             lang="$1"
             marker="$2"
-            png="$3"
-            start_log="$output/start-${lang}.log"
-            marker_log="$output/marker-${lang}.log"
+            width="$3"
+            height="$4"
+            density="$5"
+            png="$6"
+            suffix="${lang}-${width}x${height}"
+            start_log="$output/start-${suffix}.log"
+            marker_log="$output/marker-${suffix}.log"
 
             adb shell am force-stop "$package_name" || true
+            adb logcat -c >/dev/null 2>&1 || true
+            adb shell wm size "${width}x${height}"
+            adb shell wm density "$density"
             adb shell am start -W -n "$package_name/$launch_activity" \
               --es hol_capture_screen dailyhunt \
               --es hol_capture_language "$lang" \
               > "$start_log" 2>&1
 
             ready=0
-            for attempt in $(seq 1 150); do
+            for attempt in $(seq 1 180); do
               adb logcat -d -v threadtime > "$marker_log" 2>/dev/null || true
               if grep -Fq "$marker" "$marker_log"; then
                 ready=1
@@ -207,7 +212,7 @@ jobs:
               sleep 1
             done
             if [ "$ready" -ne 1 ]; then
-              echo "::error::Timed out waiting for $marker"
+              echo "::error::Timed out waiting for $marker at ${width}x${height}"
               return 1
             fi
 
@@ -215,11 +220,16 @@ jobs:
             test -s "$output/$png"
             node tools/mainmenu/validate-mainmenu-screenshot.mjs "$output/$png"
             adb shell uiautomator dump /sdcard/window.xml >/dev/null 2>&1 || true
-            adb pull /sdcard/window.xml "$output/ui-${lang}.xml" >/dev/null 2>&1 || true
+            adb pull /sdcard/window.xml "$output/ui-${suffix}.xml" >/dev/null 2>&1 || true
           }
 
-          capture_language en HOL_DAILYHUNT_CAPTURE_READY_EN daily-hunt-en.png
-          capture_language el HOL_DAILYHUNT_CAPTURE_READY_EL daily-hunt-el.png
+          capture_viewport en HOL_DAILYHUNT_CAPTURE_READY_EN 1080 1920 420 daily-hunt-en-1080x1920.png
+          capture_viewport el HOL_DAILYHUNT_CAPTURE_READY_EL 1080 1920 420 daily-hunt-el-1080x1920.png
+          capture_viewport en HOL_DAILYHUNT_CAPTURE_READY_EN 1080 2400 420 daily-hunt-en-1080x2400.png
+          capture_viewport el HOL_DAILYHUNT_CAPTURE_READY_EL 1080 2400 420 daily-hunt-el-1080x2400.png
+          capture_viewport en HOL_DAILYHUNT_CAPTURE_READY_EN 1179 2556 460 daily-hunt-en-1179x2556.png
+          capture_viewport el HOL_DAILYHUNT_CAPTURE_READY_EL 1179 2556 460 daily-hunt-el-1179x2556.png
+
           adb logcat -d -v threadtime > "$output/logcat.txt" 2>&1 || true
           {
             adb shell wm size
@@ -228,7 +238,15 @@ jobs:
 
           (
             cd "$output"
-            sha256sum HOL-daily-hunt-debug.apk daily-hunt-en.png daily-hunt-el.png > SHA256SUMS
+            sha256sum \
+              HOL-daily-hunt-debug.apk \
+              daily-hunt-en-1080x1920.png \
+              daily-hunt-el-1080x1920.png \
+              daily-hunt-en-1080x2400.png \
+              daily-hunt-el-1080x2400.png \
+              daily-hunt-en-1179x2556.png \
+              daily-hunt-el-1179x2556.png \
+              > SHA256SUMS
           )
           CAPTURE_SCRIPT
           chmod +x "$RUNNER_TEMP/daily-hunt-capture.sh"
