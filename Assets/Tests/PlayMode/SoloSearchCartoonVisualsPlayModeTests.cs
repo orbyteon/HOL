@@ -33,16 +33,23 @@ public sealed class SoloSearchCartoonVisualsPlayModeTests
         Assert.That(GetProperty<bool>(visuals, "IsReady"), Is.True);
         Assert.That(CountInScene(RuntimeType("SoloSearchVisuals")), Is.EqualTo(1));
 
-        SetField(matchmaking, "preparationSeconds", 5f);
-        SetField(matchmaking, "readyHoldSeconds", 0.1f);
+        GameObject searchPanel = GetField<GameObject>(matchmaking, "searchingPanel");
+        GameObject gamePanel = GetField<GameObject>(matchmaking, "panelGame");
+        var layout = gamePanel.GetComponentInChildren(
+            RuntimeType("HolDuelBoardLayout"), true) as Behaviour;
+        Assert.That(layout, Is.Not.Null,
+            "The Search lifecycle must wait on the real Solo board owner.");
+
+        // Hold the real board's Start lifecycle so the modal can be inspected
+        // without a fake timer or a test-only production delay field.
+        layout.enabled = false;
         Invoke(matchmaking, "StartSearch");
         yield return null;
         yield return null;
 
-        GameObject searchPanel = GetField<GameObject>(matchmaking, "searchingPanel");
-        GameObject gamePanel = GetField<GameObject>(matchmaking, "panelGame");
         Assert.That(searchPanel.activeInHierarchy, Is.True);
-        Assert.That(gamePanel.activeSelf, Is.False);
+        Assert.That(gamePanel.activeSelf, Is.True,
+            "The real board must initialize behind the blocking modal.");
         Assert.That(GetProperty<bool>(matchmaking, "IsPreparing"), Is.True);
 
         Transform root = Find(searchPanel.transform, "SoloSearchVisualRoot");
@@ -101,7 +108,7 @@ public sealed class SoloSearchCartoonVisualsPlayModeTests
             "Radar animation must rotate an Image sprite, not draw a procedural Graphic.");
 
         TMP_Text status = Find(root, "SearchStatus").GetComponent<TMP_Text>();
-        Assert.That(status.text, Does.Contain("AI"));
+        Assert.That(status.text, Does.StartWith(Localized("solo_ai_preparing")));
         Assert.That(status.enableAutoSizing, Is.True);
         Assert.That(status.fontSizeMin, Is.GreaterThanOrEqualTo(27f));
         Assert.That(status.GetComponent<AnimatedEllipsis>(), Is.Not.Null);
@@ -137,15 +144,26 @@ public sealed class SoloSearchCartoonVisualsPlayModeTests
         Assert.That(searchPanel.activeSelf, Is.False);
         Assert.That(gamePanel.activeSelf, Is.False);
 
-        // Completion enters the existing AI board exactly once.
-        SetField(matchmaking, "preparationSeconds", 0.02f);
-        SetField(matchmaking, "readyHoldSeconds", 0.01f);
+        // Re-enable the actual board owner. Completion now depends only on its
+        // real keypad/submit construction and not on a fixed waiting period.
+        layout.enabled = true;
         Invoke(matchmaking, "StartSearch");
-        yield return new WaitForSecondsRealtime(0.08f);
-        yield return null;
+        for (int frame = 0; frame < 120 &&
+             GetProperty<bool>(matchmaking, "IsPreparing"); frame++)
+            yield return null;
+        yield return new WaitForEndOfFrame();
+
         Assert.That(searchPanel.activeSelf, Is.False);
         Assert.That(gamePanel.activeSelf, Is.True);
         Assert.That(GetProperty<bool>(matchmaking, "IsPreparing"), Is.False);
+    }
+
+    static string Localized(string key)
+    {
+        MethodInfo get = RuntimeType("L10n").GetMethod(
+            "Get", BindingFlags.Public | BindingFlags.Static);
+        Assert.That(get, Is.Not.Null);
+        return (string)get.Invoke(null, new object[] { key, new object[0] });
     }
 
     static void AssertSprite(Transform root, string name, string resource)
@@ -188,15 +206,6 @@ public sealed class SoloSearchCartoonVisualsPlayModeTests
                         BindingFlags.NonPublic);
         Assert.That(method, Is.Not.Null, methodName);
         return method.Invoke(target, null);
-    }
-
-    static void SetField(Component component, string name, object value)
-    {
-        FieldInfo field = component.GetType().GetField(
-            name, BindingFlags.Instance | BindingFlags.Public |
-                  BindingFlags.NonPublic);
-        Assert.That(field, Is.Not.Null, name);
-        field.SetValue(component, value);
     }
 
     static T GetField<T>(Component component, string name) where T : class
