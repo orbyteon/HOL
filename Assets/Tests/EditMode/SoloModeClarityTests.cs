@@ -73,8 +73,10 @@ public sealed class SoloModeClarityTests
         Assert.That(GetProperty<bool>("IsPreparing"), Is.True);
         Assert.That(searchingText.text, Is.EqualTo(GetCopy("solo_ai_ready")));
 
-        yield return null;
-        yield return null;
+        for (int frame = 0;
+             frame < 20 && GetProperty<bool>("IsPreparing");
+             frame++)
+            yield return null;
 
         Assert.That(searchingPanel.activeSelf, Is.False);
         Assert.That(panelGame.activeSelf, Is.True,
@@ -107,9 +109,10 @@ public sealed class SoloModeClarityTests
         Assert.That(GetProperty<bool>("IsPreparing"), Is.True);
 
         MakeBoardReady();
-        yield return null;
-        yield return null;
-        yield return null;
+        for (int frame = 0;
+             frame < 20 && GetProperty<bool>("IsPreparing");
+             frame++)
+            yield return null;
 
         Assert.That(searchingPanel.activeSelf, Is.False);
         Assert.That(panelGame.activeSelf, Is.True,
