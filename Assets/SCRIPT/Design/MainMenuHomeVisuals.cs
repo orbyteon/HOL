@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using TMPro;
 using UnityEngine;
@@ -6,94 +7,121 @@ using UnityEngine.UI;
 
 // Sole Home presentation owner on MainMenu.
 //
-// This component reuses the real ButtonPlay, ButtonPvP, DailyHuntButton and
-// Buttonsettings controls. Approved sprites stay visibly rendered at alpha 1;
-// no custom Graphic paints a lookalike over hidden artwork.
+// The approved cartoon composition is built from modular production sprites and
+// live TMP. Existing gameplay/navigation buttons stay callback-authoritative;
+// the additional Play With A Friend entry is a real Button routed into the same
+// PvpGameController room hub rather than a disconnected visual clone.
 [DefaultExecutionOrder(1600)]
 public sealed class MainMenuHomeVisuals : MonoBehaviour
 {
     public const string VisualRootName = "HomeVisualRoot";
     public const string SafeRootName = "HomeSafeAreaRoot";
     public const string BackgroundName = "HomeBackground";
-    public const string DecoStarsName = "HomeDecoStars";
-    public const string DecoLightningName = "HomeDecoLightning";
-    public const string DecoConfettiName = "HomeDecoConfetti";
-    public const string DecoNumbersName = "HomeDecoNumbers";
-    public const string ArenaGridName = "HomeArenaGrid";
+    public const string OuterFrameName = "HomeOuterFrame";
+    public const string StarsName = "HomeStars";
+    public const string ConfettiName = "HomeConfetti";
     public const string LogoName = "HomeLogo";
-    public const string MascotSixName = "HomeMascotSix";
-    public const string MascotSevenName = "HomeMascotSeven";
     public const string HeroBoyName = "HomeHeroBoy";
-    public const string HeroGirlName = "HomeHeroGirl";
-    public const string TipIconName = "HomeTipIcon";
+    public const string SpeechBubbleName = "HomeSpeechBubble";
     public const string ChipName = "HomePlayerChip";
     public const string ChipTextName = "HomePlayerChipText";
-    public const string TipName = "HomeTipCard";
     public const string SoloIconName = "HomeSoloIcon";
-    public const string PrivateIconName = "HomePrivateIcon";
+    public const string PvpIconName = "HomePvpIcon";
+    public const string FriendIconName = "HomeFriendIcon";
     public const string DailyIconName = "HomeDailyIcon";
+    public const string PromoName = "HomeDailyPromo";
+    public const string MascotSixName = "HomeMascotSix";
+    public const string MascotSevenName = "HomeMascotSeven";
+    public const string FriendButtonName = "ButtonPrivateRoom";
 
     const string BackgroundResource = "phase2a/hol_neon_reference_bg_r3";
     const string LogoResource = "reference/hol_logo_exact";
     const string AvatarResource = "reference/player_cyan_exact";
+    const string HeroBoyResource = "reference/char_boy_exact";
     const string MascotSixResource = "reference/mascot_6_exact";
     const string MascotSevenResource = "reference/mascot_7_exact";
-    const string HeroBoyResource = "phase2a/hol_menu_boy_arms_crossed_r3";
-    const string HeroGirlResource = "phase2a/hol_menu_girl_forward_fist_r3";
+    const string TrophyResource = "reference/board_trophy_exact";
+    const string VsResource = "reference/board_vs_burst_exact";
+    const string FriendResource = "reference/board_friend_exact";
+    const string SoloResource = "phase2a/hol_mode_solo_r2";
+    const string DailyResource = "phase2a/hol_mode_daily_r2";
+    const string SpeechBubbleResource = "cartoon/cartoon_speech_bubble";
+    const string StarsResource = "mainmenu/mainmenu_deco_stars";
+    const string ConfettiResource = "mainmenu/mainmenu_deco_confetti";
+
     const string GoldCtaResource = "phase2a/hol_cta_gold_r2_9s";
+    const string MagentaCtaResource = "phase2a/hol_cta_magenta_r2_9s";
     const string BlueCtaResource = "phase2a/hol_cta_blue_r2_9s";
+    const string PurpleFrameResource = "mainmenu/mainmenu_tip_frame_9s";
     const string ChipFrameResource = "phase2a/hol_player_chip_r2_9s";
-    const string TipFrameResource = "mainmenu/mainmenu_tip_frame_9s";
-    const string TipIconResource = "mainmenu/mainmenu_icon_tip_bulb";
-    const string StreakIconResource = "mainmenu/mainmenu_icon_streak";
     const string GearResource = "phase2a/hol_settings_gear_r2";
-    const string PrivateIconResource = "phase2a/hol_mode_private_r2";
-    const string DailyIconResource = "phase2a/hol_mode_daily_r2";
     const string DisplayFontResource = "phase2a/fonts/HOL Menu Display SDF";
     const string BodyFontResource = "phase2a/fonts/HOL Menu Body SDF";
 
     const float ReferenceWidth = 1080f;
     const float ReferenceHeight = 1920f;
 
-    static readonly Color Ink = new Color(0.09f, 0.06f, 0.22f, 1f);
-    static readonly Color NearWhite = new Color(0.96f, 0.97f, 1f, 1f);
-    static readonly Color Cyan = new Color(0.08f, 0.86f, 1f, 1f);
+    static readonly Color Ink = new Color(0.09f, 0.05f, 0.16f, 1f);
+    static readonly Color NearWhite = new Color(0.985f, 0.975f, 1f, 1f);
+    static readonly Color Cyan = new Color(0.18f, 0.92f, 1f, 1f);
+    static readonly Color Gold = new Color(1f, 0.80f, 0.20f, 1f);
+    static readonly Color Muted = new Color(0.87f, 0.84f, 0.96f, 0.90f);
 
     public static readonly string[] LoadedResources =
     {
-        BackgroundResource, LogoResource, AvatarResource,
-        MascotSixResource, MascotSevenResource, HeroBoyResource, HeroGirlResource,
-        GoldCtaResource, BlueCtaResource, ChipFrameResource,
-        TipFrameResource, TipIconResource, StreakIconResource, GearResource,
-        PrivateIconResource, DailyIconResource
+        BackgroundResource,
+        LogoResource,
+        AvatarResource,
+        HeroBoyResource,
+        MascotSixResource,
+        MascotSevenResource,
+        TrophyResource,
+        VsResource,
+        FriendResource,
+        SoloResource,
+        DailyResource,
+        SpeechBubbleResource,
+        StarsResource,
+        ConfettiResource,
+        GoldCtaResource,
+        MagentaCtaResource,
+        BlueCtaResource,
+        PurpleFrameResource,
+        ChipFrameResource,
+        GearResource,
     };
 
     public static readonly string[] LoadedFontResources =
     {
-        DisplayFontResource, BodyFontResource
+        DisplayFontResource,
+        BodyFontResource,
     };
 
     RectTransform visualRoot;
     RectTransform safeRoot;
     RectTransform logoRect;
-    RectTransform mascotSixRect;
-    RectTransform mascotSevenRect;
     RectTransform heroBoyRect;
-    RectTransform heroGirlRect;
+    RectTransform speechBubbleRect;
     RectTransform gearRect;
     RectTransform chipRect;
     RectTransform soloButtonRect;
-    RectTransform privateButtonRect;
+    RectTransform pvpButtonRect;
+    RectTransform friendButtonRect;
     RectTransform dailyButtonRect;
-    RectTransform tipRect;
-    TMP_Text chipText;
+    RectTransform promoRect;
+    RectTransform mascotSixRect;
+    RectTransform mascotSevenRect;
+
     TMP_FontAsset displayFont;
     TMP_FontAsset bodyFont;
+    TMP_Text chipText;
+    TMP_Text speechText;
+    Button friendButton;
+    PvpGameController pvpController;
     bool laidOut;
-    bool compactLayout;
     int lastLayoutWidth = -1;
     int lastLayoutHeight = -1;
-    L10n.Language lastLayoutLanguage;
+    L10n.Language lastLanguage;
 
     public bool IsReady { get; private set; }
     public bool IsSettled { get; private set; }
@@ -118,32 +146,43 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
     public static bool OwnsHome(Scene scene)
     {
         if (!scene.IsValid()) return false;
-        foreach (var root in scene.GetRootGameObjects())
+
+        foreach (GameObject root in scene.GetRootGameObjects())
+        {
             if (root.GetComponentInChildren<MainMenuHomeVisuals>(true) != null)
                 return true;
+        }
+
         return false;
     }
 
     IEnumerator Start()
     {
-        // PvP and Daily Hunt entry buttons are runtime-injected shortly after
-        // scene start. Wait for those real controls rather than inventing clones.
-        for (int i = 0; i < 24; i++)
+        // Runtime owners inject PvP and Daily Hunt controls after scene load.
+        // Wait for those real buttons and the room controller instead of
+        // replacing them with visual-only copies.
+        for (int frame = 0; frame < 120; frame++)
         {
+            pvpController = FindInScene<PvpGameController>(gameObject.scene);
             if (FindButton("ButtonPlay") != null &&
                 FindButton("ButtonPvP") != null &&
                 FindButton("DailyHuntButton") != null &&
-                FindButton("Buttonsettings") != null)
+                FindButton("Buttonsettings") != null &&
+                pvpController != null)
                 break;
+
             yield return null;
         }
 
         BuildHome();
         if (IsReady)
         {
+            // Two presentation barriers let layout, fonts and localized text
+            // settle before screenshot capture or user input.
             yield return null;
-            yield return null;
+            yield return new WaitForEndOfFrame();
         }
+
         IsSettled = IsReady;
         laidOut = true;
     }
@@ -161,11 +200,15 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
     void LateUpdate()
     {
         if (!laidOut || visualRoot == null) return;
+
         var menu = FindInScene<MenuManager>(gameObject.scene);
-        bool homeVisible = menu != null && menu.mainMenuPanel != null &&
+        bool homeVisible = menu != null &&
+                           menu.mainMenuPanel != null &&
                            menu.mainMenuPanel.activeSelf;
+
         if (visualRoot.gameObject.activeSelf != homeVisible)
             visualRoot.gameObject.SetActive(homeVisible);
+
         if (!homeVisible) return;
 
         RefreshChip();
@@ -174,7 +217,7 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
 
     void BuildHome()
     {
-        var canvas = GetComponent<Canvas>();
+        Canvas canvas = GetComponent<Canvas>();
         var menu = FindInScene<MenuManager>(gameObject.scene);
         if (canvas == null || menu == null || menu.mainMenuPanel == null)
         {
@@ -182,32 +225,44 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
             return;
         }
 
+        pvpController = pvpController ??
+            FindInScene<PvpGameController>(gameObject.scene);
+
         Sprite background = LoadRequired(BackgroundResource);
         Sprite logo = LoadRequired(LogoResource);
         Sprite avatar = LoadRequired(AvatarResource);
+        Sprite heroBoy = LoadRequired(HeroBoyResource);
         Sprite six = LoadRequired(MascotSixResource);
         Sprite seven = LoadRequired(MascotSevenResource);
-        Sprite heroBoy = LoadRequired(HeroBoyResource);
-        Sprite heroGirl = LoadRequired(HeroGirlResource);
-        Sprite gold = LoadRequired(GoldCtaResource);
-        Sprite blue = LoadRequired(BlueCtaResource);
+        Sprite trophy = LoadRequired(TrophyResource);
+        Sprite vs = LoadRequired(VsResource);
+        Sprite friend = LoadRequired(FriendResource);
+        Sprite solo = LoadRequired(SoloResource);
+        Sprite daily = LoadRequired(DailyResource);
+        Sprite speech = LoadRequired(SpeechBubbleResource);
+        Sprite stars = LoadRequired(StarsResource);
+        Sprite confetti = LoadRequired(ConfettiResource);
+        Sprite goldFrame = LoadRequired(GoldCtaResource);
+        Sprite magentaFrame = LoadRequired(MagentaCtaResource);
+        Sprite blueFrame = LoadRequired(BlueCtaResource);
+        Sprite purpleFrame = LoadRequired(PurpleFrameResource);
         Sprite chipFrame = LoadRequired(ChipFrameResource);
-        Sprite tipFrame = LoadRequired(TipFrameResource);
-        Sprite tipIcon = LoadRequired(TipIconResource);
-        Sprite streakIcon = LoadRequired(StreakIconResource);
         Sprite gear = LoadRequired(GearResource);
-        Sprite privateIcon = LoadRequired(PrivateIconResource);
-        Sprite dailyIcon = LoadRequired(DailyIconResource);
         displayFont = Resources.Load<TMP_FontAsset>(DisplayFontResource);
         bodyFont = Resources.Load<TMP_FontAsset>(BodyFontResource);
 
-        IsReady = RequiredArtReady(background, logo, avatar, six, seven,
-            heroBoy, heroGirl, gold, blue, chipFrame, tipFrame, tipIcon,
-            streakIcon, gear, privateIcon, dailyIcon) &&
-            displayFont != null && bodyFont != null;
+        IsReady = ArtReady(
+            background, logo, avatar, heroBoy, six, seven, trophy, vs,
+            friend, solo, daily, speech, stars, confetti, goldFrame,
+            magentaFrame, blueFrame, purpleFrame, chipFrame, gear) &&
+            displayFont != null &&
+            bodyFont != null &&
+            pvpController != null;
+
         if (!IsReady)
         {
-            Debug.LogError("[MainMenuHomeVisuals] Required Home production assets are missing.");
+            Debug.LogError(
+                "[MainMenuHomeVisuals] Required Home art, fonts or controller are missing.");
             return;
         }
 
@@ -229,138 +284,412 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         Stretch(bg.rectTransform);
         ConfigureImage(bg, background, false, Image.Type.Simple);
 
+        var starsImage = EnsureImage(visualRoot, StarsName);
+        Stretch(starsImage.rectTransform);
+        ConfigureImage(starsImage, stars, false, Image.Type.Simple);
+
+        var confettiImage = EnsureImage(visualRoot, ConfettiName);
+        Stretch(confettiImage.rectTransform);
+        ConfigureImage(confettiImage, confetti, false, Image.Type.Simple);
+
+        var outer = EnsureImage(visualRoot, OuterFrameName);
+        ConfigureImage(outer, purpleFrame, false, Image.Type.Sliced);
+        outer.pixelsPerUnitMultiplier = 2f;
+        Place(outer.rectTransform, Vector2.zero, new Vector2(1032f, 1872f));
+
         safeRoot = EnsureRect(visualRoot, SafeRootName);
         Stretch(safeRoot);
-        ResponsiveSafeAreaRoot.Attach(safeRoot, (RectTransform)canvas.transform,
+        ResponsiveSafeAreaRoot.Attach(
+            safeRoot, (RectTransform)canvas.transform,
             new Vector2(ReferenceWidth, ReferenceHeight));
+
+        BuildTopBar(safeRoot, gear, chipFrame, avatar, trophy);
 
         var logoImage = EnsureImage(safeRoot, LogoName);
         ConfigureImage(logoImage, logo, true, Image.Type.Simple);
-        Place(logoImage.rectTransform, new Vector2(0f, 650f),
-            new Vector2(780f, 520f));
         logoRect = logoImage.rectTransform;
 
-        var sixImage = EnsureImage(safeRoot, MascotSixName);
-        ConfigureImage(sixImage, six, true, Image.Type.Simple);
-        Place(sixImage.rectTransform, new Vector2(-395f, 185f),
-            new Vector2(430f, 430f));
-        mascotSixRect = sixImage.rectTransform;
+        var heroImage = EnsureImage(safeRoot, HeroBoyName);
+        ConfigureImage(heroImage, heroBoy, true, Image.Type.Simple);
+        heroBoyRect = heroImage.rectTransform;
 
-        var boyImage = EnsureImage(safeRoot, HeroBoyName);
-        ConfigureImage(boyImage, heroBoy, true, Image.Type.Simple);
-        Place(boyImage.rectTransform, new Vector2(-145f, 165f),
-            new Vector2(470f, 470f));
-        heroBoyRect = boyImage.rectTransform;
+        var bubble = EnsureImage(safeRoot, SpeechBubbleName);
+        ConfigureImage(bubble, speech, false, Image.Type.Sliced);
+        bubble.pixelsPerUnitMultiplier = 2f;
+        speechBubbleRect = bubble.rectTransform;
 
-        var girlImage = EnsureImage(safeRoot, HeroGirlName);
-        ConfigureImage(girlImage, heroGirl, true, Image.Type.Simple);
-        Place(girlImage.rectTransform, new Vector2(145f, 165f),
-            new Vector2(470f, 470f));
-        heroGirlRect = girlImage.rectTransform;
+        speechText = EnsureText(
+            bubble.transform, "HomeSpeechText", 32f, bodyFont, Ink,
+            TextAlignmentOptions.Center);
+        StretchText(speechText.rectTransform, 34f, 32f);
+        ConfigureBodyText(speechText, 25f, 34f);
+        SetLocalized(speechText, "home_tip_body");
 
-        var sevenImage = EnsureImage(safeRoot, MascotSevenName);
-        ConfigureImage(sevenImage, seven, true, Image.Type.Simple);
-        Place(sevenImage.rectTransform, new Vector2(395f, 185f),
-            new Vector2(430f, 430f));
-        mascotSevenRect = sevenImage.rectTransform;
+        soloButtonRect = RestyleCta(
+            safeRoot, FindButton("ButtonPlay"), goldFrame, solo,
+            SoloIconName, "HomeSoloTitle", "home_solo_title",
+            "HomeSoloSubtitle", "home_solo_subtitle", true, Ink);
 
-        RestyleGear(safeRoot, gear);
-        BuildChip(safeRoot, chipFrame, avatar, streakIcon);
-        soloButtonRect = RestyleCta(safeRoot, "ButtonPlay", gold, null,
-            SoloIconName, "HomeSoloTitle", "home_solo_title", true);
-        privateButtonRect = RestyleCta(safeRoot, "ButtonPvP", blue, privateIcon,
-            PrivateIconName, "HomePrivateTitle", "home_private_title", false);
-        dailyButtonRect = RestyleCta(safeRoot, "DailyHuntButton", gold, dailyIcon,
-            DailyIconName, "HomeDailyTitle", "home_daily_title", false);
-        BuildTip(safeRoot, tipFrame, tipIcon);
+        pvpButtonRect = RestyleCta(
+            safeRoot, FindButton("ButtonPvP"), magentaFrame, vs,
+            PvpIconName, "HomePvpTitle", "pvp_duel",
+            "HomePvpSubtitle", "prebattle_rule", false, NearWhite);
+
+        friendButton = EnsureFriendButton(safeRoot);
+        friendButtonRect = RestyleCta(
+            safeRoot, friendButton, blueFrame, friend,
+            FriendIconName, "HomeFriendTitle", "private_room_title",
+            "HomeFriendSubtitle", "private_room_create_hint", false,
+            NearWhite);
+
+        dailyButtonRect = RestyleCta(
+            safeRoot, FindButton("DailyHuntButton"), purpleFrame, daily,
+            DailyIconName, "HomeDailyTitle", "home_daily_title",
+            "HomeDailySubtitle", "home_daily_subtitle", false,
+            NearWhite);
+
+        BuildBottomPromo(safeRoot, purpleFrame, trophy, six, seven);
 
         ApplyResponsiveLayout(true);
         RefreshChip();
     }
 
-    void RestyleGear(Transform safe, Sprite gear)
+    void BuildTopBar(
+        Transform safe,
+        Sprite gear,
+        Sprite chipFrame,
+        Sprite avatar,
+        Sprite trophy)
     {
-        var button = FindButton("Buttonsettings");
-        if (button == null) return;
-        Reparent(button.transform, safe);
-        gearRect = (RectTransform)button.transform;
-        Place(gearRect, new Vector2(-455f, 820f), new Vector2(132f, 132f));
+        var settings = FindButton("Buttonsettings");
+        if (settings != null)
+        {
+            Reparent(settings.transform, safe);
+            HideChildGraphics(settings.transform);
+            gearRect = (RectTransform)settings.transform;
 
-        HideChildGraphics(button.transform);
-        var image = button.GetComponent<Image>();
-        if (image == null) image = button.gameObject.AddComponent<Image>();
-        image.enabled = true;
-        image.sprite = gear;
-        image.type = Image.Type.Simple;
-        image.preserveAspect = true;
-        image.color = Color.white;
-        image.raycastTarget = true;
-        button.targetGraphic = image;
-        ConfigureButtonState(button);
+            var image = settings.GetComponent<Image>();
+            if (image == null)
+                image = settings.gameObject.AddComponent<Image>();
+            ConfigureInteractiveImage(image, gear, true, Image.Type.Simple, 1f);
+            settings.targetGraphic = image;
+            ConfigureButtonState(settings);
+        }
+
+        var chip = EnsureImage(safe, ChipName);
+        ConfigureImage(chip, chipFrame, false, Image.Type.Sliced);
+        chip.pixelsPerUnitMultiplier = 2f;
+        chipRect = chip.rectTransform;
+
+        var avatarImage = EnsureImage(chip.transform, "HomePlayerAvatar");
+        ConfigureImage(avatarImage, avatar, true, Image.Type.Simple);
+        Place(
+            avatarImage.rectTransform, new Vector2(-122f, 0f),
+            new Vector2(82f, 82f));
+
+        var trophyImage = EnsureImage(chip.transform, "HomeTrophyIcon");
+        ConfigureImage(trophyImage, trophy, true, Image.Type.Simple);
+        Place(
+            trophyImage.rectTransform, new Vector2(-28f, -26f),
+            new Vector2(42f, 42f));
+
+        chipText = EnsureText(
+            chip.transform, ChipTextName, 28f, bodyFont, NearWhite,
+            TextAlignmentOptions.Center);
+        Place(
+            chipText.rectTransform, new Vector2(56f, 3f),
+            new Vector2(190f, 82f));
+        chipText.enableAutoSizing = true;
+        chipText.fontSizeMin = 22f;
+        chipText.fontSizeMax = 29f;
+        chipText.overflowMode = TextOverflowModes.Ellipsis;
+    }
+
+    Button EnsureFriendButton(Transform parent)
+    {
+        Transform existing = DeepFind(transform, FriendButtonName);
+        Button button = existing == null ? null : existing.GetComponent<Button>();
+        if (button == null)
+        {
+            button = RuntimeUI.CreateButton(
+                parent, FriendButtonName, L10n.Get("private_room_title"),
+                Vector2.zero, new Vector2(930f, 160f), Color.white,
+                NearWhite);
+            button.onClick.AddListener(pvpController.OpenPvpMenu);
+        }
+
+        return button;
     }
 
     RectTransform RestyleCta(
         Transform safe,
-        string buttonName,
+        Button button,
         Sprite frame,
         Sprite icon,
         string iconName,
         string titleName,
         string titleKey,
-        bool primary)
+        string subtitleName,
+        string subtitleKey,
+        bool primary,
+        Color labelColor)
     {
-        var button = FindButton(buttonName);
         if (button == null) return null;
 
         Reparent(button.transform, safe);
         HideChildGraphics(button.transform);
-        var rect = (RectTransform)button.transform;
-        Vector2 size = primary ? new Vector2(930f, 235f) : new Vector2(450f, 205f);
-        Place(rect, Vector2.zero, size);
 
+        var rect = (RectTransform)button.transform;
         var image = button.GetComponent<Image>();
-        if (image == null) image = button.gameObject.AddComponent<Image>();
-        image.enabled = true;
-        image.sprite = frame;
-        image.type = Image.Type.Sliced;
-        image.pixelsPerUnitMultiplier = 2f;
-        image.preserveAspect = false;
-        image.color = Color.white;
-        image.raycastTarget = true;
+        if (image == null)
+            image = button.gameObject.AddComponent<Image>();
+
+        ConfigureInteractiveImage(image, frame, false, Image.Type.Sliced, 2f);
         button.targetGraphic = image;
         ConfigureButtonState(button);
+        RuntimeUI.AttachJuice(button);
 
-        if (!primary && icon != null)
+        if (icon != null)
         {
             var iconImage = EnsureImage(button.transform, iconName);
             ConfigureImage(iconImage, icon, true, Image.Type.Simple);
-            Place(iconImage.rectTransform, new Vector2(-154f, 0f),
-                new Vector2(128f, 128f));
+            Place(
+                iconImage.rectTransform, new Vector2(-350f, 0f),
+                new Vector2(primary ? 118f : 104f, primary ? 118f : 104f));
         }
 
-        var title = EnsureTmp(button.transform, titleName,
-            primary ? 76f : 46f);
-        ApplyDisplayFont(title);
-        title.color = primary || buttonName == "DailyHuntButton" ? Ink : NearWhite;
-        title.alignment = primary
-            ? TextAlignmentOptions.Center
-            : TextAlignmentOptions.MidlineLeft;
-        title.enableWordWrapping = !primary;
-        title.enableAutoSizing = true;
-        title.fontSizeMin = primary ? 54f : 32f;
-        title.fontSizeMax = primary ? 76f : 48f;
-        title.overflowMode = TextOverflowModes.Overflow;
-        title.raycastTarget = false;
-        Place(title.rectTransform,
-            primary ? Vector2.zero : new Vector2(58f, 0f),
-            primary ? new Vector2(780f, 145f) : new Vector2(286f, 150f));
+        var title = EnsureText(
+            button.transform, titleName, primary ? 52f : 46f,
+            displayFont, labelColor, TextAlignmentOptions.Center);
+        Place(
+            title.rectTransform, new Vector2(60f, 25f),
+            new Vector2(690f, 70f));
+        ConfigureDisplayText(
+            title, primary ? 40f : 34f, primary ? 54f : 48f);
         SetLocalized(title, titleKey);
-        AddTextShadow(title, primary ? 0.24f : 0.55f);
+
+        var subtitle = EnsureText(
+            button.transform, subtitleName, primary ? 25f : 23f,
+            bodyFont, primary ? Ink : Muted,
+            TextAlignmentOptions.Center);
+        Place(
+            subtitle.rectTransform, new Vector2(60f, -43f),
+            new Vector2(690f, 50f));
+        ConfigureBodyText(
+            subtitle, primary ? 20f : 18f, primary ? 26f : 24f);
+        SetLocalized(subtitle, subtitleKey);
+
         return rect;
+    }
+
+    void BuildBottomPromo(
+        Transform safe,
+        Sprite frame,
+        Sprite trophy,
+        Sprite six,
+        Sprite seven)
+    {
+        var promo = EnsureImage(safe, PromoName);
+        ConfigureImage(promo, frame, false, Image.Type.Sliced);
+        promo.pixelsPerUnitMultiplier = 2f;
+        promoRect = promo.rectTransform;
+
+        var trophyImage = EnsureImage(promo.transform, "HomePromoTrophy");
+        ConfigureImage(trophyImage, trophy, true, Image.Type.Simple);
+        Place(
+            trophyImage.rectTransform, new Vector2(-260f, 0f),
+            new Vector2(78f, 78f));
+
+        var promoTitle = EnsureText(
+            promo.transform, "HomePromoTitle", 31f, displayFont, Cyan,
+            TextAlignmentOptions.Center);
+        Place(
+            promoTitle.rectTransform, new Vector2(55f, 29f),
+            new Vector2(520f, 50f));
+        ConfigureDisplayText(promoTitle, 24f, 32f);
+        SetLocalized(promoTitle, "home_daily_subtitle");
+
+        var promoBody = EnsureText(
+            promo.transform, "HomePromoBody", 27f, bodyFont, Gold,
+            TextAlignmentOptions.Center);
+        Place(
+            promoBody.rectTransform, new Vector2(55f, -30f),
+            new Vector2(520f, 54f));
+        ConfigureBodyText(promoBody, 21f, 28f);
+        SetLocalized(promoBody, "home_tip_body");
+
+        var sixImage = EnsureImage(safe, MascotSixName);
+        ConfigureImage(sixImage, six, true, Image.Type.Simple);
+        mascotSixRect = sixImage.rectTransform;
+
+        var sevenImage = EnsureImage(safe, MascotSevenName);
+        ConfigureImage(sevenImage, seven, true, Image.Type.Simple);
+        mascotSevenRect = sevenImage.rectTransform;
+    }
+
+    void RefreshPresentation()
+    {
+        RefreshChip();
+        ApplyResponsiveLayout(true);
+    }
+
+    void RefreshChip()
+    {
+        if (chipText == null) return;
+
+        string player = PlayerPrefs.GetString("PlayerName", "");
+        if (string.IsNullOrWhiteSpace(player))
+            player = L10n.Get("player_default");
+
+        chipText.text = "<b>" + player + "</b>\n<size=82%>" +
+                        L10n.Get("stats_wins") + ": " +
+                        GameStats.Wins + "</size>";
+    }
+
+    void ApplyResponsiveLayout(bool force = false)
+    {
+        ApplyResponsiveLayoutForViewport(Screen.width, Screen.height, force);
+    }
+
+    // Regression/capture seam retained for existing automation.
+    void ApplyResponsiveLayoutForWidth(int width, bool force = false)
+    {
+        ApplyResponsiveLayoutForViewport(width, Screen.height, force);
+    }
+
+    void ApplyResponsiveLayoutForViewport(
+        int width,
+        int height,
+        bool force = false)
+    {
+        if (logoRect == null || heroBoyRect == null ||
+            speechBubbleRect == null || soloButtonRect == null ||
+            pvpButtonRect == null || friendButtonRect == null ||
+            dailyButtonRect == null || promoRect == null ||
+            mascotSixRect == null || mascotSevenRect == null)
+            return;
+
+        L10n.Language language = L10n.Current;
+        if (!force &&
+            width == lastLayoutWidth &&
+            height == lastLayoutHeight &&
+            language == lastLanguage)
+            return;
+
+        lastLayoutWidth = width;
+        lastLayoutHeight = height;
+        lastLanguage = language;
+
+        float aspect = width > 0
+            ? Mathf.Max(1, height) / (float)width
+            : ReferenceHeight / ReferenceWidth;
+        float tall = Mathf.InverseLerp(1.78f, 2.22f, aspect);
+
+        Place(
+            gearRect, new Vector2(-478f, 842f + 165f * tall),
+            new Vector2(106f, 106f));
+        Place(
+            chipRect, new Vector2(350f, 842f + 165f * tall),
+            new Vector2(365f, 118f));
+        Place(
+            logoRect, new Vector2(0f, 690f + 110f * tall),
+            new Vector2(585f, 310f));
+        Place(
+            heroBoyRect, new Vector2(-75f, 395f + 62f * tall),
+            new Vector2(500f, 500f));
+        Place(
+            speechBubbleRect, new Vector2(310f, 400f + 62f * tall),
+            new Vector2(340f, 190f));
+
+        float buttonShift = 30f * tall;
+        Place(
+            soloButtonRect, new Vector2(0f, 115f + buttonShift),
+            new Vector2(930f, 164f));
+        Place(
+            pvpButtonRect, new Vector2(0f, -70f + buttonShift),
+            new Vector2(930f, 164f));
+        Place(
+            friendButtonRect, new Vector2(0f, -255f + buttonShift),
+            new Vector2(930f, 164f));
+        Place(
+            dailyButtonRect, new Vector2(0f, -440f + buttonShift),
+            new Vector2(930f, 164f));
+        Place(
+            promoRect, new Vector2(0f, -655f - 30f * tall),
+            new Vector2(650f, 155f));
+        Place(
+            mascotSixRect, new Vector2(-430f, -805f - 45f * tall),
+            new Vector2(245f, 280f));
+        Place(
+            mascotSevenRect, new Vector2(430f, -805f - 45f * tall),
+            new Vector2(245f, 280f));
+
+        // Greek needs the full title bounds, never a tiny-font fallback.
+        foreach (string textName in new[]
+        {
+            "HomeSoloTitle",
+            "HomePvpTitle",
+            "HomeFriendTitle",
+            "HomeDailyTitle",
+        })
+        {
+            Transform found = DeepFind(safeRoot, textName);
+            TMP_Text text = found == null ? null : found.GetComponent<TMP_Text>();
+            if (text == null) continue;
+            text.fontSizeMin = language == L10n.Language.Greek ? 32f : 34f;
+            text.fontSizeMax = textName == "HomeSoloTitle" ? 54f : 48f;
+        }
+    }
+
+    static void ConfigureDisplayText(
+        TMP_Text text,
+        float minimum,
+        float maximum)
+    {
+        if (text == null) return;
+
+        text.fontStyle = FontStyles.Bold;
+        text.enableAutoSizing = true;
+        text.fontSizeMin = minimum;
+        text.fontSizeMax = maximum;
+        text.enableWordWrapping = true;
+        text.overflowMode = TextOverflowModes.Overflow;
+        text.raycastTarget = false;
+        AddTextShadow(text, 0.68f);
+    }
+
+    static void ConfigureBodyText(
+        TMP_Text text,
+        float minimum,
+        float maximum)
+    {
+        if (text == null) return;
+
+        text.enableAutoSizing = true;
+        text.fontSizeMin = minimum;
+        text.fontSizeMax = maximum;
+        text.enableWordWrapping = true;
+        text.overflowMode = TextOverflowModes.Overflow;
+        text.raycastTarget = false;
+    }
+
+    static void AddTextShadow(TMP_Text text, float alpha)
+    {
+        if (text == null) return;
+
+        var shadow = text.GetComponent<Shadow>();
+        if (shadow == null)
+            shadow = text.gameObject.AddComponent<Shadow>();
+
+        shadow.effectColor = new Color(0.02f, 0.01f, 0.12f, alpha);
+        shadow.effectDistance = new Vector2(2f, -3f);
+        shadow.useGraphicAlpha = true;
     }
 
     static void ConfigureButtonState(Button button)
     {
+        if (button == null) return;
+
         var colors = button.colors;
         colors.normalColor = Color.white;
         colors.highlightedColor = Color.white;
@@ -373,240 +702,24 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         button.colors = colors;
     }
 
-    void BuildChip(Transform safe, Sprite frame, Sprite avatar, Sprite streakIcon)
-    {
-        var chip = EnsureImage(safe, ChipName);
-        ConfigureImage(chip, frame, false, Image.Type.Sliced);
-        chip.pixelsPerUnitMultiplier = 2f;
-        Place(chip.rectTransform, new Vector2(360f, 820f),
-            new Vector2(330f, 120f));
-        chipRect = chip.rectTransform;
-
-        var avatarImage = EnsureImage(chip.transform, "HomePlayerAvatar");
-        ConfigureImage(avatarImage, avatar, true, Image.Type.Simple);
-        Place(avatarImage.rectTransform, new Vector2(-105f, -1f),
-            new Vector2(78f, 78f));
-
-        var streak = EnsureImage(chip.transform, "HomeStreakIcon");
-        ConfigureImage(streak, streakIcon, true, Image.Type.Simple);
-        Place(streak.rectTransform, new Vector2(-3f, -26f),
-            new Vector2(38f, 38f));
-
-        chipText = EnsureTmp(chip.transform, ChipTextName, 28f);
-        ApplyBodyFont(chipText, true);
-        chipText.alignment = TextAlignmentOptions.MidlineLeft;
-        chipText.color = NearWhite;
-        chipText.enableAutoSizing = true;
-        chipText.fontSizeMin = 22f;
-        chipText.fontSizeMax = 30f;
-        chipText.lineSpacing = -8f;
-        chipText.richText = true;
-        Place(chipText.rectTransform, new Vector2(62f, 0f),
-            new Vector2(170f, 84f));
-        AddTextShadow(chipText, 0.62f);
-    }
-
-    void BuildTip(Transform safe, Sprite frame, Sprite tipIcon)
-    {
-        var tip = EnsureImage(safe, TipName);
-        ConfigureImage(tip, frame, false, Image.Type.Sliced);
-        tip.pixelsPerUnitMultiplier = 2f;
-        Place(tip.rectTransform, new Vector2(0f, -715f),
-            new Vector2(900f, 190f));
-        tipRect = tip.rectTransform;
-
-        var icon = EnsureImage(tip.transform, TipIconName);
-        ConfigureImage(icon, tipIcon, true, Image.Type.Simple);
-        Place(icon.rectTransform, new Vector2(-365f, 0f),
-            new Vector2(104f, 104f));
-
-        var title = EnsureTmp(tip.transform, "HomeTipTitle", 34f);
-        ApplyDisplayFont(title);
-        title.color = Cyan;
-        title.alignment = TextAlignmentOptions.MidlineLeft;
-        Place(title.rectTransform, new Vector2(72f, 35f),
-            new Vector2(620f, 52f));
-        SetLocalized(title, "home_tip_title");
-        AddTextShadow(title, 0.66f);
-
-        var body = EnsureTmp(tip.transform, "HomeTipBody", 28f);
-        ApplyBodyFont(body, true);
-        body.color = NearWhite;
-        body.alignment = TextAlignmentOptions.MidlineLeft;
-        body.enableAutoSizing = true;
-        body.fontSizeMin = 22f;
-        body.fontSizeMax = 30f;
-        Place(body.rectTransform, new Vector2(0f, -30f),
-            new Vector2(500f, 84f));
-        SetLocalized(body, "home_tip_body");
-        AddTextShadow(body, 0.66f);
-    }
-
-    void RefreshPresentation()
-    {
-        RefreshChip();
-        ApplyResponsiveLayout(true);
-    }
-
-    void ApplyResponsiveLayout(bool force = false)
-    {
-        ApplyResponsiveLayoutForViewport(Screen.width, Screen.height, force);
-    }
-
-    // Kept for capture/regression tools.
-    void ApplyResponsiveLayoutForWidth(int width, bool force = false)
-    {
-        ApplyResponsiveLayoutForViewport(width, Screen.height, force);
-    }
-
-    void ApplyResponsiveLayoutForViewport(int width, int height, bool force = false)
-    {
-        if (soloButtonRect == null || privateButtonRect == null ||
-            dailyButtonRect == null || tipRect == null) return;
-
-        var language = L10n.Current;
-        bool shouldCompact = width > 0 && width < 600;
-        if (!force && width == lastLayoutWidth && height == lastLayoutHeight &&
-            language == lastLayoutLanguage && shouldCompact == compactLayout)
-            return;
-
-        compactLayout = shouldCompact;
-        lastLayoutWidth = width;
-        lastLayoutHeight = height;
-        lastLayoutLanguage = language;
-
-        float aspect = width > 0
-            ? Mathf.Max(1, height) / (float)width
-            : ReferenceHeight / ReferenceWidth;
-        float tall = Mathf.InverseLerp(1.85f, 2.22f, aspect);
-
-        Place(logoRect, new Vector2(0f, 650f + 150f * tall),
-            new Vector2(780f, 520f));
-        Place(mascotSixRect, new Vector2(-395f, 185f + 95f * tall),
-            new Vector2(430f, 430f));
-        Place(heroBoyRect, new Vector2(-145f, 165f + 95f * tall),
-            new Vector2(470f, 470f));
-        Place(heroGirlRect, new Vector2(145f, 165f + 95f * tall),
-            new Vector2(470f, 470f));
-        Place(mascotSevenRect, new Vector2(395f, 185f + 95f * tall),
-            new Vector2(430f, 430f));
-        Place(gearRect, new Vector2(-455f, 820f + 190f * tall),
-            new Vector2(132f, 132f));
-        Place(chipRect, new Vector2(360f, 820f + 190f * tall),
-            new Vector2(330f, 120f));
-        Place(soloButtonRect, new Vector2(0f, -145f + 20f * tall),
-            new Vector2(930f, 235f));
-
-        if (compactLayout)
-        {
-            Place(privateButtonRect, new Vector2(0f, -430f),
-                new Vector2(930f, 195f));
-            Place(dailyButtonRect, new Vector2(0f, -640f),
-                new Vector2(930f, 195f));
-            Place(tipRect, new Vector2(0f, -855f - 70f * tall),
-                new Vector2(930f, 200f));
-        }
-        else
-        {
-            Place(privateButtonRect, new Vector2(-240f, -390f - 45f * tall),
-                new Vector2(450f, 205f));
-            Place(dailyButtonRect, new Vector2(240f, -390f - 45f * tall),
-                new Vector2(450f, 205f));
-            Place(tipRect, new Vector2(0f, -715f - 90f * tall),
-                new Vector2(900f, 190f));
-        }
-
-        LayoutSupportingContent(privateButtonRect, PrivateIconName,
-            "HomePrivateTitle", compactLayout);
-        LayoutSupportingContent(dailyButtonRect, DailyIconName,
-            "HomeDailyTitle", compactLayout);
-    }
-
-    static void LayoutSupportingContent(RectTransform card, string iconName,
-        string titleName, bool compact)
-    {
-        if (card == null) return;
-        var icon = DirectChild(card, iconName) as RectTransform;
-        var titleTransform = DirectChild(card, titleName);
-        var title = titleTransform == null ? null : titleTransform.GetComponent<TMP_Text>();
-        if (icon == null || title == null) return;
-
-        if (compact)
-        {
-            Place(icon, new Vector2(-345f, 0f), new Vector2(132f, 132f));
-            Place(title.rectTransform, new Vector2(42f, 0f),
-                new Vector2(650f, 130f));
-            title.fontSizeMin = 28f;
-            title.fontSizeMax = 46f;
-        }
-        else
-        {
-            Place(icon, new Vector2(-153f, 0f), new Vector2(128f, 128f));
-            Place(title.rectTransform, new Vector2(60f, 0f),
-                new Vector2(286f, 150f));
-            title.fontSizeMin = 32f;
-            title.fontSizeMax = 48f;
-        }
-        title.enableAutoSizing = true;
-        title.enableWordWrapping = true;
-        title.alignment = TextAlignmentOptions.MidlineLeft;
-    }
-
-    static void AddTextShadow(TMP_Text text, float alpha)
-    {
-        if (text == null) return;
-        var shadow = text.GetComponent<Shadow>();
-        if (shadow == null) shadow = text.gameObject.AddComponent<Shadow>();
-        shadow.effectColor = new Color(0.02f, 0.01f, 0.12f, alpha);
-        shadow.effectDistance = new Vector2(2f, -3f);
-        shadow.useGraphicAlpha = true;
-    }
-
-    void ApplyDisplayFont(TMP_Text text)
-    {
-        if (text == null) return;
-        if (displayFont != null) text.font = displayFont;
-        text.fontStyle = FontStyles.Normal;
-        text.fontWeight = FontWeight.Bold;
-    }
-
-    void ApplyBodyFont(TMP_Text text, bool semibold)
-    {
-        if (text == null) return;
-        if (bodyFont != null) text.font = bodyFont;
-        text.fontStyle = semibold ? FontStyles.Bold : FontStyles.Normal;
-        text.fontWeight = semibold ? FontWeight.SemiBold : FontWeight.Regular;
-    }
-
-    static bool RequiredArtReady(params Sprite[] sprites)
-    {
-        if (sprites == null || sprites.Length == 0) return false;
-        for (int i = 0; i < sprites.Length; i++)
-            if (sprites[i] == null) return false;
-        return true;
-    }
-
-    void RefreshChip()
-    {
-        if (chipText == null) return;
-        string player = PlayerPrefs.GetString("PlayerName", "");
-        if (string.IsNullOrEmpty(player)) player = L10n.Get("player_default");
-        chipText.text = "<b>" + player + "</b>\n<size=82%>" +
-                        L10n.Get("stats_streak") + " " +
-                        GameStats.CurrentStreak + "</size>";
-    }
-
     void HideLegacyHome(Transform canvas)
     {
-        foreach (var name in new[]
+        foreach (string name in new[]
         {
-            "ExactReferenceBackdrop", "AttachmentReferenceBackdrop",
-            "ExactHOLLogo", "BoardHomeLogo", "StatsLabel",
-            "HomeNeonBackdrop", "HomeArenaGrid", "HomeDecoStars",
-            "HomeDecoLightning", "HomeDecoConfetti", "HomeDecoNumbers"
+            "ExactReferenceBackdrop",
+            "AttachmentReferenceBackdrop",
+            "ExactHOLLogo",
+            "BoardHomeLogo",
+            "StatsLabel",
+            "HomeNeonBackdrop",
+            "HomeArenaGrid",
+            "HomeDecoStars",
+            "HomeDecoLightning",
+            "HomeDecoConfetti",
+            "HomeDecoNumbers",
         })
         {
-            var child = DeepFind(canvas, name);
+            Transform child = DeepFind(canvas, name);
             if (child != null && child != visualRoot)
                 child.gameObject.SetActive(false);
         }
@@ -614,20 +727,22 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
 
     Button FindButton(string name)
     {
-        var found = DeepFind(transform, name);
+        Transform found = DeepFind(transform, name);
         return found == null ? null : found.GetComponent<Button>();
     }
 
     void HideNamed(string name)
     {
-        var found = DeepFind(transform, name);
-        if (found != null) found.gameObject.SetActive(false);
+        Transform found = DeepFind(transform, name);
+        if (found != null)
+            found.gameObject.SetActive(false);
     }
 
     static void HideChildGraphics(Transform root)
     {
         if (root == null) return;
-        foreach (var graphic in root.GetComponentsInChildren<Graphic>(true))
+
+        foreach (Graphic graphic in root.GetComponentsInChildren<Graphic>(true))
         {
             if (graphic.transform == root) continue;
             graphic.gameObject.SetActive(false);
@@ -637,26 +752,47 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
     static void Reparent(Transform child, Transform parent)
     {
         if (child == null || parent == null) return;
-        if (child.parent != parent) child.SetParent(parent, false);
+
+        if (child.parent != parent)
+            child.SetParent(parent, false);
+
         child.gameObject.SetActive(true);
         child.SetAsLastSibling();
     }
 
     static void SetLocalized(TMP_Text text, string key)
     {
-        var loc = text.GetComponent<LocalizedText>();
-        if (loc == null)
+        if (text == null) return;
+
+        var localized = text.GetComponent<LocalizedText>();
+        if (localized == null)
         {
             RuntimeUI.Localize(text, key);
-            loc = text.GetComponent<LocalizedText>();
+            localized = text.GetComponent<LocalizedText>();
         }
-        if (loc != null) loc.key = key;
+
+        if (localized != null)
+            localized.key = key;
+
         text.text = L10n.Get(key);
+    }
+
+    static bool ArtReady(params Sprite[] sprites)
+    {
+        if (sprites == null || sprites.Length == 0) return false;
+
+        foreach (Sprite sprite in sprites)
+        {
+            if (sprite == null)
+                return false;
+        }
+
+        return true;
     }
 
     static Sprite LoadRequired(string path)
     {
-        var sprite = Resources.Load<Sprite>(path);
+        Sprite sprite = Resources.Load<Sprite>(path);
         if (sprite == null)
             Debug.LogError("[MainMenuHomeVisuals] Missing Resources/" + path + ".");
         return sprite;
@@ -670,31 +806,46 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
             existing.gameObject.SetActive(true);
             return existing;
         }
+
         return (RectTransform)RuntimeUI.CreateObject(name, parent).transform;
     }
 
     static Image EnsureImage(Transform parent, string name)
     {
-        var rect = EnsureRect(parent, name);
+        RectTransform rect = EnsureRect(parent, name);
         var image = rect.GetComponent<Image>();
-        if (image == null) image = rect.gameObject.AddComponent<Image>();
+        if (image == null)
+            image = rect.gameObject.AddComponent<Image>();
         return image;
     }
 
-    static TMP_Text EnsureTmp(Transform parent, string name, float size)
+    static TMP_Text EnsureText(
+        Transform parent,
+        string name,
+        float size,
+        TMP_FontAsset font,
+        Color color,
+        TextAlignmentOptions alignment)
     {
-        var rect = EnsureRect(parent, name);
-        var tmp = rect.GetComponent<TextMeshProUGUI>();
-        if (tmp == null) tmp = rect.gameObject.AddComponent<TextMeshProUGUI>();
-        tmp.gameObject.SetActive(true);
-        tmp.fontSize = size;
-        tmp.raycastTarget = false;
-        tmp.color = NearWhite;
-        RuntimeUI.ConfigureText(tmp, ResponsiveTextRole.Body, size);
-        return tmp;
+        RectTransform rect = EnsureRect(parent, name);
+        var text = rect.GetComponent<TextMeshProUGUI>();
+        if (text == null)
+            text = rect.gameObject.AddComponent<TextMeshProUGUI>();
+
+        text.gameObject.SetActive(true);
+        text.font = font;
+        text.fontSize = size;
+        text.fontStyle = FontStyles.Bold;
+        text.color = color;
+        text.alignment = alignment;
+        text.raycastTarget = false;
+        return text;
     }
 
-    static void ConfigureImage(Image image, Sprite sprite, bool preserveAspect,
+    static void ConfigureImage(
+        Image image,
+        Sprite sprite,
+        bool preserveAspect,
         Image.Type type)
     {
         image.enabled = true;
@@ -705,9 +856,25 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         image.raycastTarget = false;
     }
 
-    static void Place(RectTransform rect, Vector2 position, Vector2 size)
+    static void ConfigureInteractiveImage(
+        Image image,
+        Sprite sprite,
+        bool preserveAspect,
+        Image.Type type,
+        float pixelsPerUnit)
+    {
+        ConfigureImage(image, sprite, preserveAspect, type);
+        image.pixelsPerUnitMultiplier = pixelsPerUnit;
+        image.raycastTarget = true;
+    }
+
+    static void Place(
+        RectTransform rect,
+        Vector2 position,
+        Vector2 size)
     {
         if (rect == null) return;
+
         rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
         rect.pivot = new Vector2(0.5f, 0.5f);
         rect.anchoredPosition = position;
@@ -719,6 +886,7 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
     static void Stretch(RectTransform rect)
     {
         if (rect == null) return;
+
         rect.anchorMin = Vector2.zero;
         rect.anchorMax = Vector2.one;
         rect.offsetMin = Vector2.zero;
@@ -727,11 +895,30 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         rect.localRotation = Quaternion.identity;
     }
 
+    static void StretchText(
+        RectTransform rect,
+        float horizontalInset,
+        float verticalInset)
+    {
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.offsetMin = new Vector2(horizontalInset, verticalInset);
+        rect.offsetMax = new Vector2(-horizontalInset, -verticalInset);
+        rect.localScale = Vector3.one;
+        rect.localRotation = Quaternion.identity;
+    }
+
     static Transform DirectChild(Transform parent, string name)
     {
         if (parent == null) return null;
+
         for (int i = 0; i < parent.childCount; i++)
-            if (parent.GetChild(i).name == name) return parent.GetChild(i);
+        {
+            Transform child = parent.GetChild(i);
+            if (child.name == name)
+                return child;
+        }
+
         return null;
     }
 
@@ -739,22 +926,28 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
     {
         if (root == null) return null;
         if (root.name == name) return root;
+
         for (int i = 0; i < root.childCount; i++)
         {
-            var found = DeepFind(root.GetChild(i), name);
-            if (found != null) return found;
+            Transform found = DeepFind(root.GetChild(i), name);
+            if (found != null)
+                return found;
         }
+
         return null;
     }
 
     static T FindInScene<T>(Scene scene) where T : Component
     {
         if (!scene.IsValid()) return null;
-        foreach (var root in scene.GetRootGameObjects())
+
+        foreach (GameObject root in scene.GetRootGameObjects())
         {
-            var found = root.GetComponentInChildren<T>(true);
-            if (found != null) return found;
+            T found = root.GetComponentInChildren<T>(true);
+            if (found != null)
+                return found;
         }
+
         return null;
     }
 
@@ -763,21 +956,24 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         var menu = FindInScene<MenuManager>(scene);
         if (menu != null && menu.mainMenuPanel != null)
         {
-            var owned = menu.mainMenuPanel.GetComponentInParent<Canvas>();
-            if (owned != null && owned.isRootCanvas &&
+            Canvas owned = menu.mainMenuPanel.GetComponentInParent<Canvas>();
+            if (owned != null &&
+                owned.isRootCanvas &&
                 owned.renderMode != RenderMode.WorldSpace)
                 return owned;
         }
 
-        foreach (var root in scene.GetRootGameObjects())
+        foreach (GameObject root in scene.GetRootGameObjects())
         {
-            foreach (var canvas in root.GetComponentsInChildren<Canvas>(true))
+            foreach (Canvas canvas in root.GetComponentsInChildren<Canvas>(true))
             {
-                if (canvas.gameObject.scene == scene && canvas.isRootCanvas &&
+                if (canvas.gameObject.scene == scene &&
+                    canvas.isRootCanvas &&
                     canvas.renderMode != RenderMode.WorldSpace)
                     return canvas;
             }
         }
+
         return null;
     }
 }

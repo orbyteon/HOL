@@ -11,7 +11,7 @@ using UnityEngine.UI;
 public sealed class ProductionSymbolPlayModeTests
 {
     [UnityTest]
-    public IEnumerator HomeTipUsesCurrentOwnerAndContainsNoUnsupportedStarGlyph()
+    public IEnumerator HomeSpeechAndPromoUseCurrentOwnerWithoutUnsupportedStarGlyphs()
     {
         InvokeInstaller(RuntimeType("MainMenuHomeVisuals"));
         yield return SceneManager.LoadSceneAsync("MainMenu", LoadSceneMode.Single);
@@ -21,12 +21,20 @@ public sealed class ProductionSymbolPlayModeTests
             RuntimeType("MainMenuHomeVisuals")) as Component;
         Assert.That(owner, Is.Not.Null);
 
-        Transform tipTitle = Find(owner.transform, "HomeTipTitle");
-        Assert.That(tipTitle, Is.Not.Null);
-        var title = tipTitle.GetComponent<TMP_Text>();
-        Assert.That(title, Is.Not.Null);
-        Assert.That(title.text, Does.Not.Contain(char.ConvertFromUtf32(0x2605)),
-            "Tip title must use dedicated art/text rather than an unsupported star glyph.");
+        foreach (string textName in new[]
+        {
+            "HomeSpeechText",
+            "HomePromoTitle",
+            "HomePromoBody",
+        })
+        {
+            Transform target = Find(owner.transform, textName);
+            Assert.That(target, Is.Not.Null, "Missing current Home text: " + textName);
+            var text = target.GetComponent<TMP_Text>();
+            Assert.That(text, Is.Not.Null, textName);
+            Assert.That(text.text, Does.Not.Contain(char.ConvertFromUtf32(0x2605)),
+                textName + " must use dedicated art/text rather than an unsupported star glyph.");
+        }
     }
 
     [UnityTest]
