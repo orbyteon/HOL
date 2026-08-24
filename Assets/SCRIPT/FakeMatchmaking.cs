@@ -2,21 +2,18 @@ using System.Collections;
 using TMPro;
 using UnityEngine;
 
-// Deterministic Solo-vs-AI preparation transition.
+// Truthful Solo-vs-AI preparation transition.
 //
-// This is intentionally not public matchmaking and never claims that a remote
-// human is being searched. The short presentation window lets the approved
-// radar screen read clearly, then opens the existing local AI board. Gameplay
-// ownership remains with GameManager/DuelRules.
+// This is not public matchmaking and never claims that a remote human is being
+// searched. The approved radar modal remains visible only while the existing
+// local duel board performs its real first-frame construction. Gameplay remains
+// owned by GameManager, NumberManager and DuelRules.
 public class FakeMatchmaking : MonoBehaviour
 {
     public GameObject searchingPanel;
     public GameObject panelGame;
     public TMP_Text searchingText;
     public AudioSource foundSound;
-
-    [Min(0f)] public float preparationSeconds = 0.85f;
-    [Min(0f)] public float readyHoldSeconds = 0.25f;
 
     Coroutine preparationRoutine;
     bool readyPhase;
@@ -25,6 +22,7 @@ public class FakeMatchmaking : MonoBehaviour
 
     void OnEnable()
     {
+        L10n.OnLanguageChanged -= RefreshStatusCopy;
         L10n.OnLanguageChanged += RefreshStatusCopy;
     }
 
@@ -32,9 +30,17 @@ public class FakeMatchmaking : MonoBehaviour
     {
         StopPendingTransition();
 
-        if (panelGame != null)
-            panelGame.SetActive(false);
+        if (panelGame == null)
+        {
+            Debug.LogError("[FakeMatchmaking] Solo game panel is missing.");
+            ResetSearchPresentation(false);
+            IsPreparing = false;
+            return;
+        }
 
+        // The board starts its actual Unity initialization immediately behind
+        // the modal. There is no timer, random delay or fake queue simulation.
+        panelGame.SetActive(true);
         ResetSearchPresentation(true);
         IsPreparing = true;
         readyPhase = false;
@@ -44,8 +50,8 @@ public class FakeMatchmaking : MonoBehaviour
 
     IEnumerator PrepareComputerChallenger()
     {
-        if (preparationSeconds > 0f)
-            yield return new WaitForSecondsRealtime(preparationSeconds);
+        while (IsPreparing && !IsLocalBoardReady())
+            yield return null;
 
         if (!IsPreparing)
             yield break;
@@ -55,8 +61,9 @@ public class FakeMatchmaking : MonoBehaviour
         if (foundSound != null)
             foundSound.Play();
 
-        if (readyHoldSeconds > 0f)
-            yield return new WaitForSecondsRealtime(readyHoldSeconds);
+        // One render barrier lets the localized ready state settle without
+        // inventing a fixed waiting period. The board is already playable.
+        yield return new WaitForEndOfFrame();
 
         if (!IsPreparing)
             yield break;
@@ -65,13 +72,21 @@ public class FakeMatchmaking : MonoBehaviour
         readyPhase = false;
         preparationRoutine = null;
         ResetSearchPresentation(false);
+    }
 
-        if (panelGame != null)
-            panelGame.SetActive(true);
+    bool IsLocalBoardReady()
+    {
+        if (panelGame == null || !panelGame.activeInHierarchy)
+            return false;
+
+        var layout = panelGame.GetComponentInChildren<HolDuelBoardLayout>(true);
+        return layout != null &&
+               layout.KeypadRoot != null &&
+               layout.SubmitControl != null;
     }
 
     // Back and the large Cancel CTA share this single cancellation path. It
-    // invalidates every delayed callback before hiding the presentation.
+    // invalidates every deferred callback before hiding either presentation.
     public void CancelSearch()
     {
         StopPendingTransition();
@@ -91,6 +106,7 @@ public class FakeMatchmaking : MonoBehaviour
             StopCoroutine(preparationRoutine);
             preparationRoutine = null;
         }
+
         StopAllCoroutines();
     }
 
@@ -111,19 +127,8 @@ public class FakeMatchmaking : MonoBehaviour
     {
         if (searchingText == null || !IsPreparing) return;
 
-        string text;
-        if (readyPhase)
-        {
-            text = L10n.Current == L10n.Language.Greek
-                ? "Ο AI ΑΝΤΙΠΑΛΟΣ ΕΙΝΑΙ ΕΤΟΙΜΟΣ!"
-                : "AI OPPONENT READY!";
-        }
-        else
-        {
-            text = L10n.Current == L10n.Language.Greek
-                ? "ΠΡΟΕΤΟΙΜΑΣΙΑ AI ΑΝΤΙΠΑΛΟΥ"
-                : "PREPARING AI OPPONENT";
-        }
+        string text = L10n.Get(
+            readyPhase ? "solo_ai_ready" : "solo_ai_preparing");
 
         var ellipsis = searchingText.GetComponent<AnimatedEllipsis>();
         if (ellipsis != null)
@@ -132,6 +137,7 @@ public class FakeMatchmaking : MonoBehaviour
             if (!readyPhase)
                 ellipsis.SetBaseText(text);
         }
+
         searchingText.text = text;
     }
 
