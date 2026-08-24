@@ -17,8 +17,9 @@ public sealed class DailyHuntVisuals : MonoBehaviour
     const string AvatarResource = "reference/player_cyan_exact";
     const string MascotSixResource = "reference/mascot_6_exact";
     const string MascotSevenResource = "reference/mascot_7_exact";
-    const string CalendarResource = "cartoon/cartoon_daily_calendar";
-    const string ChestResource = "cartoon/cartoon_reward_chest";
+    // Approved repository artwork is the only production visual source.
+    const string CalendarResource = "phase2a/hol_mode_daily_r2";
+    const string ChestResource = "mainmenu/mainmenu_icon_daily_hunt";
     const string TrophyResource = "reference/board_trophy_exact";
     const string StarsResource = "mainmenu/mainmenu_deco_stars";
     const string ConfettiResource = "mainmenu/mainmenu_deco_confetti";
