@@ -71,6 +71,7 @@ public sealed class DailyHuntVisuals : MonoBehaviour
     TMP_Text chipWins;
     TMP_Text challengeHeading;
     TMP_Text rewardHeading;
+    TMP_Text trailText;
     float nextChipRefresh;
 
     public bool IsReady { get; private set; }
@@ -99,7 +100,10 @@ public sealed class DailyHuntVisuals : MonoBehaviour
 
     void LateUpdate()
     {
-        if (!IsReady || Time.unscaledTime < nextChipRefresh) return;
+        if (!IsReady) return;
+
+        RefreshVisibleTrail();
+        if (Time.unscaledTime < nextChipRefresh) return;
         nextChipRefresh = Time.unscaledTime + 0.25f;
         RefreshPlayerChip();
     }
@@ -276,6 +280,7 @@ public sealed class DailyHuntVisuals : MonoBehaviour
             new Vector2(500f, 100f));
 
         Reparent(trail.transform, trailFrame.transform);
+        trailText = trail;
         trail.font = productionFont;
         trail.color = Cyan;
         trail.alignment = TextAlignmentOptions.Center;
@@ -351,6 +356,7 @@ public sealed class DailyHuntVisuals : MonoBehaviour
 
         HideLegacyPresentation(panel);
         RefreshCopy();
+        RefreshVisibleTrail();
         RefreshPlayerChip();
     }
 
@@ -420,10 +426,23 @@ public sealed class DailyHuntVisuals : MonoBehaviour
         if (!IsReady) return;
 
         if (challengeHeading != null)
-            challengeHeading.text = L10n.Get("daily_challenge_heading");
+            challengeHeading.text = L10n.Get("home_daily_title");
         if (rewardHeading != null)
-            rewardHeading.text = L10n.Get("daily_progress_heading");
+            rewardHeading.text = L10n.Get("stats_streak").ToUpperInvariant();
+        RefreshVisibleTrail();
         RefreshPlayerChip();
+    }
+
+    void RefreshVisibleTrail()
+    {
+        if (trailText == null || string.IsNullOrEmpty(trailText.text)) return;
+
+        string safe = trailText.text
+            .Replace("🎯", "●")
+            .Replace("🔺", "▲")
+            .Replace("🔻", "▼");
+        if (safe != trailText.text)
+            trailText.text = safe;
     }
 
     void RefreshPlayerChip()
