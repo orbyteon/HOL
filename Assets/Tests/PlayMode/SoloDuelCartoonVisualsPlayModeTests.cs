@@ -61,7 +61,6 @@ public sealed class SoloDuelCartoonVisualsPlayModeTests
             "OpponentCard",
             "OpponentCharacter",
             "OpponentCaption",
-            "OpponentIdentity",
             "SoloVsBurst",
             "SoloPromptRibbon",
             "RoundLabel",
@@ -78,7 +77,6 @@ public sealed class SoloDuelCartoonVisualsPlayModeTests
             "AiGuessHistory",
             "SoloTipCard",
             "SoloTipHeading",
-            "RangeLabel",
             "NumberKeypad",
             "ButtonConfirm",
         })
@@ -144,10 +142,18 @@ public sealed class SoloDuelCartoonVisualsPlayModeTests
                     image.name + " hides approved production art.");
         }
 
-        TMP_Text prompt = GetField<TMP_Text>(
-            FindInScene(RuntimeType("GameManager")), "turnText");
+        Component gameManager = FindInScene(RuntimeType("GameManager"));
+        TMP_Text prompt = GetField<TMP_Text>(gameManager, "turnText");
+        TMP_Text opponentIdentity = GetField<TMP_Text>(gameManager, "opponentNameText");
+        TMP_Text range = GetField<TMP_Text>(gameManager, "rangeText");
         Assert.That(prompt.transform.IsChildOf(root), Is.True,
             "The real GameManager prompt must be seated in the approved ribbon.");
+        Assert.That(opponentIdentity.transform.IsChildOf(
+            Find(root, "OpponentCard")), Is.True,
+            "The real opponent identity must be seated in the magenta card.");
+        Assert.That(range.transform.IsChildOf(
+            Find(root, "SoloTipCard")), Is.True,
+            "The real range text must be seated in the contextual tip card.");
 
         string[] answerNames =
         {
