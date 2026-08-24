@@ -21,6 +21,8 @@ public sealed class MainMenuHomeTypographyFidelity : MonoBehaviour
     Transform visualRoot;
     bool applied;
 
+    public bool IsApplied => applied;
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     static void Install()
     {
