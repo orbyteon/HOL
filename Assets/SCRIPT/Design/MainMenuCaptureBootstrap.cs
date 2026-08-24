@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Text;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -8,11 +9,14 @@ using UnityEngine.SceneManagement;
 public sealed class MainMenuCaptureBootstrap : MonoBehaviour
 {
     const string CaptureExtra = "hol_capture_screen";
+    const string CaptureLanguageExtra = "hol_capture_language";
+    const string CaptureTokenExtra = "hol_capture_token";
     const string MainMenuScreen = "mainmenu";
     const string ReadyMarker = "HOL_MAINMENU_CAPTURE_READY";
     const string AdsConsentPrefKey = "AdsConsent";
 
     static bool markerLogged;
+    static string readyMarker = ReadyMarker;
     MainMenuHomeVisuals homeVisuals;
     bool presentationWaitStarted;
     int presentationBarriersPassed;
@@ -25,17 +29,23 @@ public sealed class MainMenuCaptureBootstrap : MonoBehaviour
         SceneManager.sceneLoaded -= InstallForScene;
         CaptureRequested = false;
         markerLogged = false;
+        readyMarker = ReadyMarker;
     }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     static void Install()
     {
 #if UNITY_ANDROID && DEVELOPMENT_BUILD && !UNITY_EDITOR
-        string requestedScreen = ReadRequestedScreen();
+        string requestedScreen = ReadIntentString(CaptureExtra);
         if (!ShouldCapture(true, true, requestedScreen))
             return;
 
         CaptureRequested = true;
+        string requestedLanguage = ReadIntentString(CaptureLanguageExtra);
+        if (!string.IsNullOrEmpty(requestedLanguage))
+            L10n.SetLanguage(ResolveCaptureLanguage(requestedLanguage));
+        readyMarker = BuildReadyMarker(ReadIntentString(CaptureTokenExtra));
+
         if (!PlayerPrefs.HasKey(AdsConsentPrefKey))
         {
             PlayerPrefs.SetInt(AdsConsentPrefKey, 0);
@@ -54,8 +64,30 @@ public sealed class MainMenuCaptureBootstrap : MonoBehaviour
                string.Equals(requestedScreen, MainMenuScreen, StringComparison.Ordinal);
     }
 
+    public static L10n.Language ResolveCaptureLanguage(string requestedLanguage)
+    {
+        return string.Equals(requestedLanguage, "el", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(requestedLanguage, "greek", StringComparison.OrdinalIgnoreCase)
+            ? L10n.Language.Greek
+            : L10n.Language.English;
+    }
+
+    public static string BuildReadyMarker(string token)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+            return ReadyMarker;
+
+        var safe = new StringBuilder(token.Length);
+        foreach (char character in token.Trim())
+        {
+            if (char.IsLetterOrDigit(character) || character == '-' || character == '_')
+                safe.Append(character);
+        }
+        return safe.Length == 0 ? ReadyMarker : ReadyMarker + ":" + safe;
+    }
+
 #if UNITY_ANDROID && DEVELOPMENT_BUILD && !UNITY_EDITOR
-    static string ReadRequestedScreen()
+    static string ReadIntentString(string key)
     {
         using (var unityPlayer = new AndroidJavaClass("com.unity3d.player.UnityPlayer"))
         using (var activity = unityPlayer.GetStatic<AndroidJavaObject>("currentActivity"))
@@ -63,7 +95,7 @@ public sealed class MainMenuCaptureBootstrap : MonoBehaviour
         {
             return intent == null
                 ? null
-                : intent.Call<string>("getStringExtra", CaptureExtra);
+                : intent.Call<string>("getStringExtra", key);
         }
     }
 #endif
@@ -156,7 +188,7 @@ public sealed class MainMenuCaptureBootstrap : MonoBehaviour
 
         HideCaptureOverlays();
         markerLogged = true;
-        Debug.Log(ReadyMarker);
+        Debug.Log(readyMarker);
         enabled = false;
     }
 
