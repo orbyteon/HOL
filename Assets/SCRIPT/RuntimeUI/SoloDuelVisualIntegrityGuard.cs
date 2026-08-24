@@ -29,6 +29,10 @@ public sealed class SoloDuelVisualIntegrityGuard : MonoBehaviour
     GameManager gameManager;
     RectTransform visualRoot;
     RectTransform safeRoot;
+    Button lockButton;
+    Button saveStreakButton;
+    bool resultControlSeated;
+    float nextDynamicControlProbe;
 
     public bool IsSettled { get; private set; }
 
@@ -64,38 +68,54 @@ public sealed class SoloDuelVisualIntegrityGuard : MonoBehaviour
 
     IEnumerator Start()
     {
-        for (int frame = 0; frame < 300; frame++)
+        for (int frame = 0; frame < 300 && !IsSettled; frame++)
         {
-            if (TryResolveOwnerRoots())
-            {
-                ApplyApprovedGeometry();
-                SeatControllerOwnedControls();
-                SuppressLegacyGuessPanels();
-                EnforcePhaseVisibility();
-                KeepProductionOwnerOnTop();
-                IsSettled = true;
-                yield break;
-            }
-
-            yield return null;
+            SettleIfReady();
+            if (!IsSettled)
+                yield return null;
         }
 
-        Debug.LogError(
-            "[SoloDuelVisualIntegrityGuard] Solo duel owner did not settle within 300 frames.");
+        if (!IsSettled)
+        {
+            Debug.LogError(
+                "[SoloDuelVisualIntegrityGuard] Solo duel owner did not settle within 300 frames.");
+        }
     }
 
     void LateUpdate()
     {
+        // HolDuelBoardLayout currently builds from an Invoke(0) callback. The
+        // LateUpdate check catches that same frame, before Canvas rendering, so
+        // no legacy hierarchy can flash above the approved presentation.
         if (!IsSettled)
+        {
+            SettleIfReady();
+            if (!IsSettled)
+                return;
+        }
+
+        if (Time.unscaledTime >= nextDynamicControlProbe)
+        {
+            nextDynamicControlProbe = Time.unscaledTime + 0.25f;
+            SeatControllerOwnedControls();
+        }
+
+        SuppressLegacyGuessPanels();
+        EnforcePhaseVisibility();
+        KeepProductionOwnerOnTop();
+    }
+
+    void SettleIfReady()
+    {
+        if (!TryResolveOwnerRoots())
             return;
 
-        // NumberManager and GameManager may toggle or create these objects later
-        // in the match. Re-applying their placement/state here is deterministic,
-        // allocation-free and happens before the Canvas is rendered.
+        ApplyApprovedGeometry();
         SeatControllerOwnedControls();
         SuppressLegacyGuessPanels();
         EnforcePhaseVisibility();
         KeepProductionOwnerOnTop();
+        IsSettled = true;
     }
 
     bool TryResolveOwnerRoots()
@@ -161,7 +181,9 @@ public sealed class SoloDuelVisualIntegrityGuard : MonoBehaviour
         if (safeRoot == null)
             return;
 
-        if (gameManager != null && gameManager.stopGameButton != null)
+        if (!resultControlSeated &&
+            gameManager != null &&
+            gameManager.stopGameButton != null)
         {
             SeatButton(
                 gameManager.stopGameButton,
@@ -169,10 +191,12 @@ public sealed class SoloDuelVisualIntegrityGuard : MonoBehaviour
                 new Vector2(500f, 96f),
                 GoldFrameResource,
                 Ink);
+            resultControlSeated = true;
         }
 
-        Button lockButton = FindNamedButton("LockButton");
-        if (lockButton != null)
+        if (lockButton == null)
+            lockButton = FindNamedButton("LockButton");
+        if (lockButton != null && lockButton.transform.parent != safeRoot)
         {
             SeatButton(
                 lockButton.gameObject,
@@ -182,11 +206,12 @@ public sealed class SoloDuelVisualIntegrityGuard : MonoBehaviour
                 Ink);
         }
 
-        Button saveStreak = FindNamedButton("SaveStreakButton");
-        if (saveStreak != null)
+        if (saveStreakButton == null)
+            saveStreakButton = FindNamedButton("SaveStreakButton");
+        if (saveStreakButton != null && saveStreakButton.transform.parent != safeRoot)
         {
             SeatButton(
-                saveStreak.gameObject,
+                saveStreakButton.gameObject,
                 new Vector2(0f, -710f),
                 new Vector2(560f, 90f),
                 PurpleFrameResource,
