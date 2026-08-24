@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using TMPro;
 using UnityEngine;
 
@@ -16,7 +15,6 @@ public class FakeMatchmaking : MonoBehaviour
     public TMP_Text searchingText;
     public AudioSource foundSound;
 
-    Coroutine preparationRoutine;
     bool readyPhase;
 
     // Non-serialized lifecycle seam used by EditMode tests. Production leaves
@@ -31,14 +29,16 @@ public class FakeMatchmaking : MonoBehaviour
         L10n.OnLanguageChanged += RefreshStatusCopy;
     }
 
+    void Update()
+    {
+        TickPreparation();
+    }
+
     public void StartSearch()
     {
         // A second tap while the blocking modal is already active is a no-op.
-        // The one owned readiness routine remains authoritative and cannot be
-        // replaced by another callback in the same frame.
+        // One deterministic state machine remains authoritative.
         if (IsPreparing) return;
-
-        StopPendingTransition();
 
         if (panelGame == null)
         {
@@ -55,32 +55,26 @@ public class FakeMatchmaking : MonoBehaviour
         IsPreparing = true;
         readyPhase = false;
         RefreshStatusCopy();
-        preparationRoutine = StartCoroutine(PrepareComputerChallenger());
     }
 
-    IEnumerator PrepareComputerChallenger()
+    // Production calls this from Update. EditMode tests invoke the same method
+    // directly, avoiding editor-only coroutine scheduling differences.
+    internal void TickPreparation()
     {
-        while (IsPreparing && !IsLocalBoardReady())
-            yield return null;
+        if (!IsPreparing || !IsLocalBoardReady())
+            return;
 
-        if (!IsPreparing)
-            yield break;
-
-        readyPhase = true;
-        RefreshStatusCopy();
-        if (foundSound != null)
-            foundSound.Play();
-
-        // One engine update lets the localized ready state settle without a
-        // fixed waiting period and remains valid in both EditMode and PlayMode.
-        yield return null;
-
-        if (!IsPreparing)
-            yield break;
+        if (!readyPhase)
+        {
+            readyPhase = true;
+            RefreshStatusCopy();
+            if (foundSound != null)
+                foundSound.Play();
+            return;
+        }
 
         IsPreparing = false;
         readyPhase = false;
-        preparationRoutine = null;
         ResetSearchPresentation(false);
     }
 
@@ -98,11 +92,10 @@ public class FakeMatchmaking : MonoBehaviour
                layout.SubmitControl != null;
     }
 
-    // Back and the large Cancel CTA share this single cancellation path. It
-    // invalidates the one owned deferred callback before hiding presentation.
+    // Back and the large Cancel CTA share this single cancellation path. There
+    // is no deferred timer/coroutine left that can reopen gameplay afterward.
     public void CancelSearch()
     {
-        StopPendingTransition();
         IsPreparing = false;
         readyPhase = false;
         if (foundSound != null)
@@ -110,14 +103,6 @@ public class FakeMatchmaking : MonoBehaviour
         ResetSearchPresentation(false);
         if (panelGame != null)
             panelGame.SetActive(false);
-    }
-
-    void StopPendingTransition()
-    {
-        if (preparationRoutine == null) return;
-
-        StopCoroutine(preparationRoutine);
-        preparationRoutine = null;
     }
 
     void ResetSearchPresentation(bool visible)
