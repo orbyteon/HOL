@@ -5,26 +5,24 @@ using NUnit.Framework;
 using TMPro;
 using UnityEngine;
 using UnityEngine.TestTools;
-using UnityEngine.UI;
 
 public sealed class SoloModeClarityTests
 {
     Type transitionType;
     Type l10nType;
-    Type layoutType;
     GameObject host;
     GameObject searchingPanel;
     GameObject panelGame;
     TMP_Text searchingText;
     Component transition;
     object initialLanguage;
+    bool boardReady;
 
     [SetUp]
     public void SetUp()
     {
         transitionType = RuntimeType("FakeMatchmaking");
         l10nType = RuntimeType("L10n");
-        layoutType = RuntimeType("HolDuelBoardLayout");
         initialLanguage = l10nType.GetProperty(
             "Current", BindingFlags.Public | BindingFlags.Static)
             .GetValue(null, null);
@@ -45,6 +43,14 @@ public sealed class SoloModeClarityTests
         SetField(transition, "searchingPanel", searchingPanel);
         SetField(transition, "panelGame", panelGame);
         SetField(transition, "searchingText", searchingText);
+
+        boardReady = false;
+        PropertyInfo probe = transitionType.GetProperty(
+            "BoardReadyProbe",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.That(probe, Is.Not.Null, "Missing deterministic readiness seam.");
+        probe.SetValue(transition, new Func<bool>(() => boardReady));
+
         searchingPanel.SetActive(false);
         panelGame.SetActive(false);
     }
@@ -64,15 +70,20 @@ public sealed class SoloModeClarityTests
             BindingFlags.Instance | BindingFlags.NonPublic), Is.Not.Null,
             "Solo should own exactly one explicit AI preparation routine.");
 
-        MakeBoardReady();
         Invoke("StartSearch");
 
         Assert.That(searchingPanel.activeSelf, Is.True);
         Assert.That(panelGame.activeSelf, Is.True,
             "The real local board must initialize immediately behind the modal.");
         Assert.That(GetProperty<bool>("IsPreparing"), Is.True);
-        Assert.That(searchingText.text, Is.EqualTo(GetCopy("solo_ai_ready")));
+        Assert.That(searchingText.text,
+            Is.EqualTo(GetCopy("solo_ai_preparing")));
 
+        yield return null;
+        Assert.That(searchingPanel.activeSelf, Is.True,
+            "The modal must remain blocking until the board reports readiness.");
+
+        MakeBoardReady();
         for (int frame = 0;
              frame < 20 && GetProperty<bool>("IsPreparing");
              frame++)
@@ -90,7 +101,8 @@ public sealed class SoloModeClarityTests
         Invoke("StartSearch");
         Assert.That(searchingPanel.activeSelf, Is.True);
         Assert.That(panelGame.activeSelf, Is.True);
-        Assert.That(searchingText.text, Is.EqualTo(GetCopy("solo_ai_preparing")));
+        Assert.That(searchingText.text,
+            Is.EqualTo(GetCopy("solo_ai_preparing")));
 
         Invoke("CancelSearch");
         Assert.That(searchingPanel.activeSelf, Is.False);
@@ -169,20 +181,7 @@ public sealed class SoloModeClarityTests
 
     void MakeBoardReady()
     {
-        Component layout = panelGame.GetComponent(layoutType);
-        if (layout == null)
-            layout = panelGame.AddComponent(layoutType);
-        ((Behaviour)layout).enabled = false;
-
-        var keypad = new GameObject("TestKeypad", typeof(RectTransform));
-        keypad.transform.SetParent(panelGame.transform, false);
-        var submitObject = new GameObject(
-            "TestSubmit", typeof(RectTransform), typeof(CanvasRenderer),
-            typeof(Image), typeof(Button));
-        submitObject.transform.SetParent(panelGame.transform, false);
-
-        SetField(layout, "keypadRoot", keypad);
-        SetField(layout, "submitControl", submitObject.GetComponent<Button>());
+        boardReady = true;
     }
 
     string GetCopy(string key)
@@ -208,9 +207,12 @@ public sealed class SoloModeClarityTests
             .Invoke(null, new[] { language });
     }
 
-    void SetField(string name, object value)
+    void Invoke(string method)
     {
-        SetField(transition, name, value);
+        transitionType.GetMethod(
+            method, BindingFlags.Instance | BindingFlags.Public |
+                    BindingFlags.NonPublic)
+            .Invoke(transition, null);
     }
 
     static void SetField(Component target, string name, object value)
@@ -222,14 +224,6 @@ public sealed class SoloModeClarityTests
         field.SetValue(target, value);
     }
 
-    void Invoke(string method)
-    {
-        transitionType.GetMethod(
-            method, BindingFlags.Instance | BindingFlags.Public |
-                    BindingFlags.NonPublic)
-            .Invoke(transition, null);
-    }
-
     static Type RuntimeType(string name)
     {
         foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
@@ -237,6 +231,7 @@ public sealed class SoloModeClarityTests
             Type type = assembly.GetType(name);
             if (type != null) return type;
         }
+
         Assert.Fail("Missing runtime type: " + name);
         return null;
     }
