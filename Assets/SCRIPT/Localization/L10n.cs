@@ -100,7 +100,7 @@ public static class L10n
         { "enter_your_number",       new[] { "Enter your number", "Βάλε τον αριθμό σου" } },
         { "number_placeholder",      new[] { "1-100", "1-100" } },
         { "confirm",                 new[] { "Confirm", "Επιβεβαίωση" } },
-        { "invalid_number",          new[] { "Enter a valid number", "Βάλε έγκρο αριθμό" } },
+        { "invalid_number",          new[] { "Enter a valid number", "Βάλε έγκυρο αριθμό" } },
         { "number_out_of_range",     new[] { "Number must be between 1 and 100", "Ο αριθμός πρέπει να είναι από 1 έως 100" } },
 
         // duel
