@@ -73,7 +73,7 @@ public sealed class SoloModeClarityTests
         Assert.That(GetProperty<bool>("IsPreparing"), Is.True);
         Assert.That(searchingText.text, Is.EqualTo(GetCopy("solo_ai_ready")));
 
-        yield return new WaitForEndOfFrame();
+        yield return null;
         yield return null;
 
         Assert.That(searchingPanel.activeSelf, Is.False);
@@ -108,7 +108,7 @@ public sealed class SoloModeClarityTests
 
         MakeBoardReady();
         yield return null;
-        yield return new WaitForEndOfFrame();
+        yield return null;
         yield return null;
 
         Assert.That(searchingPanel.activeSelf, Is.False);
