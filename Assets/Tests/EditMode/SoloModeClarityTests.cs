@@ -1,9 +1,10 @@
 using System;
 using System.Collections;
-using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
+using TMPro;
 using UnityEngine;
+using UnityEngine.TestTools;
 
 public sealed class SoloModeClarityTests
 {
@@ -12,6 +13,7 @@ public sealed class SoloModeClarityTests
     GameObject host;
     GameObject searchingPanel;
     GameObject panelGame;
+    TMP_Text searchingText;
     Component transition;
     object initialLanguage;
 
@@ -20,19 +22,28 @@ public sealed class SoloModeClarityTests
     {
         transitionType = RuntimeType("FakeMatchmaking");
         l10nType = RuntimeType("L10n");
-        initialLanguage = l10nType.GetProperty("Current",
-            BindingFlags.Public | BindingFlags.Static).GetValue(null, null);
+        initialLanguage = l10nType.GetProperty(
+            "Current", BindingFlags.Public | BindingFlags.Static)
+            .GetValue(null, null);
 
         host = new GameObject("SoloEntryOwner");
-        searchingPanel = new GameObject("LegacySearchingPanel");
+        searchingPanel = new GameObject(
+            "SoloPreparationPanel", typeof(RectTransform));
         searchingPanel.transform.SetParent(host.transform, false);
         searchingPanel.AddComponent<CanvasGroup>();
-        panelGame = new GameObject("SoloGamePanel");
+        panelGame = new GameObject("SoloGamePanel", typeof(RectTransform));
         panelGame.transform.SetParent(host.transform, false);
+
+        var textObject = new GameObject("SearchStatus", typeof(RectTransform));
+        textObject.transform.SetParent(searchingPanel.transform, false);
+        searchingText = textObject.AddComponent<TextMeshProUGUI>();
 
         transition = host.AddComponent(transitionType);
         SetField("searchingPanel", searchingPanel);
         SetField("panelGame", panelGame);
+        SetField("searchingText", searchingText);
+        SetField("preparationSeconds", 0.03f);
+        SetField("readyHoldSeconds", 0.02f);
         searchingPanel.SetActive(false);
         panelGame.SetActive(false);
     }
@@ -44,47 +55,52 @@ public sealed class SoloModeClarityTests
         UnityEngine.Object.DestroyImmediate(host);
     }
 
-    [Test]
-    public void SoloEntryIsImmediateDeterministicAndHasNoDeferredSearchRoutine()
+    [UnityTest]
+    public IEnumerator SoloEntryUsesOneTruthfulDeterministicAiPreparation()
     {
-        var deferredMethods = transitionType.GetMethods(BindingFlags.Instance |
-                BindingFlags.Public | BindingFlags.NonPublic |
-                BindingFlags.DeclaredOnly)
-            .Where(method => typeof(IEnumerator).IsAssignableFrom(method.ReturnType))
-            .Select(method => method.Name)
-            .ToArray();
-        Assert.That(deferredMethods, Is.Empty,
-            "Local Solo entry must not retain delayed search callbacks.");
+        Assert.That(transitionType.GetMethod(
+            "PrepareComputerChallenger",
+            BindingFlags.Instance | BindingFlags.NonPublic), Is.Not.Null,
+            "Solo should own exactly one explicit AI preparation routine.");
 
-        for (int attempt = 0; attempt < 64; attempt++)
-        {
-            panelGame.SetActive(false);
-            searchingPanel.SetActive(true);
-            searchingPanel.GetComponent<CanvasGroup>().alpha = 0.25f;
+        Invoke("StartSearch");
+        Assert.That(searchingPanel.activeSelf, Is.True);
+        Assert.That(panelGame.activeSelf, Is.False);
+        Assert.That(GetProperty<bool>("IsPreparing"), Is.True);
+        Assert.That(searchingText.text, Does.Contain("AI"));
 
-            Invoke("StartSearch");
+        yield return new WaitForSecondsRealtime(0.08f);
+        yield return null;
 
-            Assert.That(searchingPanel.activeSelf, Is.False,
-                "Solo must never expose the legacy search panel.");
-            Assert.That(panelGame.activeSelf, Is.True,
-                "Every Solo attempt must enter the AI board synchronously.");
-            Assert.That(searchingPanel.GetComponent<CanvasGroup>().alpha,
-                Is.EqualTo(1f));
-        }
+        Assert.That(searchingPanel.activeSelf, Is.False);
+        Assert.That(panelGame.activeSelf, Is.True,
+            "The deterministic preparation must always enter the local AI board.");
+        Assert.That(GetProperty<bool>("IsPreparing"), Is.False);
     }
 
-    [Test]
-    public void BackCancellationAndRepeatedEntryCannotLeaveAStaleTransition()
+    [UnityTest]
+    public IEnumerator CancelAndRepeatedEntryCannotLeaveAStaleCallback()
     {
-        searchingPanel.SetActive(true);
+        Invoke("StartSearch");
+        Assert.That(searchingPanel.activeSelf, Is.True);
         Invoke("CancelSearch");
         Assert.That(searchingPanel.activeSelf, Is.False);
         Assert.That(panelGame.activeSelf, Is.False);
+        Assert.That(GetProperty<bool>("IsPreparing"), Is.False);
+
+        yield return new WaitForSecondsRealtime(0.08f);
+        Assert.That(panelGame.activeSelf, Is.False,
+            "A cancelled preparation must not reopen gameplay later.");
 
         Invoke("StartSearch");
         Invoke("StartSearch");
+        Assert.That(searchingPanel.activeSelf, Is.True);
+        Assert.That(panelGame.activeSelf, Is.False);
+        yield return new WaitForSecondsRealtime(0.08f);
+        yield return null;
         Assert.That(searchingPanel.activeSelf, Is.False);
-        Assert.That(panelGame.activeSelf, Is.True);
+        Assert.That(panelGame.activeSelf, Is.True,
+            "Repeated entry must resolve once without a stale transition.");
     }
 
     [Test]
@@ -105,11 +121,16 @@ public sealed class SoloModeClarityTests
             "Παίξε με φίλο");
     }
 
-    void AssertLocalizedCopy(string language, string solo, string start,
-        string disclosure, string privateRoom, string friend)
+    void AssertLocalizedCopy(
+        string language,
+        string solo,
+        string start,
+        string disclosure,
+        string privateRoom,
+        string friend)
     {
-        Type languageType = l10nType.GetNestedType("Language",
-            BindingFlags.Public);
+        Type languageType = l10nType.GetNestedType(
+            "Language", BindingFlags.Public);
         SetLanguage(Enum.Parse(languageType, language));
 
         Assert.That(GetCopy("play_solo"), Is.EqualTo(solo));
@@ -123,28 +144,42 @@ public sealed class SoloModeClarityTests
 
     string GetCopy(string key)
     {
-        return (string)l10nType.GetMethod("Get",
-            BindingFlags.Public | BindingFlags.Static).Invoke(null,
-            new object[] { key, new object[0] });
+        return (string)l10nType.GetMethod(
+            "Get", BindingFlags.Public | BindingFlags.Static)
+            .Invoke(null, new object[] { key, new object[0] });
+    }
+
+    T GetProperty<T>(string name)
+    {
+        PropertyInfo property = transitionType.GetProperty(
+            name, BindingFlags.Instance | BindingFlags.Public |
+                  BindingFlags.NonPublic);
+        Assert.That(property, Is.Not.Null, name);
+        return (T)property.GetValue(transition);
     }
 
     void SetLanguage(object language)
     {
-        l10nType.GetMethod("SetLanguage",
-            BindingFlags.Public | BindingFlags.Static).Invoke(null,
-            new[] { language });
+        l10nType.GetMethod(
+            "SetLanguage", BindingFlags.Public | BindingFlags.Static)
+            .Invoke(null, new[] { language });
     }
 
     void SetField(string name, object value)
     {
-        transitionType.GetField(name, BindingFlags.Instance |
-            BindingFlags.Public | BindingFlags.NonPublic).SetValue(transition, value);
+        FieldInfo field = transitionType.GetField(
+            name, BindingFlags.Instance | BindingFlags.Public |
+                  BindingFlags.NonPublic);
+        Assert.That(field, Is.Not.Null, name);
+        field.SetValue(transition, value);
     }
 
     void Invoke(string method)
     {
-        transitionType.GetMethod(method, BindingFlags.Instance |
-            BindingFlags.Public | BindingFlags.NonPublic).Invoke(transition, null);
+        transitionType.GetMethod(
+            method, BindingFlags.Instance | BindingFlags.Public |
+                    BindingFlags.NonPublic)
+            .Invoke(transition, null);
     }
 
     static Type RuntimeType(string name)
