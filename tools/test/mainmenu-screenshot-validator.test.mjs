@@ -65,12 +65,25 @@ const syntheticRgbaPng = (pixel, width = 1080, height = 1920) => {
   return rgbaPng(width, height, zlib.deflateSync(raw));
 };
 
+const variedPixels = (x, y, width, height) =>
+  x < width / 2 && y < height / 2
+    ? [16, 8, 48, 255]
+    : [240, 196, 72, 255];
+
 test("dimensions fail before malformed image data is inflated", () => {
   const png = rgbaPng(1, 1, Buffer.from("not a deflate stream"));
 
   assert.throws(
     () => validateMainMenuPng(png),
     /Expected 1080x1920, got 1x1/);
+});
+
+test("custom viewport dimensions fail closed on a mismatch", () => {
+  const png = rgbaPng(1080, 1920, Buffer.from("not a deflate stream"));
+
+  assert.throws(
+    () => validateMainMenuPng(png, 1080, 2400),
+    /Expected 1080x2400, got 1080x1920/);
 });
 
 test("uniform gray Home screenshot fails closed", () => {
@@ -93,10 +106,7 @@ test("near-uniform Home screenshot fails range thresholds", () => {
 });
 
 test("varied 1080x1920 Home screenshot passes content validation", () => {
-  const png = syntheticRgbaPng((x, y, width, height) =>
-    x < width / 2 && y < height / 2
-      ? [16, 8, 48, 255]
-      : [240, 196, 72, 255]);
+  const png = syntheticRgbaPng(variedPixels);
 
   const result = validateMainMenuPng(png);
 
@@ -105,4 +115,18 @@ test("varied 1080x1920 Home screenshot passes content validation", () => {
   assert.ok(result.sampledColors > 1);
   assert.ok(result.luminanceRange > 0);
   assert.ok(result.channelRange > 0);
+});
+
+test("varied tall Android Home screenshot passes content validation", () => {
+  const png = syntheticRgbaPng(variedPixels, 1080, 2400);
+  const result = validateMainMenuPng(png, 1080, 2400);
+  assert.equal(result.width, 1080);
+  assert.equal(result.height, 2400);
+});
+
+test("varied iPhone portrait Home screenshot passes content validation", () => {
+  const png = syntheticRgbaPng(variedPixels, 1179, 2556);
+  const result = validateMainMenuPng(png, 1179, 2556);
+  assert.equal(result.width, 1179);
+  assert.equal(result.height, 2556);
 });
