@@ -87,6 +87,10 @@ public static class L10n
         // matchmaking
         { "find_challenger",         new[] { "Play now vs AI", "Παίξε Solo με AI" } },
         { "solo_search_title",       new[] { "Find opponent", "Βρες αντίπαλο" } },
+        { "solo_ai_preparing",       new[] {
+            "PREPARING AI OPPONENT", "ΠΡΟΕΤΟΙΜΑΣΙΑ AI ΑΝΤΙΠΑΛΟΥ" } },
+        { "solo_ai_ready",           new[] {
+            "AI OPPONENT READY!", "Ο AI ΑΝΤΙΠΑΛΟΣ ΕΙΝΑΙ ΕΤΟΙΜΟΣ!" } },
         { "searching",               new[] { "Searching opponent", "Αναζήτηση αντιπάλου" } },
         { "opponent_found",          new[] { "Opponent found!", "Βρέθηκε αντίπαλος!" } },
         { "opponent_not_found",      new[] { "Opponent not found. Try again.", "Δεν βρέθηκε αντίπαλος. Δοκίμασε ξανά." } },
@@ -96,7 +100,7 @@ public static class L10n
         { "enter_your_number",       new[] { "Enter your number", "Βάλε τον αριθμό σου" } },
         { "number_placeholder",      new[] { "1-100", "1-100" } },
         { "confirm",                 new[] { "Confirm", "Επιβεβαίωση" } },
-        { "invalid_number",          new[] { "Enter a valid number", "Βάλε έγκυρο αριθμό" } },
+        { "invalid_number",          new[] { "Enter a valid number", "Βάλε έγκρο αριθμό" } },
         { "number_out_of_range",     new[] { "Number must be between 1 and 100", "Ο αριθμός πρέπει να είναι από 1 έως 100" } },
 
         // duel
