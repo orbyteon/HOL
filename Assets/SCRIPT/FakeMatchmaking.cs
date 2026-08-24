@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using TMPro;
 using UnityEngine;
@@ -17,6 +18,10 @@ public class FakeMatchmaking : MonoBehaviour
 
     Coroutine preparationRoutine;
     bool readyPhase;
+
+    // Non-serialized lifecycle seam used by EditMode tests. Production leaves
+    // this null and therefore validates the real HolDuelBoardLayout controls.
+    internal Func<bool> BoardReadyProbe { get; set; }
 
     public bool IsPreparing { get; private set; }
 
@@ -81,6 +86,9 @@ public class FakeMatchmaking : MonoBehaviour
 
     bool IsLocalBoardReady()
     {
+        if (BoardReadyProbe != null)
+            return BoardReadyProbe();
+
         if (panelGame == null || !panelGame.activeInHierarchy)
             return false;
 
