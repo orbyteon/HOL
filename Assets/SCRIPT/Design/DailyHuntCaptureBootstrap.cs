@@ -17,6 +17,10 @@ public sealed class DailyHuntCaptureBootstrap : MonoBehaviour
     const string AdsConsentPrefKey = "AdsConsent";
     const string PlayerNamePrefKey = "PlayerName";
 
+    // PanelAnimator uses a 0.28 second entrance. Native acceptance must wait
+    // beyond that duration and then cross two render barriers before logging.
+    public const float PresentationSettleSeconds = 0.36f;
+
     static readonly string[] DailyStateKeys =
     {
         "DailyHuntDay",
@@ -194,6 +198,7 @@ public sealed class DailyHuntCaptureBootstrap : MonoBehaviour
 
     IEnumerator LogReadyAfterPresentation()
     {
+        yield return new WaitForSecondsRealtime(PresentationSettleSeconds);
         yield return new WaitForEndOfFrame();
         yield return new WaitForEndOfFrame();
 
@@ -201,6 +206,12 @@ public sealed class DailyHuntCaptureBootstrap : MonoBehaviour
         if (!CaptureRequested || markerLogged || hunt == null ||
             visuals == null || !visuals.IsReady ||
             !hunt.gameObject.activeInHierarchy)
+            yield break;
+
+        var group = hunt.GetComponent<CanvasGroup>();
+        var rect = hunt.transform as RectTransform;
+        if ((group != null && group.alpha < 0.999f) ||
+            (rect != null && Vector3.Distance(rect.localScale, Vector3.one) > 0.01f))
             yield break;
 
         Transform root = Find(hunt.transform, DailyHuntVisuals.VisualRootName);
