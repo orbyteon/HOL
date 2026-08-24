@@ -41,7 +41,7 @@ git status --short --branch
 git log -1 --oneline
 ```
 
-Expected: branch `cursor/home-neon-restyle-291c`, no modified files, base commit
+Expected: branch `feature/home-neon-restyle-20260819`, no modified files, base commit
 `663cdbc`.
 
 - [ ] **Step 2: Run the existing Node test suite**
@@ -220,7 +220,7 @@ git commit -m "feat: restyle Home as solo-first neon menu"
 Run:
 
 ```bash
-git push -u origin cursor/home-neon-restyle-291c
+git push -u origin feature/home-neon-restyle-20260819
 ```
 
 Create a draft PR targeting `main` with the Home redesign summary and the
