@@ -281,7 +281,7 @@ public sealed class DailyHuntVisuals : MonoBehaviour
 
         Reparent(input.transform, challengeCard.transform);
         Place(
-            input.rectTransform, new Vector2(120f, -220f),
+            (RectTransform)input.transform, new Vector2(120f, -220f),
             new Vector2(390f, 92f));
         StyleInput(input, purple);
 
