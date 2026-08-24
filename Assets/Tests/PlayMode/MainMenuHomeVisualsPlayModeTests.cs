@@ -79,7 +79,20 @@ public sealed class MainMenuHomeVisualsPlayModeTests
 
         AssertProductionButton(play, "phase2a/hol_cta_gold_r2_9s");
         AssertProductionButton(pvp, "phase2a/hol_cta_blue_r2_9s");
-        AssertProductionButton(hunt, "phase2a/hol_cta_gold_r2_9s");
+        AssertProductionButton(hunt, "phase2a/hol_cta_magenta_r2_9s");
+        Assert.That(hunt.GetComponent<Image>().sprite,
+            Is.Not.SameAs(play.GetComponent<Image>().sprite),
+            "PLAY must remain the sole gold primary CTA.");
+
+        var playTitle = Find(play.transform, "HomeSoloTitle").GetComponent<TMP_Text>();
+        var privateTitle = Find(pvp.transform, "HomePrivateTitle").GetComponent<TMP_Text>();
+        var dailyTitle = Find(hunt.transform, "HomeDailyTitle").GetComponent<TMP_Text>();
+        Assert.That(playTitle.color.r, Is.LessThan(0.3f),
+            "Gold PLAY uses dark ink for contrast.");
+        Assert.That(privateTitle.color.r, Is.GreaterThan(0.8f),
+            "Blue Private Room must use near-white copy.");
+        Assert.That(dailyTitle.color.r, Is.GreaterThan(0.8f),
+            "Magenta Daily Hunt must use near-white copy.");
 
         var gearImage = settings.GetComponent<Image>();
         Assert.That(gearImage, Is.Not.Null);
@@ -147,6 +160,18 @@ public sealed class MainMenuHomeVisualsPlayModeTests
         Assert.That(tipRect.sizeDelta.y, Is.GreaterThanOrEqualTo(185f));
         Assert.That(tipRect.anchoredPosition.y, Is.LessThanOrEqualTo(-700f));
 
+        // Explicit production viewport matrix: reference Android, tall Android,
+        // representative iPhone portrait and the established 720×1280 fallback.
+        AssertViewportLayout(ownerType, owner, visualRoot, play, pvp, hunt,
+            1080, 1920, 0, "Android reference EN");
+        AssertViewportLayout(ownerType, owner, visualRoot, play, pvp, hunt,
+            1080, 2400, 1, "Tall Android EL");
+        AssertViewportLayout(ownerType, owner, visualRoot, play, pvp, hunt,
+            1179, 2556, 0, "iPhone portrait EN");
+        AssertViewportLayout(ownerType, owner, visualRoot, play, pvp, hunt,
+            720, 1280, 1, "Android fallback EL");
+        SetLanguage(0);
+
         var displayFont = Resources.Load<TMP_FontAsset>(
             "phase2a/fonts/HOL Menu Display SDF");
         var bodyFont = Resources.Load<TMP_FontAsset>(
@@ -179,6 +204,7 @@ public sealed class MainMenuHomeVisualsPlayModeTests
 
         string[] paths = (string[])ownerType.GetField("LoadedResources", StaticFlags)
             .GetValue(null);
+        Assert.That(paths, Does.Contain("phase2a/hol_cta_magenta_r2_9s"));
         foreach (string path in paths)
         {
             Assert.That(path.Contains("stairs_clouds"), Is.False, path);
@@ -197,6 +223,73 @@ public sealed class MainMenuHomeVisualsPlayModeTests
             .GetValue(controller) as GameObject;
         Assert.That(pvpMenu, Is.Not.Null);
         Assert.That(pvpMenu.activeSelf, Is.True);
+    }
+
+    static void AssertViewportLayout(
+        Type ownerType,
+        Component owner,
+        Transform visualRoot,
+        Button play,
+        Button pvp,
+        Button hunt,
+        int width,
+        int height,
+        int language,
+        string viewport)
+    {
+        SetLanguage(language);
+        MethodInfo layout = ownerType.GetMethod(
+            "ApplyResponsiveLayoutForViewport", InstanceFlags);
+        Assert.That(layout, Is.Not.Null);
+        layout.Invoke(owner, new object[] { width, height, true });
+        Canvas.ForceUpdateCanvases();
+
+        var playRect = (RectTransform)play.transform;
+        var pvpRect = (RectTransform)pvp.transform;
+        var huntRect = (RectTransform)hunt.transform;
+        var tipRect = (RectTransform)Find(visualRoot, "HomeTipCard");
+
+        AssertNoOverlap(playRect, pvpRect, viewport + " PLAY/Private");
+        AssertNoOverlap(playRect, huntRect, viewport + " PLAY/Daily");
+        AssertNoOverlap(pvpRect, tipRect, viewport + " Private/Tip");
+        AssertNoOverlap(huntRect, tipRect, viewport + " Daily/Tip");
+
+        AssertTextFits(play.transform, "HomeSoloTitle", 54f, viewport);
+        AssertTextFits(pvp.transform, "HomePrivateTitle", 32f, viewport);
+        AssertTextFits(hunt.transform, "HomeDailyTitle", 32f, viewport);
+        AssertTextFits(visualRoot, "HomeTipTitle", 30f, viewport);
+        AssertTextFits(visualRoot, "HomeTipBody", 22f, viewport);
+    }
+
+    static void AssertNoOverlap(RectTransform a, RectTransform b, string context)
+    {
+        Assert.That(a, Is.Not.Null, context);
+        Assert.That(b, Is.Not.Null, context);
+        Assert.That(AnchoredBounds(a).Overlaps(AnchoredBounds(b)), Is.False, context);
+    }
+
+    static Rect AnchoredBounds(RectTransform rect)
+    {
+        Vector2 size = rect.rect.size;
+        Vector2 min = rect.anchoredPosition - Vector2.Scale(size, rect.pivot);
+        return new Rect(min, size);
+    }
+
+    static void AssertTextFits(
+        Transform root,
+        string name,
+        float minimumFontSize,
+        string viewport)
+    {
+        Transform target = Find(root, name);
+        Assert.That(target, Is.Not.Null, viewport + " " + name);
+        TMP_Text text = target.GetComponent<TMP_Text>();
+        Assert.That(text, Is.Not.Null, viewport + " " + name);
+        text.ForceMeshUpdate();
+        Assert.That(text.fontSize, Is.GreaterThanOrEqualTo(minimumFontSize),
+            viewport + " shrank " + name + " below the readability contract.");
+        Assert.That(text.isTextOverflowing, Is.False,
+            viewport + " overflows " + name + ": " + text.text);
     }
 
     static void AssertProductionButton(Button button, string resource)
