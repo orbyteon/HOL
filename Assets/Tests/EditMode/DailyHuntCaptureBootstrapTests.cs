@@ -37,17 +37,35 @@ public sealed class DailyHuntCaptureBootstrapTests
             Is.EqualTo(expected));
     }
 
+    [Test]
+    public void CaptureWaitsPastThePanelEntranceAnimation()
+    {
+        Type type = BootstrapType();
+        FieldInfo settle = type.GetField(
+            "PresentationSettleSeconds",
+            BindingFlags.Public | BindingFlags.Static);
+        Assert.That(settle, Is.Not.Null);
+        Assert.That((float)settle.GetRawConstantValue(),
+            Is.GreaterThanOrEqualTo(0.30f),
+            "The screenshot marker must not fire during the 0.28s PanelAnimator entrance.");
+    }
+
     static T Invoke<T>(string methodName, params object[] arguments)
     {
-        Type type = Type.GetType(
-            "DailyHuntCaptureBootstrap, Assembly-CSharp");
-        Assert.That(type, Is.Not.Null,
-            "DailyHuntCaptureBootstrap must compile into Assembly-CSharp.");
-
+        Type type = BootstrapType();
         MethodInfo method = type.GetMethod(
             methodName,
             BindingFlags.Public | BindingFlags.Static);
         Assert.That(method, Is.Not.Null, methodName);
         return (T)method.Invoke(null, arguments);
+    }
+
+    static Type BootstrapType()
+    {
+        Type type = Type.GetType(
+            "DailyHuntCaptureBootstrap, Assembly-CSharp");
+        Assert.That(type, Is.Not.Null,
+            "DailyHuntCaptureBootstrap must compile into Assembly-CSharp.");
+        return type;
     }
 }
