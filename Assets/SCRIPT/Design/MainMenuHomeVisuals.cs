@@ -42,6 +42,7 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
     const string HeroGirlResource = "phase2a/hol_menu_girl_forward_fist_r3";
     const string GoldCtaResource = "phase2a/hol_cta_gold_r2_9s";
     const string BlueCtaResource = "phase2a/hol_cta_blue_r2_9s";
+    const string MagentaCtaResource = "phase2a/hol_cta_magenta_r2_9s";
     const string ChipFrameResource = "phase2a/hol_player_chip_r2_9s";
     const string TipFrameResource = "mainmenu/mainmenu_tip_frame_9s";
     const string TipIconResource = "mainmenu/mainmenu_icon_tip_bulb";
@@ -63,7 +64,7 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
     {
         BackgroundResource, LogoResource, AvatarResource,
         MascotSixResource, MascotSevenResource, HeroBoyResource, HeroGirlResource,
-        GoldCtaResource, BlueCtaResource, ChipFrameResource,
+        GoldCtaResource, BlueCtaResource, MagentaCtaResource, ChipFrameResource,
         TipFrameResource, TipIconResource, StreakIconResource, GearResource,
         PrivateIconResource, DailyIconResource
     };
@@ -191,6 +192,7 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         Sprite heroGirl = LoadRequired(HeroGirlResource);
         Sprite gold = LoadRequired(GoldCtaResource);
         Sprite blue = LoadRequired(BlueCtaResource);
+        Sprite magenta = LoadRequired(MagentaCtaResource);
         Sprite chipFrame = LoadRequired(ChipFrameResource);
         Sprite tipFrame = LoadRequired(TipFrameResource);
         Sprite tipIcon = LoadRequired(TipIconResource);
@@ -202,7 +204,7 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         bodyFont = Resources.Load<TMP_FontAsset>(BodyFontResource);
 
         IsReady = RequiredArtReady(background, logo, avatar, six, seven,
-            heroBoy, heroGirl, gold, blue, chipFrame, tipFrame, tipIcon,
+            heroBoy, heroGirl, gold, blue, magenta, chipFrame, tipFrame, tipIcon,
             streakIcon, gear, privateIcon, dailyIcon) &&
             displayFont != null && bodyFont != null;
         if (!IsReady)
@@ -270,7 +272,7 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
             SoloIconName, "HomeSoloTitle", "home_solo_title", true);
         privateButtonRect = RestyleCta(safeRoot, "ButtonPvP", blue, privateIcon,
             PrivateIconName, "HomePrivateTitle", "home_private_title", false);
-        dailyButtonRect = RestyleCta(safeRoot, "DailyHuntButton", gold, dailyIcon,
+        dailyButtonRect = RestyleCta(safeRoot, "DailyHuntButton", magenta, dailyIcon,
             DailyIconName, "HomeDailyTitle", "home_daily_title", false);
         BuildTip(safeRoot, tipFrame, tipIcon);
 
@@ -341,7 +343,7 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         var title = EnsureTmp(button.transform, titleName,
             primary ? 76f : 46f);
         ApplyDisplayFont(title);
-        title.color = primary || buttonName == "DailyHuntButton" ? Ink : NearWhite;
+        title.color = primary ? Ink : NearWhite;
         title.alignment = primary
             ? TextAlignmentOptions.Center
             : TextAlignmentOptions.MidlineLeft;
