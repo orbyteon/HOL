@@ -10,6 +10,8 @@ using UnityEngine.UI;
 
 public sealed class PrivateRoomCartoonReferencePlayModeTests
 {
+    const float PortraitReferenceAspect = 1080f / 1920f;
+
     static readonly string[] PortraitOverlayNames =
     {
         "PrivateRoomBackground",
@@ -104,14 +106,15 @@ public sealed class PrivateRoomCartoonReferencePlayModeTests
         foreach (string overlayName in PortraitOverlayNames)
         {
             var overlay = Find(root, overlayName) as RectTransform;
-            Assert.That(overlay, Is.Not.Null, "Missing portrait overlay: " + overlayName);
+            Assert.That(overlay, Is.Not.Null,
+                "Missing portrait overlay: " + overlayName);
             var fitter = overlay.GetComponent<AspectRatioFitter>();
             Assert.That(fitter, Is.Not.Null,
                 overlayName + " must preserve the approved 9:16 art ratio.");
             Assert.That(fitter.aspectMode,
                 Is.EqualTo(AspectRatioFitter.AspectMode.EnvelopeParent));
             Assert.That(fitter.aspectRatio,
-                Is.EqualTo(PrivateRoomPortraitArtEnvelope.ReferenceAspect).Within(0.0001f));
+                Is.EqualTo(PortraitReferenceAspect).Within(0.0001f));
         }
 
         foreach (var image in root.GetComponentsInChildren<Image>(true))
