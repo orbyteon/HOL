@@ -66,9 +66,9 @@ public sealed class SoloModeClarityTests
     public IEnumerator SoloEntryWaitsOnlyForTheRealLocalBoard()
     {
         Assert.That(transitionType.GetMethod(
-            "PrepareComputerChallenger",
+            "TickPreparation",
             BindingFlags.Instance | BindingFlags.NonPublic), Is.Not.Null,
-            "Solo should own exactly one explicit AI preparation routine.");
+            "Solo should expose one deterministic preparation tick.");
 
         Invoke("StartSearch");
 
@@ -79,15 +79,18 @@ public sealed class SoloModeClarityTests
         Assert.That(searchingText.text,
             Is.EqualTo(GetCopy("solo_ai_preparing")));
 
-        yield return null;
+        Invoke("TickPreparation");
         Assert.That(searchingPanel.activeSelf, Is.True,
             "The modal must remain blocking until the board reports readiness.");
 
         MakeBoardReady();
-        for (int frame = 0;
-             frame < 20 && GetProperty<bool>("IsPreparing");
-             frame++)
-            yield return null;
+        Invoke("TickPreparation");
+        Assert.That(searchingPanel.activeSelf, Is.True,
+            "The localized ready state must render for one engine update.");
+        Assert.That(searchingText.text, Is.EqualTo(GetCopy("solo_ai_ready")));
+
+        Invoke("TickPreparation");
+        yield return null;
 
         Assert.That(searchingPanel.activeSelf, Is.False);
         Assert.That(panelGame.activeSelf, Is.True,
@@ -109,11 +112,14 @@ public sealed class SoloModeClarityTests
         Assert.That(panelGame.activeSelf, Is.False);
         Assert.That(GetProperty<bool>("IsPreparing"), Is.False);
 
-        yield return null;
+        MakeBoardReady();
+        Invoke("TickPreparation");
+        Invoke("TickPreparation");
         yield return null;
         Assert.That(panelGame.activeSelf, Is.False,
             "A cancelled preparation must not reopen gameplay later.");
 
+        boardReady = false;
         Invoke("StartSearch");
         Invoke("StartSearch");
         Assert.That(searchingPanel.activeSelf, Is.True);
@@ -121,10 +127,11 @@ public sealed class SoloModeClarityTests
         Assert.That(GetProperty<bool>("IsPreparing"), Is.True);
 
         MakeBoardReady();
-        for (int frame = 0;
-             frame < 20 && GetProperty<bool>("IsPreparing");
-             frame++)
-            yield return null;
+        Invoke("TickPreparation");
+        Assert.That(searchingPanel.activeSelf, Is.True);
+        Assert.That(searchingText.text, Is.EqualTo(GetCopy("solo_ai_ready")));
+        Invoke("TickPreparation");
+        yield return null;
 
         Assert.That(searchingPanel.activeSelf, Is.False);
         Assert.That(panelGame.activeSelf, Is.True,
@@ -209,10 +216,11 @@ public sealed class SoloModeClarityTests
 
     void Invoke(string method)
     {
-        transitionType.GetMethod(
+        MethodInfo target = transitionType.GetMethod(
             method, BindingFlags.Instance | BindingFlags.Public |
-                    BindingFlags.NonPublic)
-            .Invoke(transition, null);
+                    BindingFlags.NonPublic);
+        Assert.That(target, Is.Not.Null, method);
+        target.Invoke(transition, null);
     }
 
     static void SetField(Component target, string name, object value)
