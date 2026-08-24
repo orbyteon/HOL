@@ -111,7 +111,7 @@ public sealed class SoloSearchCartoonVisualsPlayModeTests
         Assert.That(status.text, Does.StartWith(Localized("solo_ai_preparing")));
         Assert.That(status.enableAutoSizing, Is.True);
         Assert.That(status.fontSizeMin, Is.GreaterThanOrEqualTo(27f));
-        Assert.That(status.GetComponent<AnimatedEllipsis>(), Is.Not.Null);
+        Assert.That(status.GetComponent(RuntimeType("AnimatedEllipsis")), Is.Not.Null);
 
         Image blocker = Find(root, "SearchBackground").GetComponent<Image>();
         Assert.That(blocker.raycastTarget, Is.True,
