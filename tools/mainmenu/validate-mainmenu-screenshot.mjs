@@ -2,8 +2,8 @@ import fs from "node:fs";
 import { pathToFileURL } from "node:url";
 import zlib from "node:zlib";
 
-const expectedWidth = 1080;
-const expectedHeight = 1920;
+const defaultWidth = 1080;
+const defaultHeight = 1920;
 const minimumLuminanceRange = 12;
 const minimumChannelRange = 16;
 const targetSampleCount = 4096;
@@ -21,8 +21,16 @@ const paeth = (left, up, upperLeft) => {
   return upDistance <= upperLeftDistance ? up : upperLeft;
 };
 
-export const decodeRgbaPng = png => {
+export const decodeRgbaPng = (
+  png,
+  expectedWidth = defaultWidth,
+  expectedHeight = defaultHeight,
+) => {
   requireCondition(Buffer.isBuffer(png), "Screenshot must be a PNG Buffer");
+  requireCondition(
+    Number.isInteger(expectedWidth) && expectedWidth > 0 &&
+      Number.isInteger(expectedHeight) && expectedHeight > 0,
+    "Expected screenshot dimensions must be positive integers");
   requireCondition(
     png.length >= 33 &&
       png.subarray(0, 8).toString("hex") === "89504e470d0a1a0a",
@@ -90,8 +98,13 @@ export const decodeRgbaPng = png => {
   return { width, height, rgba };
 };
 
-export const validateMainMenuPng = png => {
-  const { width, height, rgba } = decodeRgbaPng(png);
+export const validateMainMenuPng = (
+  png,
+  expectedWidth = defaultWidth,
+  expectedHeight = defaultHeight,
+) => {
+  const { width, height, rgba } = decodeRgbaPng(
+    png, expectedWidth, expectedHeight);
 
   const pixelCount = width * height;
   const sampleStep = Math.max(1, Math.floor(pixelCount / targetSampleCount));
@@ -154,8 +167,17 @@ const isMain = process.argv[1] &&
 if (isMain) {
   try {
     const path = process.argv[2];
-    requireCondition(path, "Usage: validate-mainmenu-screenshot.mjs <mainmenu.png>");
-    const result = validateMainMenuPng(fs.readFileSync(path));
+    requireCondition(
+      path,
+      "Usage: validate-mainmenu-screenshot.mjs <png> [width] [height]");
+    const expectedWidth = process.argv[3]
+      ? Number.parseInt(process.argv[3], 10)
+      : defaultWidth;
+    const expectedHeight = process.argv[4]
+      ? Number.parseInt(process.argv[4], 10)
+      : defaultHeight;
+    const result = validateMainMenuPng(
+      fs.readFileSync(path), expectedWidth, expectedHeight);
     console.log(
       `Validated ${result.width}x${result.height} Home PNG: ` +
       `${result.sampledColors} sampled colors, ` +
