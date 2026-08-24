@@ -1,0 +1,92 @@
+name: One-shot Solo Duel Review Repair
+
+on:
+  push:
+    branches:
+      - feature/cartoon-solo-duel-20260824
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.event.head_commit.message != 'fix(ui): resolve Solo duel review findings'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repair branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: feature/cartoon-solo-duel-20260824
+          fetch-depth: 0
+
+      - name: Apply deterministic review fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('Assets/SCRIPT/RuntimeUI/HolDuelBoardLayout.cs')
+          text = path.read_text(encoding='utf-8')
+
+          replacements = [
+              (
+                  '        visualRoot.SetAsFirstSibling();',
+                  '        // The approved composition must render above any remaining scene-authored\n'
+                  '        // presentation siblings. Real callback-bearing controls are reparented below.\n'
+                  '        visualRoot.SetAsLastSibling();',
+              ),
+              (
+                  '            new Vector2(0f, 410f), new Vector2(520f, 48f), NearWhite);',
+                  '            new Vector2(0f, 430f), new Vector2(520f, 40f), NearWhite);',
+              ),
+              (
+                  '                input.transform as RectTransform, new Vector2(0f, 315f),\n'
+                  '                new Vector2(500f, 125f));',
+                  '                input.transform as RectTransform, new Vector2(0f, 310f),\n'
+                  '                new Vector2(500f, 110f));',
+              ),
+              (
+                  '                new Vector2(0f, 390f), new Vector2(500f, 45f));',
+                  '                new Vector2(0f, 388f), new Vector2(500f, 30f));',
+              ),
+              (
+                  '            numberManager.playerNumberText.fontSize = 27f;',
+                  '            numberManager.playerNumberText.fontSize = 25f;',
+              ),
+              (
+                  '        RectTransform child = FindChild(name);\n'
+                  '        if (child == null) return;\n'
+                  '        Reparent(child, safeRoot);\n'
+                  '        CenterRoot(child, size, position);',
+                  '        RectTransform child = FindChild(name);\n'
+                  '        if (child == null) return;\n'
+                  '        bool wasActive = child.gameObject.activeSelf;\n'
+                  '        Reparent(child, safeRoot);\n'
+                  '        child.gameObject.SetActive(wasActive);\n'
+                  '        CenterRoot(child, size, position);',
+              ),
+          ]
+
+          for old, new in replacements:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'Expected one match, found {count}: {old[:80]!r}')
+              text = text.replace(old, new, 1)
+
+          path.write_text(text, encoding='utf-8', newline='\n')
+          PY
+
+          git diff --check
+          git diff -- Assets/SCRIPT/RuntimeUI/HolDuelBoardLayout.cs
+
+      - name: Commit repaired layout
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "orbyteon"
+          git config user.email "orbyteonstudio@gmail.com"
+          git add Assets/SCRIPT/RuntimeUI/HolDuelBoardLayout.cs
+          git commit -m "fix(ui): resolve Solo duel review findings"
+          git push origin HEAD:feature/cartoon-solo-duel-20260824
