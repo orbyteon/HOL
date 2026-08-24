@@ -10,6 +10,13 @@ using UnityEngine.UI;
 
 public sealed class PrivateRoomCartoonReferencePlayModeTests
 {
+    static readonly string[] PortraitOverlayNames =
+    {
+        "PrivateRoomBackground",
+        "PrivateRoomStars",
+        "PrivateRoomConfetti",
+    };
+
     [UnityTest]
     public IEnumerator ApprovedReferenceGeometryAndRealControlsRemainAuthoritative()
     {
@@ -46,10 +53,12 @@ public sealed class PrivateRoomCartoonReferencePlayModeTests
         Transform root = Find(menuPanel.transform, "PrivateRoomVisualRoot");
         Assert.That(root, Is.Not.Null);
         Assert.That(
-            menuPanel.GetComponentsInChildren(
-                RuntimeType("PrivateRoomVisuals"), true).Length,
+            CountRuntimeComponents("PrivateRoomVisuals"),
             Is.EqualTo(1),
-            "Private Room must have one presentation owner.");
+            "Private Room must have one presentation owner on the controller host.");
+
+        for (int frame = 0; frame < 60 && !PortraitEnvelopeReady(root); frame++)
+            yield return null;
 
         AssertRect(root, "PrivateRoomStepPill",
             new Vector2(-292f, 842f), new Vector2(350f, 82f));
@@ -90,6 +99,19 @@ public sealed class PrivateRoomCartoonReferencePlayModeTests
         {
             Assert.That(Find(root, objectName), Is.Not.Null,
                 "Missing approved modular object: " + objectName);
+        }
+
+        foreach (string overlayName in PortraitOverlayNames)
+        {
+            var overlay = Find(root, overlayName) as RectTransform;
+            Assert.That(overlay, Is.Not.Null, "Missing portrait overlay: " + overlayName);
+            var fitter = overlay.GetComponent<AspectRatioFitter>();
+            Assert.That(fitter, Is.Not.Null,
+                overlayName + " must preserve the approved 9:16 art ratio.");
+            Assert.That(fitter.aspectMode,
+                Is.EqualTo(AspectRatioFitter.AspectMode.EnvelopeParent));
+            Assert.That(fitter.aspectRatio,
+                Is.EqualTo(PrivateRoomPortraitArtEnvelope.ReferenceAspect).Within(0.0001f));
         }
 
         foreach (var image in root.GetComponentsInChildren<Image>(true))
@@ -143,6 +165,19 @@ public sealed class PrivateRoomCartoonReferencePlayModeTests
         yield return null;
     }
 
+    static bool PortraitEnvelopeReady(Transform root)
+    {
+        if (root == null) return false;
+        foreach (string overlayName in PortraitOverlayNames)
+        {
+            Transform overlay = Find(root, overlayName);
+            if (overlay == null || overlay.GetComponent<AspectRatioFitter>() == null)
+                return false;
+        }
+
+        return true;
+    }
+
     static int RuntimeListenerCount(Button button)
     {
         // UnityEvent does not expose runtime listener count. A non-null event is
@@ -191,6 +226,15 @@ public sealed class PrivateRoomCartoonReferencePlayModeTests
         }
 
         return null;
+    }
+
+    static int CountRuntimeComponents(string typeName)
+    {
+        Type type = RuntimeType(typeName);
+        int count = 0;
+        foreach (var root in SceneManager.GetActiveScene().GetRootGameObjects())
+            count += root.GetComponentsInChildren(type, true).Length;
+        return count;
     }
 
     static T GetField<T>(Component component, string name) where T : class
