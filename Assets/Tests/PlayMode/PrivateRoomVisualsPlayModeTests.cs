@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.IO;
 using System.Reflection;
 using NUnit.Framework;
 using TMPro;
@@ -13,6 +14,9 @@ public sealed class PrivateRoomVisualsPlayModeTests
     [UnityTest]
     public IEnumerator PrivateRoomUsesOneProductionOwnerAndPreservesCreateJoinFlows()
     {
+        Screen.SetResolution(1080, 1920, false);
+        yield return null;
+
         RegisterInstaller();
         yield return SceneManager.LoadSceneAsync("MainMenu", LoadSceneMode.Single);
 
@@ -46,6 +50,8 @@ public sealed class PrivateRoomVisualsPlayModeTests
         Assert.That(visualRoot, Is.Not.Null,
             "Approved Private Room visual root was not built.");
         Assert.That(visualRoot.gameObject.activeInHierarchy, Is.True);
+
+        yield return CapturePrivateRoomScreenshot();
 
         string[] requiredObjects =
         {
@@ -145,6 +151,30 @@ public sealed class PrivateRoomVisualsPlayModeTests
             Assert.That(t.name, Is.Not.EqualTo("BackdropNumbers"),
                 "Retired drifting-number backdrop returned.");
         }
+    }
+
+    static IEnumerator CapturePrivateRoomScreenshot()
+    {
+        yield return new WaitForEndOfFrame();
+
+        string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
+        string artifactDirectory = Path.Combine(projectRoot, "artifacts", "private-room-render");
+        Directory.CreateDirectory(artifactDirectory);
+        string path = Path.Combine(artifactDirectory, "private-room-1080x1920.png");
+
+        if (File.Exists(path))
+            File.Delete(path);
+
+        ScreenCapture.CaptureScreenshot(path);
+
+        for (int frame = 0; frame < 120 && !File.Exists(path); frame++)
+            yield return null;
+
+        Assert.That(File.Exists(path), Is.True,
+            "Private Room screenshot was not written to the PlayMode artifact directory.");
+        var info = new FileInfo(path);
+        Assert.That(info.Length, Is.GreaterThan(1024),
+            "Private Room screenshot artifact is unexpectedly empty.");
     }
 
     static void RegisterInstaller()
