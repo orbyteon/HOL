@@ -20,6 +20,14 @@ public static class GameEvents
     // Fired only when a new calendar day is actually registered.
     public static System.Action<int> OnDailyStreak;
 
+    // Fired exactly once after an accepted player guess is authoritatively
+    // known to be correct. UI refreshes and opponent guesses never raise it.
+    public static System.Action OnCorrectGuess;
+
+    // Fired after a real created-room invite has been copied for sharing.
+    // Copying arbitrary text or a join code is deliberately not enough.
+    public static System.Action OnRoomShared;
+
     // The single raise point for a finished match, so a call site cannot report
     // one event and forget the other. Win/lose still reach OnMatchEnded exactly
     // as before, and a draw still reaches only the stats listeners — it has no
@@ -42,5 +50,15 @@ public static class GameEvents
     internal static void DailyStreak(int days)
     {
         OnDailyStreak?.Invoke(days);
+    }
+
+    internal static void CorrectGuess()
+    {
+        OnCorrectGuess?.Invoke();
+    }
+
+    internal static void RoomShared()
+    {
+        OnRoomShared?.Invoke();
     }
 }

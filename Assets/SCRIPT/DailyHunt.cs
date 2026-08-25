@@ -39,11 +39,6 @@ public class DailyHunt : MonoBehaviour
     // ReconcilePendingRevive for why both halves are needed.
     const string PendingReviveKey = "DailyHuntPendingRevive";
 
-    // Day numbering epoch; #1 is 2026-01-01 UTC. The UTC anchor keeps the
-    // day number stable across timezone travel — a local-day anchor replayed
-    // or skipped whole days (and their streaks) on a long flight.
-    static readonly DateTime Epoch = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-
     static readonly Color DarkLabel = new Color(0.10f, 0.09f, 0.18f);
 
     AdsManager ads;
@@ -66,6 +61,7 @@ public class DailyHunt : MonoBehaviour
     bool found;
     bool revived;
     bool reviveInFlight;
+    bool showingMissionDashboard;
     string trail = "";
     int min = 1;
     int max = 100;
@@ -176,7 +172,28 @@ public class DailyHunt : MonoBehaviour
     {
         EnsureToday();
         gameObject.SetActive(true);
+        ShowMissionDashboard();
         Refresh();
+    }
+
+    // The approved Daily Challenge dashboard is the entry point; START opens
+    // the existing deterministic number hunt without replacing its behavior.
+    public void StartChallenge()
+    {
+        EnsureToday();
+        showingMissionDashboard = false;
+        var visuals = GetComponent<DailyHuntVisuals>();
+        if (visuals != null)
+            visuals.SetMissionDashboardVisible(false);
+        Refresh();
+    }
+
+    void ShowMissionDashboard()
+    {
+        showingMissionDashboard = true;
+        var visuals = GetComponent<DailyHuntVisuals>();
+        if (visuals != null)
+            visuals.SetMissionDashboardVisible(true);
     }
 
     public void Close()
@@ -201,7 +218,9 @@ public class DailyHunt : MonoBehaviour
 
     static int TodayNumber()
     {
-        return (DateTime.UtcNow.Date - Epoch).Days + 1;
+        // One UTC clock contract now drives both mission reset and the number
+        // hunt, so their visible day can never drift apart.
+        return DailyChallengeProgress.CurrentUtcDayNumber;
     }
 
     static int SecretFor(int dayNumber)
@@ -330,6 +349,7 @@ public class DailyHunt : MonoBehaviour
             trail += "\U0001F3AF"; // 🎯
             done = true;
             found = true;
+            GameEvents.CorrectGuess();
             UpdateStreakOnFound();
             Persist();
             Haptics.Success();
@@ -441,6 +461,9 @@ public class DailyHunt : MonoBehaviour
 
     void Refresh()
     {
+        if (showingMissionDashboard)
+            return;
+
         title.text = L10n.Get("daily_hunt_number", day);
         // Formatted label, so RuntimeUI.Localize can't cover it — re-resolve
         // here to follow live language switches like its sibling buttons.

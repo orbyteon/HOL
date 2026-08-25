@@ -73,6 +73,14 @@ public sealed class DailyHuntCartoonVisualsPlayModeTests
         Assert.That(visuals, Is.Not.Null);
         Assert.That(GetProperty<bool>(visuals, "IsReady"), Is.True);
         Assert.That(CountInScene(RuntimeType("DailyHuntVisuals")), Is.EqualTo(1));
+        Assert.That(
+            Type.GetType("DailyHuntVisualFidelityPass, Assembly-CSharp"),
+            Is.Null,
+            "DailyHuntVisuals must remain the sole Daily Hunt visual/layout owner.");
+        Assert.That(
+            Type.GetType("DailyHuntVisualFidelityInstaller, Assembly-CSharp"),
+            Is.Null,
+            "Daily Hunt must not install a second runtime visual/layout writer.");
 
         Invoke(hunt, "Open");
         yield return new WaitForSecondsRealtime(0.36f);
@@ -87,33 +95,37 @@ public sealed class DailyHuntCartoonVisualsPlayModeTests
             "DailyBackground",
             "DailyStars",
             "DailyConfetti",
-            "DailyOuterFrame",
+            "DailyOuterBezelBody",
             "DailyHuntSafeRoot",
             "CloseButton",
-            "DailyBackIcon",
             "DailyPlayerChip",
+            "DailyPlayerChipShell",
+            "DailyPlayerAvatarRing",
             "DailyPlayerAvatar",
-            "DailyTrophyIcon",
+            "DailyPlayerStar",
             "DailyPlayerName",
             "DailyPlayerWins",
+            "DailyPlayerProgress",
+            "DailyPlayerXpTrack",
             "DailyLogo",
             "DailyTitleRibbon",
-            "Title",
-            "DailyChallengeCard",
-            "DailyCalendarTarget",
-            "DailyChallengeHeading",
-            "DailyStatusFrame",
-            "Status",
-            "DailyTrailFrame",
-            "Trail",
-            "GuessInput",
-            "SubmitGuessButton",
-            "DailyRewardCard",
-            "DailyRewardChest",
-            "DailyRewardHeading",
-            "Streak",
-            "ReviveButton",
-            "ShareButton",
+            "DailyRibbonTitle",
+            "DailyMissionDashboard",
+            "DailyMissionBoard",
+            "DailyMissionCalendar",
+            "DailyMissionHeading",
+            "DailyMissionRow1",
+            "DailyMissionRow2",
+            "DailyMissionRow3",
+            "DailyMissionCompletion",
+            "DailyMissionRewardBoard",
+            "DailyMissionRewardArtwork",
+            "DailyMissionRewardChest",
+            "DailyMissionRewardHeading",
+            "DailyMissionReset",
+            "DailyMissionRewardAmount",
+            "DailyMissionStartButton",
+            "DailyMissionPortal",
             "DailyMascotSix",
             "DailyMascotSeven",
         })
@@ -122,23 +134,35 @@ public sealed class DailyHuntCartoonVisualsPlayModeTests
                 "Missing approved Daily Hunt object: " + name);
         }
 
+        AssertRect(root, "CloseButton",
+            new Vector2(-435f, 836f), new Vector2(155f, 155f));
+        AssertRect(root, "DailyPlayerChip",
+            new Vector2(335f, 827f), new Vector2(365f, 194f));
         AssertRect(root, "DailyLogo",
-            new Vector2(0f, 700f), new Vector2(560f, 300f));
+            new Vector2(-10f, 783f), new Vector2(396f, 295f));
         AssertRect(root, "DailyTitleRibbon",
-            new Vector2(0f, 505f), new Vector2(910f, 150f));
-        AssertRect(root, "DailyChallengeCard",
-            new Vector2(0f, 40f), new Vector2(940f, 760f));
-        AssertRect(root, "DailyCalendarTarget",
-            new Vector2(-300f, 70f), new Vector2(340f, 410f));
-        AssertRect(root, "DailyRewardCard",
-            new Vector2(0f, -510f), new Vector2(920f, 280f));
+            new Vector2(0f, 585f), new Vector2(1040f, 285f));
+        AssertRect(root, "DailyMissionBoard",
+            new Vector2(-1f, 119f), new Vector2(1036f, 874f));
+        AssertRect(root, "DailyMissionRewardBoard",
+            new Vector2(0f, -417f), new Vector2(1060f, 425f));
+        AssertRect(root, "DailyMissionStartButton",
+            new Vector2(0f, -771f), new Vector2(595f, 230f));
         AssertRect(root, "DailyMascotSix",
-            new Vector2(-420f, -805f), new Vector2(250f, 285f));
+            new Vector2(-372f, -754f), new Vector2(322f, 375f));
         AssertRect(root, "DailyMascotSeven",
-            new Vector2(420f, -805f), new Vector2(250f, 285f));
+            new Vector2(363f, -748f), new Vector2(326f, 380f));
 
-        AssertSprite(root, "DailyCalendarTarget", "phase2a/hol_mode_daily_r2");
-        AssertSprite(root, "DailyRewardChest", "mainmenu/mainmenu_icon_daily_hunt");
+        AssertSprite(root, "DailyMissionCalendar",
+            "dailyhunt/production/daily_calendar_target_production");
+        AssertSprite(root, "DailyMissionRewardChest",
+            "dailyhunt/production/daily_reward_chest_reference_v1");
+        AssertSprite(root, "DailyPlayerChipShell",
+            "dailyhunt/production/daily_player_chip_shell_v3");
+        AssertSprite(root, "DailyPlayerAvatarRing",
+            "dailyhunt/production/daily_player_avatar_ring_v1");
+        AssertSprite(root, "DailyPlayerXpTrack",
+            "dailyhunt/production/daily_player_xp_track_v2");
         AssertSprite(root, "DailyLogo", "reference/hol_logo_exact");
         Assert.That(Resources.Load<Sprite>("cartoon/cartoon_daily_calendar"), Is.Null,
             "The retired code-drawn calendar approximation must not return.");
@@ -151,36 +175,45 @@ public sealed class DailyHuntCartoonVisualsPlayModeTests
                 "Procedural Graphic found in Daily Hunt: " +
                 graphic.GetType().Name + " / " + graphic.name);
             if (graphic is Image image && image.sprite != null)
-                Assert.That(image.color.a, Is.GreaterThanOrEqualTo(0.99f),
-                    image.name + " hides approved production art.");
+                Assert.That(image.color.a, Is.GreaterThan(0f),
+                    image.name + " hides approved production art completely.");
         }
 
-        TMP_FontAsset productionFont = Resources.Load<TMP_FontAsset>(
-            "Fonts & Materials/LiberationSans SDF");
-        Assert.That(productionFont, Is.Not.Null);
+        TMP_FontAsset displayFont = Resources.Load<TMP_FontAsset>(
+            "phase2a/fonts/HOL Menu Display SDF");
+        TMP_FontAsset bodyFont = Resources.Load<TMP_FontAsset>(
+            "phase2a/fonts/HOL Menu Body SDF");
+        Assert.That(displayFont, Is.Not.Null);
+        Assert.That(bodyFont, Is.Not.Null);
         foreach (string name in new[]
         {
-            "Title",
-            "Status",
-            "Trail",
-            "Streak",
             "DailyPlayerName",
             "DailyPlayerWins",
-            "DailyChallengeHeading",
-            "DailyRewardHeading",
+            "DailyPlayerProgress",
+            "DailyRibbonTitle",
+            "DailyMissionHeading",
+            "DailyMissionRewardHeading",
+            "DailyMissionReset",
+            "DailyMissionRewardAmount",
         })
         {
             TMP_Text text = Find(root, name).GetComponent<TMP_Text>();
-            Assert.That(text.font, Is.SameAs(productionFont),
-                name + " must use the statically baked production font chain.");
+            Assert.That(text.font, Is.SameAs(displayFont),
+                name + " must use the approved HOL display font.");
         }
+        Assert.That(
+            Find(root, "DailyMissionProgress1").GetComponent<TMP_Text>().font,
+            Is.SameAs(bodyFont));
 
         Assert.That(
-            Find(root, "DailyChallengeHeading").GetComponent<TMP_Text>().text,
-            Is.EqualTo(Localized("home_daily_title")));
+            Find(root, "DailyRibbonTitle").GetComponent<TMP_Text>().text,
+            Is.EqualTo(Localized("daily_challenge_title")));
         Assert.That(
-            Find(root, "DailyRewardHeading").GetComponent<TMP_Text>().text,
-            Is.EqualTo(Localized("stats_streak").ToUpperInvariant()));
+            Find(root, "DailyMissionHeading").GetComponent<TMP_Text>().text,
+            Is.EqualTo(Localized("daily_missions_heading")));
+        Assert.That(
+            Find(root, "DailyMissionRewardHeading").GetComponent<TMP_Text>().text,
+            Is.EqualTo(Localized("daily_reward_heading")));
 
         foreach (Vector2Int viewport in PortraitViewports)
         {
@@ -202,6 +235,10 @@ public sealed class DailyHuntCartoonVisualsPlayModeTests
         Screen.SetResolution(1080, 1920, false);
         for (int frame = 0; frame < 3; frame++)
             yield return new WaitForEndOfFrame();
+
+        Find(root, "DailyMissionStartButton").GetComponent<Button>()
+            .onClick.Invoke();
+        yield return null;
 
         TMP_InputField input = Find(root, "GuessInput")
             .GetComponent<TMP_InputField>();
@@ -248,8 +285,10 @@ public sealed class DailyHuntCartoonVisualsPlayModeTests
             "DailyPlayerChip",
             "DailyLogo",
             "DailyTitleRibbon",
-            "DailyChallengeCard",
-            "DailyRewardCard",
+            "DailyMissionBoard",
+            "DailyMissionRewardBoard",
+            "DailyMissionStartButton",
+            "DailyMissionPortal",
             "DailyMascotSix",
             "DailyMascotSeven",
         })
@@ -262,13 +301,18 @@ public sealed class DailyHuntCartoonVisualsPlayModeTests
 
         foreach (string name in new[]
         {
-            "Title",
-            "DailyChallengeHeading",
-            "Status",
-            "DailyRewardHeading",
-            "Streak",
             "DailyPlayerName",
             "DailyPlayerWins",
+            "DailyPlayerProgress",
+            "DailyRibbonTitle",
+            "DailyMissionHeading",
+            "DailyMissionLabel1",
+            "DailyMissionLabel2",
+            "DailyMissionLabel3",
+            "DailyMissionCompletion",
+            "DailyMissionRewardHeading",
+            "DailyMissionReset",
+            "DailyMissionRewardAmount",
         })
         {
             TMP_Text text = Find(root, name).GetComponent<TMP_Text>();

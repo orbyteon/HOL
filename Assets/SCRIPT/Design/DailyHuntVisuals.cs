@@ -1,11 +1,11 @@
+using System;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-// Sole presentation owner for the real Daily Hunt number challenge.
-// DailyHunt remains responsible for date-seeded state, guesses, revive/share
-// callbacks and persistence. This owner only seats those real controls inside
-// the approved cartoon composition.
+// Sole presentation owner for the Daily Challenge dashboard and its real
+// number-hunt gameplay state. Domain state/callbacks stay outside this class;
+// this owner alone chooses sprites and writes Daily Hunt layout.
 [DisallowMultipleComponent]
 public sealed class DailyHuntVisuals : MonoBehaviour
 {
@@ -17,30 +17,59 @@ public sealed class DailyHuntVisuals : MonoBehaviour
     const string AvatarResource = "reference/player_cyan_exact";
     const string MascotSixResource = "reference/mascot_6_exact";
     const string MascotSevenResource = "reference/mascot_7_exact";
-    // Approved repository artwork is the only production visual source.
-    const string CalendarResource = "phase2a/hol_mode_daily_r2";
-    const string ChestResource = "mainmenu/mainmenu_icon_daily_hunt";
-    const string TrophyResource = "reference/board_trophy_exact";
+    const string CalendarResource = "dailyhunt/production/daily_calendar_target_production";
     const string StarsResource = "mainmenu/mainmenu_deco_stars";
     const string ConfettiResource = "mainmenu/mainmenu_deco_confetti";
-    const string PurpleFrameResource = "mainmenu/mainmenu_tip_frame_9s";
-    const string BlueFrameResource = "phase2a/hol_cta_blue_r2_9s";
-    const string MagentaFrameResource = "phase2a/hol_cta_magenta_r2_9s";
-    const string GoldFrameResource = "phase2a/hol_cta_gold_r2_9s";
-    const string ChipFrameResource = "phase2a/hol_player_chip_r2_9s";
-    const string BackChevronResource = "phase2a/hol_chevron_r2";
+    const string OuterBezelBodyResource = P0Root + "daily_outer_frame_v1";
 
-    // Daily Hunt renders live mixed-case EN/EL copy, player names, day numbers
-    // and ▲ / ▼ / ● trail symbols. The canonical Liberation Sans production
-    // chain is statically baked and covered by ProductionTextFontTests.
-    const string ProductionFontResource =
-        "Fonts & Materials/LiberationSans SDF";
+    // Daily-Hunt-only production components derived from the locked
+    // 06-daily-hunt-approved.png composition. They are intentionally owned
+    // here rather than exposed as a second shared/global visual authority.
+    const string P0Root = "dailyhunt/v1/";
+    const string BackButtonResource = P0Root + "daily_back_button_v1";
+    const string PlayerChipResource =
+        "dailyhunt/production/daily_player_chip_shell_v3";
+    const string PlayerAvatarRingResource =
+        "dailyhunt/production/daily_player_avatar_ring_v1";
+    const string PlayerXpTrackResource =
+        "dailyhunt/production/daily_player_xp_track_v2";
+    const string TitleRibbonResource = P0Root + "daily_title_ribbon_v1";
+    const string ChallengeBoardResource = P0Root + "daily_challenge_board_v1";
+    const string InfoPanelResource = P0Root + "daily_info_panel_v1";
+    const string InputShellResource = P0Root + "daily_input_shell_v1";
+    const string BaseAttemptResource = P0Root + "daily_attempt_base_v1";
+    const string BonusAttemptResource = P0Root + "daily_attempt_bonus_v1";
+    const string GuessActionResource = P0Root + "daily_action_guess_v1";
+    const string ShareActionResource = P0Root + "daily_action_share_v1";
+    const string ReviveActionResource = P0Root + "daily_action_revive_v1";
+    const string StreakBoardResource = P0Root + "daily_streak_board_v1";
+    const string ProductionRoot = "dailyhunt/production/";
+    const string MissionTrophyResource = ProductionRoot + "daily_mission_icon_trophy";
+    const string MissionBrainResource = ProductionRoot + "daily_mission_icon_brain";
+    const string MissionShareResource = ProductionRoot + "daily_mission_icon_share";
+    const string MissionProgressTrackResource = ProductionRoot + "daily_mission_progress_track";
+    const string MissionProgressCyanResource = ProductionRoot + "daily_mission_progress_cyan";
+    const string MissionProgressMagentaResource = ProductionRoot + "daily_mission_progress_magenta";
+    const string MissionCheckCyanResource = ProductionRoot + "daily_mission_check_cyan";
+    const string MissionCheckMagentaResource = ProductionRoot + "daily_mission_check_magenta";
+    const string MissionRewardBoardResource = ProductionRoot + "daily_mission_reward_board";
+    const string MissionRewardChestResource =
+        ProductionRoot + "daily_reward_chest_reference_v1";
+    const string MissionClockResource = ProductionRoot + "daily_mission_clock";
+    const string MissionPortalResource = ProductionRoot + "daily_floor_portal";
+    const string PlayerStarResource = ProductionRoot + "daily_player_star";
+
+    // Use the same approved display/body hierarchy as the established HOL
+    // cartoon shell. Live EN/EL strings and numeric state remain real TMP.
+    const string DisplayFontResource = "phase2a/fonts/HOL Menu Display SDF";
+    const string BodyFontResource = "phase2a/fonts/HOL Menu Body SDF";
 
     const float ReferenceWidth = 1080f;
     const float ReferenceHeight = 1920f;
 
     static readonly Color NearWhite = new Color(0.985f, 0.975f, 1f, 1f);
     static readonly Color Cyan = new Color(0.20f, 0.94f, 1f, 1f);
+    static readonly Color Magenta = new Color(1f, 0.20f, 0.64f, 1f);
     static readonly Color Gold = new Color(1f, 0.80f, 0.20f, 1f);
     static readonly Color Muted = new Color(0.88f, 0.84f, 0.96f, 0.90f);
     static readonly Color Ink = new Color(0.08f, 0.04f, 0.17f, 1f);
@@ -53,30 +82,104 @@ public sealed class DailyHuntVisuals : MonoBehaviour
         MascotSixResource,
         MascotSevenResource,
         CalendarResource,
-        ChestResource,
-        TrophyResource,
         StarsResource,
         ConfettiResource,
-        PurpleFrameResource,
-        BlueFrameResource,
-        MagentaFrameResource,
-        GoldFrameResource,
-        ChipFrameResource,
-        BackChevronResource,
+        OuterBezelBodyResource,
+        BackButtonResource,
+        PlayerChipResource,
+        PlayerAvatarRingResource,
+        PlayerXpTrackResource,
+        TitleRibbonResource,
+        ChallengeBoardResource,
+        InfoPanelResource,
+        InputShellResource,
+        BaseAttemptResource,
+        BonusAttemptResource,
+        GuessActionResource,
+        ShareActionResource,
+        ReviveActionResource,
+        StreakBoardResource,
+        MissionRewardBoardResource,
+        MissionRewardChestResource,
+        MissionTrophyResource,
+        MissionBrainResource,
+        MissionShareResource,
+        MissionProgressTrackResource,
+        MissionProgressCyanResource,
+        MissionProgressMagentaResource,
+        MissionCheckCyanResource,
+        MissionCheckMagentaResource,
+        MissionClockResource,
+        MissionPortalResource,
+        PlayerStarResource,
     };
 
     RectTransform visualRoot;
     RectTransform safeRoot;
-    TMP_FontAsset productionFont;
+    RectTransform huntRoot;
+    RectTransform missionRoot;
+    RectTransform closeRect;
+    RectTransform chipRect;
+    RectTransform logoRect;
+    RectTransform ribbonRect;
+    RectTransform challengeCardRect;
+    RectTransform rewardCardRect;
+    RectTransform submitRect;
+    RectTransform reviveRect;
+    RectTransform shareRect;
+    RectTransform mascotSixRect;
+    RectTransform mascotSevenRect;
+    RectTransform missionBoardRect;
+    RectTransform missionRewardRect;
+    RectTransform missionStartRect;
+    RectTransform missionPortalRect;
+    TMP_FontAsset displayFont;
+    TMP_FontAsset bodyFont;
     TMP_Text chipName;
     TMP_Text chipWins;
-    TMP_Text challengeHeading;
+    TMP_Text chipProgress;
+    Image chipProgressFill;
+    TMP_Text ribbonTitle;
+    TMP_Text challengeTitle;
+    TMP_Text statusCopy;
     TMP_Text rewardHeading;
+    TMP_Text attemptHeading;
+    TMP_Text inputCaption;
+    TMP_Text streakValue;
     TMP_Text trailText;
+    TMP_Text missionHeading;
+    TMP_Text missionCompletion;
+    TMP_Text missionRewardHeading;
+    TMP_Text missionResetLabel;
+    TMP_Text missionReset;
+    TMP_Text missionRewardAmount;
+    TMP_Text missionRewardStatus;
+    readonly TMP_Text[] missionLabels = new TMP_Text[3];
+    readonly TMP_Text[] missionProgress = new TMP_Text[3];
+    readonly Image[] missionChecks = new Image[3];
+    readonly Image[] missionFills = new Image[3];
+    readonly Image[] attemptSlots = new Image[9];
+    readonly TMP_Text[] attemptSlotLabels = new TMP_Text[9];
+    Sprite baseAttemptSprite;
+    Sprite bonusAttemptSprite;
+    Sprite missionCheckCyanSprite;
+    Sprite missionCheckMagentaSprite;
+    bool lastRevivedLayout;
     float nextChipRefresh;
+    float nextMissionRefresh;
+    int lastLayoutWidth = -1;
+    int lastLayoutHeight = -1;
+    L10n.Language lastLayoutLanguage;
+    bool missionDashboardVisible = true;
+
+#if UNITY_STANDALONE_WIN && DEVELOPMENT_BUILD
+    int captureChipPoints = -1;
+    int captureChipProgress = -1;
+    string captureResetText;
+#endif
 
     public bool IsReady { get; private set; }
-    public TMP_FontAsset ProductionFont => productionFont;
+    public TMP_FontAsset ProductionFont => bodyFont;
 
     public static void Apply(Transform panel)
     {
@@ -88,22 +191,49 @@ public sealed class DailyHuntVisuals : MonoBehaviour
         owner.Build(panel);
     }
 
+#if UNITY_STANDALONE_WIN && DEVELOPMENT_BUILD
+    public void SetCapturePlayerChipFixture(int points, int milestoneProgress)
+    {
+        captureChipPoints = Mathf.Max(0, points);
+        captureChipProgress = Mathf.Clamp(
+            milestoneProgress, 0, DailyChallengeProgress.PointsMilestone);
+        captureResetText = "12:45:09";
+        RefreshPlayerChip();
+        RefreshMissionState();
+    }
+#endif
+
     void OnEnable()
     {
         L10n.OnLanguageChanged += RefreshCopy;
+        DailyChallengeProgress.Changed += RefreshMissionState;
         RefreshCopy();
     }
 
     void OnDisable()
     {
         L10n.OnLanguageChanged -= RefreshCopy;
+        DailyChallengeProgress.Changed -= RefreshMissionState;
     }
 
     void LateUpdate()
     {
         if (!IsReady) return;
 
-        RefreshVisibleTrail();
+        ApplyResponsiveLayout();
+        if (missionDashboardVisible)
+        {
+            if (Time.unscaledTime >= nextMissionRefresh)
+            {
+                nextMissionRefresh = Time.unscaledTime + 0.25f;
+                RefreshMissionState();
+            }
+        }
+        else
+        {
+            RefreshVisibleTrail();
+            RefreshStreakValue();
+        }
         if (Time.unscaledTime < nextChipRefresh) return;
         nextChipRefresh = Time.unscaledTime + 0.25f;
         RefreshPlayerChip();
@@ -118,29 +248,59 @@ public sealed class DailyHuntVisuals : MonoBehaviour
             return;
         }
 
-        productionFont = Resources.Load<TMP_FontAsset>(ProductionFontResource);
+        displayFont = Resources.Load<TMP_FontAsset>(DisplayFontResource);
+        bodyFont = Resources.Load<TMP_FontAsset>(BodyFontResource);
 
         Sprite background = LoadRequired(BackgroundResource);
         Sprite logo = LoadRequired(LogoResource);
         Sprite avatar = LoadRequired(AvatarResource);
         Sprite six = LoadRequired(MascotSixResource);
         Sprite seven = LoadRequired(MascotSevenResource);
+        Sprite rewardChest = LoadRequired(MissionRewardChestResource);
         Sprite calendar = LoadRequired(CalendarResource);
-        Sprite chest = LoadRequired(ChestResource);
-        Sprite trophy = LoadRequired(TrophyResource);
         Sprite stars = LoadRequired(StarsResource);
         Sprite confetti = LoadRequired(ConfettiResource);
-        Sprite purple = LoadRequired(PurpleFrameResource);
-        Sprite blue = LoadRequired(BlueFrameResource);
-        Sprite magenta = LoadRequired(MagentaFrameResource);
-        Sprite goldFrame = LoadRequired(GoldFrameResource);
-        Sprite chip = LoadRequired(ChipFrameResource);
-        Sprite chevron = LoadRequired(BackChevronResource);
+        Sprite outerBezelBody = LoadRequired(OuterBezelBodyResource);
+        Sprite backButton = LoadRequired(BackButtonResource);
+        Sprite playerChip = LoadRequired(PlayerChipResource);
+        Sprite playerAvatarRing = LoadRequired(PlayerAvatarRingResource);
+        Sprite playerXpTrack = LoadRequired(PlayerXpTrackResource);
+        Sprite titleRibbon = LoadRequired(TitleRibbonResource);
+        Sprite challengeBoard = LoadRequired(ChallengeBoardResource);
+        Sprite infoPanel = LoadRequired(InfoPanelResource);
+        Sprite inputShell = LoadRequired(InputShellResource);
+        baseAttemptSprite = LoadRequired(BaseAttemptResource);
+        bonusAttemptSprite = LoadRequired(BonusAttemptResource);
+        Sprite guessAction = LoadRequired(GuessActionResource);
+        Sprite shareAction = LoadRequired(ShareActionResource);
+        Sprite reviveAction = LoadRequired(ReviveActionResource);
+        Sprite streakBoard = LoadRequired(StreakBoardResource);
+        Sprite missionRewardBoard = LoadRequired(MissionRewardBoardResource);
+        Sprite missionTrophy = LoadRequired(MissionTrophyResource);
+        Sprite missionBrain = LoadRequired(MissionBrainResource);
+        Sprite missionShare = LoadRequired(MissionShareResource);
+        Sprite missionProgressTrack = LoadRequired(MissionProgressTrackResource);
+        Sprite missionProgressCyan = LoadRequired(MissionProgressCyanResource);
+        Sprite missionProgressMagenta = LoadRequired(MissionProgressMagentaResource);
+        missionCheckCyanSprite = LoadRequired(MissionCheckCyanResource);
+        missionCheckMagentaSprite = LoadRequired(MissionCheckMagentaResource);
+        Sprite missionClock = LoadRequired(MissionClockResource);
+        Sprite missionPortal = LoadRequired(MissionPortalResource);
+        Sprite playerStar = LoadRequired(PlayerStarResource);
 
         IsReady = ArtReady(
-            background, logo, avatar, six, seven, calendar, chest, trophy,
-            stars, confetti, purple, blue, magenta, goldFrame, chip,
-            chevron) && productionFont != null;
+            background, logo, avatar, six, seven, rewardChest, calendar,
+            stars, confetti, outerBezelBody, backButton, playerChip,
+            playerAvatarRing, playerXpTrack,
+            titleRibbon, challengeBoard, infoPanel, inputShell,
+            baseAttemptSprite, bonusAttemptSprite, guessAction,
+            shareAction, reviveAction, streakBoard, missionRewardBoard,
+            missionTrophy, missionBrain, missionShare,
+            missionProgressTrack, missionProgressCyan,
+            missionProgressMagenta, missionCheckCyanSprite,
+            missionCheckMagentaSprite, missionClock, missionPortal,
+            playerStar) &&
+            displayFont != null && bodyFont != null;
 
         if (!IsReady)
         {
@@ -192,15 +352,24 @@ public sealed class DailyHuntVisuals : MonoBehaviour
         var starsImage = EnsureImage(visualRoot, "DailyStars");
         Stretch(starsImage.rectTransform);
         ConfigureImage(starsImage, stars, false, Image.Type.Simple);
+        starsImage.color = new Color(1f, 1f, 1f, 0.20f);
 
         var confettiImage = EnsureImage(visualRoot, "DailyConfetti");
         Stretch(confettiImage.rectTransform);
         ConfigureImage(confettiImage, confetti, false, Image.Type.Simple);
+        confettiImage.color = new Color(1f, 1f, 1f, 0.24f);
 
-        var outer = EnsureImage(visualRoot, "DailyOuterFrame");
-        ConfigureImage(outer, purple, false, Image.Type.Sliced);
-        outer.pixelsPerUnitMultiplier = 2f;
-        Place(outer.rectTransform, Vector2.zero, new Vector2(1032f, 1872f));
+        // The locked Daily Hunt reference has its own measured portrait bezel.
+        // Render that approved asset once, at the canonical full-screen bounds;
+        // never stack another frame or procedural border over it.
+        var outerBody = EnsureImage(visualRoot, "DailyOuterBezelBody");
+        ConfigureImage(
+            outerBody, outerBezelBody, false, Image.Type.Sliced);
+        outerBody.fillCenter = false;
+        outerBody.pixelsPerUnitMultiplier = 2.75f;
+        Stretch(outerBody.rectTransform);
+        outerBody.rectTransform.offsetMin = new Vector2(5f, 7f);
+        outerBody.rectTransform.offsetMax = new Vector2(-5f, -7f);
 
         safeRoot = EnsureRect(visualRoot, SafeRootName);
         Stretch(safeRoot);
@@ -212,249 +381,893 @@ public sealed class DailyHuntVisuals : MonoBehaviour
                 new Vector2(ReferenceWidth, ReferenceHeight));
         }
 
-        BuildTopBar(close, purple, chip, avatar, trophy, chevron);
+        BuildTopBar(
+            close, backButton, playerChip,
+            playerAvatarRing, avatar, playerStar,
+            playerXpTrack, guessAction);
+
+        huntRoot = EnsureRect(safeRoot, "DailyNumberHuntRoot");
+        Stretch(huntRoot);
 
         var logoImage = EnsureImage(safeRoot, "DailyLogo");
         ConfigureImage(logoImage, logo, true, Image.Type.Simple);
-        Place(
-            logoImage.rectTransform, new Vector2(0f, 700f),
-            new Vector2(560f, 300f));
+        logoRect = logoImage.rectTransform;
 
         var ribbon = EnsureImage(safeRoot, "DailyTitleRibbon");
-        ConfigureImage(ribbon, purple, false, Image.Type.Sliced);
-        ribbon.pixelsPerUnitMultiplier = 2f;
-        Place(
-            ribbon.rectTransform, new Vector2(0f, 505f),
-            new Vector2(910f, 150f));
+        ConfigureImage(ribbon, titleRibbon, false, Image.Type.Simple);
+        ribbonRect = ribbon.rectTransform;
 
-        Reparent(title.transform, ribbon.transform);
-        title.font = productionFont;
-        title.color = NearWhite;
-        title.alignment = TextAlignmentOptions.Center;
-        title.fontStyle = FontStyles.Bold;
-        StretchText(title.rectTransform, 50f, 20f);
-        ConfigureDisplayText(title, 38f, 54f);
-
-        var challengeCard = EnsureImage(safeRoot, "DailyChallengeCard");
-        ConfigureImage(challengeCard, blue, false, Image.Type.Sliced);
-        challengeCard.pixelsPerUnitMultiplier = 2f;
+        ribbonTitle = EnsureText(
+            ribbon.transform, "DailyRibbonTitle", 48f, displayFont,
+            NearWhite, TextAlignmentOptions.Center);
         Place(
-            challengeCard.rectTransform, new Vector2(0f, 40f),
-            new Vector2(940f, 760f));
+            ribbonTitle.rectTransform, new Vector2(0f, 22f),
+            new Vector2(780f, 120f));
+        ConfigureDisplayText(ribbonTitle, 69f, 69f);
+        ribbonTitle.enableAutoSizing = false;
+        ribbonTitle.fontSize = 69f;
+        ribbonTitle.enableWordWrapping = false;
+
+        var challengeCard = EnsureImage(huntRoot, "DailyChallengeCard");
+        ConfigureImage(challengeCard, challengeBoard, false, Image.Type.Simple);
+        challengeCardRect = challengeCard.rectTransform;
 
         var calendarImage = EnsureImage(
             challengeCard.transform, "DailyCalendarTarget");
         ConfigureImage(calendarImage, calendar, true, Image.Type.Simple);
         Place(
-            calendarImage.rectTransform, new Vector2(-300f, 70f),
-            new Vector2(340f, 410f));
+            calendarImage.rectTransform, new Vector2(-278f, -6f),
+            new Vector2(390f, 430f));
 
-        challengeHeading = EnsureText(
-            challengeCard.transform, "DailyChallengeHeading", 34f,
-            productionFont, Cyan, TextAlignmentOptions.Center);
+        var headingFrame = EnsureImage(
+            challengeCard.transform, "DailyChallengeHeadingFrame");
+        ConfigureImage(headingFrame, inputShell, false, Image.Type.Simple);
         Place(
-            challengeHeading.rectTransform, new Vector2(220f, 285f),
-            new Vector2(500f, 70f));
-        ConfigureDisplayText(challengeHeading, 26f, 35f);
+            headingFrame.rectTransform, new Vector2(198f, 280f),
+            new Vector2(545f, 100f));
+
+        Reparent(title.transform, headingFrame.transform);
+        challengeTitle = title;
+        title.font = displayFont;
+        title.color = Cyan;
+        title.alignment = TextAlignmentOptions.Center;
+        title.fontStyle = FontStyles.Bold;
+        StretchText(title.rectTransform, 58f, 24f);
+        ConfigureDisplayText(title, 30f, 43f);
 
         var statusFrame = EnsureImage(
             challengeCard.transform, "DailyStatusFrame");
-        ConfigureImage(statusFrame, purple, false, Image.Type.Sliced);
-        statusFrame.pixelsPerUnitMultiplier = 2f;
+        ConfigureImage(statusFrame, infoPanel, false, Image.Type.Simple);
         Place(
-            statusFrame.rectTransform, new Vector2(220f, 125f),
-            new Vector2(500f, 220f));
+            statusFrame.rectTransform, new Vector2(198f, 165f),
+            new Vector2(545f, 134f));
 
         Reparent(status.transform, statusFrame.transform);
-        status.font = productionFont;
+        statusCopy = status;
+        status.font = bodyFont;
         status.color = NearWhite;
         status.alignment = TextAlignmentOptions.Center;
-        StretchText(status.rectTransform, 28f, 22f);
-        ConfigureBodyText(status, 23f, 31f);
+        status.fontStyle = FontStyles.Bold;
+        StretchText(status.rectTransform, 50f, 24f);
+        ConfigureBodyText(status, 21f, 30f);
 
-        var trailFrame = EnsureImage(
-            challengeCard.transform, "DailyTrailFrame");
-        ConfigureImage(trailFrame, purple, false, Image.Type.Sliced);
-        trailFrame.pixelsPerUnitMultiplier = 2f;
-        Place(
-            trailFrame.rectTransform, new Vector2(220f, -60f),
-            new Vector2(500f, 100f));
-
-        Reparent(trail.transform, trailFrame.transform);
+        Reparent(trail.transform, challengeCard.transform);
         trailText = trail;
-        trail.font = productionFont;
-        trail.color = Cyan;
-        trail.alignment = TextAlignmentOptions.Center;
-        StretchText(trail.rectTransform, 24f, 12f);
-        ConfigureDisplayText(trail, 28f, 40f);
+        trail.gameObject.SetActive(false);
+
+        attemptHeading = EnsureText(
+            challengeCard.transform, "DailyAttemptHeading", 31f,
+            displayFont, NearWhite, TextAlignmentOptions.Center);
+        Place(
+            attemptHeading.rectTransform, new Vector2(0f, -174f),
+            new Vector2(360f, 48f));
+        ConfigureDisplayText(attemptHeading, 25f, 33f);
+
+        for (int index = 0; index < attemptSlots.Length; index++)
+        {
+            var slot = EnsureImage(
+                challengeCard.transform, "DailyAttemptSlot" + (index + 1));
+            ConfigureImage(
+                slot, index < 7 ? baseAttemptSprite : bonusAttemptSprite,
+                false, Image.Type.Simple);
+            attemptSlots[index] = slot;
+
+            TMP_Text slotLabel = EnsureText(
+                slot.transform, "DailyAttemptLabel" + (index + 1), 34f,
+                displayFont, Muted, TextAlignmentOptions.Center);
+            StretchText(slotLabel.rectTransform, 12f, 10f);
+            ConfigureDisplayText(slotLabel, 25f, 36f);
+            attemptSlotLabels[index] = slotLabel;
+        }
 
         Reparent(input.transform, challengeCard.transform);
         Place(
-            (RectTransform)input.transform, new Vector2(120f, -220f),
-            new Vector2(390f, 92f));
-        StyleInput(input, purple);
+            (RectTransform)input.transform, new Vector2(198f, -8f),
+            new Vector2(545f, 124f));
+        StyleInput(input, inputShell);
 
-        Reparent(submit.transform, challengeCard.transform);
+        inputCaption = EnsureText(
+            challengeCard.transform, "DailyInputCaption", 25f,
+            displayFont, Cyan, TextAlignmentOptions.Center);
         Place(
-            (RectTransform)submit.transform, new Vector2(120f, -330f),
-            new Vector2(470f, 98f));
-        StyleButton(submit, goldFrame, Ink, 38f);
+            inputCaption.rectTransform, new Vector2(198f, 72f),
+            new Vector2(430f, 34f));
+        ConfigureDisplayText(inputCaption, 21f, 27f);
 
-        var rewardCard = EnsureImage(safeRoot, "DailyRewardCard");
-        ConfigureImage(rewardCard, magenta, false, Image.Type.Sliced);
-        rewardCard.pixelsPerUnitMultiplier = 2f;
-        Place(
-            rewardCard.rectTransform, new Vector2(0f, -510f),
-            new Vector2(920f, 280f));
+        Reparent(submit.transform, huntRoot);
+        submitRect = (RectTransform)submit.transform;
+        StyleButton(submit, guessAction, Ink, 66f);
 
-        var chestImage = EnsureImage(
-            rewardCard.transform, "DailyRewardChest");
-        ConfigureImage(chestImage, chest, true, Image.Type.Simple);
-        Place(
-            chestImage.rectTransform, new Vector2(-300f, 0f),
-            new Vector2(250f, 250f));
+        var rewardCard = EnsureImage(huntRoot, "DailyRewardCard");
+        ConfigureImage(rewardCard, streakBoard, false, Image.Type.Simple);
+        rewardCardRect = rewardCard.rectTransform;
 
         rewardHeading = EnsureText(
             rewardCard.transform, "DailyRewardHeading", 36f,
-            productionFont, NearWhite, TextAlignmentOptions.Center);
+            displayFont, NearWhite, TextAlignmentOptions.Center);
         Place(
-            rewardHeading.rectTransform, new Vector2(185f, 85f),
-            new Vector2(500f, 65f));
-        ConfigureDisplayText(rewardHeading, 28f, 38f);
+            rewardHeading.rectTransform, new Vector2(190f, 72f),
+            new Vector2(520f, 72f));
+        ConfigureDisplayText(rewardHeading, 32f, 46f);
 
         Reparent(streak.transform, rewardCard.transform);
+        streakValue = streak;
         Place(
-            streak.rectTransform, new Vector2(185f, 24f),
-            new Vector2(500f, 55f));
-        streak.font = productionFont;
+            streak.rectTransform, new Vector2(190f, -42f),
+            new Vector2(520f, 132f));
+        streak.font = displayFont;
         streak.color = Gold;
         streak.alignment = TextAlignmentOptions.Center;
-        ConfigureBodyText(streak, 23f, 31f);
+        streak.fontStyle = FontStyles.Bold;
+        ConfigureDisplayText(streak, 62f, 90f);
 
-        Reparent(revive.transform, rewardCard.transform);
-        Place(
-            (RectTransform)revive.transform, new Vector2(185f, -67f),
-            new Vector2(500f, 86f));
-        StyleButton(revive, goldFrame, Ink, 29f);
+        Reparent(revive.transform, huntRoot);
+        reviveRect = (RectTransform)revive.transform;
+        StyleButton(revive, reviveAction, NearWhite, 36f);
 
-        Reparent(share.transform, rewardCard.transform);
-        Place(
-            (RectTransform)share.transform, new Vector2(185f, -67f),
-            new Vector2(500f, 86f));
-        StyleButton(share, blue, Ink, 32f);
+        Reparent(share.transform, huntRoot);
+        shareRect = (RectTransform)share.transform;
+        StyleButton(share, shareAction, NearWhite, 46f);
 
         var sixImage = EnsureImage(safeRoot, "DailyMascotSix");
         ConfigureImage(sixImage, six, true, Image.Type.Simple);
-        Place(
-            sixImage.rectTransform, new Vector2(-420f, -805f),
-            new Vector2(250f, 285f));
+        mascotSixRect = sixImage.rectTransform;
 
         var sevenImage = EnsureImage(safeRoot, "DailyMascotSeven");
         ConfigureImage(sevenImage, seven, true, Image.Type.Simple);
-        Place(
-            sevenImage.rectTransform, new Vector2(420f, -805f),
-            new Vector2(250f, 285f));
+        mascotSevenRect = sevenImage.rectTransform;
+
+        BuildMissionDashboard(
+            challengeBoard, infoPanel, calendar, rewardChest,
+            missionRewardBoard, guessAction, streakBoard,
+            missionTrophy, missionBrain, missionShare,
+            missionProgressTrack, missionProgressCyan,
+            missionProgressMagenta, missionClock, missionPortal,
+            playerStar);
 
         HideLegacyPresentation(panel);
+        ApplyResponsiveLayout(true);
         RefreshCopy();
         RefreshVisibleTrail();
         RefreshPlayerChip();
+        SetMissionDashboardVisible(true);
+    }
+
+    void BuildMissionDashboard(
+        Sprite challengeBoard,
+        Sprite infoPanel,
+        Sprite calendar,
+        Sprite rewardChest,
+        Sprite rewardBoard,
+        Sprite startAction,
+        Sprite rewardMask,
+        Sprite trophyIcon,
+        Sprite brainIcon,
+        Sprite shareIcon,
+        Sprite progressTrackSprite,
+        Sprite progressCyanSprite,
+        Sprite progressMagentaSprite,
+        Sprite clockSprite,
+        Sprite portalSprite,
+        Sprite actionStarSprite)
+    {
+        missionRoot = EnsureRect(safeRoot, "DailyMissionDashboard");
+        Stretch(missionRoot);
+
+        var portal = EnsureImage(missionRoot, "DailyMissionPortal");
+        ConfigureImage(portal, portalSprite, true, Image.Type.Simple);
+        missionPortalRect = portal.rectTransform;
+
+        var board = EnsureImage(missionRoot, "DailyMissionBoard");
+        ConfigureImage(board, challengeBoard, false, Image.Type.Simple);
+        missionBoardRect = board.rectTransform;
+
+        var hero = EnsureImage(board.transform, "DailyMissionCalendar");
+        ConfigureImage(hero, calendar, true, Image.Type.Simple);
+        Place(
+            hero.rectTransform, new Vector2(-290f, 7f),
+            new Vector2(465f, 565f));
+
+        missionHeading = EnsureText(
+            board.transform, "DailyMissionHeading", 38f, displayFont,
+            Cyan, TextAlignmentOptions.Center);
+        Place(
+            missionHeading.rectTransform, new Vector2(165f, 291f),
+            new Vector2(470f, 106f));
+        ConfigureDisplayText(missionHeading, 28f, 40f);
+
+        Sprite[] icons = { trophyIcon, brainIcon, shareIcon };
+        float[] rowY = { 160f, 2f, -161f };
+        float[] iconX = { -223f, -237f, -230f };
+        float[] iconSizes = { 115f, 112f, 125f };
+        for (int index = 0; index < 3; index++)
+        {
+            var row = EnsureImage(board.transform, "DailyMissionRow" + (index + 1));
+            ConfigureImage(row, infoPanel, false, Image.Type.Simple);
+            row.color = new Color(0.66f, 0.74f, 0.84f, 0.55f);
+            Place(
+                row.rectTransform, new Vector2(190f, rowY[index]),
+                new Vector2(610f, 205f));
+
+            var icon = EnsureImage(
+                row.transform, "DailyMissionIcon" + (index + 1));
+            ConfigureImage(icon, icons[index], true, Image.Type.Simple);
+            Place(
+                icon.rectTransform, new Vector2(iconX[index], 0f),
+                new Vector2(iconSizes[index], iconSizes[index]));
+
+            missionLabels[index] = EnsureText(
+                row.transform, "DailyMissionLabel" + (index + 1), 28f,
+                displayFont, NearWhite, TextAlignmentOptions.Left);
+            float labelX = index == 1 ? 9f : -11f;
+            float labelY = index == 0 ? 21f : index == 1 ? 22f : 14f;
+            float labelWidth = index == 1 ? 300f : 260f;
+            Place(
+                missionLabels[index].rectTransform,
+                new Vector2(labelX, labelY),
+                new Vector2(labelWidth, 96f));
+            ConfigureDisplayText(missionLabels[index], 28f, 28f);
+            missionLabels[index].enableAutoSizing = false;
+            missionLabels[index].fontSize = 28f;
+            missionLabels[index].lineSpacing = index == 0 ? 0f : -12f;
+
+            missionProgress[index] = EnsureText(
+                row.transform, "DailyMissionProgress" + (index + 1), 25f,
+                bodyFont, index == 1 ? Magenta : Cyan,
+                TextAlignmentOptions.Center);
+            Place(
+                missionProgress[index].rectTransform,
+                new Vector2(80f, -22f), new Vector2(110f, 48f));
+            ConfigureBodyText(missionProgress[index], 26f, 26f);
+            missionProgress[index].enableAutoSizing = false;
+            missionProgress[index].fontSize = 26f;
+
+            var progressTrack = EnsureImage(
+                row.transform, "DailyMissionTrack" + (index + 1));
+            ConfigureImage(
+                progressTrack, progressTrackSprite,
+                false, Image.Type.Simple);
+            Place(
+                progressTrack.rectTransform,
+                new Vector2(-50f, -22f), new Vector2(190f, 60f));
+
+            var fill = EnsureImage(
+                progressTrack.transform, "DailyMissionFill" + (index + 1));
+            ConfigureImage(
+                fill, index == 1 ? progressMagentaSprite : progressCyanSprite,
+                false, Image.Type.Filled);
+            Stretch(fill.rectTransform);
+            fill.fillMethod = Image.FillMethod.Horizontal;
+            fill.fillOrigin = (int)Image.OriginHorizontal.Left;
+            missionFills[index] = fill;
+
+            missionChecks[index] = EnsureImage(
+                row.transform, "DailyMissionCheck" + (index + 1));
+            ConfigureImage(
+                missionChecks[index],
+                index == 1 ? missionCheckMagentaSprite : missionCheckCyanSprite,
+                true, Image.Type.Simple);
+            Place(
+                missionChecks[index].rectTransform,
+                new Vector2(202f, 0f), new Vector2(128f, 128f));
+        }
+
+        missionCompletion = EnsureText(
+            board.transform, "DailyMissionCompletion", 27f, displayFont,
+            Cyan, TextAlignmentOptions.Center);
+        Place(
+            missionCompletion.rectTransform, new Vector2(50f, -294f),
+            new Vector2(800f, 62f));
+        ConfigureDisplayText(missionCompletion, 21f, 29f);
+
+        // The generated production board is a faithful full-colour raster of
+        // the approved component. Crop its non-art canvas at runtime through
+        // an existing approved alpha silhouette; no second visual writer or
+        // procedural visible panel is introduced.
+        var rewardMaskImage = EnsureImage(
+            missionRoot, "DailyMissionRewardBoard");
+        ConfigureImage(rewardMaskImage, rewardMask, false, Image.Type.Simple);
+        var rewardMaskComponent =
+            rewardMaskImage.GetComponent<Mask>() ??
+            rewardMaskImage.gameObject.AddComponent<Mask>();
+        rewardMaskComponent.showMaskGraphic = false;
+        missionRewardRect = rewardMaskImage.rectTransform;
+
+        var reward = EnsureImage(
+            rewardMaskImage.transform, "DailyMissionRewardArtwork");
+        ConfigureImage(reward, rewardBoard, false, Image.Type.Simple);
+        Place(
+            reward.rectTransform, new Vector2(0f, -22f),
+            new Vector2(1056f, 640f));
+
+        var chest = EnsureImage(
+            rewardMaskImage.transform, "DailyMissionRewardChest");
+        ConfigureImage(chest, rewardChest, true, Image.Type.Simple);
+        Place(
+            chest.rectTransform, new Vector2(-271f, -16f),
+            new Vector2(405f, 287f));
+
+        missionRewardHeading = EnsureText(
+            rewardMaskImage.transform, "DailyMissionRewardHeading", 39f,
+            displayFont, NearWhite, TextAlignmentOptions.Center);
+        Place(
+            missionRewardHeading.rectTransform,
+            new Vector2(176f, 123f), new Vector2(520f, 70f));
+        ConfigureDisplayText(missionRewardHeading, 41f, 41f);
+        missionRewardHeading.enableAutoSizing = false;
+        missionRewardHeading.fontSize = 41f;
+
+        missionRewardStatus = EnsureText(
+            rewardMaskImage.transform, "DailyMissionRewardStatus", 20f,
+            bodyFont, NearWhite, TextAlignmentOptions.Center);
+        Place(
+            missionRewardStatus.rectTransform,
+            new Vector2(180f, 79f), new Vector2(430f, 32f));
+        ConfigureBodyText(missionRewardStatus, 14f, 20f);
+        missionRewardStatus.gameObject.SetActive(false);
+
+        var clock = EnsureImage(
+            rewardMaskImage.transform, "DailyMissionClock");
+        ConfigureImage(clock, clockSprite, true, Image.Type.Simple);
+        Place(
+            clock.rectTransform, new Vector2(0f, 8f),
+            new Vector2(88f, 88f));
+
+        missionResetLabel = EnsureText(
+            rewardMaskImage.transform, "DailyMissionResetLabel", 25f,
+            displayFont, Magenta, TextAlignmentOptions.Center);
+        Place(
+            missionResetLabel.rectTransform,
+            new Vector2(150f, 52f), new Vector2(330f, 44f));
+        ConfigureDisplayText(missionResetLabel, 21f, 30f);
+
+        missionReset = EnsureText(
+            rewardMaskImage.transform, "DailyMissionReset", 35f,
+            displayFont, Gold, TextAlignmentOptions.Center);
+        Place(
+            missionReset.rectTransform,
+            new Vector2(140f, 0f), new Vector2(330f, 56f));
+        ConfigureDisplayText(missionReset, 31f, 44f);
+
+        var rewardTrophy = EnsureImage(
+            rewardMaskImage.transform, "DailyMissionRewardTrophy");
+        ConfigureImage(rewardTrophy, trophyIcon, true, Image.Type.Simple);
+        Place(
+            rewardTrophy.rectTransform, new Vector2(40f, -110f),
+            new Vector2(125f, 125f));
+
+        missionRewardAmount = EnsureText(
+            rewardMaskImage.transform, "DailyMissionRewardAmount", 58f,
+            displayFont, Gold, TextAlignmentOptions.Center);
+        Place(
+            missionRewardAmount.rectTransform,
+            new Vector2(178f, -110f), new Vector2(350f, 104f));
+        ConfigureDisplayText(missionRewardAmount, 88f, 88f);
+        missionRewardAmount.enableAutoSizing = false;
+        missionRewardAmount.fontSize = 88f;
+
+        // Build this visual-owned control directly. RuntimeUI.CreateButton
+        // registers its construction geometry with ResponsivePageLayout; that
+        // second writer would keep restoring (0,0) after this owner placed the
+        // button in the bottom action slot.
+        missionStartRect = EnsureRect(missionRoot, "DailyMissionStartButton");
+        var startImage = missionStartRect.GetComponent<Image>();
+        if (startImage == null)
+            startImage = missionStartRect.gameObject.AddComponent<Image>();
+        var start = missionStartRect.GetComponent<Button>();
+        if (start == null)
+            start = missionStartRect.gameObject.AddComponent<Button>();
+        TMP_Text startLabel = EnsureText(
+            missionStartRect, "Label", 66f, displayFont,
+            Ink, TextAlignmentOptions.Center);
+        Stretch(startLabel.rectTransform);
+        StyleButton(start, startAction, Ink, 66f);
+        startLabel.enableAutoSizing = false;
+        startLabel.fontSize = 70f;
+        startLabel.rectTransform.offsetMin = new Vector2(118f, 30f);
+        startLabel.rectTransform.offsetMax = new Vector2(-118f, -18f);
+
+        var startStarLeft = EnsureImage(
+            missionStartRect, "DailyMissionStartStarLeft");
+        ConfigureImage(
+            startStarLeft, actionStarSprite, true, Image.Type.Simple);
+        Place(
+            startStarLeft.rectTransform, new Vector2(-225f, 0f),
+            new Vector2(64f, 64f));
+        startStarLeft.transform.SetAsFirstSibling();
+
+        var startStarRight = EnsureImage(
+            missionStartRect, "DailyMissionStartStarRight");
+        ConfigureImage(
+            startStarRight, actionStarSprite, true, Image.Type.Simple);
+        Place(
+            startStarRight.rectTransform, new Vector2(225f, 0f),
+            new Vector2(64f, 64f));
+        startStarRight.transform.SetAsFirstSibling();
+        DailyHunt hunt = GetComponent<DailyHunt>();
+        if (hunt != null)
+            start.onClick.AddListener(hunt.StartChallenge);
     }
 
     void BuildTopBar(
         Button close,
-        Sprite purple,
-        Sprite chip,
+        Sprite backButton,
+        Sprite playerChipSprite,
+        Sprite playerAvatarRing,
         Sprite avatar,
-        Sprite trophy,
-        Sprite chevron)
+        Sprite playerStar,
+        Sprite progressTrackSprite,
+        Sprite progressFillSprite)
     {
         ClearButtonPresentation(close.transform);
         Reparent(close.transform, safeRoot);
-        Place(
-            (RectTransform)close.transform, new Vector2(-484f, 842f),
-            new Vector2(90f, 90f));
-        StyleButton(close, purple, NearWhite, 0f);
+        closeRect = (RectTransform)close.transform;
+        StyleButton(close, backButton, NearWhite, 0f);
         HideButtonLabels(close.transform);
 
-        var backIcon = EnsureImage(close.transform, "DailyBackIcon");
-        ConfigureImage(backIcon, chevron, true, Image.Type.Simple);
-        Place(backIcon.rectTransform, Vector2.zero, new Vector2(46f, 58f));
-        backIcon.rectTransform.localScale = new Vector3(-1f, 1f, 1f);
+        var playerChipRoot = EnsureRect(safeRoot, "DailyPlayerChip");
+        chipRect = playerChipRoot;
 
-        var playerChip = EnsureImage(safeRoot, "DailyPlayerChip");
-        ConfigureImage(playerChip, chip, false, Image.Type.Sliced);
-        playerChip.pixelsPerUnitMultiplier = 2f;
+        var playerChipShell = EnsureImage(
+            playerChipRoot, "DailyPlayerChipShell");
+        ConfigureImage(
+            playerChipShell, playerChipSprite, false, Image.Type.Simple);
         Place(
-            playerChip.rectTransform, new Vector2(350f, 842f),
-            new Vector2(365f, 118f));
+            playerChipShell.rectTransform, new Vector2(-3f, -4f),
+            new Vector2(336f, 174f));
+
+        var avatarRing = EnsureImage(
+            playerChipRoot, "DailyPlayerAvatarRing");
+        ConfigureImage(
+            avatarRing, playerAvatarRing, true, Image.Type.Simple);
+        Place(
+            avatarRing.rectTransform, new Vector2(-91f, 17f),
+            new Vector2(118f, 118f));
+
+        var avatarClip = EnsureRect(
+            playerChipRoot, "DailyPlayerAvatarClip");
+        Place(
+            avatarClip, new Vector2(-99f, 32f),
+            new Vector2(112f, 112f));
+        if (avatarClip.GetComponent<RectMask2D>() == null)
+            avatarClip.gameObject.AddComponent<RectMask2D>();
 
         var avatarImage = EnsureImage(
-            playerChip.transform, "DailyPlayerAvatar");
+            avatarClip, "DailyPlayerAvatar");
         ConfigureImage(avatarImage, avatar, true, Image.Type.Simple);
         Place(
-            avatarImage.rectTransform, new Vector2(-126f, 0f),
-            new Vector2(84f, 84f));
-
-        var trophyImage = EnsureImage(
-            playerChip.transform, "DailyTrophyIcon");
-        ConfigureImage(trophyImage, trophy, true, Image.Type.Simple);
-        Place(
-            trophyImage.rectTransform, new Vector2(-18f, -28f),
-            new Vector2(42f, 42f));
+            avatarImage.rectTransform, new Vector2(0f, -30f),
+            new Vector2(142f, 142f));
 
         chipName = EnsureText(
-            playerChip.transform, "DailyPlayerName", 29f, productionFont,
+            playerChipRoot, "DailyPlayerName", 31f, displayFont,
             NearWhite, TextAlignmentOptions.Center);
         Place(
-            chipName.rectTransform, new Vector2(48f, 23f),
-            new Vector2(205f, 40f));
-        chipName.enableAutoSizing = true;
-        chipName.fontSizeMin = 22f;
-        chipName.fontSizeMax = 30f;
+            chipName.rectTransform, new Vector2(46f, 53f),
+            new Vector2(194f, 40f));
+        ConfigureDisplayText(chipName, 24f, 32f);
+        chipName.enableAutoSizing = false;
+        chipName.fontSize = 36f;
         chipName.overflowMode = TextOverflowModes.Ellipsis;
 
-        chipWins = EnsureText(
-            playerChip.transform, "DailyPlayerWins", 28f, productionFont,
-            Gold, TextAlignmentOptions.Center);
+        var star = EnsureImage(
+            playerChipRoot, "DailyPlayerStar");
+        ConfigureImage(star, playerStar, true, Image.Type.Simple);
         Place(
-            chipWins.rectTransform, new Vector2(65f, -28f),
-            new Vector2(125f, 40f));
+            star.rectTransform, new Vector2(0f, 0f),
+            new Vector2(40f, 40f));
+
+        chipWins = EnsureText(
+            playerChipRoot, "DailyPlayerWins", 28f, displayFont,
+            NearWhite, TextAlignmentOptions.Center);
+        Place(
+            chipWins.rectTransform, new Vector2(78f, 7f),
+            new Vector2(140f, 38f));
+        ConfigureDisplayText(chipWins, 21f, 27f);
+        chipWins.enableAutoSizing = false;
+        chipWins.fontSize = 35f;
+        chipWins.overflowMode = TextOverflowModes.Ellipsis;
+
+        chipProgress = EnsureText(
+            playerChipRoot, "DailyPlayerProgress", 25f, displayFont,
+            NearWhite, TextAlignmentOptions.Center);
+        Place(
+            chipProgress.rectTransform, new Vector2(77f, -65f),
+            new Vector2(145f, 34f));
+        ConfigureDisplayText(chipProgress, 35f, 35f);
+        chipProgress.enableAutoSizing = false;
+        chipProgress.fontSize = 35f;
+
+        var xpTrack = EnsureImage(
+            playerChipRoot, "DailyPlayerXpTrack");
+        ConfigureImage(
+            xpTrack, progressTrackSprite,
+            false, Image.Type.Simple);
+        Place(
+            xpTrack.rectTransform, new Vector2(69f, -30f),
+            new Vector2(175f, 24f));
+
+        var progressFillRoot = EnsureRect(
+            playerChipRoot, "DailyPlayerProgressFillRoot");
+        Place(
+            progressFillRoot, new Vector2(-16f, -65f),
+            new Vector2(240f, 42f));
+
+        chipProgressFill = EnsureImage(
+            progressFillRoot, "DailyPlayerProgressFill");
+        ConfigureImage(
+            chipProgressFill, progressFillSprite,
+            false, Image.Type.Sliced);
+        Stretch(chipProgressFill.rectTransform);
+        chipProgress.transform.SetAsLastSibling();
     }
 
     void RefreshCopy()
     {
         if (!IsReady) return;
 
-        if (challengeHeading != null)
-            challengeHeading.text = L10n.Get("home_daily_title");
+        if (ribbonTitle != null)
+            ribbonTitle.text = L10n.Get(
+                missionDashboardVisible
+                    ? "daily_challenge_title"
+                    : "home_daily_title");
         if (rewardHeading != null)
-            rewardHeading.text = L10n.Get("stats_streak").ToUpperInvariant();
+            rewardHeading.text = L10n.Get("daily_streak_heading");
+        if (attemptHeading != null)
+            attemptHeading.text = L10n.Get("result_attempts");
+        if (inputCaption != null)
+            inputCaption.text = L10n.Get("your_guess").ToUpperInvariant();
+        if (missionHeading != null)
+            missionHeading.text = L10n.Get("daily_missions_heading");
+        if (missionRewardHeading != null)
+            missionRewardHeading.text = L10n.Get("daily_reward_heading");
+        if (missionResetLabel != null)
+            missionResetLabel.text = L10n.Get("daily_reset_label");
+        if (missionLabels[0] != null)
+            missionLabels[0].text = L10n.Get("daily_mission_win");
+        if (missionLabels[1] != null)
+            missionLabels[1].text = L10n.Get("daily_mission_correct");
+        if (missionLabels[2] != null)
+            missionLabels[2].text = L10n.Get("daily_mission_share_room");
+        Transform start = missionRoot != null
+            ? Find<Transform>(missionRoot, "DailyMissionStartButton")
+            : null;
+        if (start != null)
+        {
+            TMP_Text label = start.GetComponentInChildren<TMP_Text>(true);
+            if (label != null)
+                label.text = L10n.Get("daily_start");
+        }
+        ApplyResponsiveLayout(true);
         RefreshVisibleTrail();
+        RefreshStreakValue();
+        RefreshMissionState();
         RefreshPlayerChip();
+    }
+
+    public void SetMissionDashboardVisible(bool visible)
+    {
+        missionDashboardVisible = visible;
+        if (missionRoot != null)
+            missionRoot.gameObject.SetActive(visible);
+        if (huntRoot != null)
+            huntRoot.gameObject.SetActive(!visible);
+        RefreshCopy();
+    }
+
+    void RefreshMissionState()
+    {
+        if (!IsReady || missionHeading == null) return;
+
+        DailyChallengeProgress.Snapshot state = DailyChallengeProgress.Current;
+        int[] values = { state.Wins, state.CorrectGuesses, state.RoomsShared };
+        int[] targets =
+        {
+            DailyChallengeProgress.WinTarget,
+            DailyChallengeProgress.CorrectGuessTarget,
+            DailyChallengeProgress.RoomShareTarget,
+        };
+
+        int complete = 0;
+        for (int index = 0; index < values.Length; index++)
+        {
+            bool done = values[index] >= targets[index];
+            if (done) complete++;
+            if (missionProgress[index] != null)
+                missionProgress[index].text = values[index] + " / " + targets[index];
+            if (missionFills[index] != null)
+                missionFills[index].fillAmount = targets[index] <= 0
+                    ? 0f
+                    : Mathf.Clamp01(values[index] / (float)targets[index]);
+            if (missionChecks[index] != null)
+            {
+                missionChecks[index].sprite = index == 1
+                    ? missionCheckMagentaSprite
+                    : missionCheckCyanSprite;
+                missionChecks[index].gameObject.SetActive(done);
+            }
+        }
+
+        if (missionCompletion != null)
+        {
+            missionCompletion.text = state.Complete
+                ? L10n.Get("daily_all_missions_complete")
+                : L10n.Get("daily_missions_progress", complete, 3);
+            missionCompletion.color = Cyan;
+        }
+
+        TimeSpan reset = DailyChallengeProgress.TimeUntilReset;
+        if (missionReset != null)
+        {
+#if UNITY_STANDALONE_WIN && DEVELOPMENT_BUILD
+            missionReset.text = string.IsNullOrEmpty(captureResetText)
+                ? string.Format(
+                    "{0:00}:{1:00}:{2:00}",
+                    Mathf.Max(0, (int)reset.TotalHours),
+                    reset.Minutes,
+                    reset.Seconds)
+                : captureResetText;
+#else
+            missionReset.text = string.Format(
+                "{0:00}:{1:00}:{2:00}",
+                Mathf.Max(0, (int)reset.TotalHours),
+                reset.Minutes,
+                reset.Seconds);
+#endif
+        }
+        if (missionRewardAmount != null)
+            missionRewardAmount.text = DailyChallengeProgress.RewardPoints.ToString();
+        if (missionRewardStatus != null)
+            missionRewardStatus.text = state.RewardClaimed
+                ? L10n.Get("daily_reward_collected")
+                : L10n.Get("daily_reward_pending");
+
+        RefreshPlayerChip();
+    }
+
+    void RefreshStreakValue()
+    {
+        if (streakValue == null) return;
+        streakValue.text = PlayerPrefs.GetInt("DailyHuntStreak", 0).ToString();
     }
 
     void RefreshVisibleTrail()
     {
-        if (trailText == null || string.IsNullOrEmpty(trailText.text)) return;
+        if (trailText == null || attemptSlotLabels == null) return;
 
-        string safe = trailText.text
+        string safe = (trailText.text ?? string.Empty)
             .Replace("🎯", "●")
             .Replace("🔺", "▲")
-            .Replace("🔻", "▼");
-        if (safe != trailText.text)
-            trailText.text = safe;
+            .Replace("🔻", "▼")
+            .Trim();
+
+        bool revived = PlayerPrefs.GetInt("DailyHuntRevived", 0) == 1;
+        ApplyAttemptLayout(revived);
+
+        for (int index = 0; index < attemptSlotLabels.Length; index++)
+        {
+            TMP_Text label = attemptSlotLabels[index];
+            if (label == null) continue;
+
+            if (index >= safe.Length)
+            {
+                label.text = (index + 1).ToString();
+                label.color = Muted;
+                continue;
+            }
+
+            char result = safe[index];
+            label.text = result.ToString();
+            label.color = result == '●'
+                ? Gold
+                : result == '▲' ? Magenta : Cyan;
+        }
+    }
+
+    void ApplyAttemptLayout(bool revived)
+    {
+        if (attemptSlots == null || attemptSlots.Length != 9) return;
+
+        if (revived != lastRevivedLayout)
+            lastRevivedLayout = revived;
+
+        // Normal play never reserves or compresses space for nine guesses:
+        // the seven base slots keep their canonical size and breathing room.
+        // A successful Revive deliberately reflows them upward and reveals a
+        // second centred bonus row without shrinking either family.
+        float baseY = revived ? -216f : -254f;
+        const float baseStep = 116f;
+        for (int index = 0; index < 7; index++)
+        {
+            Image slot = attemptSlots[index];
+            if (slot == null) continue;
+            slot.gameObject.SetActive(true);
+            Place(
+                slot.rectTransform,
+                new Vector2((index - 3) * baseStep, baseY),
+                new Vector2(102f, 76f));
+        }
+
+        for (int index = 7; index < 9; index++)
+        {
+            Image slot = attemptSlots[index];
+            if (slot == null) continue;
+            slot.gameObject.SetActive(revived);
+            if (!revived) continue;
+            Place(
+                slot.rectTransform,
+                new Vector2(index == 7 ? -66f : 66f, -300f),
+                new Vector2(102f, 76f));
+        }
+
+        if (attemptHeading != null)
+            Place(
+                attemptHeading.rectTransform,
+                new Vector2(0f, revived ? -142f : -174f),
+                new Vector2(360f, 48f));
     }
 
     void RefreshPlayerChip()
     {
-        if (chipName == null || chipWins == null) return;
+        if (chipName == null || chipWins == null || chipProgress == null) return;
 
         string player = PlayerPrefs.GetString("PlayerName", "");
         if (string.IsNullOrWhiteSpace(player))
             player = L10n.Get("player_default");
         chipName.text = player;
-        chipWins.text = GameStats.Wins.ToString();
+        DailyChallengeProgress.Snapshot state = DailyChallengeProgress.Current;
+        int displayedPoints = state.Points;
+        int displayedProgress = state.PointsTowardMilestone;
+#if UNITY_STANDALONE_WIN && DEVELOPMENT_BUILD
+        if (captureChipPoints >= 0)
+            displayedPoints = captureChipPoints;
+        if (captureChipProgress >= 0)
+            displayedProgress = captureChipProgress;
+#endif
+        chipWins.text = displayedPoints.ToString("N0");
+        chipProgress.text = "<color=#FFCD33>" +
+            displayedProgress.ToString("N0") + "</color> / " +
+            DailyChallengeProgress.PointsMilestone.ToString("N0");
+        if (chipProgressFill != null)
+        {
+            float progress = DailyChallengeProgress.PointsMilestone <= 0
+                ? 0f
+                : Mathf.Clamp01(
+                    displayedProgress /
+                    (float)DailyChallengeProgress.PointsMilestone);
+            SetHorizontalFill(chipProgressFill.rectTransform, progress);
+        }
+    }
+
+    void ApplyResponsiveLayout(bool force = false)
+    {
+        if (closeRect == null || chipRect == null || logoRect == null ||
+            ribbonRect == null || challengeCardRect == null ||
+            rewardCardRect == null || submitRect == null ||
+            reviveRect == null || shareRect == null ||
+            mascotSixRect == null || mascotSevenRect == null)
+            return;
+
+        int width = Screen.width;
+        int height = Screen.height;
+        L10n.Language language = L10n.Current;
+        if (!force && width == lastLayoutWidth && height == lastLayoutHeight &&
+            language == lastLayoutLanguage)
+            return;
+
+        lastLayoutWidth = width;
+        lastLayoutHeight = height;
+        lastLayoutLanguage = language;
+
+        float aspect = width > 0
+            ? Mathf.Max(1, height) / (float)width
+            : ReferenceHeight / ReferenceWidth;
+        float tall = Mathf.InverseLerp(1.78f, 2.22f, aspect);
+
+        Place(
+            closeRect, new Vector2(-435f, 836f + 165f * tall),
+            new Vector2(155f, 155f));
+        Place(
+            chipRect, new Vector2(335f, 827f + 165f * tall),
+            new Vector2(365f, 194f));
+        Place(
+            logoRect, new Vector2(-10f, 783f + 110f * tall),
+            new Vector2(396f, 295f));
+        Place(
+            ribbonRect, new Vector2(0f, 585f + 90f * tall),
+            new Vector2(1040f, 285f));
+        Place(
+            challengeCardRect, new Vector2(0f, 180f + 25f * tall),
+            new Vector2(1000f, 790f));
+        Place(
+            rewardCardRect, new Vector2(0f, -350f - 35f * tall),
+            new Vector2(1000f, 387f));
+        if (missionBoardRect != null)
+            Place(
+                missionBoardRect, new Vector2(-1f, 119f + 30f * tall),
+                new Vector2(1036f, 874f));
+        if (missionRewardRect != null)
+            Place(
+                missionRewardRect, new Vector2(0f, -417f - 65f * tall),
+                new Vector2(1060f, 425f));
+        if (missionPortalRect != null)
+            Place(
+                missionPortalRect, new Vector2(0f, -860f - 180f * tall),
+                new Vector2(1110f, 205f));
+
+        // Gameplay owns which of these three controls is active. Presentation
+        // gives them one shared state-specific action slot.
+        Vector2 actionPosition = new Vector2(0f, -690f - 95f * tall);
+        Vector2 actionSize = new Vector2(700f, 200f);
+        Place(submitRect, actionPosition, actionSize);
+        Place(reviveRect, actionPosition, actionSize);
+        Place(shareRect, actionPosition, actionSize);
+        if (missionStartRect != null)
+            Place(
+                missionStartRect,
+                new Vector2(0f, -771f - 125f * tall),
+                new Vector2(595f, 230f));
+
+        Place(
+            mascotSixRect,
+            new Vector2(-372f, -754f - 105f * tall),
+            new Vector2(322f, 375f));
+        Place(
+            mascotSevenRect,
+            new Vector2(363f, -748f - 105f * tall),
+            new Vector2(326f, 380f));
+
+        if (ribbonTitle != null)
+        {
+            ribbonTitle.enableAutoSizing = false;
+            ribbonTitle.fontSize = language == L10n.Language.Greek
+                ? 69f
+                : 72f;
+        }
+        if (challengeTitle != null)
+        {
+            challengeTitle.fontSizeMin =
+                language == L10n.Language.Greek ? 20f : 30f;
+            challengeTitle.fontSizeMax =
+                language == L10n.Language.Greek ? 34f : 43f;
+        }
+        if (statusCopy != null)
+        {
+            statusCopy.fontSizeMin =
+                language == L10n.Language.Greek ? 17f : 21f;
+            statusCopy.fontSizeMax =
+                language == L10n.Language.Greek ? 26f : 30f;
+        }
+        if (missionHeading != null)
+        {
+            missionHeading.fontSizeMin =
+                language == L10n.Language.Greek ? 27f : 30f;
+            missionHeading.fontSizeMax =
+                language == L10n.Language.Greek ? 39f : 42f;
+        }
+        if (missionCompletion != null)
+            missionCompletion.fontSizeMin =
+                language == L10n.Language.Greek ? 21f : 23f;
     }
 
     void StyleInput(TMP_InputField input, Sprite frame)
@@ -466,29 +1279,42 @@ public sealed class DailyHuntVisuals : MonoBehaviour
             image = input.gameObject.AddComponent<Image>();
         image.enabled = true;
         image.sprite = frame;
-        image.type = Image.Type.Sliced;
-        image.pixelsPerUnitMultiplier = 2f;
+        image.type = Image.Type.Simple;
         image.preserveAspect = false;
         image.color = Color.white;
         image.raycastTarget = true;
 
         if (input.textComponent != null)
         {
-            input.textComponent.font = productionFont;
-            input.textComponent.fontSize = 36f;
+            input.textComponent.font = bodyFont;
+            input.textComponent.fontSize = 44f;
             input.textComponent.fontStyle = FontStyles.Bold;
             input.textComponent.color = NearWhite;
             input.textComponent.alignment = TextAlignmentOptions.Center;
+            ConfigureDisplayText(input.textComponent, 39f, 52f);
         }
 
         TMP_Text placeholder = input.placeholder as TMP_Text;
         if (placeholder != null)
         {
-            placeholder.font = productionFont;
-            placeholder.fontSize = 27f;
+            placeholder.font = bodyFont;
+            placeholder.fontSize = 32f;
             placeholder.color = Muted;
             placeholder.alignment = TextAlignmentOptions.Center;
+            ConfigureBodyText(placeholder, 25f, 34f);
         }
+    }
+
+    static void SetHorizontalFill(RectTransform rect, float amount)
+    {
+        if (rect == null) return;
+        float clamped = Mathf.Clamp01(amount);
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = new Vector2(clamped, 1f);
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+        rect.localScale = Vector3.one;
+        rect.localRotation = Quaternion.identity;
     }
 
     void StyleButton(
@@ -504,8 +1330,7 @@ public sealed class DailyHuntVisuals : MonoBehaviour
             image = button.gameObject.AddComponent<Image>();
         image.enabled = true;
         image.sprite = sprite;
-        image.type = Image.Type.Sliced;
-        image.pixelsPerUnitMultiplier = 2f;
+        image.type = Image.Type.Simple;
         image.preserveAspect = false;
         image.color = Color.white;
         image.raycastTarget = true;
@@ -527,16 +1352,24 @@ public sealed class DailyHuntVisuals : MonoBehaviour
         if (label != null)
         {
             label.gameObject.SetActive(true);
-            label.font = productionFont;
+            label.font = displayFont;
             label.color = labelColor;
             label.alignment = TextAlignmentOptions.Center;
             label.fontStyle = FontStyles.Bold;
             if (labelSize > 0f)
             {
+                label.rectTransform.anchorMin = Vector2.zero;
+                label.rectTransform.anchorMax = Vector2.one;
+                label.rectTransform.offsetMin = new Vector2(72f, 30f);
+                label.rectTransform.offsetMax = new Vector2(-72f, -18f);
+                label.rectTransform.localScale = Vector3.one;
+                label.rectTransform.localRotation = Quaternion.identity;
                 label.enableAutoSizing = true;
                 label.fontSizeMin = Mathf.Max(23f, labelSize - 9f);
                 label.fontSizeMax = labelSize;
                 label.overflowMode = TextOverflowModes.Overflow;
+                ConfigureDisplayText(
+                    label, Mathf.Max(23f, labelSize - 9f), labelSize);
             }
         }
     }
@@ -545,10 +1378,6 @@ public sealed class DailyHuntVisuals : MonoBehaviour
     {
         foreach (string name in new[]
         {
-            "ExactDailyLogo",
-            "ExactDailySeven",
-            "ExactDailyThree",
-            "DailyHuntBackdrop",
             "Card",
         })
         {
@@ -600,6 +1429,8 @@ public sealed class DailyHuntVisuals : MonoBehaviour
         text.enableWordWrapping = true;
         text.overflowMode = TextOverflowModes.Overflow;
         text.raycastTarget = false;
+        text.outlineColor = Ink;
+        text.outlineWidth = 0.18f;
 
         var shadow = text.GetComponent<Shadow>();
         if (shadow == null)
