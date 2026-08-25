@@ -843,14 +843,14 @@ public sealed class DailyHuntVisuals : MonoBehaviour
         ConfigureImage(
             avatarRing, playerAvatarRing, true, Image.Type.Simple);
         Place(
-            avatarRing.rectTransform, new Vector2(-91f, 17f),
-            new Vector2(118f, 118f));
+            avatarRing.rectTransform, new Vector2(-82f, 25f),
+            new Vector2(106f, 106f));
 
         var avatarClip = EnsureRect(
             playerChipRoot, "DailyPlayerAvatarClip");
         Place(
-            avatarClip, new Vector2(-99f, 32f),
-            new Vector2(112f, 112f));
+            avatarClip, new Vector2(-90f, 40f),
+            new Vector2(102f, 102f));
         if (avatarClip.GetComponent<RectMask2D>() == null)
             avatarClip.gameObject.AddComponent<RectMask2D>();
 
@@ -858,15 +858,15 @@ public sealed class DailyHuntVisuals : MonoBehaviour
             avatarClip, "DailyPlayerAvatar");
         ConfigureImage(avatarImage, avatar, true, Image.Type.Simple);
         Place(
-            avatarImage.rectTransform, new Vector2(0f, -30f),
-            new Vector2(142f, 142f));
+            avatarImage.rectTransform, new Vector2(0f, -24f),
+            new Vector2(130f, 130f));
 
         chipName = EnsureText(
             playerChipRoot, "DailyPlayerName", 31f, displayFont,
             NearWhite, TextAlignmentOptions.Center);
         Place(
-            chipName.rectTransform, new Vector2(46f, 53f),
-            new Vector2(194f, 40f));
+            chipName.rectTransform, new Vector2(60f, 53f),
+            new Vector2(170f, 40f));
         ConfigureDisplayText(chipName, 24f, 32f);
         chipName.enableAutoSizing = false;
         chipName.fontSize = 36f;
@@ -876,29 +876,30 @@ public sealed class DailyHuntVisuals : MonoBehaviour
             playerChipRoot, "DailyPlayerStar");
         ConfigureImage(star, playerStar, true, Image.Type.Simple);
         Place(
-            star.rectTransform, new Vector2(0f, 0f),
-            new Vector2(40f, 40f));
+            star.rectTransform, new Vector2(3f, 0f),
+            new Vector2(32f, 32f));
 
         chipWins = EnsureText(
             playerChipRoot, "DailyPlayerWins", 28f, displayFont,
             NearWhite, TextAlignmentOptions.Center);
         Place(
-            chipWins.rectTransform, new Vector2(78f, 7f),
-            new Vector2(140f, 38f));
+            chipWins.rectTransform, new Vector2(92f, 7f),
+            new Vector2(120f, 38f));
         ConfigureDisplayText(chipWins, 21f, 27f);
         chipWins.enableAutoSizing = false;
-        chipWins.fontSize = 35f;
+        chipWins.fontSize = 32f;
         chipWins.overflowMode = TextOverflowModes.Ellipsis;
 
         chipProgress = EnsureText(
             playerChipRoot, "DailyPlayerProgress", 25f, displayFont,
             NearWhite, TextAlignmentOptions.Center);
         Place(
-            chipProgress.rectTransform, new Vector2(77f, -65f),
-            new Vector2(145f, 34f));
-        ConfigureDisplayText(chipProgress, 35f, 35f);
+            chipProgress.rectTransform, new Vector2(70f, -62f),
+            new Vector2(176f, 36f));
+        ConfigureDisplayText(chipProgress, 39f, 39f);
         chipProgress.enableAutoSizing = false;
-        chipProgress.fontSize = 35f;
+        chipProgress.fontSize = 39f;
+        chipProgress.overflowMode = TextOverflowModes.Truncate;
 
         var xpTrack = EnsureImage(
             playerChipRoot, "DailyPlayerXpTrack");
@@ -906,14 +907,14 @@ public sealed class DailyHuntVisuals : MonoBehaviour
             xpTrack, progressTrackSprite,
             false, Image.Type.Simple);
         Place(
-            xpTrack.rectTransform, new Vector2(69f, -30f),
-            new Vector2(175f, 24f));
+            xpTrack.rectTransform, new Vector2(74f, -22f),
+            new Vector2(164f, 28f));
 
         var progressFillRoot = EnsureRect(
             playerChipRoot, "DailyPlayerProgressFillRoot");
         Place(
-            progressFillRoot, new Vector2(-16f, -65f),
-            new Vector2(240f, 42f));
+            progressFillRoot, new Vector2(-44f, -61f),
+            new Vector2(170f, 34f));
 
         chipProgressFill = EnsureImage(
             progressFillRoot, "DailyPlayerProgressFill");
