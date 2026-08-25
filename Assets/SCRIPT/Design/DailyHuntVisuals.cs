@@ -179,6 +179,8 @@ public sealed class DailyHuntVisuals : MonoBehaviour
 #endif
 
     public bool IsReady { get; private set; }
+    public TMP_FontAsset DisplayFont => displayFont;
+    public TMP_FontAsset BodyFont => bodyFont;
     public TMP_FontAsset ProductionFont => bodyFont;
 
     public static void Apply(Transform panel)

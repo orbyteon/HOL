@@ -164,7 +164,7 @@ public sealed class DailyHuntCaptureBootstrap : MonoBehaviour
         if (visuals == null && hunt != null)
             visuals = hunt.GetComponent<DailyHuntVisuals>();
         if (hunt == null || visuals == null || !visuals.IsReady ||
-            visuals.ProductionFont == null)
+            visuals.DisplayFont == null || visuals.BodyFont == null)
             return;
 
         if (!opened)
@@ -185,8 +185,8 @@ public sealed class DailyHuntCaptureBootstrap : MonoBehaviour
             string.IsNullOrWhiteSpace(title.text) ||
             string.IsNullOrWhiteSpace(status.text) ||
             string.IsNullOrWhiteSpace(challenge.text) ||
-            title.font != visuals.ProductionFont ||
-            status.font != visuals.ProductionFont)
+            title.font != visuals.DisplayFont ||
+            status.font != visuals.BodyFont)
             return;
 
         if (!presentationWaitStarted)
