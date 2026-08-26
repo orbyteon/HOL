@@ -216,11 +216,16 @@ public sealed class SoloBoardPresenterPlayModeTests
     void StartWithOpener(string opener, int playerSecret)
     {
         Invoke(game, "SetPlayerNumber", playerSecret);
-        Type side = RuntimeType("DuelRules").GetNestedType("Side");
         MethodInfo start = game.GetType().GetMethod("StartGameWithOpener",
             BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.That(start, Is.Not.Null);
-        start.Invoke(game, new[] { Enum.Parse(side, opener) });
+        ParameterInfo[] parameters = start.GetParameters();
+        Assert.That(parameters, Has.Length.EqualTo(1),
+            "StartGameWithOpener must take exactly one opener enum.");
+        Assert.That(parameters[0].ParameterType.IsEnum, Is.True,
+            "StartGameWithOpener opener must remain an enum.");
+        start.Invoke(game,
+            new[] { Enum.Parse(parameters[0].ParameterType, opener) });
         ((MonoBehaviour)game).CancelInvoke("AIGuess");
     }
 
