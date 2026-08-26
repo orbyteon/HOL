@@ -33,7 +33,12 @@ public sealed class ProductionAssetFailClosedTests
                 "HOL UI: missing approved production sprite Resources/" +
                 missingPath + ".");
 
-            bool applied = InvokeApplyProductionSprite(image, missingPath);
+            bool applied = InvokeApplyProductionSprite(
+                image,
+                missingPath,
+                Image.Type.Sliced,
+                false,
+                1f);
 
             Assert.That(applied, Is.False);
             Assert.That(image.sprite, Is.Null,
@@ -51,7 +56,50 @@ public sealed class ProductionAssetFailClosedTests
         }
     }
 
-    static bool InvokeApplyProductionSprite(Image image, string path)
+    [Test]
+    public void ApprovedProductionSpriteRestoresRenderingAfterFailureState()
+    {
+        var host = new GameObject(
+            "ProductionAssetRecoveryHost",
+            typeof(RectTransform),
+            typeof(Image));
+
+        try
+        {
+            var image = host.GetComponent<Image>();
+            image.sprite = null;
+            image.enabled = false;
+            image.raycastTarget = false;
+            image.color = Color.clear;
+
+            bool applied = InvokeApplyProductionSprite(
+                image,
+                "reference/hol_logo_exact",
+                Image.Type.Simple,
+                true,
+                1f);
+
+            Assert.That(applied, Is.True);
+            Assert.That(image.sprite, Is.Not.Null);
+            Assert.That(image.enabled, Is.True);
+            Assert.That(image.type, Is.EqualTo(Image.Type.Simple));
+            Assert.That(image.preserveAspect, Is.True);
+            Assert.That(image.color, Is.EqualTo(Color.white));
+            Assert.That(image.raycastTarget, Is.False,
+                "Sprite assignment must not silently change input ownership.");
+        }
+        finally
+        {
+            UnityEngine.Object.DestroyImmediate(host);
+        }
+    }
+
+    static bool InvokeApplyProductionSprite(
+        Image image,
+        string path,
+        Image.Type type,
+        bool preserveAspect,
+        float pixelsPerUnitMultiplier)
     {
         Type runtimeUi = Type.GetType("RuntimeUI, Assembly-CSharp");
         Assert.That(runtimeUi, Is.Not.Null,
@@ -64,7 +112,14 @@ public sealed class ProductionAssetFailClosedTests
 
         object result = method.Invoke(
             null,
-            new object[] { image, path, Image.Type.Sliced, false, 1f });
+            new object[]
+            {
+                image,
+                path,
+                type,
+                preserveAspect,
+                pixelsPerUnitMultiplier,
+            });
         Assert.That(result, Is.TypeOf<bool>());
         return (bool)result;
     }
