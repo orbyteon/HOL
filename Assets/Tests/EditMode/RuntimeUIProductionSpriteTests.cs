@@ -25,7 +25,7 @@ public class RuntimeUIProductionSpriteTests
     }
 
     [Test]
-    public void MissingApprovedSpriteRemovesFallbackAndDisablesImage()
+    public void MissingApprovedSpriteRemovesFallbackAndDeactivatesControl()
     {
         var root = new GameObject("MissingProductionSpriteTest");
         var texture = new Texture2D(1, 1, TextureFormat.RGBA32, false);
@@ -70,6 +70,8 @@ public class RuntimeUIProductionSpriteTests
                 "Missing approved artwork must fail closed rather than render a fallback.");
             Assert.IsFalse(image.raycastTarget,
                 "An invisible failed control must not retain a hidden input target.");
+            Assert.IsFalse(root.activeSelf,
+                "The failed control must remain inert even if a caller later restores raycasts.");
             Assert.AreEqual(Image.Type.Simple, image.type);
             Assert.IsFalse(image.preserveAspect);
             Assert.AreEqual(1f, image.pixelsPerUnitMultiplier);
