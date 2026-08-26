@@ -777,6 +777,11 @@ handlers.leaveRoom = function (args, context) {
     var outcome = withRoomMutation(roomId, function (state) {
         var side = sideForPlayer(state, playerId);
         if (!side) return { result: { ok: false, error: "not a member" } };
+        // A room survives rematches, so leave is match-scoped too. Omitted
+        // matchIndex is match 0 for compatibility and fails closed later.
+        var sentIndex = args.matchIndex === undefined ? 0 : (Number(args.matchIndex) | 0);
+        if (sentIndex !== (state.matchIndex | 0))
+            return { result: { ok: false, error: "stale match" } };
 
         // A finished room survives until the opponent has observed the result.
         // Leaving counts as this side's acknowledgement and closes rematch.
