@@ -23,7 +23,7 @@ function playToEnd(cs, roomId, view) {
   return view;
 }
 
-test("stale match-scoped signal, rematch and acknowledgement commands fail closed", () => {
+test("stale match-scoped signal, leave, rematch and acknowledgement commands fail closed", () => {
   const cs = loadCloudScript();
   const started = startMatch(cs, { hostSecret: 42, guestSecret: 77 });
   const roomId = started.roomId;
@@ -54,7 +54,21 @@ test("stale match-scoped signal, rematch and acknowledgement commands fail close
     assert.equal(staleSignal.error, "stale match");
   }
 
-  const secondResult = playToEnd(cs, roomId, secondMatch);
+  for (const args of [
+    { roomId, matchIndex: 0 },
+    { roomId },
+  ]) {
+    const staleLeave = cs.call("leaveRoom", "HOST", args);
+    assert.equal(staleLeave.ok, false);
+    assert.equal(staleLeave.error, "stale match");
+  }
+
+  let liveState = cs.view(cs.call("getRoom", "HOST", { roomId }));
+  assert.equal(liveState.phase, "play",
+    "a stale leave callback must not close the active rematch");
+  assert.equal(liveState.matchIndex, 1);
+
+  const secondResult = playToEnd(cs, roomId, liveState);
   assert.equal(secondResult.matchIndex, 1);
 
   for (const args of [
