@@ -56,7 +56,7 @@ public sealed class MainMenuHomeSubtitlePlayModeTests
             Assert.That(subtitle, Is.Not.Null);
             Assert.That(title.gameObject.activeInHierarchy, Is.True);
             Assert.That(subtitle.gameObject.activeInHierarchy, Is.True);
-            Assert.That(subtitle.text, Is.EqualTo(L10n.Get("home_solo_subtitle")));
+            Assert.That(subtitle.text, Is.EqualTo(Localized("home_solo_subtitle")));
             Assert.That(subtitle.raycastTarget, Is.False);
             Assert.That(subtitle.color.r, Is.GreaterThanOrEqualTo(0.80f));
             Assert.That(subtitle.color.g, Is.GreaterThanOrEqualTo(0.80f));
@@ -65,7 +65,7 @@ public sealed class MainMenuHomeSubtitlePlayModeTests
 
             SetLanguage(1);
             Assert.That(subtitle.text,
-                Is.EqualTo(L10n.Get("home_solo_subtitle")));
+                Is.EqualTo(Localized("home_solo_subtitle")));
             Assert.That(subtitle.text, Is.EqualTo("ΑΜΕΣΟ ΠΑΙΧΝΙΔΙ"));
             Assert.That(solo.GetComponentsInChildren<TMP_Text>(false),
                 Has.Length.EqualTo(2));
@@ -76,6 +76,13 @@ public sealed class MainMenuHomeSubtitlePlayModeTests
             if (!hadLanguage)
                 PlayerPrefs.DeleteKey("Language");
         }
+    }
+
+    static string Localized(string key)
+    {
+        MethodInfo get = RuntimeType("L10n").GetMethod("Get", StaticFlags);
+        Assert.That(get, Is.Not.Null);
+        return (string)get.Invoke(null, new object[] { key, new object[0] });
     }
 
     static void InvokeInstaller()
