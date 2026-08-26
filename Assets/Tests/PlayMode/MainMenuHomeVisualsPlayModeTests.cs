@@ -92,13 +92,13 @@ public sealed class MainMenuHomeVisualsPlayModeTests
         }
 
         AssertSprite(root, "HomeBackground",
-            "phase2a/hol_neon_reference_bg_r3", Image.Type.Simple);
+            "cartoonui/v1/home/hol_home_background_v1", Image.Type.Simple);
         AssertSprite(root, "HomeLogo",
             "reference/hol_logo_exact", Image.Type.Simple);
         AssertSprite(root, "HomeHeroBoy",
-            "reference/char_boy_exact", Image.Type.Simple);
+            "reference/player_cyan_exact", Image.Type.Simple);
         AssertSprite(root, "HomeSpeechBubble",
-            "cartoon/cartoon_speech_bubble", Image.Type.Sliced);
+            "cartoonui/v1/raster/hol_speech_bubble_v1", Image.Type.Simple);
 
         Button solo = Find(canvas.transform, "ButtonPlay").GetComponent<Button>();
         Button pvp = Find(canvas.transform, "ButtonPvP").GetComponent<Button>();
@@ -116,7 +116,7 @@ public sealed class MainMenuHomeVisualsPlayModeTests
         AssertProductionButton(solo, "phase2a/hol_cta_gold_r2_9s");
         AssertProductionButton(pvp, "phase2a/hol_cta_magenta_r2_9s");
         AssertProductionButton(friend, "phase2a/hol_cta_blue_r2_9s");
-        AssertProductionButton(daily, "mainmenu/mainmenu_tip_frame_9s");
+        AssertProductionButton(daily, "phase2a/hol_tip_frame_r2_9s");
 
         Assert.That(PersistentMethods(solo), Does.Contain("OnPlayPressed"));
         Assert.That(PersistentMethods(settings), Does.Contain("OpenSettings"));

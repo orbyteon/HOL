@@ -17,7 +17,10 @@ public sealed class PrivateRoomVisualsInstaller : MonoBehaviour
 
     static void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
-        if (!scene.IsValid() || !scene.isLoaded || scene.name == "SplashScene")
+        // PvpRuntimeUI and its PvpGameController live only in MainMenu. Installing
+        // this bridge in test/utility scenes creates a waiter that can never
+        // succeed and later emits an unrelated 300-frame timeout.
+        if (!scene.IsValid() || !scene.isLoaded || scene.name != "MainMenu")
             return;
 
         foreach (var root in scene.GetRootGameObjects())

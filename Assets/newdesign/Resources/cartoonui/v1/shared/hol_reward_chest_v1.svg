@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="purple" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#c22cff"/><stop offset=".55" stop-color="#7a16d5"/><stop offset="1" stop-color="#3b087d"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff07b"/><stop offset=".24" stop-color="#ffd21c"/><stop offset=".68" stop-color="#f19a00"/><stop offset="1" stop-color="#a74b00"/>
+    </linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="170%">
+      <feGaussianBlur stdDeviation="7" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <ellipse cx="256" cy="455" rx="188" ry="25" fill="#160238" opacity=".78"/>
+  <path d="M86 222v-65c0-58 48-105 106-105h128c58 0 106 47 106 105v65z" fill="#21044f" stroke="#17022f" stroke-width="22" stroke-linejoin="round"/>
+  <path d="M103 214v-53c0-48 39-87 87-87h132c48 0 87 39 87 87v53z" fill="url(#purple)" stroke="#7c1dd2" stroke-width="8" stroke-linejoin="round"/>
+  <path d="M126 157c9-38 38-58 78-58h104c40 0 69 20 78 58" fill="none" stroke="#e895ff" stroke-width="10" stroke-linecap="round" opacity=".72"/>
+  <path d="M82 202h348v53H82z" fill="url(#gold)" stroke="#6e2b00" stroke-width="14" filter="url(#glow)"/>
+  <path d="M65 248h382v166c0 31-25 56-56 56H121c-31 0-56-25-56-56z" fill="#230650" stroke="#160231" stroke-width="22" stroke-linejoin="round"/>
+  <path d="M82 260h348v147c0 26-21 46-46 46H128c-25 0-46-20-46-46z" fill="url(#purple)" stroke="#8d22dc" stroke-width="7"/>
+  <path d="M90 278h332" stroke="#f0a2ff" stroke-width="9" opacity=".55"/>
+  <path d="M122 113v318M390 113v318" stroke="#682900" stroke-width="48" opacity=".92"/>
+  <path d="M122 113v318M390 113v318" stroke="url(#gold)" stroke-width="32"/>
+  <path d="M112 110h20M380 110h20" stroke="#fff1a1" stroke-width="7" stroke-linecap="round" opacity=".8"/>
+  <rect x="205" y="220" width="102" height="126" rx="22" fill="#6f2b00"/>
+  <rect x="218" y="231" width="76" height="101" rx="16" fill="url(#gold)" stroke="#ffef91" stroke-width="5"/>
+  <path d="M256 250l15 30 33 5-24 23 6 33-30-16-30 16 6-33-24-23 33-5z" fill="#fff1a3" stroke="#7c3100" stroke-width="8" stroke-linejoin="round"/>
+  <path d="M99 388h314" stroke="#51108f" stroke-width="8" opacity=".65"/>
+  <path d="M108 419h296" stroke="#f7a9ff" stroke-width="6" opacity=".25"/>
+</svg>

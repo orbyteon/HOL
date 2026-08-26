@@ -101,8 +101,8 @@ public sealed class SoloSearchCartoonVisualsPlayModeTests
         AssertRect(root, "SearchMascotSeven",
             new Vector2(410f, -790f), new Vector2(265f, 300f));
 
-        AssertSprite(root, "SearchRadarBase", "cartoon/cartoon_radar_base");
-        AssertSprite(root, "SearchRadarSweep", "cartoon/cartoon_radar_sweep");
+        AssertSprite(root, "SearchRadarBase", "cartoonui/v1/raster/hol_radar_base_v1");
+        AssertSprite(root, "SearchRadarSweep", "cartoonui/v1/raster/hol_radar_sweep_v1");
         Assert.That(Find(root, "SearchRadarSweep").GetComponent(
             RuntimeType("CartoonRadarSweep")), Is.Not.Null,
             "Radar animation must rotate an Image sprite, not draw a procedural Graphic.");

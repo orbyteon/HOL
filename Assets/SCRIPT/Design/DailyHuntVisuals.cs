@@ -172,7 +172,7 @@ public sealed class DailyHuntVisuals : MonoBehaviour
     L10n.Language lastLayoutLanguage;
     bool missionDashboardVisible = true;
 
-#if UNITY_STANDALONE_WIN && DEVELOPMENT_BUILD
+#if DEVELOPMENT_BUILD
     int captureChipPoints = -1;
     int captureChipProgress = -1;
     string captureResetText;
@@ -193,7 +193,7 @@ public sealed class DailyHuntVisuals : MonoBehaviour
         owner.Build(panel);
     }
 
-#if UNITY_STANDALONE_WIN && DEVELOPMENT_BUILD
+#if DEVELOPMENT_BUILD
     public void SetCapturePlayerChipFixture(int points, int milestoneProgress)
     {
         captureChipPoints = Mathf.Max(0, points);
@@ -622,16 +622,16 @@ public sealed class DailyHuntVisuals : MonoBehaviour
                 row.transform, "DailyMissionLabel" + (index + 1), 28f,
                 displayFont, NearWhite, TextAlignmentOptions.Left);
             float labelX = index == 1 ? 9f : -11f;
-            float labelY = index == 0 ? 21f : index == 1 ? 22f : 14f;
-            float labelWidth = index == 1 ? 300f : 260f;
+            float labelY = index == 0 ? 35f : 36f;
+            float labelWidth = index == 1 ? 300f : 280f;
             Place(
                 missionLabels[index].rectTransform,
                 new Vector2(labelX, labelY),
-                new Vector2(labelWidth, 96f));
+                new Vector2(labelWidth, 88f));
             ConfigureDisplayText(missionLabels[index], 28f, 28f);
             missionLabels[index].enableAutoSizing = false;
             missionLabels[index].fontSize = 28f;
-            missionLabels[index].lineSpacing = index == 0 ? 0f : -12f;
+            missionLabels[index].lineSpacing = index == 0 ? 0f : -6f;
 
             missionProgress[index] = EnsureText(
                 row.transform, "DailyMissionProgress" + (index + 1), 25f,
@@ -639,7 +639,7 @@ public sealed class DailyHuntVisuals : MonoBehaviour
                 TextAlignmentOptions.Center);
             Place(
                 missionProgress[index].rectTransform,
-                new Vector2(80f, -22f), new Vector2(110f, 48f));
+                new Vector2(80f, -46f), new Vector2(110f, 42f));
             ConfigureBodyText(missionProgress[index], 26f, 26f);
             missionProgress[index].enableAutoSizing = false;
             missionProgress[index].fontSize = 26f;
@@ -651,7 +651,7 @@ public sealed class DailyHuntVisuals : MonoBehaviour
                 false, Image.Type.Simple);
             Place(
                 progressTrack.rectTransform,
-                new Vector2(-50f, -22f), new Vector2(190f, 60f));
+                new Vector2(-50f, -46f), new Vector2(190f, 48f));
 
             var fill = EnsureImage(
                 progressTrack.transform, "DailyMissionFill" + (index + 1));
@@ -894,11 +894,11 @@ public sealed class DailyHuntVisuals : MonoBehaviour
             playerChipRoot, "DailyPlayerProgress", 25f, displayFont,
             NearWhite, TextAlignmentOptions.Center);
         Place(
-            chipProgress.rectTransform, new Vector2(70f, -62f),
-            new Vector2(176f, 36f));
-        ConfigureDisplayText(chipProgress, 39f, 39f);
+            chipProgress.rectTransform, new Vector2(68f, -47f),
+            new Vector2(190f, 36f));
+        ConfigureDisplayText(chipProgress, 31f, 34f);
         chipProgress.enableAutoSizing = false;
-        chipProgress.fontSize = 39f;
+        chipProgress.fontSize = 34f;
         chipProgress.overflowMode = TextOverflowModes.Truncate;
 
         var xpTrack = EnsureImage(
@@ -907,14 +907,26 @@ public sealed class DailyHuntVisuals : MonoBehaviour
             xpTrack, progressTrackSprite,
             false, Image.Type.Simple);
         Place(
-            xpTrack.rectTransform, new Vector2(74f, -22f),
-            new Vector2(164f, 28f));
+            xpTrack.rectTransform, new Vector2(74f, -20f),
+            new Vector2(150f, 24f));
+
+        var progressFillTrack = EnsureImage(
+            playerChipRoot, "DailyPlayerProgressFillTrack");
+        ConfigureImage(
+            progressFillTrack, progressTrackSprite,
+            false, Image.Type.Simple);
+        Place(
+            progressFillTrack.rectTransform, new Vector2(74f, -75f),
+            new Vector2(150f, 22f));
 
         var progressFillRoot = EnsureRect(
             playerChipRoot, "DailyPlayerProgressFillRoot");
+        // Keep the live fill on its own measured lower track. The top dark
+        // XP track and this lower progress track are intentionally separate
+        // rows, matching the approved chip hierarchy.
         Place(
-            progressFillRoot, new Vector2(-44f, -61f),
-            new Vector2(170f, 34f));
+            progressFillRoot, new Vector2(74f, -75f),
+            new Vector2(150f, 22f));
 
         chipProgressFill = EnsureImage(
             progressFillRoot, "DailyPlayerProgressFill");
@@ -1022,7 +1034,7 @@ public sealed class DailyHuntVisuals : MonoBehaviour
         TimeSpan reset = DailyChallengeProgress.TimeUntilReset;
         if (missionReset != null)
         {
-#if UNITY_STANDALONE_WIN && DEVELOPMENT_BUILD
+#if DEVELOPMENT_BUILD
             missionReset.text = string.IsNullOrEmpty(captureResetText)
                 ? string.Format(
                     "{0:00}:{1:00}:{2:00}",
@@ -1141,7 +1153,7 @@ public sealed class DailyHuntVisuals : MonoBehaviour
         DailyChallengeProgress.Snapshot state = DailyChallengeProgress.Current;
         int displayedPoints = state.Points;
         int displayedProgress = state.PointsTowardMilestone;
-#if UNITY_STANDALONE_WIN && DEVELOPMENT_BUILD
+#if DEVELOPMENT_BUILD
         if (captureChipPoints >= 0)
             displayedPoints = captureChipPoints;
         if (captureChipProgress >= 0)

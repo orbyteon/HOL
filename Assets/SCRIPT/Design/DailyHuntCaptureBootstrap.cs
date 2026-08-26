@@ -16,6 +16,14 @@ public sealed class DailyHuntCaptureBootstrap : MonoBehaviour
     const string ReadyMarkerGreek = "HOL_DAILYHUNT_CAPTURE_READY_EL";
     const string AdsConsentPrefKey = "AdsConsent";
     const string PlayerNamePrefKey = "PlayerName";
+    const string ChallengeDayPrefKey = "DailyChallengeDay";
+    const string ChallengeWinsPrefKey = "DailyChallengeWins";
+    const string ChallengeCorrectPrefKey = "DailyChallengeCorrectGuesses";
+    const string ChallengeRoomsPrefKey = "DailyChallengeRoomsShared";
+    const string ChallengeRewardPrefKey = "DailyChallengeRewardClaimed";
+    const string ChallengePointsPrefKey = "DailyChallengePoints";
+    const int CapturePoints = 1250;
+    const int CaptureMilestoneProgress = 650;
 
     // PanelAnimator uses a 0.28 second entrance. Native acceptance must wait
     // beyond that duration and then cross two render barriers before logging.
@@ -34,6 +42,12 @@ public sealed class DailyHuntCaptureBootstrap : MonoBehaviour
         "DailyHuntStreak",
         "DailyHuntLastFound",
         "DailyHuntPendingRevive",
+        ChallengeDayPrefKey,
+        ChallengeWinsPrefKey,
+        ChallengeCorrectPrefKey,
+        ChallengeRoomsPrefKey,
+        ChallengeRewardPrefKey,
+        ChallengePointsPrefKey,
     };
 
     static bool markerLogged;
@@ -42,6 +56,9 @@ public sealed class DailyHuntCaptureBootstrap : MonoBehaviour
     DailyHunt hunt;
     DailyHuntVisuals visuals;
     bool opened;
+#if DEVELOPMENT_BUILD
+    bool fixtureApplied;
+#endif
     bool presentationWaitStarted;
     string lastReadinessFailure;
     float nextReadinessLog;
@@ -113,6 +130,16 @@ public sealed class DailyHuntCaptureBootstrap : MonoBehaviour
         PlayerPrefs.DeleteKey(PlayerNamePrefKey);
         foreach (string key in DailyStateKeys)
             PlayerPrefs.DeleteKey(key);
+        PlayerPrefs.SetInt(
+            ChallengeDayPrefKey, DailyChallengeProgress.CurrentUtcDayNumber);
+        PlayerPrefs.SetInt(
+            ChallengeWinsPrefKey, DailyChallengeProgress.WinTarget);
+        PlayerPrefs.SetInt(
+            ChallengeCorrectPrefKey, DailyChallengeProgress.CorrectGuessTarget);
+        PlayerPrefs.SetInt(
+            ChallengeRoomsPrefKey, DailyChallengeProgress.RoomShareTarget);
+        PlayerPrefs.SetInt(ChallengeRewardPrefKey, 1);
+        PlayerPrefs.SetInt(ChallengePointsPrefKey, CapturePoints);
         PlayerPrefs.Save();
     }
 
@@ -168,6 +195,15 @@ public sealed class DailyHuntCaptureBootstrap : MonoBehaviour
         if (hunt == null || visuals == null || !visuals.IsReady ||
             visuals.DisplayFont == null || visuals.BodyFont == null)
             return;
+
+#if DEVELOPMENT_BUILD
+        if (!fixtureApplied)
+        {
+            visuals.SetCapturePlayerChipFixture(
+                CapturePoints, CaptureMilestoneProgress);
+            fixtureApplied = true;
+        }
+#endif
 
         if (!opened)
         {
@@ -298,13 +334,52 @@ public sealed class DailyHuntCaptureBootstrap : MonoBehaviour
                 "DailyMissionStartButton/Label", out failure))
             return false;
 
-        if (!LiveTextReady(
-                FindText(dashboard, "DailyMissionProgress1"), owner.BodyFont,
-                "DailyMissionProgress1", out failure))
-            return false;
+        for (int index = 1; index <= 3; index++)
+        {
+            string labelName = "DailyMissionLabel" + index;
+            string progressName = "DailyMissionProgress" + index;
+            TMP_Text label = FindText(dashboard, labelName);
+            TMP_Text progress = FindText(dashboard, progressName);
+            if (!LiveTextReady(
+                    label, owner.DisplayFont, labelName, out failure))
+                return false;
+            if (!LiveTextReady(
+                    progress, owner.BodyFont, progressName, out failure))
+                return false;
+
+            Transform track = Find(
+                dashboard, "DailyMissionTrack" + index);
+            if (track == null)
+            {
+                failure = "DailyMissionTrack" + index + "-missing";
+                return false;
+            }
+            if (RectsOverlap(
+                    label.rectTransform, track as RectTransform))
+            {
+                failure = labelName + "-overlaps-progress";
+                return false;
+            }
+        }
 
         failure = null;
         return true;
+    }
+
+    static bool RectsOverlap(RectTransform first, RectTransform second)
+    {
+        if (first == null || second == null)
+            return false;
+
+        var firstCorners = new Vector3[4];
+        var secondCorners = new Vector3[4];
+        first.GetWorldCorners(firstCorners);
+        second.GetWorldCorners(secondCorners);
+        const float separation = 1f;
+        return firstCorners[0].x < secondCorners[2].x - separation &&
+               firstCorners[2].x > secondCorners[0].x + separation &&
+               firstCorners[0].y < secondCorners[2].y - separation &&
+               firstCorners[2].y > secondCorners[0].y + separation;
     }
 
     static bool LiveTextReady(

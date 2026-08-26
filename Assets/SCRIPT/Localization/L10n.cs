@@ -53,12 +53,29 @@ public static class L10n
         { "play_solo",               new[] { "Play Solo vs AI", "Παίξε Solo με AI" } },
         { "private_room",            new[] { "Private Room", "Ιδιωτικό δωμάτιο" } },
         { "home_solo_title",         new[] { "PLAY SOLO VS AI", "ΠΑΙΞΕ SOLO ΜΕ AI" } },
-        { "home_solo_subtitle",      new[] { "PLAY NOW", "ΑΜΕΣΟ ΠΑΙΧΝΙΔΙ" } },
+        { "home_solo_subtitle",      new[] {
+            "Play and beat your high score!",
+            "Παίξε και σπάσε το ρεκόρ σου!" } },
         { "home_private_title",      new[] { "PRIVATE ROOM", "ΙΔΙΩΤΙΚΟ ΔΩΜΑΤΙΟ" } },
         { "home_private_subtitle",   new[] { "PLAY WITH A FRIEND", "ΠΑΙΞΕ ΜΕ ΦΙΛΟ" } },
         { "home_daily_title",        new[] { "DAILY HUNT", "ΚΥΝΗΓΙ ΗΜΕΡΑΣ" } },
         { "home_daily_subtitle",     new[] {
             "NEW CHALLENGE EVERY DAY", "ΝΕΑ ΠΡΟΚΛΗΣΗ ΚΑΘΕ ΜΕΡΑ" } },
+        { "home_pvp_subtitle",       new[] {
+            "Challenge players online!", "Αντιμετώπισε παίκτες online!" } },
+        { "home_pvp_title",          new[] {
+            "PVP DUEL", "ΜΟΝΟΜΑΧΙΑ PVP" } },
+        { "home_friend_title",       new[] {
+            "PLAY WITH A FRIEND", "ΠΑΙΞΕ ΜΕ ΦΙΛΟ" } },
+        { "home_friend_subtitle",    new[] {
+            "Create a room and play together!",
+            "Δημιούργησε δωμάτιο και παίξε μαζί!" } },
+        { "home_speech_body",        new[] {
+            "Ready for action? LET'S GO!", "Έτοιμος για δράση; ΠΑΜΕΕΕ!" } },
+        { "home_promo_title",        new[] {
+            "PLAY EVERY DAY", "ΠΑΙΞΕ ΚΑΘΕ ΜΕΡΑ" } },
+        { "home_promo_body",         new[] {
+            "BUILD YOUR STREAK!", "ΧΤΙΣΕ ΤΟ ΣΕΡΙ ΣΟΥ!" } },
         { "home_tip_title",          new[] { "TIP:", "ΣΥΜΒΟΥΛΗ:" } },
         { "home_tip_body",           new[] {
             "Every guess narrows the range!",
@@ -130,6 +147,8 @@ public static class L10n
         { "result_rematch_heading",  new[] { "FOR A REMATCH", "ΓΙΑ ΡΕΒΑΝΣ" } },
         { "result_reactions",        new[] { "SEND A REACTION", "ΣΤΕΙΛΕ ΑΝΤΙΔΡΑΣΗ" } },
         { "result_exit",             new[] { "EXIT", "ΕΞΟΔΟΣ" } },
+        { "result_opponent",         new[] { "OPPONENT", "ΑΝΤΙΠΑΛΟΣ" } },
+        { "result_defeated",         new[] { "DEFEATED", "ΗΤΤΗΜΕΝΟΣ" } },
         { "won_in_guesses",          new[] { "In {0} guesses", "Σε {0} προσπάθειες" } },
         { "number_was",              new[] { "The number was {0}", "Ο αριθμός ήταν {0}" } },
         { "rematch",                 new[] { "Rematch", "Ρεβάνς" } },
