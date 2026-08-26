@@ -69,7 +69,8 @@ For every later Phase 1 module:
 4. Add a cheap Node contract where structure can be proven without Unity.
 5. Keep Unity EditMode and Android compile as the authoritative validation for
    `Assets/` changes.
-6. Do not merge while issue #58 or exact-head CI is unresolved.
+6. Merge only through an active `main` protection rule and after the exact PR
+   merge candidate is green.
 
 No assembly slice authorizes gameplay changes, PlayFab/Azure deployment, signed
 builds, store publication, package changes or `minVersion` changes.
