@@ -33,7 +33,9 @@ Never start PlayMode or Android preview work before static integrity is green.
 ## 4. Expensive jobs only after fast checks pass
 
 - **PlayMode tests** trigger from a successful `CI` workflow run (or manual
-  dispatch), not from every push in parallel with `CI`.
+  dispatch), not from every push in parallel with `CI`. A path-filtered
+  `preview-mainmenu` label event may self-test changes to the PlayMode workflow
+  itself before merge, but only after `CI` is green on that exact PR head.
 - **Android preview workflows** (Main Menu, PanelPlay, Splash) require a green
   `CI` run on the same commit **and** an explicit label or manual dispatch.
 
@@ -45,6 +47,13 @@ capture by either:
 - adding the label **`preview-mainmenu`**, **`preview-panelplay`**, or
   **`preview-splash`** to the PR, or
 - using **Run workflow** on the matching workflow in the Actions tab.
+
+GitHub sends a `labeled` pull-request event to every preview workflow before
+job-level `if` expressions decide which screen was requested. Therefore every
+label-triggered preview workflow must use a **screen-scoped workflow concurrency
+group**. Never reuse one workflow-level concurrency group across Main Menu,
+PanelPlay, Splash, or future screen previews: a non-matching run can otherwise
+cancel the requested capture before its own job is skipped.
 
 Remove the label after the capture succeeds to avoid accidental re-runs on later
 pushes.

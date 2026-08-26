@@ -30,11 +30,22 @@ public sealed class SoloSearchCartoonVisualsPlayModeTests
 
         Assert.That(matchmaking, Is.Not.Null);
         Assert.That(visuals, Is.Not.Null);
-        Assert.That(GetProperty<bool>(visuals, "IsReady"), Is.True);
         Assert.That(CountInScene(RuntimeType("SoloSearchVisuals")), Is.EqualTo(1));
+
+        // Enter through the real MenuManager lifecycle. The searching modal is
+        // a child of the Play page; calling FakeMatchmaking directly while that
+        // parent is inactive cannot activate or initialize the modal hierarchy.
+        Component menu = FindInScene(RuntimeType("MenuManager"));
+        Assert.That(menu, Is.Not.Null);
+        menu.SendMessage("OnPlayPressed", SendMessageOptions.RequireReceiver);
+        yield return null;
 
         GameObject searchPanel = GetField<GameObject>(matchmaking, "searchingPanel");
         GameObject gamePanel = GetField<GameObject>(matchmaking, "panelGame");
+        Assert.That(searchPanel.transform.parent, Is.Not.Null);
+        Assert.That(searchPanel.transform.parent.gameObject.activeInHierarchy, Is.True,
+            "The real Play page must be active before starting Solo preparation.");
+
         var layout = gamePanel.GetComponentInChildren(
             RuntimeType("HolDuelBoardLayout"), true) as Behaviour;
         Assert.That(layout, Is.Not.Null,
@@ -44,9 +55,23 @@ public sealed class SoloSearchCartoonVisualsPlayModeTests
         // without a fake timer or a test-only production delay field.
         layout.enabled = false;
         Invoke(matchmaking, "StartSearch");
-        yield return null;
-        yield return null;
+        Assert.That(GetProperty<bool>(matchmaking, "IsPreparing"), Is.True);
+        Assert.That(searchPanel.activeInHierarchy, Is.True);
 
+        for (int frame = 0; frame < 120; frame++)
+        {
+            visuals = searchPanel.GetComponent(
+                RuntimeType("SoloSearchVisuals")) as Component;
+            if (visuals != null &&
+                GetProperty<bool>(visuals, "IsReady") &&
+                Find(searchPanel.transform, "SoloSearchVisualRoot") != null)
+                break;
+            yield return null;
+        }
+
+        Assert.That(visuals, Is.Not.Null);
+        Assert.That(GetProperty<bool>(visuals, "IsReady"), Is.True,
+            "The modal owner must become ready after the real Play parent and Search panel activate.");
         Assert.That(searchPanel.activeInHierarchy, Is.True);
         Assert.That(gamePanel.activeSelf, Is.True,
             "The real board must initialize behind the blocking modal.");
@@ -119,7 +144,7 @@ public sealed class SoloSearchCartoonVisualsPlayModeTests
 
         foreach (Graphic graphic in root.GetComponentsInChildren<Graphic>(true))
         {
-            Assert.That(graphic is Image || graphic is TMP_Text, Is.True,
+            Assert.That(IsAllowedProductionGraphic(graphic), Is.True,
                 "Procedural Graphic found in Search: " + graphic.GetType().Name);
             if (graphic is Image image && image.sprite != null)
                 Assert.That(image.color.a, Is.GreaterThanOrEqualTo(0.99f),
@@ -151,11 +176,26 @@ public sealed class SoloSearchCartoonVisualsPlayModeTests
         for (int frame = 0; frame < 120 &&
              GetProperty<bool>(matchmaking, "IsPreparing"); frame++)
             yield return null;
-        yield return new WaitForEndOfFrame();
+
+        if (Application.isBatchMode)
+            yield return null;
+        else
+            yield return new WaitForEndOfFrame();
 
         Assert.That(searchPanel.activeSelf, Is.False);
         Assert.That(gamePanel.activeSelf, Is.True);
         Assert.That(GetProperty<bool>(matchmaking, "IsPreparing"), Is.False);
+    }
+
+    static bool IsAllowedProductionGraphic(Graphic graphic)
+    {
+        if (graphic is Image || graphic is TMP_Text)
+            return true;
+
+        var subMesh = graphic as TMP_SubMeshUI;
+        return subMesh != null &&
+               subMesh.transform.parent != null &&
+               subMesh.transform.parent.GetComponent<TMP_Text>() != null;
     }
 
     static string Localized(string key)

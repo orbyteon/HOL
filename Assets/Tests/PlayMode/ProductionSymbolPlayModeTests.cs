@@ -72,15 +72,50 @@ public sealed class ProductionSymbolPlayModeTests
         yield return null;
     }
 
-    [Test]
-    public void ApprovedSoloTrophyIsARealProductionSprite()
+    [UnityTest]
+    public IEnumerator ApprovedSoloTrophyIsARealProductionSprite()
     {
+        // Exercise the real result-overlay construction. A standalone PlayMode
+        // test can run before Vector Graphics has crossed a scene-load boundary,
+        // while production always requests this sprite from the live MainMenu UI.
+        yield return SceneManager.LoadSceneAsync("MainMenu", LoadSceneMode.Single);
+
+        Image trophyImage = null;
+        for (int frame = 0; frame < 120 && trophyImage == null; frame++)
+        {
+            Transform resultRoot = null;
+            foreach (GameObject root in SceneManager.GetActiveScene().GetRootGameObjects())
+            {
+                resultRoot = Find(root.transform, "ResultVisualRoot");
+                if (resultRoot != null)
+                    break;
+            }
+
+            Transform trophyObject = Find(resultRoot, "Trophy");
+            if (trophyObject != null)
+            {
+                var image = trophyObject.GetComponent<Image>();
+                if (image != null && image.sprite != null)
+                    trophyImage = image;
+            }
+
+            if (trophyImage == null)
+                yield return null;
+        }
+
+        Assert.That(trophyImage, Is.Not.Null,
+            "The live result overlay requires the approved trophy sprite.");
         var trophy = Resources.Load<Sprite>("reference/board_trophy_exact");
         Assert.That(trophy, Is.Not.Null,
-            "Result presentation requires the approved trophy sprite.");
-        Assert.That(trophy.texture, Is.Not.Null);
-        Assert.That(trophy.texture.width, Is.GreaterThanOrEqualTo(256));
-        Assert.That(trophy.texture.height, Is.GreaterThanOrEqualTo(256));
+            "Result presentation requires the approved trophy resource.");
+        Assert.That(trophyImage.sprite, Is.SameAs(trophy));
+
+        // Vector Graphics sprites are geometry-backed and are not required to
+        // expose a raster Texture2D. Validate the imported vector mesh instead.
+        Assert.That(trophy.vertices, Has.Length.GreaterThanOrEqualTo(3));
+        Assert.That(trophy.triangles, Has.Length.GreaterThanOrEqualTo(3));
+        Assert.That(trophy.bounds.size.x, Is.GreaterThan(0f));
+        Assert.That(trophy.bounds.size.y, Is.GreaterThan(0f));
     }
 
     static void InvokeInstaller(Type type)

@@ -164,7 +164,7 @@ public sealed class MainMenuHomeVisualsPlayModeTests
 
         foreach (Graphic graphic in root.GetComponentsInChildren<Graphic>(true))
         {
-            Assert.That(graphic is Image || graphic is TMP_Text, Is.True,
+            Assert.That(IsAllowedProductionGraphic(graphic), Is.True,
                 "Procedural Graphic found on Home: " +
                 graphic.GetType().Name + " / " + graphic.name);
             if (graphic is Image image && image.sprite != null)
@@ -206,6 +206,17 @@ public sealed class MainMenuHomeVisualsPlayModeTests
         yield return null;
         Assert.That(pvpMenu.activeSelf, Is.True,
             "Play With A Friend entry is not wired to the real room hub.");
+    }
+
+    static bool IsAllowedProductionGraphic(Graphic graphic)
+    {
+        if (graphic is Image || graphic is TMP_Text)
+            return true;
+
+        var subMesh = graphic as TMP_SubMeshUI;
+        return subMesh != null &&
+               subMesh.transform.parent != null &&
+               subMesh.transform.parent.GetComponent<TMP_Text>() != null;
     }
 
     static void AssertSprite(

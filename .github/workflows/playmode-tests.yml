@@ -1,5 +1,7 @@
 # PlayMode exact-visual tests run only after CI succeeds on the same commit.
-# Manual dispatch remains available for targeted reruns. See docs/ci-policy.md.
+# Manual dispatch remains available for targeted reruns. Any PR can request the
+# pre-merge self-test by adding preview-mainmenu after CI is green; the explicit
+# label is the cost gate, so no path filter may silently suppress that request.
 
 name: PlayMode tests
 
@@ -7,6 +9,8 @@ on:
   workflow_run:
     workflows: [CI]
     types: [completed]
+  pull_request:
+    types: [labeled]
   workflow_dispatch:
     inputs:
       ref:
@@ -15,7 +19,7 @@ on:
         type: string
 
 concurrency:
-  group: playmode-${{ github.event.workflow_run.head_branch || github.ref_name }}
+  group: playmode-${{ github.event.workflow_run.head_branch || github.event.pull_request.number || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -23,7 +27,10 @@ jobs:
     name: Exact visuals PlayMode
     if: >
       github.event_name == 'workflow_dispatch' ||
-      github.event.workflow_run.conclusion == 'success'
+      github.event.workflow_run.conclusion == 'success' ||
+      (github.event_name == 'pull_request' &&
+       github.event.action == 'labeled' &&
+       github.event.label.name == 'preview-mainmenu')
     runs-on: ubuntu-latest
     permissions:
       checks: write
@@ -31,9 +38,13 @@ jobs:
       actions: read
       pull-requests: read
     steps:
+      # Keep the sparse utility checkout outside the Unity project workspace.
+      # Reusing the repository root left the second checkout in sparse mode and
+      # made GameCI fail before Unity started because ProjectSettings was absent.
       - name: Checkout actions for local composite steps
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          path: workflow-actions
           sparse-checkout: .github/actions
           sparse-checkout-cone-mode: false
 
@@ -46,6 +57,17 @@ jobs:
             echo "sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
             echo "branch=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
             echo "ref=${{ inputs.ref || github.ref }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "sha=${{ github.event.pull_request.head.sha }}" >> "$GITHUB_OUTPUT"
+            echo "branch=${{ github.event.pull_request.head.ref }}" >> "$GITHUB_OUTPUT"
+            echo "ref=${{ github.event.pull_request.head.sha }}" >> "$GITHUB_OUTPUT"
+          elif [ -n "${{ github.event.workflow_run.pull_requests[0].head.sha }}" ]; then
+            # workflow_run.head_sha may point at main for a pull-request CI run.
+            # Prefer the associated PR head so the expensive gate validates the
+            # candidate that actually produced the successful CI result.
+            echo "sha=${{ github.event.workflow_run.pull_requests[0].head.sha }}" >> "$GITHUB_OUTPUT"
+            echo "branch=${{ github.event.workflow_run.pull_requests[0].head.ref }}" >> "$GITHUB_OUTPUT"
+            echo "ref=${{ github.event.workflow_run.pull_requests[0].head.sha }}" >> "$GITHUB_OUTPUT"
           else
             echo "sha=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
             echo "branch=${{ github.event.workflow_run.head_branch }}" >> "$GITHUB_OUTPUT"
@@ -53,22 +75,44 @@ jobs:
           fi
 
       - name: Require successful CI on target commit
-        if: github.event_name == 'workflow_run'
-        uses: ./.github/actions/require-ci-green
+        if: github.event_name != 'workflow_dispatch'
+        uses: ./workflow-actions/.github/actions/require-ci-green
         with:
           sha: ${{ steps.target.outputs.sha }}
 
       - name: Resolve merge ref for pull requests
         id: merge_ref
-        uses: ./.github/actions/resolve-pr-merge-ref
+        uses: ./workflow-actions/.github/actions/resolve-pr-merge-ref
         with:
           sha: ${{ steps.target.outputs.sha }}
           branch: ${{ steps.target.outputs.branch }}
 
-      - name: Checkout merge ref for pull requests
+      - name: Checkout complete Unity project
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ steps.merge_ref.outputs.ref }}
+          clean: true
+          fetch-depth: 1
+
+      - name: Verify complete Unity checkout and seed diagnostics
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f ProjectSettings/ProjectVersion.txt || {
+            echo "::error::Full Unity checkout is missing ProjectSettings/ProjectVersion.txt"
+            exit 1
+          }
+          test -f Packages/manifest.json
+          test -d Assets
+          mkdir -p artifacts/diagnostics
+          {
+            echo "workspace=$PWD"
+            echo "requested_sha=${{ steps.target.outputs.sha }}"
+            echo "checkout_ref=${{ steps.merge_ref.outputs.ref }}"
+            echo "actual_sha=$(git rev-parse HEAD)"
+            echo "project_version=$(tr '\n' ' ' < ProjectSettings/ProjectVersion.txt)"
+          } > artifacts/diagnostics/checkout.txt
+          git status --short --branch > artifacts/diagnostics/git-status.txt
 
       - name: Require Unity credentials
         env:
@@ -113,13 +157,35 @@ jobs:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
+          projectPath: .
           testMode: PlayMode
+          artifactsPath: artifacts/playmode
           githubToken: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload test results
+      - name: Collect Unity failure diagnostics
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          mkdir -p artifacts/diagnostics
+          for candidate in \
+            Editor.log \
+            Logs/AssetImportWorker0.log \
+            Logs/shadercompiler-UnityShaderCompiler0.log \
+            Library/LastSceneManagerSetup.txt; do
+            if [ -f "$candidate" ]; then
+              safe_name="$(echo "$candidate" | tr '/ ' '__')"
+              cp "$candidate" "artifacts/diagnostics/$safe_name"
+            fi
+          done
+          find artifacts -maxdepth 4 -type f -printf '%p %s bytes\n' | sort \
+            > artifacts/diagnostics/artifact-inventory.txt
+
+      - name: Upload test results and diagnostics
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: playmode-test-results
           path: artifacts
-          retention-days: 3
+          if-no-files-found: error
+          retention-days: 7

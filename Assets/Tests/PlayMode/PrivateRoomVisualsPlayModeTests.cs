@@ -85,12 +85,13 @@ public sealed class PrivateRoomVisualsPlayModeTests
                 image.name + " hides/fades its approved production sprite.");
         }
 
-        // No custom procedural Graphic is permitted under the approved landing
+        // No authored procedural Graphic is permitted under the approved landing
         // screen. Images render approved art; TMP renders localized/dynamic copy.
+        // TMP-generated submeshes and input carets are functional text/input
+        // infrastructure and are accepted only beneath their owning TMP control.
         foreach (var graphic in visualRoot.GetComponentsInChildren<Graphic>(true))
         {
-            bool allowed = graphic is Image || graphic is TMP_Text;
-            Assert.That(allowed, Is.True,
+            Assert.That(IsAllowedProductionGraphic(graphic), Is.True,
                 "Procedural Graphic found in Private Room: " +
                 graphic.GetType().Name + " on " + graphic.name);
         }
@@ -153,8 +154,30 @@ public sealed class PrivateRoomVisualsPlayModeTests
         }
     }
 
+    static bool IsAllowedProductionGraphic(Graphic graphic)
+    {
+        if (graphic is Image || graphic is TMP_Text)
+            return true;
+
+        var subMesh = graphic as TMP_SubMeshUI;
+        if (subMesh != null &&
+            subMesh.transform.parent != null &&
+            subMesh.transform.parent.GetComponent<TMP_Text>() != null)
+            return true;
+
+        return graphic.GetType().Name == "TMP_SelectionCaret" &&
+               graphic.GetComponentInParent<TMP_InputField>() != null;
+    }
+
     static IEnumerator CapturePrivateRoomScreenshot()
     {
+        // ScreenCapture.CaptureScreenshot is a player/device paint seam and is
+        // a no-op in Linux batchmode. The native Android preview remains the
+        // authoritative capture gate; skip only this file-write step in CI so
+        // the hierarchy, artwork, callback and input assertions still execute.
+        if (Application.isBatchMode)
+            yield break;
+
         yield return new WaitForEndOfFrame();
 
         string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));

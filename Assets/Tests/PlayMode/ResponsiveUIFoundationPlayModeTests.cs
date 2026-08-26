@@ -67,7 +67,8 @@ public sealed class ResponsiveUIFoundationPlayModeTests
         var pvpCreate = (GameObject)Field(pvp, "createPanel");
         var pvpJoin = (GameObject)Field(pvp, "joinPanel");
         var pvpMatch = (GameObject)Field(pvp, "matchPanel");
-        AddTargets(targets, pvpMenu.transform, "CreateButton", "JoinButton", "TipCard");
+        AddTargets(targets, pvpMenu.transform,
+            "CreateButton", "JoinButton", "PrivateRoomTipCard");
         AddTargets(targets, pvpCreate.transform,
             "YouCard", "OpponentCard", "RuleCard", "CancelButton",
             "ConfirmCreateButton");

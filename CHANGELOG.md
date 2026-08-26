@@ -10,14 +10,31 @@ Play Console versionName in `ProjectSettings.asset`.
 - CI cost guardrails: PlayMode runs only after a green `CI` workflow;
   Android preview captures are label-triggered (`preview-mainmenu`,
   `preview-panelplay`, `preview-splash`) or manual, require green CI, checkout
-  the PR merge ref, share one preview concurrency group, and retain artifacts
-  for 3 days. Documented in `docs/ci-policy.md`.
+  the PR merge ref, use screen-scoped preview concurrency groups, and retain
+  artifacts for 3 days. Documented in `docs/ci-policy.md`.
 
 ### Fixed
 
+- PlayMode exact-visual validation now keeps its sparse workflow-action checkout
+  outside the Unity workspace, verifies the complete project before GameCI,
+  supports an opt-in pre-merge self-test after exact-head CI is green, and
+  always retains checkout, Unity, test-result and artifact diagnostics.
+- Missing required production UI sprites now fail closed: stale/procedural
+  fallbacks are removed, the failed control is deactivated so it cannot remain
+  as a hidden raycast blocker, and an EditMode regression test locks the
+  behavior.
 - Home PlayMode settle gate no longer blocks on `WaitForEndOfFrame` in
   headless CI batchmode; Android preview builds still wait for end-of-frame
   paint before logging `HOL_MAINMENU_CAPTURE_READY`.
+- Settings presentation ownership is now scoped to `MainMenu`; loading Splash
+  or another scene can no longer install a Settings owner that waits for
+  nonexistent controls and emits a delayed false production failure.
+- Responsive safe-area refreshes preserve an explicit screen-authored TMP
+  `Overflow` policy when that screen already owns a bounded autosize floor,
+  instead of silently replacing the choice with Ellipsis.
+- Splash and production-symbol PlayMode checks now follow the current legacy
+  purge and Vector Graphics lifecycle contracts: a retired logo may be deleted
+  or disabled, and SVG resource assertions run after PlayMode initialization.
 - Delayed PvP guesses from a finished match can no longer land on a rematch:
   `submitGuess` rejects a stale or omitted `matchIndex`, the PlayFab client
   ignores a late success that belongs to a previous match, and the controller
@@ -97,8 +114,8 @@ Play Console versionName in `ProjectSettings.asset`.
   callbacks remain unchanged; the presentation is safe-area aware and does
   not add Store, Profile, 1v1, coins, or fake `2,450` UI. Android preview
   capture waits two end-of-frame barriers before logging ready, and preview
-  workflows share one Unity build concurrency group with `actions: read` for
-  artifact handoff.
+  workflows use screen-scoped concurrency with `actions: read` for artifact
+  handoff.
 - **PanelPlay** (Play Solo → find challenger) uses the same stairs/clouds
   bible as a quieter inner page: HOL logo, cyan Back, gold Find Challenger,
   and the existing simulated-opponents disclosure. Searching, Settings,

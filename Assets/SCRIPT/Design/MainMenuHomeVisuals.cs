@@ -177,10 +177,12 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         BuildHome();
         if (IsReady)
         {
-            // Two presentation barriers let layout, fonts and localized text
-            // settle before screenshot capture or user input.
+            // Runtime/device capture gets an end-of-frame paint barrier. Unity's
+            // headless batchmode never resumes WaitForEndOfFrame, so PlayMode
+            // validation uses the deterministic frame barrier only.
             yield return null;
-            yield return new WaitForEndOfFrame();
+            if (!Application.isBatchMode)
+                yield return new WaitForEndOfFrame();
         }
 
         IsSettled = IsReady;
@@ -470,7 +472,7 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
 
         var subtitle = EnsureText(
             button.transform, subtitleName, primary ? 25f : 23f,
-            bodyFont, primary ? Ink : Muted,
+            bodyFont, primary ? NearWhite : Muted,
             TextAlignmentOptions.Center);
         Place(
             subtitle.rectTransform, new Vector2(60f, -43f),
