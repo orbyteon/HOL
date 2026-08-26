@@ -30,7 +30,6 @@ public sealed class SoloSearchCartoonVisualsPlayModeTests
 
         Assert.That(matchmaking, Is.Not.Null);
         Assert.That(visuals, Is.Not.Null);
-        Assert.That(GetProperty<bool>(visuals, "IsReady"), Is.True);
         Assert.That(CountInScene(RuntimeType("SoloSearchVisuals")), Is.EqualTo(1));
 
         GameObject searchPanel = GetField<GameObject>(matchmaking, "searchingPanel");
@@ -44,9 +43,12 @@ public sealed class SoloSearchCartoonVisualsPlayModeTests
         // without a fake timer or a test-only production delay field.
         layout.enabled = false;
         Invoke(matchmaking, "StartSearch");
-        yield return null;
-        yield return null;
+        for (int frame = 0; frame < 120 &&
+             !GetProperty<bool>(visuals, "IsReady"); frame++)
+            yield return null;
 
+        Assert.That(GetProperty<bool>(visuals, "IsReady"), Is.True,
+            "The inactive modal owner must become ready after StartSearch activates it.");
         Assert.That(searchPanel.activeInHierarchy, Is.True);
         Assert.That(gamePanel.activeSelf, Is.True,
             "The real board must initialize behind the blocking modal.");
@@ -119,7 +121,7 @@ public sealed class SoloSearchCartoonVisualsPlayModeTests
 
         foreach (Graphic graphic in root.GetComponentsInChildren<Graphic>(true))
         {
-            Assert.That(graphic is Image || graphic is TMP_Text, Is.True,
+            Assert.That(IsAllowedProductionGraphic(graphic), Is.True,
                 "Procedural Graphic found in Search: " + graphic.GetType().Name);
             if (graphic is Image image && image.sprite != null)
                 Assert.That(image.color.a, Is.GreaterThanOrEqualTo(0.99f),
@@ -156,6 +158,17 @@ public sealed class SoloSearchCartoonVisualsPlayModeTests
         Assert.That(searchPanel.activeSelf, Is.False);
         Assert.That(gamePanel.activeSelf, Is.True);
         Assert.That(GetProperty<bool>(matchmaking, "IsPreparing"), Is.False);
+    }
+
+    static bool IsAllowedProductionGraphic(Graphic graphic)
+    {
+        if (graphic is Image || graphic is TMP_Text)
+            return true;
+
+        var subMesh = graphic as TMP_SubMeshUI;
+        return subMesh != null &&
+               subMesh.transform.parent != null &&
+               subMesh.transform.parent.GetComponent<TMP_Text>() != null;
     }
 
     static string Localized(string key)

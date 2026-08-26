@@ -87,10 +87,10 @@ public sealed class PrivateRoomVisualsPlayModeTests
 
         // No custom procedural Graphic is permitted under the approved landing
         // screen. Images render approved art; TMP renders localized/dynamic copy.
+        // TMP_SubMeshUI is allowed only as a direct generated child of TMP text.
         foreach (var graphic in visualRoot.GetComponentsInChildren<Graphic>(true))
         {
-            bool allowed = graphic is Image || graphic is TMP_Text;
-            Assert.That(allowed, Is.True,
+            Assert.That(IsAllowedProductionGraphic(graphic), Is.True,
                 "Procedural Graphic found in Private Room: " +
                 graphic.GetType().Name + " on " + graphic.name);
         }
@@ -151,6 +151,17 @@ public sealed class PrivateRoomVisualsPlayModeTests
             Assert.That(t.name, Is.Not.EqualTo("BackdropNumbers"),
                 "Retired drifting-number backdrop returned.");
         }
+    }
+
+    static bool IsAllowedProductionGraphic(Graphic graphic)
+    {
+        if (graphic is Image || graphic is TMP_Text)
+            return true;
+
+        var subMesh = graphic as TMP_SubMeshUI;
+        return subMesh != null &&
+               subMesh.transform.parent != null &&
+               subMesh.transform.parent.GetComponent<TMP_Text>() != null;
     }
 
     static IEnumerator CapturePrivateRoomScreenshot()

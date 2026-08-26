@@ -75,14 +75,40 @@ public sealed class ProductionSymbolPlayModeTests
     [UnityTest]
     public IEnumerator ApprovedSoloTrophyIsARealProductionSprite()
     {
-        // Vector Graphics resources finish their player-side initialization on
-        // the first PlayMode frame. A synchronous NUnit test can run before that
-        // boundary and report a false missing-resource failure.
-        yield return null;
+        // Exercise the real result-overlay construction. A standalone PlayMode
+        // test can run before Vector Graphics has crossed a scene-load boundary,
+        // while production always requests this sprite from the live MainMenu UI.
+        yield return SceneManager.LoadSceneAsync("MainMenu", LoadSceneMode.Single);
 
+        Image trophyImage = null;
+        for (int frame = 0; frame < 120 && trophyImage == null; frame++)
+        {
+            Transform resultRoot = null;
+            foreach (GameObject root in SceneManager.GetActiveScene().GetRootGameObjects())
+            {
+                resultRoot = Find(root.transform, "ResultVisualRoot");
+                if (resultRoot != null)
+                    break;
+            }
+
+            Transform trophyObject = Find(resultRoot, "Trophy");
+            if (trophyObject != null)
+            {
+                var image = trophyObject.GetComponent<Image>();
+                if (image != null && image.sprite != null)
+                    trophyImage = image;
+            }
+
+            if (trophyImage == null)
+                yield return null;
+        }
+
+        Assert.That(trophyImage, Is.Not.Null,
+            "The live result overlay requires the approved trophy sprite.");
         var trophy = Resources.Load<Sprite>("reference/board_trophy_exact");
         Assert.That(trophy, Is.Not.Null,
-            "Result presentation requires the approved trophy sprite.");
+            "Result presentation requires the approved trophy resource.");
+        Assert.That(trophyImage.sprite, Is.SameAs(trophy));
         Assert.That(trophy.texture, Is.Not.Null);
         Assert.That(trophy.texture.width, Is.GreaterThanOrEqualTo(256));
         Assert.That(trophy.texture.height, Is.GreaterThanOrEqualTo(256));

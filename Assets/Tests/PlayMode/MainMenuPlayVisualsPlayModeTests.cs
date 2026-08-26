@@ -135,13 +135,17 @@ public sealed class MainMenuPlayVisualsPlayModeTests
         Assert.That(panelGame, Is.Not.Null);
         Assert.That(panelGame.activeSelf, Is.False);
 
-        // Same-call assertions are intentional: a coroutine-based fake search
-        // cannot satisfy this deterministic local-AI entry contract.
+        // The real board is activated in the same call, while the truthful
+        // blocking modal remains visible until its keypad and submit control
+        // exist. There is no fake timer or remote-matchmaking claim.
         matchmaking.SendMessage("StartSearch", SendMessageOptions.RequireReceiver);
-        Assert.That(searching.activeSelf, Is.False);
+        Assert.That(searching.activeSelf, Is.True);
         Assert.That(panelGame.activeSelf, Is.True);
-        for (int i = 0; i < 12; i++)
+        Assert.That(IsPreparing(matchmaking), Is.True);
+        for (int frame = 0; frame < 120 && IsPreparing(matchmaking); frame++)
             yield return null;
+        Assert.That(IsPreparing(matchmaking), Is.False,
+            "Solo preparation did not finish after the real board became ready.");
         Assert.That(searching.activeSelf, Is.False);
         Assert.That(panelGame.activeSelf, Is.True);
 
@@ -154,8 +158,21 @@ public sealed class MainMenuPlayVisualsPlayModeTests
         Assert.That(panelGame.activeSelf, Is.False);
         ((Behaviour)matchmaking).enabled = true;
         matchmaking.SendMessage("StartSearch", SendMessageOptions.RequireReceiver);
+        Assert.That(searching.activeSelf, Is.True);
+        Assert.That(panelGame.activeSelf, Is.True);
+        for (int frame = 0; frame < 120 && IsPreparing(matchmaking); frame++)
+            yield return null;
+        Assert.That(IsPreparing(matchmaking), Is.False,
+            "Re-enabled Solo preparation did not finish on the ready board.");
         Assert.That(searching.activeSelf, Is.False);
         Assert.That(panelGame.activeSelf, Is.True);
+    }
+
+    static bool IsPreparing(Component matchmaking)
+    {
+        var property = matchmaking.GetType().GetProperty("IsPreparing");
+        Assert.That(property, Is.Not.Null);
+        return (bool)property.GetValue(matchmaking, null);
     }
 
     static string LocalizedCopy(string key)

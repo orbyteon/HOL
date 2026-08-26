@@ -60,6 +60,7 @@ public sealed class MainMenuCapturePlayModeTests
         ResetCaptureState();
         SetCaptureRequested(true);
         InvokeHomeInstaller();
+        InvokeTypographyInstaller();
 
         Component owner = null;
         Component bootstrap = null;
@@ -90,6 +91,18 @@ public sealed class MainMenuCapturePlayModeTests
                 yield return null;
             Assert.That((bool)ready.GetValue(owner, null), Is.True);
             Assert.That((bool)settled.GetValue(owner, null), Is.True);
+
+            var typography = FindInScene(
+                scene, RuntimeType("MainMenuHomeTypographyFidelity"));
+            Assert.That(typography, Is.Not.Null);
+            var applied = typography.GetType().GetProperty(
+                "IsApplied", InstanceFlags);
+            Assert.That(applied, Is.Not.Null);
+            float typographyDeadline = Time.realtimeSinceStartup + 2f;
+            while (!(bool)applied.GetValue(typography, null) &&
+                   Time.realtimeSinceStartup < typographyDeadline)
+                yield return null;
+            Assert.That((bool)applied.GetValue(typography, null), Is.True);
 
             InvokeInstallForScene(scene);
             InvokeInstallForScene(scene);
@@ -122,6 +135,10 @@ public sealed class MainMenuCapturePlayModeTests
                 "homeVisuals", InstanceFlags);
             Assert.That(ownerField, Is.Not.Null);
             ownerField.SetValue(bootstrap, owner);
+            var typographyField = bootstrap.GetType().GetField(
+                "typographyFidelity", InstanceFlags);
+            Assert.That(typographyField, Is.Not.Null);
+            typographyField.SetValue(bootstrap, typography);
             var routine = (IEnumerator)routineMethod.Invoke(bootstrap, null);
             AssertEndOfFrame(routine, presentationBarriers, bootstrap, 0);
             AssertEndOfFrame(routine, presentationBarriers, bootstrap, 1);
@@ -198,6 +215,14 @@ public sealed class MainMenuCapturePlayModeTests
     static void InvokeHomeInstaller()
     {
         var install = RuntimeType("MainMenuHomeVisuals").GetMethod(
+            "Install", StaticFlags);
+        Assert.That(install, Is.Not.Null);
+        install.Invoke(null, null);
+    }
+
+    static void InvokeTypographyInstaller()
+    {
+        var install = RuntimeType("MainMenuHomeTypographyFidelity").GetMethod(
             "Install", StaticFlags);
         Assert.That(install, Is.Not.Null);
         install.Invoke(null, null);
