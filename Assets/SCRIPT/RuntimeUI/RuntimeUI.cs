@@ -38,10 +38,10 @@ public static class RuntimeUI
         return juice;
     }
 
-    // Neutral fallback only. Approved production screens must replace this
-    // with their real sprite before becoming visible. Keeping one cached
-    // fallback prevents runtime-created controls from becoming unclickable
-    // while a required-art failure is being surfaced in logs/tests.
+    // Neutral construction placeholder only. Approved production screens must
+    // replace it with their real sprite before becoming visible. If that
+    // replacement fails, ApplyProductionSprite disables the Image instead of
+    // allowing this placeholder to become the production look.
     static Sprite roundedSprite;
 
     public static Sprite RoundedRectSprite
@@ -177,10 +177,18 @@ public static class RuntimeUI
         Image.Type type = Image.Type.Simple, bool preserveAspect = false,
         float pixelsPerUnitMultiplier = 1f)
     {
-        if (image == null || string.IsNullOrWhiteSpace(resourcePath)) return false;
+        if (image == null) return false;
+        if (string.IsNullOrWhiteSpace(resourcePath))
+        {
+            DisableMissingProductionImage(image);
+            Debug.LogError("HOL UI: approved production sprite path is empty.");
+            return false;
+        }
+
         var sprite = Resources.Load<Sprite>(resourcePath);
         if (sprite == null)
         {
+            DisableMissingProductionImage(image);
             Debug.LogError("HOL UI: missing approved production sprite Resources/" +
                 resourcePath + ".");
             return false;
@@ -193,6 +201,15 @@ public static class RuntimeUI
         image.pixelsPerUnitMultiplier = pixelsPerUnitMultiplier;
         image.color = Color.white;
         return true;
+    }
+
+    static void DisableMissingProductionImage(Image image)
+    {
+        // A construction-time rounded rectangle or any previously assigned
+        // generic sprite must never survive a required production-art failure.
+        image.sprite = null;
+        image.enabled = false;
+        image.raycastTarget = false;
     }
 
     // Neutral infrastructure for a caller-owned production frame. The
