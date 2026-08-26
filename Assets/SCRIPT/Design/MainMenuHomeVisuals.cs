@@ -472,7 +472,7 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
 
         var subtitle = EnsureText(
             button.transform, subtitleName, primary ? 25f : 23f,
-            bodyFont, primary ? Ink : Muted,
+            bodyFont, primary ? NearWhite : Muted,
             TextAlignmentOptions.Center);
         Place(
             subtitle.rectTransform, new Vector2(60f, -43f),
