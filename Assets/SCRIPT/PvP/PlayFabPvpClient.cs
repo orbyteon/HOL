@@ -33,6 +33,7 @@ public class PlayFabPvpClient : PvpBackend
     string sessionTicket = "";
     Coroutine pollRoutine;
     PlayIntegrityProvisioner provisioner;
+    int lastObservedMatchIndex = -1;
 
     string Api(string method) => "https://" + titleId.Trim() + ".playfabapi.com/Client/" + method;
     string CustomId => SystemInfo.deviceUniqueIdentifier;
@@ -186,6 +187,7 @@ public class PlayFabPvpClient : PvpBackend
                     return;
                 }
                 RoomCode = code;
+                lastObservedMatchIndex = 0;
                 ClearPendingRoomRequest(requestEpoch);
                 IsHost = true;
                 done?.Invoke(true, code);
@@ -251,6 +253,7 @@ public class PlayFabPvpClient : PvpBackend
                 }
 
                 RoomCode = code;
+                lastObservedMatchIndex = 0;
                 ClearPendingRoomRequest(requestEpoch);
                 IsHost = false;
                 done?.Invoke(true, "");
@@ -290,7 +293,7 @@ public class PlayFabPvpClient : PvpBackend
 
     public override void SendSignal(int signalId, Action<bool> done)
     {
-        SendSignal(signalId, -1, done);
+        SendSignal(signalId, lastObservedMatchIndex, done);
     }
 
     public override void SendSignal(int signalId, int matchIndex,
@@ -312,15 +315,24 @@ public class PlayFabPvpClient : PvpBackend
 
     public override void RequestRematch(int secret, Action<bool> done)
     {
-        if (string.IsNullOrEmpty(RoomCode) || secret < 1 || secret > 100)
+        RequestRematch(secret, lastObservedMatchIndex, done);
+    }
+
+    public override void RequestRematch(int secret, int matchIndex,
+        Action<bool> done)
+    {
+        if (string.IsNullOrEmpty(RoomCode) || secret < 1 || secret > 100 ||
+            matchIndex < 0)
         {
             done?.Invoke(false);
             return;
         }
 
         string args = "{\"roomId\":\"" + EscapeJson(RoomCode) +
-                      "\",\"secret\":" + secret + "}";
-        ExecuteCloudScript("requestRematch", args, (ok, resp) => done?.Invoke(ok && CloudOk(resp)));
+                      "\",\"secret\":" + secret +
+                      ",\"matchIndex\":" + matchIndex + "}";
+        ExecuteCloudScript("requestRematch", args,
+            (ok, resp) => done?.Invoke(ok && CloudOk(resp)));
     }
 
     public override void StartPolling(Action<RoomState> onState)
@@ -347,6 +359,7 @@ public class PlayFabPvpClient : PvpBackend
             LeaveExactRoom(code);
         }
         RoomCode = "";
+        lastObservedMatchIndex = -1;
     }
 
     void LeaveExactRoom(string code)
@@ -372,6 +385,7 @@ public class PlayFabPvpClient : PvpBackend
 
         var latestDone = pendingRoomDone;
         RoomCode = code;
+        lastObservedMatchIndex = 0;
         IsHost = false;
         roomRequestEpoch++;
         pendingRoomCode = "";
@@ -383,14 +397,23 @@ public class PlayFabPvpClient : PvpBackend
 
     public override void AcknowledgeResult()
     {
-        if (string.IsNullOrEmpty(RoomCode)) return;
+        AcknowledgeResult(lastObservedMatchIndex);
+    }
+
+    public override void AcknowledgeResult(int matchIndex)
+    {
+        if (string.IsNullOrEmpty(RoomCode) || matchIndex < 0) return;
 
         string code = RoomCode;
-        string args = "{\"roomId\":\"" + EscapeJson(code) + "\"}";
+        string args = "{\"roomId\":\"" + EscapeJson(code) +
+                      "\",\"matchIndex\":" + matchIndex + "}";
         ExecuteCloudScript("ackResult", args, (ok, resp) =>
         {
             if (ok && CloudOk(resp) && resp.Contains("\"deleted\":true") && RoomCode == code)
+            {
                 RoomCode = "";
+                lastObservedMatchIndex = -1;
+            }
         });
     }
 
@@ -436,6 +459,7 @@ public class PlayFabPvpClient : PvpBackend
             }
 
             failures = 0;
+            lastObservedMatchIndex = state.matchIndex;
             onState?.Invoke(state);
             yield return new WaitForSeconds(pollIntervalSeconds);
         }
@@ -456,8 +480,16 @@ public class PlayFabPvpClient : PvpBackend
             RoomState state = null;
             if (!string.IsNullOrEmpty(inner))
             {
-                try { state = JsonUtility.FromJson<RoomState>(inner); }
-                catch { }
+                try
+                {
+                    state = JsonUtility.FromJson<RoomState>(inner);
+                    if (state != null)
+                        lastObservedMatchIndex = state.matchIndex;
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError("PlayFab room-state JSON parse failed: " + ex.Message);
+                }
             }
             done?.Invoke(state != null, state);
         });
@@ -502,8 +534,12 @@ public class PlayFabPvpClient : PvpBackend
             current.iWantRematch = applied.iWantRematch;
             current.theyWantRematch = applied.theyWantRematch;
             current.opponentLeft = applied.opponentLeft;
+            lastObservedMatchIndex = applied.matchIndex;
         }
-        catch { }
+        catch (Exception ex)
+        {
+            Debug.LogError("PlayFab returned room-state JSON parse failed: " + ex.Message);
+        }
     }
 
     void ExecuteCloudScript(string functionName, string functionArgsJson, Action<bool, string> done)
