@@ -29,7 +29,9 @@ candidate satisfies every gate below.
 4. Production Visual Integrity passes.
 5. Automatic PlayMode checks out and passes the same exact candidate.
 6. No unresolved review thread remains.
-7. The canonical changelog records the boundary before merge.
+7. The focused release-note fragment records the boundary and is retained until
+   it is folded into the top `[Unreleased]` section during release-note
+   consolidation.
 
 No successful gate authorizes PlayFab/Azure deployment, a signed build,
 `minVersion` change or store publication.
