@@ -4,7 +4,9 @@ using UnityEngine.UI;
 // Durable fail-closed marker for a control whose required production artwork
 // could not be loaded. State owners may still call SetActive(true), but this
 // guard keeps the complete hierarchy invisible and non-interactive for the
-// remainder of the object's lifetime.
+// remainder of the object's lifetime. ExecuteAlways keeps the same lifecycle
+// contract in editor previews and EditMode validation as in a player build.
+[ExecuteAlways]
 [DisallowMultipleComponent]
 public sealed class RequiredProductionArtFailure : MonoBehaviour
 {
