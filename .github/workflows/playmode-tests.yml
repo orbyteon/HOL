@@ -31,9 +31,13 @@ jobs:
       actions: read
       pull-requests: read
     steps:
+      # Keep the composite-action checkout in its own repository. Reusing the
+      # project workspace after a sparse checkout can leave Unity's
+      # ProjectSettings absent even after a later checkout.
       - name: Checkout actions for local composite steps
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          path: workflow-actions
           sparse-checkout: .github/actions
           sparse-checkout-cone-mode: false
 
@@ -54,21 +58,36 @@ jobs:
 
       - name: Require successful CI on target commit
         if: github.event_name == 'workflow_run'
-        uses: ./.github/actions/require-ci-green
+        uses: ./workflow-actions/.github/actions/require-ci-green
         with:
           sha: ${{ steps.target.outputs.sha }}
 
       - name: Resolve merge ref for pull requests
         id: merge_ref
-        uses: ./.github/actions/resolve-pr-merge-ref
+        uses: ./workflow-actions/.github/actions/resolve-pr-merge-ref
         with:
           sha: ${{ steps.target.outputs.sha }}
           branch: ${{ steps.target.outputs.branch }}
 
-      - name: Checkout merge ref for pull requests
+      - name: Checkout complete Unity project
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ steps.merge_ref.outputs.ref }}
+
+      - name: Verify complete Unity checkout and seed diagnostics
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/preflight
+          git rev-parse HEAD | tee artifacts/preflight/commit-sha.txt
+          git status --short > artifacts/preflight/git-status.txt
+          df -h / > artifacts/preflight/disk-before-unity.txt
+          if [ ! -f ProjectSettings/ProjectVersion.txt ]; then
+            find . -maxdepth 3 -type f | sort > artifacts/preflight/workspace-files.txt
+            echo "::error::Complete checkout is missing ProjectSettings/ProjectVersion.txt"
+            exit 1
+          fi
+          cp ProjectSettings/ProjectVersion.txt artifacts/preflight/ProjectVersion.txt
 
       - name: Require Unity credentials
         env:
@@ -96,6 +115,7 @@ jobs:
           sudo apt-get clean
           echo "Disk after cleanup:"
           df -h /
+          df -h / > artifacts/preflight/disk-after-cleanup.txt
 
       - name: Cache Library
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -107,19 +127,24 @@ jobs:
             Library-
 
       - name: Run PlayMode tests
+        id: playmode
         uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9 # v4
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
+          projectPath: .
           testMode: PlayMode
+          artifactsPath: artifacts
           githubToken: ${{ secrets.GITHUB_TOKEN }}
+          checkName: Exact visuals PlayMode results
 
-      - name: Upload test results
+      - name: Upload complete PlayMode diagnostics
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: playmode-test-results
-          path: artifacts
-          retention-days: 3
+          name: playmode-test-results-${{ steps.target.outputs.sha }}
+          path: ${{ steps.playmode.outputs.artifactsPath || 'artifacts' }}
+          if-no-files-found: error
+          retention-days: 7
