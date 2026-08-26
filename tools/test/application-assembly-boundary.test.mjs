@@ -87,9 +87,10 @@ test("Phase 1B keeps scoped agent, validation and release-note contracts", () =>
   assert.match(scopedAgent, /legacy JSON formatting methods/);
 
   const validation = read(validationDocPath);
-  assert.match(validation, /exact PR merge candidate/);
+  assert.match(validation, /exact PR merge\s+candidate/);
   assert.match(validation, /Android compile/);
   assert.match(validation, /Automatic PlayMode/);
+  assert.match(validation, /focused release-note fragment/);
 
   const fragment = read(changelogFragmentPath);
   assert.match(fragment, /Introduced `HOL\.Application`/);
