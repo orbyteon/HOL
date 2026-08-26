@@ -7,6 +7,10 @@ Play Console versionName in `ProjectSettings.asset`.
 
 ### Changed
 
+- PlayMode validation now checks out workflow-only composite actions in an
+  isolated directory before performing a clean full-project checkout. It
+  verifies `ProjectSettings/ProjectVersion.txt` before GameCI starts and always
+  uploads preflight diagnostics plus Unity test artifacts on failure.
 - CI cost guardrails: PlayMode runs only after a green `CI` workflow;
   Android preview captures are label-triggered (`preview-mainmenu`,
   `preview-panelplay`, `preview-splash`) or manual, require green CI, checkout
@@ -15,6 +19,17 @@ Play Console versionName in `ProjectSettings.asset`.
 
 ### Fixed
 
+- Required production sprite assignment now fails closed: an absent/empty
+  Resources path clears and disables the previous Image instead of leaving a
+  procedural fallback visible or intercepting input. EditMode coverage locks
+  that contract.
+- Signals, rematch commitments and result acknowledgements are fenced by the
+  room's live `matchIndex` on both client and CloudScript. Delayed result-screen
+  callbacks from a previous match can no longer mutate or delete a later match
+  in the same persistent room; headless regression tests cover explicit and
+  omitted stale indices.
+- PlayFab room-state deserialization failures now produce actionable error logs
+  instead of disappearing inside empty catches.
 - Home PlayMode settle gate no longer blocks on `WaitForEndOfFrame` in
   headless CI batchmode; Android preview builds still wait for end-of-frame
   paint before logging `HOL_MAINMENU_CAPTURE_READY`.
@@ -237,8 +252,8 @@ Play Console versionName in `ProjectSettings.asset`.
   winning guess. Simulated over the real rules at human accuracy, the two
   sides now take 46.3% and 46.5% with 7.3% draws; the seeded simulation in
   `tools/test/cloudscript.test.mjs` reproduces those figures exactly.
-- **The Lock**, one per match: stake it on a guess and a correct one wins
-  a same-round tie, while a wrong one forfeits your next turn. It is the
+- **The Lock**, one per match: stake it on a guess and a correct one wins a
+  same-round tie, while a wrong one forfeits your next turn. It is the
   game's first genuine decision — staking it only on a certain guess
   beats never locking 50.3% to 36.6%, and locking on every guess loses
   18.2% to 63.8%. The button turns into a prompt once the range is down
