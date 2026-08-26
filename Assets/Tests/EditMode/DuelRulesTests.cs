@@ -1,139 +1,124 @@
 using System;
-using System.Reflection;
 using NUnit.Framework;
 
-// Rule tests for the duel state machine. Reflection keeps the editor-only test
-// assembly decoupled from Assembly-CSharp, matching L10nIntegrityTests.
+// Rule tests for the duel state machine. HOL.EditModeTests references HOL.Core
+// directly, so assembly moves and API drift now fail at compile time instead of
+// being hidden behind reflection.
 //
 // playfab/cloudscript.js implements the same rules server-side for PlayFab and
 // is covered by the equivalent cases in tools/test/cloudscript.test.mjs. When a
 // rule changes here, change it there too.
 public class DuelRulesTests
 {
-    // ------------------------------------------------------------- reflection
-
-    static Type FindGameType(string name)
-    {
-        foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
-        {
-            var t = asm.GetType(name);
-            if (t != null) return t;
-        }
-        Assert.Fail("Type '" + name + "' not found in loaded assemblies — renamed?");
-        return null;
-    }
-
-    static Type RulesType { get { return FindGameType("DuelRules"); } }
-
-    static Type Nested(string name)
-    {
-        var t = RulesType.GetNestedType(name);
-        Assert.IsNotNull(t, "DuelRules." + name + " not found — renamed?");
-        return t;
-    }
-
-    static object Side(string name) { return Enum.Parse(Nested("Side"), name); }
-
     // A duel in progress, wrapped so the tests read like the rules do.
-    class Duel
+    sealed class Duel
     {
-        readonly object rules;
+        readonly DuelRules rules = new DuelRules();
 
-        public Duel(string opener)
+        public Duel(DuelRules.Side opener)
         {
-            rules = Activator.CreateInstance(RulesType);
-            RulesType.GetMethod("StartMatch").Invoke(rules, new[] { Side(opener) });
+            rules.StartMatch(opener);
         }
 
-        public Move Guess(string side, int guess, int opponentSecret, bool useLock = false)
+        public DuelRules.Move Guess(
+            DuelRules.Side side,
+            int guess,
+            int opponentSecret,
+            bool useLock = false)
         {
-            var move = RulesType.GetMethod("Submit")
-                .Invoke(rules, new object[] { Side(side), guess, opponentSecret, useLock });
-            return new Move(move);
+            return rules.Submit(side, guess, opponentSecret, useLock);
         }
 
-        object Get(string property) { return RulesType.GetProperty(property).GetValue(rules); }
+        public bool Finished { get { return rules.Finished; } }
+        public DuelRules.Outcome Result { get { return rules.Result; } }
+        public DuelRules.Side Turn { get { return rules.Turn; } }
+        public DuelRules.Side PendingWin { get { return rules.PendingWin; } }
 
-        bool Ask(string method, string side)
+        public int GuessCount(DuelRules.Side side)
         {
-            return (bool)RulesType.GetMethod(method).Invoke(rules, new[] { Side(side) });
+            return rules.GuessCount(side);
         }
 
-        public bool Finished { get { return (bool)Get("Finished"); } }
-        public string Result { get { return Get("Result").ToString(); } }
-        public string Turn { get { return Get("Turn").ToString(); } }
-        public string PendingWin { get { return Get("PendingWin").ToString(); } }
-
-        public int GuessCount(string side)
+        public bool LockAvailable(DuelRules.Side side)
         {
-            return (int)RulesType.GetMethod("GuessCount").Invoke(rules, new[] { Side(side) });
+            return rules.LockAvailable(side);
         }
 
-        public bool LockAvailable(string side) { return Ask("LockAvailable", side); }
-        public bool ForfeitPending(string side) { return Ask("ForfeitPending", side); }
-        public bool MatchPointAgainst(string side) { return Ask("IsMatchPointAgainst", side); }
+        public bool ForfeitPending(DuelRules.Side side)
+        {
+            return rules.ForfeitPending(side);
+        }
+
+        public bool MatchPointAgainst(DuelRules.Side side)
+        {
+            return rules.IsMatchPointAgainst(side);
+        }
     }
 
-    class Move
-    {
-        readonly object move;
-        public Move(object move) { this.move = move; }
-
-        object Field(string name) { return move.GetType().GetField(name).GetValue(move); }
-
-        public bool Accepted { get { return (bool)Field("Accepted"); } }
-        public string Error { get { return (string)Field("Error"); } }
-        public string Hint { get { return Field("Hint").ToString(); } }
-    }
-
-    // Host secret 42, guest secret 77 throughout: "Host" hunts 77, "Guest" hunts 42.
+    // Host secret 42, guest secret 77 throughout: Host hunts 77, Guest hunts 42.
     const int HostSecret = 42;
     const int GuestSecret = 77;
-
-    // ------------------------------------------------------------------ tests
 
     [Test]
     public void CorrectOpeningGuessDoesNotEndTheMatch()
     {
-        var duel = new Duel("Host");
-        var move = duel.Guess("Host", GuestSecret, GuestSecret);
+        var duel = new Duel(DuelRules.Side.Host);
+        var move = duel.Guess(
+            DuelRules.Side.Host,
+            GuestSecret,
+            GuestSecret);
 
-        Assert.AreEqual("Correct", move.Hint);
-        Assert.IsFalse(duel.Finished, "the round must close before a winner is declared");
-        Assert.AreEqual("Host", duel.PendingWin);
-        Assert.AreEqual("Guest", duel.Turn, "the responder is owed an answering guess");
-        Assert.IsTrue(duel.MatchPointAgainst("Guest"));
-        Assert.IsFalse(duel.MatchPointAgainst("Host"));
+        Assert.AreEqual(DuelRules.Hint.Correct, move.Hint);
+        Assert.IsFalse(
+            duel.Finished,
+            "the round must close before a winner is declared");
+        Assert.AreEqual(DuelRules.Side.Host, duel.PendingWin);
+        Assert.AreEqual(
+            DuelRules.Side.Guest,
+            duel.Turn,
+            "the responder is owed an answering guess");
+        Assert.IsTrue(duel.MatchPointAgainst(DuelRules.Side.Guest));
+        Assert.IsFalse(duel.MatchPointAgainst(DuelRules.Side.Host));
     }
 
     [Test]
     public void MissedAnswerLeavesTheProvisionalWinStanding()
     {
-        var duel = new Duel("Host");
-        duel.Guess("Host", GuestSecret, GuestSecret);
-        duel.Guess("Guest", 50, HostSecret);
+        var duel = new Duel(DuelRules.Side.Host);
+        duel.Guess(DuelRules.Side.Host, GuestSecret, GuestSecret);
+        duel.Guess(DuelRules.Side.Guest, 50, HostSecret);
 
         Assert.IsTrue(duel.Finished);
-        Assert.AreEqual("HostWins", duel.Result);
+        Assert.AreEqual(DuelRules.Outcome.HostWins, duel.Result);
     }
 
     [Test]
     public void TiedRoundWithNoLockIsADraw()
     {
-        var duel = new Duel("Host");
-        duel.Guess("Host", GuestSecret, GuestSecret);
-        duel.Guess("Guest", HostSecret, HostSecret);
+        var duel = new Duel(DuelRules.Side.Host);
+        duel.Guess(DuelRules.Side.Host, GuestSecret, GuestSecret);
+        duel.Guess(DuelRules.Side.Guest, HostSecret, HostSecret);
 
-        Assert.AreEqual("Draw", duel.Result);
+        Assert.AreEqual(DuelRules.Outcome.Draw, duel.Result);
     }
 
-    [TestCase("Host", "HostWins")]
-    [TestCase("Guest", "GuestWins")]
-    public void TheLockBreaksATiedRound(string locker, string expected)
+    [TestCase(DuelRules.Side.Host, DuelRules.Outcome.HostWins)]
+    [TestCase(DuelRules.Side.Guest, DuelRules.Outcome.GuestWins)]
+    public void TheLockBreaksATiedRound(
+        DuelRules.Side locker,
+        DuelRules.Outcome expected)
     {
-        var duel = new Duel("Host");
-        duel.Guess("Host", GuestSecret, GuestSecret, locker == "Host");
-        duel.Guess("Guest", HostSecret, HostSecret, locker == "Guest");
+        var duel = new Duel(DuelRules.Side.Host);
+        duel.Guess(
+            DuelRules.Side.Host,
+            GuestSecret,
+            GuestSecret,
+            locker == DuelRules.Side.Host);
+        duel.Guess(
+            DuelRules.Side.Guest,
+            HostSecret,
+            HostSecret,
+            locker == DuelRules.Side.Guest);
 
         Assert.AreEqual(expected, duel.Result);
     }
@@ -141,56 +126,75 @@ public class DuelRulesTests
     [Test]
     public void BothSidesLockingATiedRoundIsStillADraw()
     {
-        var duel = new Duel("Host");
-        duel.Guess("Host", GuestSecret, GuestSecret, true);
-        duel.Guess("Guest", HostSecret, HostSecret, true);
+        var duel = new Duel(DuelRules.Side.Host);
+        duel.Guess(DuelRules.Side.Host, GuestSecret, GuestSecret, true);
+        duel.Guess(DuelRules.Side.Guest, HostSecret, HostSecret, true);
 
-        Assert.AreEqual("Draw", duel.Result);
+        Assert.AreEqual(DuelRules.Outcome.Draw, duel.Result);
     }
 
     [Test]
     public void MissedLockForfeitsTheNextTurn()
     {
-        var duel = new Duel("Host");
-        var move = duel.Guess("Host", 50, GuestSecret, true);
+        var duel = new Duel(DuelRules.Side.Host);
+        var move = duel.Guess(
+            DuelRules.Side.Host,
+            50,
+            GuestSecret,
+            true);
 
-        Assert.AreEqual("Higher", move.Hint, "a missed Lock still earns its hint");
-        Assert.IsFalse(duel.LockAvailable("Host"));
-        Assert.IsTrue(duel.ForfeitPending("Host"));
-        Assert.AreEqual("Guest", duel.Turn);
+        Assert.AreEqual(
+            DuelRules.Hint.Higher,
+            move.Hint,
+            "a missed Lock still earns its hint");
+        Assert.IsFalse(duel.LockAvailable(DuelRules.Side.Host));
+        Assert.IsTrue(duel.ForfeitPending(DuelRules.Side.Host));
+        Assert.AreEqual(DuelRules.Side.Guest, duel.Turn);
 
         // Round two opens on the host, whose slot is burned, so the turn comes
         // straight back to the guest.
-        duel.Guess("Guest", 10, HostSecret);
-        Assert.AreEqual("Guest", duel.Turn);
-        Assert.IsFalse(duel.ForfeitPending("Host"), "the forfeit is spent, not permanent");
-        Assert.AreEqual(1, duel.GuessCount("Host"));
+        duel.Guess(DuelRules.Side.Guest, 10, HostSecret);
+        Assert.AreEqual(DuelRules.Side.Guest, duel.Turn);
+        Assert.IsFalse(
+            duel.ForfeitPending(DuelRules.Side.Host),
+            "the forfeit is spent, not permanent");
+        Assert.AreEqual(1, duel.GuessCount(DuelRules.Side.Host));
 
-        duel.Guess("Guest", 20, HostSecret);
-        Assert.AreEqual(2, duel.GuessCount("Guest"), "the guest really does play twice");
-        Assert.AreEqual("Host", duel.Turn, "and the host is back in after paying the forfeit");
+        duel.Guess(DuelRules.Side.Guest, 20, HostSecret);
+        Assert.AreEqual(
+            2,
+            duel.GuessCount(DuelRules.Side.Guest),
+            "the guest really does play twice");
+        Assert.AreEqual(
+            DuelRules.Side.Host,
+            duel.Turn,
+            "and the host is back in after paying the forfeit");
     }
 
     [Test]
     public void ForfeitedResponderCannotAnswerAProvisionalWin()
     {
-        var duel = new Duel("Guest");
-        duel.Guess("Guest", 50, HostSecret, true);  // opens, misses the Lock
-        duel.Guess("Host", GuestSecret, GuestSecret);
+        var duel = new Duel(DuelRules.Side.Guest);
+        duel.Guess(DuelRules.Side.Guest, 50, HostSecret, true);
+        duel.Guess(DuelRules.Side.Host, GuestSecret, GuestSecret);
 
         Assert.IsTrue(duel.Finished, "nobody is left to answer");
-        Assert.AreEqual("HostWins", duel.Result);
+        Assert.AreEqual(DuelRules.Outcome.HostWins, duel.Result);
     }
 
     [Test]
     public void TheLockIsOncePerMatch()
     {
-        var duel = new Duel("Host");
-        duel.Guess("Host", 50, GuestSecret, true);
-        duel.Guess("Guest", 10, HostSecret);
-        duel.Guess("Guest", 20, HostSecret);
+        var duel = new Duel(DuelRules.Side.Host);
+        duel.Guess(DuelRules.Side.Host, 50, GuestSecret, true);
+        duel.Guess(DuelRules.Side.Guest, 10, HostSecret);
+        duel.Guess(DuelRules.Side.Guest, 20, HostSecret);
 
-        var rejected = duel.Guess("Host", 60, GuestSecret, true);
+        var rejected = duel.Guess(
+            DuelRules.Side.Host,
+            60,
+            GuestSecret,
+            true);
         Assert.IsFalse(rejected.Accepted);
         Assert.AreEqual("lock already spent", rejected.Error);
     }
@@ -198,15 +202,24 @@ public class DuelRulesTests
     [Test]
     public void TurnAndRangeDisciplineAreEnforced()
     {
-        var duel = new Duel("Host");
+        var duel = new Duel(DuelRules.Side.Host);
 
-        var jumped = duel.Guess("Guest", 50, HostSecret);
+        var jumped = duel.Guess(
+            DuelRules.Side.Guest,
+            50,
+            HostSecret);
         Assert.IsFalse(jumped.Accepted);
         Assert.AreEqual("not your turn", jumped.Error);
 
         foreach (int outOfRange in new[] { 0, 101, -5 })
-            Assert.IsFalse(duel.Guess("Host", outOfRange, GuestSecret).Accepted,
+        {
+            Assert.IsFalse(
+                duel.Guess(
+                    DuelRules.Side.Host,
+                    outOfRange,
+                    GuestSecret).Accepted,
                 outOfRange + " is outside 1-100 and must be rejected");
+        }
     }
 
     // The reason the rules were rewritten: under "first correct guess wins" the
@@ -216,48 +229,74 @@ public class DuelRulesTests
     public void TurnOrderNoLongerDecidesMatchesBetweenEqualPlayers()
     {
         const int runs = 6000;
-        var rng = new System.Random(20260813);
-        int openerWins = 0, responderWins = 0;
+        var rng = new Random(20260813);
+        int openerWins = 0;
+        int responderWins = 0;
 
         for (int i = 0; i < runs; i++)
         {
-            string opener = rng.Next(2) == 0 ? "Host" : "Guest";
+            DuelRules.Side opener = rng.Next(2) == 0
+                ? DuelRules.Side.Host
+                : DuelRules.Side.Guest;
             var duel = new Duel(opener);
 
             int hostSecret = rng.Next(1, 101);
             int guestSecret = rng.Next(1, 101);
-            int hostLo = 1, hostHi = 100, guestLo = 1, guestHi = 100;
+            int hostLo = 1;
+            int hostHi = 100;
+            int guestLo = 1;
+            int guestHi = 100;
 
             for (int step = 0; step < 60 && !duel.Finished; step++)
             {
-                bool hostTurn = duel.Turn == "Host";
-                int guess = hostTurn ? (hostLo + hostHi) / 2 : (guestLo + guestHi) / 2;
-                var move = duel.Guess(hostTurn ? "Host" : "Guest", guess,
+                bool hostTurn = duel.Turn == DuelRules.Side.Host;
+                int guess = hostTurn
+                    ? (hostLo + hostHi) / 2
+                    : (guestLo + guestHi) / 2;
+                DuelRules.Side side = hostTurn
+                    ? DuelRules.Side.Host
+                    : DuelRules.Side.Guest;
+                var move = duel.Guess(
+                    side,
+                    guess,
                     hostTurn ? guestSecret : hostSecret);
 
-                Assert.IsTrue(move.Accepted, "simulated move rejected: " + move.Error);
+                Assert.IsTrue(
+                    move.Accepted,
+                    "simulated move rejected: " + move.Error);
 
-                if (move.Hint == "Higher")
+                if (move.Hint == DuelRules.Hint.Higher)
                 {
-                    if (hostTurn) hostLo = guess + 1; else guestLo = guess + 1;
+                    if (hostTurn) hostLo = guess + 1;
+                    else guestLo = guess + 1;
                 }
-                else if (move.Hint == "Lower")
+                else if (move.Hint == DuelRules.Hint.Lower)
                 {
-                    if (hostTurn) hostHi = guess - 1; else guestHi = guess - 1;
+                    if (hostTurn) hostHi = guess - 1;
+                    else guestHi = guess - 1;
                 }
             }
 
             Assert.IsTrue(duel.Finished, "simulated match failed to finish");
 
-            string winner = duel.Result == "HostWins" ? "Host"
-                : duel.Result == "GuestWins" ? "Guest" : "";
-            if (winner == "") continue;
-            if (winner == opener) openerWins++; else responderWins++;
+            DuelRules.Side winner = duel.Result == DuelRules.Outcome.HostWins
+                ? DuelRules.Side.Host
+                : duel.Result == DuelRules.Outcome.GuestWins
+                    ? DuelRules.Side.Guest
+                    : DuelRules.Side.None;
+            if (winner == DuelRules.Side.None) continue;
+            if (winner == opener) openerWins++;
+            else responderWins++;
         }
 
         double gap = Math.Abs(openerWins - responderWins) / (double)runs;
-        Assert.Less(gap, 0.05,
-            string.Format("opener won {0} and responder {1} of {2} — turn order still decides matches",
-                openerWins, responderWins, runs));
+        Assert.Less(
+            gap,
+            0.05,
+            string.Format(
+                "opener won {0} and responder {1} of {2} — turn order still decides matches",
+                openerWins,
+                responderWins,
+                runs));
     }
 }

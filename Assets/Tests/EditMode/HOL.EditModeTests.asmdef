@@ -2,6 +2,7 @@
     "name": "HOL.EditModeTests",
     "rootNamespace": "",
     "references": [
+        "HOL.Core",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner",
         "Unity.TextMeshPro"
