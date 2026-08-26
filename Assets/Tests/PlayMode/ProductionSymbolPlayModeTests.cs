@@ -72,9 +72,14 @@ public sealed class ProductionSymbolPlayModeTests
         yield return null;
     }
 
-    [Test]
-    public void ApprovedSoloTrophyIsARealProductionSprite()
+    [UnityTest]
+    public IEnumerator ApprovedSoloTrophyIsARealProductionSprite()
     {
+        // Vector Graphics resources finish their player-side initialization on
+        // the first PlayMode frame. A synchronous NUnit test can run before that
+        // boundary and report a false missing-resource failure.
+        yield return null;
+
         var trophy = Resources.Load<Sprite>("reference/board_trophy_exact");
         Assert.That(trophy, Is.Not.Null,
             "Result presentation requires the approved trophy sprite.");
