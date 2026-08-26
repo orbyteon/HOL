@@ -13,8 +13,11 @@ permissions:
   actions: read
   pull-requests: read
 
+# A labeled event starts every preview workflow before job-level `if` filters
+# are evaluated. Keep this group screen-scoped so unrelated skipped workflows
+# cannot cancel the requested PanelPlay capture.
 concurrency:
-  group: hol-android-preview-${{ github.event.pull_request.number || github.ref }}
+  group: hol-panelplay-android-preview-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
