@@ -43,6 +43,8 @@ public sealed class DailyHuntCaptureBootstrap : MonoBehaviour
     DailyHuntVisuals visuals;
     bool opened;
     bool presentationWaitStarted;
+    string lastReadinessFailure;
+    float nextReadinessLog;
 
     public static bool CaptureRequested { get; private set; }
 
@@ -178,8 +180,11 @@ public sealed class DailyHuntCaptureBootstrap : MonoBehaviour
             return;
 
         Transform root = Find(hunt.transform, DailyHuntVisuals.VisualRootName);
-        if (!ApprovedPresentationReady(root, visuals))
+        if (!ApprovedPresentationReady(root, visuals, out string failure))
+        {
+            LogReadinessWait(failure);
             return;
+        }
 
         if (!presentationWaitStarted)
         {
@@ -207,8 +212,11 @@ public sealed class DailyHuntCaptureBootstrap : MonoBehaviour
             yield break;
 
         Transform root = Find(hunt.transform, DailyHuntVisuals.VisualRootName);
-        if (!ApprovedPresentationReady(root, visuals))
+        if (!ApprovedPresentationReady(root, visuals, out string failure))
+        {
+            LogReadinessWait(failure);
             yield break;
+        }
 
         HideCaptureOverlays();
         markerLogged = true;
@@ -220,41 +228,127 @@ public sealed class DailyHuntCaptureBootstrap : MonoBehaviour
 
     static bool ApprovedPresentationReady(
         Transform root,
-        DailyHuntVisuals owner)
+        DailyHuntVisuals owner,
+        out string failure)
     {
-        if (root == null || owner == null ||
-            owner.DisplayFont == null || owner.BodyFont == null)
+        if (root == null)
+        {
+            failure = "visual-root-missing";
             return false;
+        }
+        if (owner == null)
+        {
+            failure = "visual-owner-missing";
+            return false;
+        }
+        if (owner.DisplayFont == null)
+        {
+            failure = "display-font-missing";
+            return false;
+        }
+        if (owner.BodyFont == null)
+        {
+            failure = "body-font-missing";
+            return false;
+        }
 
         Transform dashboard = Find(root, "DailyMissionDashboard");
         Transform startButton = Find(root, "DailyMissionStartButton");
-        if (dashboard == null || !dashboard.gameObject.activeInHierarchy ||
-            startButton == null || !startButton.gameObject.activeInHierarchy)
+        if (dashboard == null)
+        {
+            failure = "mission-dashboard-missing";
+            return false;
+        }
+        if (!dashboard.gameObject.activeInHierarchy)
+        {
+            failure = "mission-dashboard-inactive";
+            return false;
+        }
+        if (startButton == null)
+        {
+            failure = "mission-start-missing";
+            return false;
+        }
+        if (!startButton.gameObject.activeInHierarchy)
+        {
+            failure = "mission-start-inactive";
+            return false;
+        }
+
+        string[] displayNames =
+        {
+            "DailyRibbonTitle",
+            "DailyPlayerName",
+            "DailyPlayerProgress",
+            "DailyMissionHeading",
+            "DailyMissionRewardHeading",
+        };
+        foreach (string name in displayNames)
+        {
+            Transform searchRoot = name.StartsWith("DailyMission",
+                StringComparison.Ordinal) ? dashboard : root;
+            if (!LiveTextReady(
+                    FindText(searchRoot, name), owner.DisplayFont,
+                    name, out failure))
+                return false;
+        }
+
+        if (!LiveTextReady(
+                FindText(startButton, "Label"), owner.DisplayFont,
+                "DailyMissionStartButton/Label", out failure))
             return false;
 
-        TMP_Text[] displayTexts =
-        {
-            FindText(root, "DailyRibbonTitle"),
-            FindText(root, "DailyPlayerName"),
-            FindText(root, "DailyPlayerProgress"),
-            FindText(dashboard, "DailyMissionHeading"),
-            FindText(dashboard, "DailyMissionRewardHeading"),
-            FindText(startButton, "Label"),
-        };
-        foreach (TMP_Text text in displayTexts)
-            if (!LiveTextReady(text, owner.DisplayFont))
-                return false;
+        if (!LiveTextReady(
+                FindText(dashboard, "DailyMissionProgress1"), owner.BodyFont,
+                "DailyMissionProgress1", out failure))
+            return false;
 
-        return LiveTextReady(
-            FindText(dashboard, "DailyMissionProgress1"),
-            owner.BodyFont);
+        failure = null;
+        return true;
     }
 
-    static bool LiveTextReady(TMP_Text text, TMP_FontAsset expectedFont)
+    static bool LiveTextReady(
+        TMP_Text text,
+        TMP_FontAsset expectedFont,
+        string contractName,
+        out string failure)
     {
-        return text != null && text.gameObject.activeInHierarchy &&
-               !string.IsNullOrWhiteSpace(text.text) &&
-               text.font == expectedFont;
+        if (text == null)
+        {
+            failure = contractName + "-missing";
+            return false;
+        }
+        if (!text.gameObject.activeInHierarchy)
+        {
+            failure = contractName + "-inactive";
+            return false;
+        }
+        if (string.IsNullOrWhiteSpace(text.text))
+        {
+            failure = contractName + "-empty";
+            return false;
+        }
+        if (text.font != expectedFont)
+        {
+            string actual = text.font == null ? "null" : text.font.name;
+            string expected = expectedFont == null ? "null" : expectedFont.name;
+            failure = contractName + "-font-" + actual + "-expected-" + expected;
+            return false;
+        }
+
+        failure = null;
+        return true;
+    }
+
+    void LogReadinessWait(string failure)
+    {
+        if (string.IsNullOrEmpty(failure)) return;
+        if (failure == lastReadinessFailure && Time.unscaledTime < nextReadinessLog)
+            return;
+
+        lastReadinessFailure = failure;
+        nextReadinessLog = Time.unscaledTime + 1f;
+        Debug.Log("[DailyHuntCaptureBootstrap] WAIT " + failure);
     }
 
     void HideCaptureOverlays()
