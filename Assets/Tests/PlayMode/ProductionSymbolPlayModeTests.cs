@@ -109,9 +109,13 @@ public sealed class ProductionSymbolPlayModeTests
         Assert.That(trophy, Is.Not.Null,
             "Result presentation requires the approved trophy resource.");
         Assert.That(trophyImage.sprite, Is.SameAs(trophy));
-        Assert.That(trophy.texture, Is.Not.Null);
-        Assert.That(trophy.texture.width, Is.GreaterThanOrEqualTo(256));
-        Assert.That(trophy.texture.height, Is.GreaterThanOrEqualTo(256));
+
+        // Vector Graphics sprites are geometry-backed and are not required to
+        // expose a raster Texture2D. Validate the imported vector mesh instead.
+        Assert.That(trophy.vertices, Has.Length.GreaterThanOrEqualTo(3));
+        Assert.That(trophy.triangles, Has.Length.GreaterThanOrEqualTo(3));
+        Assert.That(trophy.bounds.size.x, Is.GreaterThan(0f));
+        Assert.That(trophy.bounds.size.y, Is.GreaterThan(0f));
     }
 
     static void InvokeInstaller(Type type)

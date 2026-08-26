@@ -85,9 +85,10 @@ public sealed class PrivateRoomVisualsPlayModeTests
                 image.name + " hides/fades its approved production sprite.");
         }
 
-        // No custom procedural Graphic is permitted under the approved landing
+        // No authored procedural Graphic is permitted under the approved landing
         // screen. Images render approved art; TMP renders localized/dynamic copy.
-        // TMP_SubMeshUI is allowed only as a direct generated child of TMP text.
+        // TMP-generated submeshes and input carets are functional text/input
+        // infrastructure and are accepted only beneath their owning TMP control.
         foreach (var graphic in visualRoot.GetComponentsInChildren<Graphic>(true))
         {
             Assert.That(IsAllowedProductionGraphic(graphic), Is.True,
@@ -159,14 +160,24 @@ public sealed class PrivateRoomVisualsPlayModeTests
             return true;
 
         var subMesh = graphic as TMP_SubMeshUI;
-        return subMesh != null &&
-               subMesh.transform.parent != null &&
-               subMesh.transform.parent.GetComponent<TMP_Text>() != null;
+        if (subMesh != null &&
+            subMesh.transform.parent != null &&
+            subMesh.transform.parent.GetComponent<TMP_Text>() != null)
+            return true;
+
+        return graphic.GetType().Name == "TMP_SelectionCaret" &&
+               graphic.GetComponentInParent<TMP_InputField>() != null;
     }
 
     static IEnumerator CapturePrivateRoomScreenshot()
     {
-        yield return new WaitForEndOfFrame();
+        // WaitForEndOfFrame can stall indefinitely in headless batchmode. The
+        // native Android preview remains the authoritative painted-frame gate;
+        // this PlayMode artifact needs only a normal frame barrier in CI.
+        if (Application.isBatchMode)
+            yield return null;
+        else
+            yield return new WaitForEndOfFrame();
 
         string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
         string artifactDirectory = Path.Combine(projectRoot, "artifacts", "private-room-render");

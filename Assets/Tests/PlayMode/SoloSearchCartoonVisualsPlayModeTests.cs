@@ -32,8 +32,20 @@ public sealed class SoloSearchCartoonVisualsPlayModeTests
         Assert.That(visuals, Is.Not.Null);
         Assert.That(CountInScene(RuntimeType("SoloSearchVisuals")), Is.EqualTo(1));
 
+        // Enter through the real MenuManager lifecycle. The searching modal is
+        // a child of the Play page; calling FakeMatchmaking directly while that
+        // parent is inactive cannot activate or initialize the modal hierarchy.
+        Component menu = FindInScene(RuntimeType("MenuManager"));
+        Assert.That(menu, Is.Not.Null);
+        menu.SendMessage("OnPlayPressed", SendMessageOptions.RequireReceiver);
+        yield return null;
+
         GameObject searchPanel = GetField<GameObject>(matchmaking, "searchingPanel");
         GameObject gamePanel = GetField<GameObject>(matchmaking, "panelGame");
+        Assert.That(searchPanel.transform.parent, Is.Not.Null);
+        Assert.That(searchPanel.transform.parent.gameObject.activeInHierarchy, Is.True,
+            "The real Play page must be active before starting Solo preparation.");
+
         var layout = gamePanel.GetComponentInChildren(
             RuntimeType("HolDuelBoardLayout"), true) as Behaviour;
         Assert.That(layout, Is.Not.Null,
@@ -43,12 +55,23 @@ public sealed class SoloSearchCartoonVisualsPlayModeTests
         // without a fake timer or a test-only production delay field.
         layout.enabled = false;
         Invoke(matchmaking, "StartSearch");
-        for (int frame = 0; frame < 120 &&
-             !GetProperty<bool>(visuals, "IsReady"); frame++)
-            yield return null;
+        Assert.That(GetProperty<bool>(matchmaking, "IsPreparing"), Is.True);
+        Assert.That(searchPanel.activeInHierarchy, Is.True);
 
+        for (int frame = 0; frame < 120; frame++)
+        {
+            visuals = searchPanel.GetComponent(
+                RuntimeType("SoloSearchVisuals")) as Component;
+            if (visuals != null &&
+                GetProperty<bool>(visuals, "IsReady") &&
+                Find(searchPanel.transform, "SoloSearchVisualRoot") != null)
+                break;
+            yield return null;
+        }
+
+        Assert.That(visuals, Is.Not.Null);
         Assert.That(GetProperty<bool>(visuals, "IsReady"), Is.True,
-            "The inactive modal owner must become ready after StartSearch activates it.");
+            "The modal owner must become ready after the real Play parent and Search panel activate.");
         Assert.That(searchPanel.activeInHierarchy, Is.True);
         Assert.That(gamePanel.activeSelf, Is.True,
             "The real board must initialize behind the blocking modal.");
