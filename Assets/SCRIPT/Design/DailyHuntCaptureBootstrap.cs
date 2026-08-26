@@ -178,15 +178,7 @@ public sealed class DailyHuntCaptureBootstrap : MonoBehaviour
             return;
 
         Transform root = Find(hunt.transform, DailyHuntVisuals.VisualRootName);
-        TMP_Text title = FindText(root, "Title");
-        TMP_Text status = FindText(root, "Status");
-        TMP_Text challenge = FindText(root, "DailyChallengeHeading");
-        if (root == null || title == null || status == null || challenge == null ||
-            string.IsNullOrWhiteSpace(title.text) ||
-            string.IsNullOrWhiteSpace(status.text) ||
-            string.IsNullOrWhiteSpace(challenge.text) ||
-            title.font != visuals.DisplayFont ||
-            status.font != visuals.BodyFont)
+        if (!ApprovedPresentationReady(root, visuals))
             return;
 
         if (!presentationWaitStarted)
@@ -215,11 +207,7 @@ public sealed class DailyHuntCaptureBootstrap : MonoBehaviour
             yield break;
 
         Transform root = Find(hunt.transform, DailyHuntVisuals.VisualRootName);
-        TMP_Text title = FindText(root, "Title");
-        TMP_Text status = FindText(root, "Status");
-        if (root == null || title == null || status == null ||
-            string.IsNullOrWhiteSpace(title.text) ||
-            string.IsNullOrWhiteSpace(status.text))
+        if (!ApprovedPresentationReady(root, visuals))
             yield break;
 
         HideCaptureOverlays();
@@ -228,6 +216,45 @@ public sealed class DailyHuntCaptureBootstrap : MonoBehaviour
             ? ReadyMarkerGreek
             : ReadyMarkerEnglish);
         enabled = false;
+    }
+
+    static bool ApprovedPresentationReady(
+        Transform root,
+        DailyHuntVisuals owner)
+    {
+        if (root == null || owner == null ||
+            owner.DisplayFont == null || owner.BodyFont == null)
+            return false;
+
+        Transform dashboard = Find(root, "DailyMissionDashboard");
+        Transform startButton = Find(root, "DailyMissionStartButton");
+        if (dashboard == null || !dashboard.gameObject.activeInHierarchy ||
+            startButton == null || !startButton.gameObject.activeInHierarchy)
+            return false;
+
+        TMP_Text[] displayTexts =
+        {
+            FindText(root, "DailyRibbonTitle"),
+            FindText(root, "DailyPlayerName"),
+            FindText(root, "DailyPlayerProgress"),
+            FindText(dashboard, "DailyMissionHeading"),
+            FindText(dashboard, "DailyMissionRewardHeading"),
+            FindText(startButton, "Label"),
+        };
+        foreach (TMP_Text text in displayTexts)
+            if (!LiveTextReady(text, owner.DisplayFont))
+                return false;
+
+        return LiveTextReady(
+            FindText(dashboard, "DailyMissionProgress1"),
+            owner.BodyFont);
+    }
+
+    static bool LiveTextReady(TMP_Text text, TMP_FontAsset expectedFont)
+    {
+        return text != null && text.gameObject.activeInHierarchy &&
+               !string.IsNullOrWhiteSpace(text.text) &&
+               text.font == expectedFont;
     }
 
     void HideCaptureOverlays()
