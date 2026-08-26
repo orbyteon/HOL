@@ -23,11 +23,23 @@ test("PlayMode workflow isolates its utility checkout from the Unity workspace",
   );
 });
 
-test("PlayMode workflow changes can be validated before merge without taxing ordinary PRs", () => {
+test("an explicit preview label can validate any PR without taxing ordinary PRs", () => {
   assert.match(workflow, /pull_request:\s*\n\s*types:\s*\[labeled\]/);
-  assert.match(workflow, /paths:[\s\S]*?\.github\/workflows\/playmode-tests\.yml/);
+  const pullRequestTrigger = workflow.match(
+    /pull_request:\s*\n([\s\S]*?)\n\s*workflow_dispatch:/
+  )?.[1] ?? "";
+  assert.doesNotMatch(
+    pullRequestTrigger,
+    /\bpaths:/,
+    "the explicit preview label is already the cost gate and must not be silently path-filtered"
+  );
   assert.match(workflow, /github\.event\.label\.name == 'preview-mainmenu'/);
   assert.match(workflow, /github\.event\.pull_request\.head\.sha/);
+  assert.match(
+    workflow,
+    /github\.event\.workflow_run\.pull_requests\[0\]\.head\.sha/,
+    "workflow_run must prefer the associated PR head instead of accidentally testing main"
+  );
   assert.match(
     workflow,
     /if:\s*github\.event_name != 'workflow_dispatch'[\s\S]*?require-ci-green/,
