@@ -217,9 +217,13 @@ public static class RuntimeUI
         image.color = Color.white;
         image.raycastTarget = false;
 
-        // Several screen owners restore raycastTarget after styling. Deactivate
-        // the failed control itself so a later assignment cannot leave an
-        // invisible blocker or clickable generic replacement in production.
+        // A controller may later call SetActive(true) on this same button/input.
+        // Persist the failure independently of active state so the full child
+        // hierarchy remains invisible and non-interactive after reactivation.
+        var guard = image.GetComponent<RequiredProductionArtFailure>();
+        if (guard == null)
+            guard = image.gameObject.AddComponent<RequiredProductionArtFailure>();
+        guard.Apply();
         image.gameObject.SetActive(false);
     }
 
