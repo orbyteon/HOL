@@ -183,7 +183,7 @@ public class PlayFabPvpClient : PvpBackend
 
                 if (requestEpoch != roomRequestEpoch)
                 {
-                    if (RoomCode != code) LeaveExactRoom(code);
+                    if (RoomCode != code) LeaveExactRoom(code, 0);
                     return;
                 }
                 RoomCode = code;
@@ -223,7 +223,7 @@ public class PlayFabPvpClient : PvpBackend
                     if (joined && TryAdoptPendingJoin(code)) return;
                     else if (joined && RoomCode != code)
                     {
-                        LeaveExactRoom(code);
+                        LeaveExactRoom(code, 0);
                     }
                     return;
                 }
@@ -356,16 +356,21 @@ public class PlayFabPvpClient : PvpBackend
         if (!string.IsNullOrEmpty(RoomCode))
         {
             string code = RoomCode;
-            LeaveExactRoom(code);
+            int matchIndex = lastObservedMatchIndex >= 0
+                ? lastObservedMatchIndex
+                : 0;
+            LeaveExactRoom(code, matchIndex);
         }
         RoomCode = "";
         lastObservedMatchIndex = -1;
     }
 
-    void LeaveExactRoom(string code)
+    void LeaveExactRoom(string code, int matchIndex)
     {
         if (string.IsNullOrEmpty(code)) return;
-        string args = "{\"roomId\":\"" + EscapeJson(code) + "\"}";
+        if (matchIndex < 0) matchIndex = 0;
+        string args = "{\"roomId\":\"" + EscapeJson(code) +
+                      "\",\"matchIndex\":" + matchIndex + "}";
         ExecuteCloudScript("leaveRoom", args, (_, __) => { });
     }
 
