@@ -7,21 +7,19 @@ Assembly-CSharp coupling with explicit Unity assembly definitions.
 
 ## Current graph
 
-Phase 1A introduces the first production module:
+Phase 1A introduces the first production module. Arrows point from consumers to
+their compile-time dependency:
 
 ```text
-HOL.Core
-  ^
-  |
-Assembly-CSharp (legacy runtime consumers)
-  ^
-  |
-HOL.EditModeTests
+Assembly-CSharp ───────► HOL.Core ◄─────── HOL.EditModeTests
 ```
 
 `Assembly-CSharp` still owns the unmigrated runtime. Because `HOL.Core` is
 `autoReferenced`, those existing consumers can continue using `DuelRules`
 without source changes while later phases extract additional modules.
+
+`HOL.EditModeTests` references `HOL.Core` directly; it does not route migrated
+core tests through `Assembly-CSharp`.
 
 ## `HOL.Core`
 
@@ -42,14 +40,16 @@ Forbidden:
 - ads, consent or release configuration.
 
 The asmdef enforces the first rule with `noEngineReferences: true` and declares
-no assembly references. `tools/test/core-assembly-boundary.test.mjs` locks the
-remaining path, identity and test-reference invariants.
+no assembly or precompiled references. `tools/test/core-assembly-boundary.test.mjs`
+scans every C# source under `Assets/SCRIPT/Core/` for forbidden framework
+imports/calls and locks the remaining path, identity and direct-test-reference
+invariants.
 
 ## Phase 1A migration
 
 `DuelRules.cs` moved from `Assets/SCRIPT/` to `Assets/SCRIPT/Core/` with its
-existing `.meta` file unchanged. Preserving the GUID keeps every serialized
-Unity reference stable.
+existing `.meta` file unchanged. Preserving the GUID keeps the Unity asset
+identity stable.
 
 `HOL.EditModeTests` now references `HOL.Core` directly. Its duel tests instantiate
 and call `DuelRules` through the public API rather than locating
