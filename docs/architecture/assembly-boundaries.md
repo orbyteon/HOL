@@ -7,19 +7,23 @@ Assembly-CSharp coupling with explicit Unity assembly definitions.
 
 ## Current graph
 
-Phase 1A introduces the first production module. Arrows point from consumers to
-their compile-time dependency:
+Arrows point from consumers to their compile-time dependency:
 
 ```text
-Assembly-CSharp ───────► HOL.Core ◄─────── HOL.EditModeTests
+Assembly-CSharp ───────► HOL.Application ───────► HOL.Core
+       │                                           ▲
+       └───────────────────────────────────────────┘
+
+HOL.EditModeTests ─────► HOL.Application
+HOL.EditModeTests ─────► HOL.Core
 ```
 
-`Assembly-CSharp` still owns the unmigrated runtime. Because `HOL.Core` is
-`autoReferenced`, those existing consumers can continue using `DuelRules`
-without source changes while later phases extract additional modules.
+`Assembly-CSharp` still owns the unmigrated runtime. Because both production
+modules are `autoReferenced`, existing callers continue to compile while later
+slices extract their responsibilities.
 
-`HOL.EditModeTests` references `HOL.Core` directly; it does not route migrated
-core tests through `Assembly-CSharp`.
+Tests for migrated contracts reference the corresponding production asmdef
+directly. They do not route ordinary C# API checks through reflection.
 
 ## `HOL.Core`
 
@@ -27,7 +31,7 @@ Location: `Assets/SCRIPT/Core/HOL.Core.asmdef`
 
 Allowed:
 
-- pure C# duel rules, outcomes and value types;
+- pure C# duel rules and core value types;
 - deterministic calculations with no scene, service or persistence dependency;
 - .NET base-class-library types.
 
@@ -45,19 +49,55 @@ scans every C# source under `Assets/SCRIPT/Core/` for forbidden framework
 imports/calls and locks the remaining path, identity and direct-test-reference
 invariants.
 
-## Phase 1A migration
+## `HOL.Application`
+
+Location: `Assets/SCRIPT/Application/HOL.Application.asmdef`
+
+Allowed:
+
+- Unity-free match/application value contracts;
+- application-level events and orchestration contracts;
+- use cases that depend only on `HOL.Core` and .NET base types.
+
+Forbidden:
+
+- `UnityEngine`, scenes, UI, `MonoBehaviour` or `ScriptableObject`;
+- `PlayerPrefs` or `Resources`;
+- `UnityWebRequest`, PlayFab clients or transport scheduling;
+- ads, consent and release configuration.
+
+The initial slice moves `MatchOutcome` and `GameEvents` with their existing
+Unity GUIDs. `MatchOutcomeTests` now binds both types directly at compile time.
+`AssemblyInfo.cs` temporarily grants internal access to `Assembly-CSharp` while
+callers remain in the predefined Unity assembly, plus `HOL.EditModeTests` for
+direct internal behavior tests. Remove the `Assembly-CSharp` friend when those
+callers move behind typed application entry points.
+
+`MatchOutcome` still contains its existing analytics JSON methods in this first
+behavior-neutral move. Their eventual extraction belongs to
+`HOL.Infrastructure.PlayFab`; this temporary placement is not permission to add
+new transport concerns to `HOL.Application`.
+
+`tools/test/application-assembly-boundary.test.mjs` locks the asmdef direction,
+forbidden dependencies, stable GUIDs and removal of the old reflection harness.
+
+## Completed migrations
+
+### Phase 1A — Core
 
 `DuelRules.cs` moved from `Assets/SCRIPT/` to `Assets/SCRIPT/Core/` with its
-existing `.meta` file unchanged. Preserving the GUID keeps the Unity asset
-identity stable.
-
-`HOL.EditModeTests` now references `HOL.Core` directly. Its duel tests instantiate
-and call `DuelRules` through the public API rather than locating
-`Assembly-CSharp` types with reflection. A renamed or broken public API therefore
-fails compilation instead of a runtime lookup.
+existing `.meta` file unchanged. `HOL.EditModeTests` references `HOL.Core`
+directly and its duel tests use normal construction and method calls.
 
 The server-authoritative mirror remains `playfab/cloudscript.js`; any rule
 change must still update both the C# and CloudScript test suites.
+
+### Phase 1B — application outcome/events
+
+`MatchOutcome.cs` and `GameEvents.cs` move from `SmartHooks/` to
+`Application/`. The event behavior, JSON field names and legacy win/loss
+compatibility stay unchanged. The only production source edit removes an unused
+`UnityEngine` import so the module can enforce `noEngineReferences: true`.
 
 ## Migration discipline
 
