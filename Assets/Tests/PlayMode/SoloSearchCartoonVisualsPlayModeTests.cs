@@ -176,7 +176,11 @@ public sealed class SoloSearchCartoonVisualsPlayModeTests
         for (int frame = 0; frame < 120 &&
              GetProperty<bool>(matchmaking, "IsPreparing"); frame++)
             yield return null;
-        yield return new WaitForEndOfFrame();
+
+        if (Application.isBatchMode)
+            yield return null;
+        else
+            yield return new WaitForEndOfFrame();
 
         Assert.That(searchPanel.activeSelf, Is.False);
         Assert.That(gamePanel.activeSelf, Is.True);
