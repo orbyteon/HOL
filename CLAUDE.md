@@ -15,8 +15,12 @@ approved production cartoon UI with one presentation owner per screen.
      stubs (mcs; keep legacy `Text` int/`TextAnchor` vs TMP float/
      `TextAlignmentOptions` shapes honest so misuse fails like Unity).
      Run the stub compile again *after the last edit*, not before it.
+   - Assembly boundaries — run the relevant structural contract under
+     `tools/test/` (for `HOL.Core`,
+     `node --test tools/test/core-assembly-boundary.test.mjs`). Unity remains
+     authoritative for asmdef compilation and player compatibility.
    - Provisioner — `npm test` in `services/provisioner`.
-   - CloudScript / duel rules — `node --test tools/test`.
+   - CloudScript / duel rules — `node --test tools/test/*.test.mjs`.
    - Real Unity CI (EditMode + Android compile) is always the authority.
 4. **PR and merge** (merge commit) only when every CI job is green. Mark the PR
    ready for review only after local verification; expensive Android preview
@@ -52,14 +56,18 @@ approved production cartoon UI with one presentation owner per screen.
   `SIGNAL_COUNT` in `playfab/cloudscript.js`.
 - The committed `HOLReleaseConfig.json` stays empty. No secrets, keys, or
   keystores in git — CI gates enforce this.
-- Tests in `Assets/Tests/EditMode` reach game types **via reflection only**
-  (the test asmdef deliberately does not reference Assembly-CSharp).
+- Tests for migrated production assemblies reference their asmdefs directly so
+  API drift fails compilation. Reflection remains only for unmigrated
+  `Assembly-CSharp` types or a genuine Unity test boundary; `HOL.EditModeTests`
+  currently references `HOL.Core` directly.
 
 ## Where things live
 
+- Pure duel domain assembly: `Assets/SCRIPT/Core/` (`HOL.Core`).
 - Production art: `Assets/newdesign/Resources/`, grouped by current screen/family.
 - Screen presentation owners: `Assets/SCRIPT/Design/`.
 - Theme-agnostic runtime infrastructure: `Assets/SCRIPT/RuntimeUI/`.
+- Assembly graph and dependency rules: `docs/architecture/assembly-boundaries.md`.
 - Release order and gates: `docs/release-checklist.md`.
 - Play Console answers: `docs/store-listing.md`.
 - Keep `CHANGELOG.md`'s Unreleased section current with every merged change.

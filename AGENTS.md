@@ -10,17 +10,19 @@ missing so a skipped compile cannot look green.
 
 - `Assets/Scenes/` — `SplashScene.unity` (loader) and `MainMenu.unity`
   (everything: menu, solo game, PvP UI hooks).
-- `Assets/SCRIPT/` — gameplay (`GameManager`, `NumberManager`, `DuelRules`,
-  `FakeMatchmaking`, `MenuManager`), ads (`AdsManager`, `ConsentManager`),
-  ops (`ForceUpdate` — PlayFab TitleData `minVersion` gate, fail-open),
-  `ReleaseConfig` + `ReleaseBootstrap` (public production runtime config),
-  `PvP/` (backend abstraction + PlayFab client + controller +
-  `Signals` quick-chat table),
-  `Localization/` (`L10n` table, `LocalizedText`, `LanguageSelector`),
-  `SmartHooks/` (`GameEvents`, `DailyStreak`, `Haptics`),
+- `Assets/SCRIPT/` — the unmigrated runtime: gameplay (`GameManager`,
+  `NumberManager`, `FakeMatchmaking`, `MenuManager`), ads (`AdsManager`,
+  `ConsentManager`), ops (`ForceUpdate` — PlayFab TitleData `minVersion` gate,
+  fail-open), `ReleaseConfig` + `ReleaseBootstrap` (public production runtime
+  config), `PvP/` (backend abstraction + PlayFab client + controller +
+  `Signals` quick-chat table), `Localization/` (`L10n` table, `LocalizedText`,
+  `LanguageSelector`), `SmartHooks/` (`GameEvents`, `DailyStreak`, `Haptics`),
   `UIJuice/` (`ButtonJuice`, `PanelAnimator`, `ConfettiBurst`, …),
   `RuntimeUI/` (theme-agnostic runtime construction/wiring infrastructure),
   `Design/` (screen-specific production presentation owners only).
+- `Assets/SCRIPT/Core/` — `HOL.Core`, a pure C# production assembly for duel
+  rules, outcomes and value types. It has `noEngineReferences: true`; keep
+  Unity, PlayerPrefs, Resources, PlayFab, ads and UI dependencies out.
 - `Assets/newdesign/Resources/` — approved production art grouped by current
   screen/family (`reference`, `phase2a`, `mainmenu`, `settings`, `splash`, etc.).
   Historical generic theme surfaces are not production sources of truth.
@@ -38,8 +40,9 @@ missing so a skipped compile cannot look green.
   CloudScript against an in-memory Shared Group store;
   `room-state-contract.test.mjs` checks every key the server emits against
   `PvpBackend.RoomState`, because JsonUtility binds by exact field name and a
-  mismatch fails silently; `lock-policy-sim.mjs` balances the Lock. No Unity
-  needed for any of them.
+  mismatch fails silently; `core-assembly-boundary.test.mjs` enforces the
+  `HOL.Core` path, dependency and direct-test-reference contract;
+  `lock-policy-sim.mjs` balances the Lock. No Unity needed for any of them.
 - `tools/release/write-release-config.mjs` — validates/injects public production
   config into the temporary release-build workspace.
 - `docs/privacy.html` — privacy policy; keep it truthful when data practices change.
@@ -148,6 +151,11 @@ language. Historical theme systems are retired and must not return.
 - **Every `.cs` and folder needs a committed `.meta`.** Scripts without metas
   got random GUIDs per machine in the past; don't let it happen again.
   MonoImporter metas use the standard block, new GUID per file.
+- **Assembly dependency direction is a compile-time contract.** Follow
+  `docs/architecture/assembly-boundaries.md`. `HOL.Core` may use the .NET base
+  class library only; it must not reference Unity, PlayerPrefs, Resources,
+  PlayFab, ads or UI. Tests for migrated production code reference its asmdef
+  directly; reflection is reserved for genuine Unity test boundaries.
 - **Scene edits are hand-edited YAML.** Preserve existing fileIDs and serialized
   callbacks. When a retired MonoBehaviour is deleted, remove its serialized
   component from the scene in the same controlled phase so no Missing Script is
@@ -165,9 +173,9 @@ language. Historical theme systems are retired and must not return.
   Do not reintroduce a global palette contract that recolors approved sprites.
   Text colors may be authored per screen for contrast and fidelity.
 - **The duel rules live in two places and must stay in step.**
-  `Assets/SCRIPT/DuelRules.cs` (solo) and `playfab/cloudscript.js` (PlayFab,
-  server-authoritative) implement the same round/last-licks/Lock machine. Change
-  one, change the other, and update both test suites —
+  `Assets/SCRIPT/Core/DuelRules.cs` (solo) and `playfab/cloudscript.js`
+  (PlayFab, server-authoritative) implement the same round/last-licks/Lock
+  machine. Change one, change the other, and update both test suites —
   `Assets/Tests/EditMode/DuelRulesTests.cs` and `tools/test/cloudscript.test.mjs`.
 - **Signals carry an index, never text.** `Signals.Table` order is protocol and
   the server validates against its length: append only, never reorder or remove.

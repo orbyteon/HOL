@@ -7,6 +7,10 @@ Play Console versionName in `ProjectSettings.asset`.
 
 ### Changed
 
+- Architecture Phase 1A introduces `HOL.Core` as a Unity-free production
+  assembly (`noEngineReferences: true`), moves `DuelRules` into it without
+  behavior or asset-GUID changes, replaces reflection-based duel tests with
+  direct compile-time references, and documents/automates the dependency boundary.
 - CI cost guardrails: PlayMode runs only after a green `CI` workflow;
   Android preview captures are label-triggered (`preview-mainmenu`,
   `preview-panelplay`, `preview-splash`) or manual, require green CI, checkout

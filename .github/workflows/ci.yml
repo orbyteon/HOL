@@ -284,7 +284,7 @@ jobs:
           node-version: 22
 
       # The duel rules exist twice — playfab/cloudscript.js for PlayFab and
-      # Assets/SCRIPT/DuelRules.cs for solo — and only the JavaScript side can
+      # Assets/SCRIPT/Core/DuelRules.cs for solo — and only the JavaScript side can
       # be executed without Unity. These run the real CloudScript against an
       # in-memory Shared Group store, and check every key it emits against
       # PvpBackend.RoomState, which JsonUtility binds by exact field name.
