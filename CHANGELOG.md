@@ -15,6 +15,14 @@ Play Console versionName in `ProjectSettings.asset`.
 
 ### Fixed
 
+- PlayMode exact-visual validation now keeps its sparse workflow-action checkout
+  outside the Unity workspace, verifies the complete project before GameCI,
+  supports an opt-in pre-merge self-test after exact-head CI is green, and
+  always retains checkout, Unity, test-result and artifact diagnostics.
+- Missing required production UI sprites now fail closed: stale/procedural
+  fallbacks are removed, the failed control is deactivated so it cannot remain
+  as a hidden raycast blocker, and an EditMode regression test locks the
+  behavior.
 - Home PlayMode settle gate no longer blocks on `WaitForEndOfFrame` in
   headless CI batchmode; Android preview builds still wait for end-of-frame
   paint before logging `HOL_MAINMENU_CAPTURE_READY`.
