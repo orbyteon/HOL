@@ -331,8 +331,13 @@ public class PlayFabPvpClient : PvpBackend
         string args = "{\"roomId\":\"" + EscapeJson(RoomCode) +
                       "\",\"secret\":" + secret +
                       ",\"matchIndex\":" + matchIndex + "}";
-        ExecuteCloudScript("requestRematch", args,
-            (ok, resp) => done?.Invoke(ok && CloudOk(resp)));
+        ExecuteCloudScript("requestRematch", args, (ok, resp) =>
+        {
+            bool accepted = ok && CloudOk(resp);
+            if (accepted)
+                ObserveReturnedMatchIndex(resp);
+            done?.Invoke(accepted);
+        });
     }
 
     public override void StartPolling(Action<RoomState> onState)
@@ -498,6 +503,23 @@ public class PlayFabPvpClient : PvpBackend
             }
             done?.Invoke(state != null, state);
         });
+    }
+
+    void ObserveReturnedMatchIndex(string resp)
+    {
+        string inner = ExtractStateJson(resp);
+        if (string.IsNullOrEmpty(inner)) return;
+
+        try
+        {
+            var observed = JsonUtility.FromJson<RoomState>(inner);
+            if (observed != null)
+                lastObservedMatchIndex = observed.matchIndex;
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError("PlayFab returned match-index JSON parse failed: " + ex.Message);
+        }
     }
 
     void ApplyReturnedState(RoomState current, string resp)
