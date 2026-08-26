@@ -23,6 +23,12 @@ Play Console versionName in `ProjectSettings.asset`.
   fallbacks are removed, the failed control is deactivated so it cannot remain
   as a hidden raycast blocker, and an EditMode regression test locks the
   behavior.
+- Signals, rematch commitments, result acknowledgements and room releases now
+  carry and validate the room's live `matchIndex`. Delayed or omitted callbacks
+  from an older match fail closed after a rematch instead of mutating or deleting
+  the newer match in the same persistent room.
+- PlayFab room-state and returned-state JSON parse failures now emit actionable,
+  sanitized diagnostics instead of disappearing inside empty catches.
 - Home PlayMode settle gate no longer blocks on `WaitForEndOfFrame` in
   headless CI batchmode; Android preview builds still wait for end-of-frame
   paint before logging `HOL_MAINMENU_CAPTURE_READY`.
