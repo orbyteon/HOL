@@ -25,9 +25,16 @@ public class RuntimeUIProductionSpriteTests
     }
 
     [Test]
-    public void MissingApprovedSpriteRemovesFallbackAndDeactivatesControl()
+    public void MissingApprovedSpriteRemainsInvisibleAndInertAfterReactivation()
     {
         var root = new GameObject("MissingProductionSpriteTest");
+        var child = new GameObject(
+            "ChildGraphic",
+            typeof(RectTransform),
+            typeof(CanvasRenderer),
+            typeof(Image));
+        child.transform.SetParent(root.transform, false);
+
         var texture = new Texture2D(1, 1, TextureFormat.RGBA32, false);
         texture.SetPixel(0, 0, Color.white);
         texture.Apply();
@@ -46,6 +53,15 @@ public class RuntimeUIProductionSpriteTests
             image.preserveAspect = true;
             image.pixelsPerUnitMultiplier = 2f;
             image.color = Color.red;
+
+            var button = root.AddComponent<Button>();
+            button.targetGraphic = image;
+            button.interactable = true;
+
+            var childImage = child.GetComponent<Image>();
+            childImage.sprite = fallback;
+            childImage.enabled = true;
+            childImage.raycastTarget = true;
 
             const string missingPath = "__tests__/missing-approved-production-sprite";
             LogAssert.Expect(
@@ -71,11 +87,44 @@ public class RuntimeUIProductionSpriteTests
             Assert.IsFalse(image.raycastTarget,
                 "An invisible failed control must not retain a hidden input target.");
             Assert.IsFalse(root.activeSelf,
-                "The failed control must remain inert even if a caller later restores raycasts.");
+                "The first failure response must remove the control immediately.");
             Assert.AreEqual(Image.Type.Simple, image.type);
             Assert.IsFalse(image.preserveAspect);
             Assert.AreEqual(1f, image.pixelsPerUnitMultiplier);
             Assert.AreEqual(Color.white, image.color);
+
+            // PvP and menu state owners legitimately call SetActive(true) while
+            // switching panels. The required-art failure must remain durable
+            // across that transition rather than exposing child labels or input.
+            root.SetActive(true);
+
+            Assert.IsTrue(root.activeSelf,
+                "The regression must exercise an actual state-owner reactivation.");
+            var blocker = root.GetComponent<CanvasGroup>();
+            Assert.IsNotNull(blocker,
+                "A durable failure marker must survive independently of active state.");
+            Assert.AreEqual(0f, blocker.alpha);
+            Assert.IsFalse(blocker.interactable);
+            Assert.IsFalse(blocker.blocksRaycasts);
+            Assert.IsFalse(button.interactable);
+            Assert.IsFalse(image.raycastTarget);
+            Assert.IsFalse(childImage.raycastTarget,
+                "Child graphics must not become hidden raycast targets after reactivation.");
+
+            // Even if a later presentation pass touches a child Graphic, the
+            // root CanvasGroup remains the final visibility/input boundary.
+            childImage.raycastTarget = true;
+            Assert.AreEqual(0f, blocker.alpha);
+            Assert.IsFalse(blocker.interactable);
+            Assert.IsFalse(blocker.blocksRaycasts);
+
+            root.SetActive(false);
+            root.SetActive(true);
+            Assert.AreEqual(0f, blocker.alpha);
+            Assert.IsFalse(blocker.interactable);
+            Assert.IsFalse(blocker.blocksRaycasts);
+            Assert.IsFalse(childImage.raycastTarget,
+                "OnEnable must reapply the durable failure policy every time.");
         }
         finally
         {
