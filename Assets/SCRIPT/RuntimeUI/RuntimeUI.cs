@@ -216,6 +216,11 @@ public static class RuntimeUI
         image.pixelsPerUnitMultiplier = 1f;
         image.color = Color.white;
         image.raycastTarget = false;
+
+        // Several screen owners restore raycastTarget after styling. Deactivate
+        // the failed control itself so a later assignment cannot leave an
+        // invisible blocker or clickable generic replacement in production.
+        image.gameObject.SetActive(false);
     }
 
     // Neutral infrastructure for a caller-owned production frame. The
