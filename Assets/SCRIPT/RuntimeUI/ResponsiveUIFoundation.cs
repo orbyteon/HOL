@@ -115,7 +115,9 @@ public enum ResponsiveTextRole
 /// <summary>
 /// One bounded TMP policy for English and Greek. Existing configured font
 /// sizes remain the maximum; autosizing may only shrink to the explicit floor,
-/// wrapping is controlled by role, and vertical overflow becomes ellipsis.
+/// wrapping is controlled by role, and unowned vertical overflow becomes
+/// ellipsis. A screen that already authored an explicit autosize floor plus
+/// Overflow keeps that decision when the safe-area hierarchy is refreshed.
 /// </summary>
 public static class ResponsiveTextPolicy
 {
@@ -126,6 +128,9 @@ public static class ResponsiveTextPolicy
 
         bool preserveExistingMinimum = configuredMaximum <= 0f &&
             text.enableAutoSizing && text.fontSizeMin > 0f;
+        bool preserveExistingOverflow = text.enableAutoSizing &&
+            text.fontSizeMin > 0f &&
+            text.overflowMode == TextOverflowModes.Overflow;
         float maximum = configuredMaximum > 0f
             ? configuredMaximum
             : text.enableAutoSizing && text.fontSizeMax > 0f
@@ -163,7 +168,8 @@ public static class ResponsiveTextPolicy
             ? Mathf.Min(maximum, text.fontSizeMin)
             : Mathf.Min(maximum, Mathf.Max(absoluteFloor, maximum * factor));
         text.enableWordWrapping = role != ResponsiveTextRole.Input;
-        text.overflowMode = TextOverflowModes.Ellipsis;
+        if (!preserveExistingOverflow)
+            text.overflowMode = TextOverflowModes.Ellipsis;
     }
 
     public static void ApplyHierarchy(Transform root)
