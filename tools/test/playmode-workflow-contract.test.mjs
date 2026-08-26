@@ -23,6 +23,18 @@ test("PlayMode workflow isolates its utility checkout from the Unity workspace",
   );
 });
 
+test("PlayMode workflow changes can be validated before merge without taxing ordinary PRs", () => {
+  assert.match(workflow, /pull_request:\s*\n\s*types:\s*\[labeled\]/);
+  assert.match(workflow, /paths:[\s\S]*?\.github\/workflows\/playmode-tests\.yml/);
+  assert.match(workflow, /github\.event\.label\.name == 'preview-mainmenu'/);
+  assert.match(workflow, /github\.event\.pull_request\.head\.sha/);
+  assert.match(
+    workflow,
+    /if:\s*github\.event_name != 'workflow_dispatch'[\s\S]*?require-ci-green/,
+    "an opt-in pre-merge run must still require green CI on the exact head"
+  );
+});
+
 test("PlayMode workflow proves that a complete Unity project exists before GameCI", () => {
   assert.match(
     workflow,
