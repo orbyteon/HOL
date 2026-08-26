@@ -49,6 +49,15 @@ The approved cartoon HOL references and production sprites are the sole visual s
 - One screen has one presentation owner. Global theme passes, stacked reskins and procedural replacements for approved artwork are prohibited by `AGENTS.md` and CI integrity gates.
 - Final acceptance is based on native-resolution side-by-side comparison with approved references in both English and Greek.
 
+## Compile-time architecture
+
+Phase 1 is replacing implicit `Assembly-CSharp` coupling with explicit Unity
+assembly definitions. The first production module is `HOL.Core`, a pure C#
+assembly with `noEngineReferences: true` that owns the shared duel state machine.
+Legacy runtime consumers and `HOL.EditModeTests` both compile against it; migrated
+core tests no longer locate production APIs through reflection. See
+`docs/architecture/assembly-boundaries.md`.
+
 ## Tech stack
 
 - **Engine:** Unity `2022.3.62f3` LTS
@@ -89,6 +98,7 @@ HOL/
 ├── Assets/
 │   ├── Scenes/                 # SplashScene, MainMenu
 │   ├── SCRIPT/
+│   │   ├── Core/               # HOL.Core pure duel domain assembly
 │   │   ├── Design/             # screen-specific production visual owners
 │   │   ├── RuntimeUI/          # neutral runtime UI/wiring infrastructure
 │   │   ├── Localization/
@@ -103,7 +113,7 @@ HOL/
 ├── playfab/                    # server-authoritative CloudScript
 ├── services/provisioner/       # first-install production provisioner
 ├── tools/                      # tests, deployment and release tooling
-└── docs/                       # privacy, release and store documentation
+└── docs/                       # privacy, release and architecture documentation
 ```
 
 The game uses two scenes. Main menu, settings, solo, private-room PvP and match panels live in `MainMenu` as controller-owned flows with dedicated presentation owners where required.
@@ -112,7 +122,7 @@ The game uses two scenes. Main menu, settings, solo, private-room PvP and match 
 
 | Script | Responsibility |
 |---|---|
-| `DuelRules.cs` | Pure duel state machine: rounds, equal turns, Lock and draws; mirrored server-side |
+| `Core/DuelRules.cs` | Pure duel state machine in `HOL.Core`: rounds, equal turns, Lock and draws; mirrored server-side |
 | `GameManager.cs` | Solo game loop, AI, turns, stats and match-end flow |
 | `NumberManager.cs` | Secret-number validation and player guess routing |
 | `MenuManager.cs` | Main menu/settings/play navigation and Android back handling |
@@ -141,8 +151,8 @@ The game uses two scenes. Main menu, settings, solo, private-room PvP and match 
 The repository enforces production correctness with:
 
 - static integrity and release-boundary checks
-- Node.js duel-rule and provisioner tests
-- Unity EditMode tests
+- Node.js duel-rule, assembly-boundary and provisioner tests
+- Unity EditMode tests with direct references to migrated production assemblies
 - Android compile build
 - PlayMode tests after green CI on the same commit
 - a dedicated production visual-integrity workflow that rejects retired visual architecture, visual graveyard folders, near-zero-alpha sprite hiding and rejected generic surfaces
