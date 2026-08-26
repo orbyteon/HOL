@@ -23,12 +23,28 @@ test("PlayFab match-scoped commands carry the authoritative match index", () => 
     /AcknowledgeResult\(int matchIndex\)/,
     "PvpBackend must expose an explicit match-index acknowledgement overload");
 
+  const defaultSignal = methodSlice(
+    client,
+    "public override void SendSignal(int signalId, Action<bool> done)",
+    "public override void SendSignal(int signalId, int matchIndex");
+  assert.match(defaultSignal,
+    /SendSignal\(signalId,\s*lastObservedMatchIndex,\s*done\)/,
+    "The compatibility Signal entry point must use the last authoritative index");
+
   const signal = methodSlice(
     client,
     "public override void SendSignal(int signalId, int matchIndex",
     "public override void RequestRematch(int secret, Action<bool> done)");
   assert.match(signal, /\\\"matchIndex\\\":/,
     "Signals must send matchIndex");
+
+  const defaultRematch = methodSlice(
+    client,
+    "public override void RequestRematch(int secret, Action<bool> done)",
+    "public override void RequestRematch(int secret, int matchIndex");
+  assert.match(defaultRematch,
+    /RequestRematch\(secret,\s*lastObservedMatchIndex,\s*done\)/,
+    "The controller-facing Rematch entry point must use the last authoritative index");
 
   const rematch = methodSlice(
     client,
@@ -39,6 +55,15 @@ test("PlayFab match-scoped commands carry the authoritative match index", () => 
   assert.match(rematch, /ObserveReturnedMatchIndex\(resp\)/,
     "A successful rematch response must immediately advance the observed index");
 
+  const deleteRoom = methodSlice(
+    client,
+    "public override void DeleteRoom()",
+    "void LeaveExactRoom(string code, int matchIndex)");
+  assert.match(deleteRoom, /lastObservedMatchIndex/,
+    "Room release must be fenced by the last authoritative index");
+  assert.match(deleteRoom, /LeaveExactRoom\(code,\s*matchIndex\)/,
+    "DeleteRoom must pass its captured generation into leaveRoom");
+
   const leave = methodSlice(
     client,
     "void LeaveExactRoom(string code, int matchIndex)",
@@ -48,10 +73,28 @@ test("PlayFab match-scoped commands carry the authoritative match index", () => 
   assert.match(leave, /ExecuteCloudScript\("leaveRoom"/,
     "Leave must remain server-authoritative");
 
+  const defaultAcknowledgement = methodSlice(
+    client,
+    "public override void AcknowledgeResult()",
+    "public override void AcknowledgeResult(int matchIndex)");
+  assert.match(defaultAcknowledgement,
+    /AcknowledgeResult\(lastObservedMatchIndex\)/,
+    "The controller-facing result Ack must use the last authoritative index");
+
   const acknowledgement = methodSlice(
     client,
     "public override void AcknowledgeResult(int matchIndex)",
     "IEnumerator Poll");
   assert.match(acknowledgement, /\\\"matchIndex\\\":/,
     "Result acknowledgements must send matchIndex");
+
+  const poll = methodSlice(
+    client,
+    "IEnumerator Poll(Action<RoomState> onState)",
+    "// ------------------------------------------------ CloudScript state access");
+  assert.match(poll, /lastObservedMatchIndex\s*=\s*state\.matchIndex/,
+    "Every authoritative poll snapshot must refresh the tracked generation");
+
+  assert.doesNotMatch(client, /catch\s*\{\s*\}/,
+    "PlayFab state parsing must never fail silently");
 });
