@@ -3,6 +3,7 @@
     "rootNamespace": "",
     "references": [
         "HOL.Core",
+        "HOL.Application",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner",
         "Unity.TextMeshPro"
