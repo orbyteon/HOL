@@ -171,13 +171,14 @@ public sealed class PrivateRoomVisualsPlayModeTests
 
     static IEnumerator CapturePrivateRoomScreenshot()
     {
-        // WaitForEndOfFrame can stall indefinitely in headless batchmode. The
-        // native Android preview remains the authoritative painted-frame gate;
-        // this PlayMode artifact needs only a normal frame barrier in CI.
+        // ScreenCapture.CaptureScreenshot is a player/device paint seam and is
+        // a no-op in Linux batchmode. The native Android preview remains the
+        // authoritative capture gate; skip only this file-write step in CI so
+        // the hierarchy, artwork, callback and input assertions still execute.
         if (Application.isBatchMode)
-            yield return null;
-        else
-            yield return new WaitForEndOfFrame();
+            yield break;
+
+        yield return new WaitForEndOfFrame();
 
         string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
         string artifactDirectory = Path.Combine(projectRoot, "artifacts", "private-room-render");
