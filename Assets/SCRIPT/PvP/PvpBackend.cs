@@ -94,27 +94,16 @@ public abstract class PvpBackend : MonoBehaviour
         SendSignal(signalId, done);
     }
 
-    // Commits a fresh secret for another match in the same room. The indexed
-    // overload fences a delayed result-screen command from a later match while
-    // retaining the original virtual for any non-shipping test transport.
+    // Commits a fresh secret for another match in the same room. The next match
+    // is dealt only once both sides have committed.
     public virtual void RequestRematch(int secret, Action<bool> done) { done?.Invoke(false); }
-    public virtual void RequestRematch(int secret, int matchIndex,
-        Action<bool> done)
-    {
-        RequestRematch(secret, done);
-    }
 
     public abstract void StartPolling(Action<RoomState> onState);
     public abstract void StopPolling();
     public abstract void DeleteRoom();
 
-    // Deletes completed room data after both clients observed the result. The
-    // indexed overload provides the same stale-command fence as rematch.
+    // Deletes completed room data after both clients observed the result.
     public virtual void AcknowledgeResult() { }
-    public virtual void AcknowledgeResult(int matchIndex)
-    {
-        AcknowledgeResult();
-    }
 
     protected const string CodeAlphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 
