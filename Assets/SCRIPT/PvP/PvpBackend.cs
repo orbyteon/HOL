@@ -94,16 +94,32 @@ public abstract class PvpBackend : MonoBehaviour
         SendSignal(signalId, done);
     }
 
-    // Commits a fresh secret for another match in the same room. The next match
-    // is dealt only once both sides have committed.
-    public virtual void RequestRematch(int secret, Action<bool> done) { done?.Invoke(false); }
+    // Commits a fresh secret for another match in the same room. Every current
+    // caller must include the authoritative match index so a delayed result-
+    // screen command cannot mutate a later match in the same long-lived room.
+    public virtual void RequestRematch(int secret, Action<bool> done)
+    {
+        RequestRematch(secret, -1, done);
+    }
+
+    public virtual void RequestRematch(int secret, int matchIndex,
+        Action<bool> done)
+    {
+        done?.Invoke(false);
+    }
 
     public abstract void StartPolling(Action<RoomState> onState);
     public abstract void StopPolling();
     public abstract void DeleteRoom();
 
-    // Deletes completed room data after both clients observed the result.
-    public virtual void AcknowledgeResult() { }
+    // Deletes completed room data after both clients observed the result. The
+    // match-scoped overload fences delayed acknowledgements after a rematch.
+    public virtual void AcknowledgeResult()
+    {
+        AcknowledgeResult(-1);
+    }
+
+    public virtual void AcknowledgeResult(int matchIndex) { }
 
     protected const string CodeAlphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 
