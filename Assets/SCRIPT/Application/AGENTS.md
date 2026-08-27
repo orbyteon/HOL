@@ -13,8 +13,8 @@ second UI, persistence, transport or service layer.
 - Depend only on `HOL.Core` and .NET base-class-library types.
 - Do not reference `UnityEngine`, `UnityEditor`, scenes, `MonoBehaviour`,
   `ScriptableObject`, TextMesh Pro or Unity UI.
-- Do not call `PlayerPrefs`, `Resources`, `UnityWebRequest`, PlayFab clients,
-  ads, consent, release configuration or platform APIs.
+- Do not call `PlayerPrefs`, `Resources`, `L10n`, `UnityWebRequest`, PlayFab
+  clients, ads, consent, release configuration or platform APIs.
 - Do not perform HTTP, JSON transport-envelope parsing, polling, retries,
   authentication, persistence or screen navigation here.
 - Do not introduce dependencies from `HOL.Core` back to `HOL.Application`.
@@ -35,6 +35,9 @@ second UI, persistence, transport or service layer.
 - `PvpBackend.RoomState` is a temporary fieldless compatibility shim that
   inherits `PvpRoomState` while unmigrated Unity signatures still use the nested
   type. Do not add fields or behavior back to the shim.
+- `PvpSignalProtocol` owns the ordered fixed Signal ids and per-side cap.
+  Existing ids are append-only protocol. Keep localization, icon loading and
+  all `L10n`/`Resources` behavior in the Unity `Signals` adapter.
 - `AssemblyInfo.cs` grants `Assembly-CSharp` temporary internal access while
   unmigrated callers remain in Unity's predefined assembly. Do not add more
   friend assemblies without an explicit architecture reason. Remove the
@@ -51,6 +54,8 @@ second UI, persistence, transport or service layer.
   enforceable.
 - Keep `tools/test/room-state-contract.test.mjs` aligned with the authoritative
   `PvpRoomState` source and every CloudScript-emitted public field.
+- Keep `tools/test/pvp-signal-protocol.test.mjs` aligned with
+  `PvpSignalProtocol`, the Unity adapter and the CloudScript Signal constants.
 - Keep each PR behavior-neutral unless the owner explicitly authorizes a product
   or gameplay change.
 - No module change authorizes PlayFab/Azure deployment, signed builds,

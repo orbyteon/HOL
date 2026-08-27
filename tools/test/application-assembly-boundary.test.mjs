@@ -9,6 +9,9 @@ const testsAsmdefPath = "Assets/Tests/EditMode/HOL.EditModeTests.asmdef";
 const outcomeTestsPath = "Assets/Tests/EditMode/MatchOutcomeTests.cs";
 const roomStatePath = `${appDir}/PvpRoomState.cs`;
 const roomStateTestsPath = "Assets/Tests/EditMode/PvpRoomStateTests.cs";
+const signalProtocolPath = `${appDir}/PvpSignalProtocol.cs`;
+const signalProtocolTestsPath =
+  "Assets/Tests/EditMode/PvpSignalProtocolTests.cs";
 const pvpBackendPath = "Assets/SCRIPT/PvP/PvpBackend.cs";
 const scopedAgentPath = `${appDir}/AGENTS.md`;
 const phase1bValidationDocPath =
@@ -19,6 +22,10 @@ const phase1cValidationDocPath =
   "docs/architecture/phase-1c-pvp-room-state-validation.md";
 const phase1cChangelogFragmentPath =
   "CHANGELOG.d/phase-1c-pvp-room-state.md";
+const phase1dValidationDocPath =
+  "docs/architecture/phase-1d-signal-protocol-validation.md";
+const phase1dChangelogFragmentPath =
+  "CHANGELOG.d/phase-1d-signal-protocol.md";
 
 function read(file) {
   return fs.readFileSync(file, "utf8");
@@ -45,6 +52,7 @@ test("HOL.Application is a Unity-free module that depends only on HOL.Core", () 
     /\busing\s+UnityEditor\b/,
     /\bPlayerPrefs\b/,
     /\bResources\s*\./,
+    /\bL10n\b/,
     /\bMonoBehaviour\b/,
     /\bScriptableObject\b/,
     /\bUnityWebRequest\b/,
@@ -120,6 +128,26 @@ test("PvP room state is an application contract with a fieldless runtime shim", 
   assert.match(tests, /JsonUtility\.FromJson<DerivedRoomState>/);
 });
 
+test("fixed Signal protocol belongs to HOL.Application with direct tests", () => {
+  const protocol = read(signalProtocolPath);
+  assert.match(protocol, /public\s+static\s+class\s+PvpSignalProtocol/);
+  assert.match(protocol, /public\s+static\s+readonly\s+string\[\]\s+Keys/);
+  assert.match(protocol, /public\s+const\s+int\s+CapPerSide\s*=\s*12/);
+  assert.match(protocol, /public\s+static\s+bool\s+IsValid\s*\(/);
+  assert.match(protocol, /public\s+static\s+string\s+Key\s*\(/);
+  assert.doesNotMatch(protocol, /\bL10n\b/);
+  assert.doesNotMatch(protocol, /\bResources\b/);
+
+  assert.match(read(`${signalProtocolPath}.meta`),
+    /guid:\s*0a3a957b710043878bc8d3e41c2c75f0/);
+
+  const tests = read(signalProtocolTestsPath);
+  assert.match(tests, /PvpSignalProtocol\.Keys/);
+  assert.match(tests, /PvpSignalProtocol\.CapPerSide/);
+  assert.doesNotMatch(tests, /System\.Reflection/);
+  assert.doesNotMatch(tests, /AppDomain\.CurrentDomain/);
+});
+
 test("Phase 1B keeps scoped agent, validation and release-note contracts", () => {
   const scopedAgent = read(scopedAgentPath);
   assert.match(scopedAgent, /HOL\.Application — Mandatory Agent Contract/);
@@ -153,4 +181,21 @@ test("Phase 1C keeps room-state guidance, validation and release notes", () => {
   assert.match(fragment, /Moved the PvP public room-state contract/);
   assert.match(fragment, /fieldless compatibility shim/);
   assert.match(fragment, /No gameplay, transport, scene, UI or deployment/);
+});
+
+test("Phase 1D keeps Signal guidance, validation and release notes", () => {
+  const scopedAgent = read(scopedAgentPath);
+  assert.match(scopedAgent, /`PvpSignalProtocol`/);
+  assert.match(scopedAgent, /append-only protocol/);
+  assert.match(scopedAgent, /Unity `Signals` adapter/);
+
+  const validation = read(phase1dValidationDocPath);
+  assert.match(validation, /exact PR merge\s+candidate/);
+  assert.match(validation, /SIGNAL_COUNT/);
+  assert.match(validation, /Automatic PlayMode/);
+
+  const fragment = read(phase1dChangelogFragmentPath);
+  assert.match(fragment, /Moved the ordered six Signal localization keys/);
+  assert.match(fragment, /thin localization adapter/);
+  assert.match(fragment, /No gameplay, networking, moderation/);
 });
