@@ -328,6 +328,7 @@ public class GameManager : MonoBehaviour
         {
             // Not "you win" yet — the opponent may still answer this round.
             aiAnswerText.text = playerLabel + ": " + guess + "\n" + L10n.Get("correct") + "!";
+            GameEvents.CorrectGuess();
         }
         else if (move.Hint == DuelRules.Hint.Higher)
         {

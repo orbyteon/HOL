@@ -3,6 +3,7 @@ import test from "node:test";
 import zlib from "node:zlib";
 
 import {
+  expectedDimensionsFromPath,
   validateMainMenuPng,
 } from "../mainmenu/validate-mainmenu-screenshot.mjs";
 
@@ -73,6 +74,18 @@ test("dimensions fail before malformed image data is inflated", () => {
     /Expected 1080x1920, got 1x1/);
 });
 
+test("named portrait screenshots provide their exact expected viewport", () => {
+  assert.deepEqual(
+    expectedDimensionsFromPath("daily-hunt-en-1080x2400.png"),
+    { expectedWidth: 1080, expectedHeight: 2400 });
+  assert.deepEqual(
+    expectedDimensionsFromPath("/tmp/daily-hunt-el-1179x2556.png"),
+    { expectedWidth: 1179, expectedHeight: 2556 });
+  assert.deepEqual(
+    expectedDimensionsFromPath("mainmenu.png"),
+    { expectedWidth: 1080, expectedHeight: 1920 });
+});
+
 test("uniform gray Home screenshot fails closed", () => {
   const png = syntheticRgbaPng(() => [127, 127, 127, 255]);
 
@@ -102,6 +115,23 @@ test("varied 1080x1920 Home screenshot passes content validation", () => {
 
   assert.equal(result.width, 1080);
   assert.equal(result.height, 1920);
+  assert.ok(result.sampledColors > 1);
+  assert.ok(result.luminanceRange > 0);
+  assert.ok(result.channelRange > 0);
+});
+
+test("varied alternate portrait screenshot passes exact viewport validation", () => {
+  const png = syntheticRgbaPng((x, y, width, height) =>
+    x < width / 2 && y < height / 2
+      ? [12, 18, 64, 255]
+      : [238, 74, 160, 255], 360, 800);
+
+  const result = validateMainMenuPng(
+    png,
+    { expectedWidth: 360, expectedHeight: 800 });
+
+  assert.equal(result.width, 360);
+  assert.equal(result.height, 800);
   assert.ok(result.sampledColors > 1);
   assert.ok(result.luminanceRange > 0);
   assert.ok(result.channelRange > 0);

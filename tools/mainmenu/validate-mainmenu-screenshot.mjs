@@ -2,8 +2,8 @@ import fs from "node:fs";
 import { pathToFileURL } from "node:url";
 import zlib from "node:zlib";
 
-const expectedWidth = 1080;
-const expectedHeight = 1920;
+const defaultExpectedWidth = 1080;
+const defaultExpectedHeight = 1920;
 const minimumLuminanceRange = 12;
 const minimumChannelRange = 16;
 const targetSampleCount = 4096;
@@ -21,7 +21,34 @@ const paeth = (left, up, upperLeft) => {
   return upDistance <= upperLeftDistance ? up : upperLeft;
 };
 
-export const decodeRgbaPng = png => {
+const normalizedExpectedDimensions = options => {
+  const width = Number(options?.expectedWidth ?? defaultExpectedWidth);
+  const height = Number(options?.expectedHeight ?? defaultExpectedHeight);
+  requireCondition(
+    Number.isSafeInteger(width) && width > 0,
+    "Expected screenshot width must be a positive integer");
+  requireCondition(
+    Number.isSafeInteger(height) && height > 0,
+    "Expected screenshot height must be a positive integer");
+  return { width, height };
+};
+
+export const expectedDimensionsFromPath = path => {
+  const match = String(path ?? "").match(/(?:^|[-_])(\d+)x(\d+)\.png$/i);
+  if (!match) {
+    return {
+      expectedWidth: defaultExpectedWidth,
+      expectedHeight: defaultExpectedHeight,
+    };
+  }
+
+  return {
+    expectedWidth: Number(match[1]),
+    expectedHeight: Number(match[2]),
+  };
+};
+
+export const decodeRgbaPng = (png, options = {}) => {
   requireCondition(Buffer.isBuffer(png), "Screenshot must be a PNG Buffer");
   requireCondition(
     png.length >= 33 &&
@@ -47,9 +74,10 @@ export const decodeRgbaPng = png => {
   requireCondition(idat.length > 0, "Screenshot PNG has no IDAT data");
   const width = ihdr.readUInt32BE(0);
   const height = ihdr.readUInt32BE(4);
+  const expected = normalizedExpectedDimensions(options);
   requireCondition(
-    width === expectedWidth && height === expectedHeight,
-    `Expected ${expectedWidth}x${expectedHeight}, got ${width}x${height}`);
+    width === expected.width && height === expected.height,
+    `Expected ${expected.width}x${expected.height}, got ${width}x${height}`);
   requireCondition(
     [...ihdr.subarray(8, 13)].join(",") === "8,6,0,0,0",
     "Expected a non-interlaced 8-bit RGBA PNG");
@@ -90,8 +118,8 @@ export const decodeRgbaPng = png => {
   return { width, height, rgba };
 };
 
-export const validateMainMenuPng = png => {
-  const { width, height, rgba } = decodeRgbaPng(png);
+export const validateMainMenuPng = (png, options = {}) => {
+  const { width, height, rgba } = decodeRgbaPng(png, options);
 
   const pixelCount = width * height;
   const sampleStep = Math.max(1, Math.floor(pixelCount / targetSampleCount));
@@ -154,8 +182,12 @@ const isMain = process.argv[1] &&
 if (isMain) {
   try {
     const path = process.argv[2];
-    requireCondition(path, "Usage: validate-mainmenu-screenshot.mjs <mainmenu.png>");
-    const result = validateMainMenuPng(fs.readFileSync(path));
+    requireCondition(
+      path,
+      "Usage: validate-mainmenu-screenshot.mjs <screenshot.png>");
+    const result = validateMainMenuPng(
+      fs.readFileSync(path),
+      expectedDimensionsFromPath(path));
     console.log(
       `Validated ${result.width}x${result.height} Home PNG: ` +
       `${result.sampledColors} sampled colors, ` +

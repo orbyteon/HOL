@@ -182,6 +182,7 @@ public class PvpGameController : MonoBehaviour
         if (string.IsNullOrEmpty(client.RoomCode)) return;
 
         GUIUtility.systemCopyBuffer = L10n.Get("pvp_invite_text", client.RoomCode);
+        GameEvents.RoomShared();
         SetCreateStatus(L10n.Get("pvp_invite_copied"), false);
         CancelInvoke(nameof(ResumeWaitingStatus));
         Invoke(nameof(ResumeWaitingStatus), 2.5f);
@@ -345,6 +346,9 @@ public class PvpGameController : MonoBehaviour
                 lockArmed = false;
                 if (staked) LockIntro.MarkUsed();
                 NarrowMyRange(guess, lastState != null ? lastState.lastHint : "");
+                if (lastState != null && lastState.lastBy == me &&
+                    lastState.lastHint == "correct")
+                    GameEvents.CorrectGuess();
 
                 // Render the server's answer straight away rather than leaving
                 // the player staring at "sending" for a poll interval. This

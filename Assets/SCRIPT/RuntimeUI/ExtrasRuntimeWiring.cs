@@ -17,6 +17,7 @@ using TMPro;
 //   7. Attaches DailyStreak (it is placed in no scene) so streaks count.
 //   8. Scene-authored English labels -> LocalizedText via content mapping.
 //   9. Settings -> difficulty selector (Easy/Normal/Hard/Adaptive).
+//  10. Attaches the non-visual Daily Challenge event tracker once.
 public class ExtrasRuntimeWiring : MonoBehaviour
 {
     // Functional fallback colors only; current screen owners assign production sprites.
@@ -36,6 +37,7 @@ public class ExtrasRuntimeWiring : MonoBehaviour
 
         NormalizeReferencePanels();
         EnsureDailyStreak();
+        EnsureDailyChallengeTracker();
         WireDailyHunt();
         WireRematchButton();
         WireNumberInputSubmit();
@@ -147,6 +149,15 @@ public class ExtrasRuntimeWiring : MonoBehaviour
     {
         if (FindFirstObjectByType<DailyStreak>() == null)
             gameObject.AddComponent<DailyStreak>();
+    }
+
+    // Mission progress must keep counting while the Daily Challenge panel is
+    // closed, so this event bridge lives beside the other scene-wide hooks,
+    // not on the screen's visual owner.
+    void EnsureDailyChallengeTracker()
+    {
+        if (FindFirstObjectByType<DailyChallengeTracker>() == null)
+            gameObject.AddComponent<DailyChallengeTracker>();
     }
 
     // The Daily Hunt panel and its menu entry, built the same zero-scene-edit
