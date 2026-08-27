@@ -40,13 +40,30 @@ test("an explicit preview label can validate any PR without taxing ordinary PRs"
   assert.match(workflow, /github\.event\.pull_request\.head\.sha/);
   assert.match(
     workflow,
-    /github\.event\.workflow_run\.pull_requests\[0\]\.head\.sha/,
-    "workflow_run must prefer the associated PR head instead of accidentally testing main"
+    /if:\s*github\.event_name != 'workflow_dispatch'[\s\S]*?require-ci-green/,
+    "an opt-in pre-merge run must still require green CI on the exact head"
+  );
+});
+
+test("workflow_run recovers the PR target from the authoritative source CI run", () => {
+  assert.match(
+    workflow,
+    /SOURCE_RUN_ID:\s*\$\{\{\s*github\.event\.workflow_run\.id\s*\}\}/,
+    "the chained workflow must retain the completed CI run id"
   );
   assert.match(
     workflow,
-    /if:\s*github\.event_name != 'workflow_dispatch'[\s\S]*?require-ci-green/,
-    "an opt-in pre-merge run must still require green CI on the exact head"
+    /actions\/runs\/\$\{SOURCE_RUN_ID\}/,
+    "workflow_run must re-read its source CI run because the event payload can lose PR association"
+  );
+  assert.match(workflow, /\.pull_requests\[0\]\.head\.sha/);
+  assert.match(workflow, /\.pull_requests\[0\]\.head\.ref/);
+  assert.match(workflow, /github\.event\.workflow_run\.head_sha/);
+  assert.match(workflow, /github\.event\.workflow_run\.head_branch/);
+  assert.doesNotMatch(
+    workflow,
+    /github\.event\.workflow_run\.pull_requests\[0\]\.head\.sha/,
+    "the lossy event array must not be treated as the sole PR authority"
   );
 });
 
@@ -59,6 +76,9 @@ test("PlayMode workflow proves that a complete Unity project exists before GameC
   assert.match(workflow, /test -f Packages\/manifest\.json/);
   assert.match(workflow, /test -d Assets/);
   assert.match(workflow, /projectPath:\s*\./);
+  assert.match(workflow, /requested_sha=/);
+  assert.match(workflow, /requested_branch=/);
+  assert.match(workflow, /actual_sha=/);
 });
 
 test("PlayMode cannot occupy a runner indefinitely", () => {

@@ -55,6 +55,9 @@ jobs:
       - name: Resolve target commit
         id: target
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN_ID: ${{ github.event.workflow_run.id }}
         run: |
           set -euo pipefail
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
@@ -65,17 +68,26 @@ jobs:
             echo "sha=${{ github.event.pull_request.head.sha }}" >> "$GITHUB_OUTPUT"
             echo "branch=${{ github.event.pull_request.head.ref }}" >> "$GITHUB_OUTPUT"
             echo "ref=${{ github.event.pull_request.head.sha }}" >> "$GITHUB_OUTPUT"
-          elif [ -n "${{ github.event.workflow_run.pull_requests[0].head.sha }}" ]; then
-            # workflow_run.head_sha may point at main for a pull-request CI run.
-            # Prefer the associated PR head so the expensive gate validates the
-            # candidate that actually produced the successful CI result.
-            echo "sha=${{ github.event.workflow_run.pull_requests[0].head.sha }}" >> "$GITHUB_OUTPUT"
-            echo "branch=${{ github.event.workflow_run.pull_requests[0].head.ref }}" >> "$GITHUB_OUTPUT"
-            echo "ref=${{ github.event.workflow_run.pull_requests[0].head.sha }}" >> "$GITHUB_OUTPUT"
           else
-            echo "sha=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
-            echo "branch=${{ github.event.workflow_run.head_branch }}" >> "$GITHUB_OUTPUT"
-            echo "ref=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
+            # GitHub's workflow_run payload can report the base/main SHA and an
+            # empty pull_requests array even when the completed source CI run was
+            # a pull request. Re-read the authoritative source run before falling
+            # back to push-to-main behavior.
+            source_run="$(
+              gh api --method GET \
+                "repos/${GITHUB_REPOSITORY}/actions/runs/${SOURCE_RUN_ID}"
+            )"
+            sha="$(jq -r '.pull_requests[0].head.sha // empty' <<< "$source_run")"
+            branch="$(jq -r '.pull_requests[0].head.ref // empty' <<< "$source_run")"
+
+            if [ -z "$sha" ] || [ -z "$branch" ]; then
+              sha="${{ github.event.workflow_run.head_sha }}"
+              branch="${{ github.event.workflow_run.head_branch }}"
+            fi
+
+            echo "sha=${sha}" >> "$GITHUB_OUTPUT"
+            echo "branch=${branch}" >> "$GITHUB_OUTPUT"
+            echo "ref=${sha}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Require successful CI on target commit
@@ -112,6 +124,7 @@ jobs:
           {
             echo "workspace=$PWD"
             echo "requested_sha=${{ steps.target.outputs.sha }}"
+            echo "requested_branch=${{ steps.target.outputs.branch }}"
             echo "checkout_ref=${{ steps.merge_ref.outputs.ref }}"
             echo "actual_sha=$(git rev-parse HEAD)"
             echo "project_version=$(tr '\n' ' ' < ProjectSettings/ProjectVersion.txt)"

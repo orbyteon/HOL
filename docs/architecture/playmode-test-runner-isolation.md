@@ -1,6 +1,6 @@
-# PlayMode test-runner scene isolation
+# PlayMode test-runner and exact-target isolation
 
-## Incident
+## Incident 1 — fixture scene ownership
 
 After the Daily Hunt merge, PlayMode workflow runs `#456` and `#457` remained
 inside the GameCI PlayMode step instead of producing a test result artifact.
@@ -16,7 +16,7 @@ automatically transitions it to `MainMenu` after its configured delay or a tap,
 so loading it can start unrelated production lifecycle code during a component
 fixture.
 
-## Invariant
+### Fixture invariant
 
 A PlayMode fixture that needs an empty component context must:
 
@@ -25,19 +25,31 @@ A PlayMode fixture that needs an empty component context must:
 3. make only that scene active for objects created by the fixture; and
 4. unload only that retained scene during teardown.
 
-Example:
+It must not enumerate `SceneManager.sceneCount`, call `GetSceneAt` to claim
+other scenes, use `LoadSceneMode.Single`, or start a production scene just to
+obtain an empty hierarchy.
 
-```csharp
-Scene testScene = SceneManager.CreateScene(
-    "FeatureTests_" + Guid.NewGuid().ToString("N"));
-SceneManager.SetActiveScene(testScene);
-// ... test ...
-yield return SceneManager.UnloadSceneAsync(testScene);
+## Incident 2 — chained workflow target drift
+
+After exact PR CI #629 succeeded, automatic PlayMode #459 was created with
+`head_branch: main`, the current `main` SHA and an empty `pull_requests` array.
+The completed source CI run itself still contained PR #80 and its real head.
+Trusting only the lossy `workflow_run` event would therefore validate `main`
+instead of the candidate that produced the green CI result.
+
+### Exact-target invariant
+
+For a `workflow_run` trigger, PlayMode must use the source run id to re-read:
+
+```text
+repos/<owner>/<repo>/actions/runs/<source-run-id>
 ```
 
-The fixture must not enumerate `SceneManager.sceneCount`, call `GetSceneAt` to
-claim other scenes, use `LoadSceneMode.Single`, or start a production scene just
-to obtain an empty hierarchy.
+If that source run contains a pull request, its `head.sha` and `head.ref` are the
+target. Only a source run with no PR association may fall back to the event's
+push SHA and branch. The resolved branch is then passed to the open-PR merge-ref
+resolver, and diagnostics record requested SHA, requested branch, checkout ref
+and actual checkout SHA.
 
 ## Workflow fail-safe
 
