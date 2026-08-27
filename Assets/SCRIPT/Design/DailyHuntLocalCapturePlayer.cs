@@ -43,6 +43,7 @@ public sealed class DailyHuntLocalCapturePlayer : MonoBehaviour
     static int height;
     static int captureScale;
     static string view;
+    static string captureState;
     static bool completeMissionState;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
@@ -61,9 +62,10 @@ public sealed class DailyHuntLocalCapturePlayer : MonoBehaviour
         view = string.Equals(
             ReadArgument(ViewArgument), "hunt",
             StringComparison.OrdinalIgnoreCase) ? "hunt" : "missions";
-        completeMissionState = string.Equals(
-            ReadArgument(StateArgument), "complete",
-            StringComparison.OrdinalIgnoreCase);
+        captureState = (ReadArgument(StateArgument) ?? "fresh")
+            .Trim().ToLowerInvariant();
+        completeMissionState = captureState == "complete" ||
+            captureState == "revived" || captureState == "found";
         if (width % captureScale != 0 || height % captureScale != 0)
             throw new InvalidOperationException(
                 "Capture dimensions must be divisible by the capture scale.");
@@ -92,6 +94,7 @@ public sealed class DailyHuntLocalCapturePlayer : MonoBehaviour
             // no production gameplay path reads a fake value from artwork.
             PlayerPrefs.SetInt("DailyChallengePoints", 1250);
         }
+        ApplyHuntStateFixture();
         PlayerPrefs.Save();
 
         Screen.SetResolution(
@@ -236,6 +239,31 @@ public sealed class DailyHuntLocalCapturePlayer : MonoBehaviour
         L10n.SetLanguage(language == "el"
             ? L10n.Language.Greek
             : L10n.Language.English);
+    }
+
+    static void ApplyHuntStateFixture()
+    {
+        if (captureState != "revived" && captureState != "found")
+            return;
+
+        int day = DailyChallengeProgress.CurrentUtcDayNumber;
+        PlayerPrefs.SetInt("DailyHuntDay", day);
+        PlayerPrefs.SetInt("DailyHuntUsed", captureState == "found" ? 4 : 7);
+        PlayerPrefs.SetString(
+            "DailyHuntTrail",
+            captureState == "found"
+                ? "🔺🔻🔺🎯"
+                : "🔺🔻🔺🔻🔺🔻🔺");
+        PlayerPrefs.SetInt("DailyHuntDone", captureState == "found" ? 1 : 0);
+        PlayerPrefs.SetInt("DailyHuntFound", captureState == "found" ? 1 : 0);
+        PlayerPrefs.SetInt("DailyHuntRevived", captureState == "revived" ? 1 : 0);
+        PlayerPrefs.SetInt("DailyHuntMin", 33);
+        PlayerPrefs.SetInt("DailyHuntMax", 68);
+        if (captureState == "found")
+        {
+            PlayerPrefs.SetInt("DailyHuntStreak", 3);
+            PlayerPrefs.SetInt("DailyHuntLastFound", day);
+        }
     }
 
     static string ReadArgument(string key)

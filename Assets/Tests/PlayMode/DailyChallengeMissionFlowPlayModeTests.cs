@@ -118,7 +118,8 @@ public sealed class DailyChallengeMissionFlowPlayModeTests
         Assert.That(GetProperty<bool>(visuals, "IsReady"), Is.True);
         Invoke(hunt, "Open");
         for (int frame = 0; frame < 3; frame++)
-            yield return new WaitForEndOfFrame();
+            yield return null;
+        Canvas.ForceUpdateCanvases();
 
         Transform visualRoot = Find(hunt.transform, "DailyHuntVisualRoot");
         Transform dashboard = Find(visualRoot, "DailyMissionDashboard");

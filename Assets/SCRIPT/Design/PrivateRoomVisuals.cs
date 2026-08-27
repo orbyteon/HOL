@@ -16,30 +16,30 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
     public const string VisualRootName = "PrivateRoomVisualRoot";
     public const string SafeRootName = "PrivateRoomSafeRoot";
 
-    const string BackgroundResource = CartoonUiKit.Background;
-    const string LogoResource = CartoonUiKit.Logo;
-    const string CreateCardResource = CartoonUiKit.PrivateCreateCard;
-    const string JoinCardResource = CartoonUiKit.PrivateJoinCard;
-    const string CreateIconResource = CartoonUiKit.PrivateAddPlayer;
-    const string ShareIconResource = CartoonUiKit.PrivateShare;
-    const string MascotSixResource = CartoonUiKit.MascotSix;
-    const string MascotSevenResource = CartoonUiKit.MascotSeven;
-    const string AvatarResource = CartoonUiKit.PlayerAvatar;
+    const string BackgroundResource = "phase2a/hol_neon_reference_bg_r3";
+    const string LogoResource = "reference/hol_logo_exact";
+    const string BoyResource = "reference/char_boy_exact";
+    const string GirlResource = "reference/char_girl_exact";
+    const string DoorResource = "reference/board_join_exact";
+    const string CreateIconResource = "reference/board_plus_exact";
+    const string ShareIconResource = "reference/board_friend_exact";
+    const string MascotSixResource = "reference/mascot_6_exact";
+    const string MascotSevenResource = "reference/mascot_7_exact";
+    const string AvatarResource = "reference/player_cyan_exact";
+    const string BackChevronResource = "phase2a/hol_chevron_r2";
     const string ConfettiResource = "mainmenu/mainmenu_deco_confetti";
     const string StarsResource = "mainmenu/mainmenu_deco_stars";
-    const string OuterFrameResource = CartoonUiKit.ScreenFrame;
-    const string TitleRibbonResource = CartoonUiKit.TitleRibbon;
 
-    const string CyanActionResource = CartoonUiKit.CyanAction;
-    const string GoldFrameResource = CartoonUiKit.GoldAction;
-    const string PurpleActionResource = CartoonUiKit.PurpleAction;
-    const string PurpleTrackResource = CartoonUiKit.PurpleTrack;
-    const string PlayerChipResource = CartoonUiKit.PlayerChip;
-    const string TipIconResource = CartoonUiKit.PrivateTipBulb;
+    const string BlueFrameResource = "mainmenu/mainmenu_cta_blue_9s";
+    const string GoldFrameResource = "mainmenu/mainmenu_cta_gold_9s";
+    const string MagentaFrameResource = "phase2a/hol_cta_magenta_r2_9s";
+    const string PurpleFrameResource = "mainmenu/mainmenu_tip_frame_9s";
+    const string PlayerChipResource = "mainmenu/mainmenu_player_chip_frame_9s";
+    const string TipIconResource = "mainmenu/mainmenu_icon_tip_bulb";
     const string StreakIconResource = "mainmenu/mainmenu_icon_streak";
 
-    const string DisplayFontResource = CartoonUiKit.DisplayFont;
-    const string BodyFontResource = CartoonUiKit.BodyFont;
+    const string DisplayFontResource = "phase2a/fonts/HOL Menu Display SDF";
+    const string BodyFontResource = "phase2a/fonts/HOL Menu Body SDF";
 
     const float ReferenceWidth = 1080f;
     const float ReferenceHeight = 1920f;
@@ -53,32 +53,18 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
     PvpGameController pvp;
     RectTransform visualRoot;
     RectTransform safeRoot;
-    RectTransform outerFrameRect;
-    RectTransform backRect;
-    RectTransform chipRect;
-    RectTransform logoRect;
-    RectTransform titleRibbonRect;
-    RectTransform createCardRect;
-    RectTransform joinCardRect;
-    RectTransform shareRect;
-    RectTransform tipCardRect;
-    RectTransform mascotSixRect;
-    RectTransform mascotSevenRect;
     TMP_FontAsset displayFont;
     TMP_FontAsset bodyFont;
     TMP_InputField landingCodeInput;
     TMP_Text playerNameText;
     TMP_Text streakText;
     TMP_Text stepText;
-    TMP_Text joinHeading;
     Button createButton;
     Button joinButton;
     Button backButton;
     Button shareButton;
     bool built;
     float nextRefresh;
-    int lastLayoutWidth = -1;
-    int lastLayoutHeight = -1;
 
     public bool IsReady { get; private set; }
 
@@ -119,7 +105,6 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
     {
         if (!built || pvp == null || pvp.pvpMenuPanel == null) return;
         if (!pvp.pvpMenuPanel.activeInHierarchy) return;
-        ApplyResponsiveLayout();
         if (Time.unscaledTime < nextRefresh) return;
 
         nextRefresh = Time.unscaledTime + 0.25f;
@@ -136,31 +121,29 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
 
         Sprite background = LoadRequired(BackgroundResource);
         Sprite logo = LoadRequired(LogoResource);
-        Sprite createCard = LoadRequired(CreateCardResource);
-        Sprite joinCard = LoadRequired(JoinCardResource);
+        Sprite boy = LoadRequired(BoyResource);
+        Sprite girl = LoadRequired(GirlResource);
+        Sprite door = LoadRequired(DoorResource);
         Sprite createIcon = LoadRequired(CreateIconResource);
         Sprite shareIcon = LoadRequired(ShareIconResource);
         Sprite six = LoadRequired(MascotSixResource);
         Sprite seven = LoadRequired(MascotSevenResource);
         Sprite avatar = LoadRequired(AvatarResource);
-        Sprite cyanAction = LoadRequired(CyanActionResource);
+        Sprite blue = LoadRequired(BlueFrameResource);
         Sprite gold = LoadRequired(GoldFrameResource);
-        Sprite purpleAction = LoadRequired(PurpleActionResource);
-        Sprite purpleTrack = LoadRequired(PurpleTrackResource);
-        Sprite tipPanel = LoadRequired(CartoonUiKit.PurplePanel);
+        Sprite magenta = LoadRequired(MagentaFrameResource);
+        Sprite purple = LoadRequired(PurpleFrameResource);
         Sprite chip = LoadRequired(PlayerChipResource);
         Sprite tip = LoadRequired(TipIconResource);
+        Sprite chevron = LoadRequired(BackChevronResource);
         Sprite streakIcon = LoadRequired(StreakIconResource);
         Sprite confetti = LoadRequired(ConfettiResource);
         Sprite stars = LoadRequired(StarsResource);
-        Sprite outerFrame = LoadRequired(OuterFrameResource);
-        Sprite titleRibbonSprite = LoadRequired(TitleRibbonResource);
 
         IsReady = ArtReady(
-            background, logo, createCard, joinCard, createIcon, shareIcon, six,
-            seven, avatar, cyanAction, gold, purpleAction, purpleTrack,
-            tipPanel, chip, tip,
-            streakIcon, confetti, stars, outerFrame, titleRibbonSprite) &&
+            background, logo, boy, girl, door, createIcon, shareIcon, six,
+            seven, avatar, blue, gold, magenta, purple, chip, tip, chevron,
+            streakIcon, confetti, stars) &&
             displayFont != null && bodyFont != null;
 
         if (!IsReady)
@@ -215,18 +198,11 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
         Stretch(confettiImage.rectTransform);
         ConfigureImage(confettiImage, confetti, false, Image.Type.Simple);
 
-        // Decorative full-screen layers use the approved 9:16 art envelope.
-        // This is owned here so no second runtime component rewrites geometry
-        // after the Private Room presentation has settled.
-        ApplyPortraitEnvelope(backgroundImage.rectTransform);
-        ApplyPortraitEnvelope(starsImage.rectTransform);
-        ApplyPortraitEnvelope(confettiImage.rectTransform);
-
         // The outer frame is decorative and never intercepts input.
         var outer = EnsureImage(visualRoot, "PrivateRoomOuterFrame");
-        ConfigureImage(outer, outerFrame, false, Image.Type.Simple);
-        outerFrameRect = outer.rectTransform;
-        Place(outerFrameRect, Vector2.zero, new Vector2(1056f, 1888f));
+        ConfigureImage(outer, purple, false, Image.Type.Sliced);
+        Place(outer.rectTransform, Vector2.zero, new Vector2(1032f, 1872f));
+        outer.pixelsPerUnitMultiplier = 2f;
         outer.raycastTarget = false;
 
         safeRoot = EnsureRect(visualRoot, SafeRootName);
@@ -239,147 +215,171 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
                 new Vector2(ReferenceWidth, ReferenceHeight));
         }
 
-        BuildTopBar(chip, avatar, purpleTrack, streakIcon);
+        BuildTopBar(chip, avatar, purple, chevron, streakIcon);
 
         var logoImage = EnsureImage(safeRoot, "PrivateRoomLogo");
         ConfigureImage(logoImage, logo, true, Image.Type.Simple);
-        logoRect = logoImage.rectTransform;
         Place(
-            logoRect, new Vector2(-44f, 738f),
-            new Vector2(442f, 318f));
+            logoImage.rectTransform, new Vector2(0f, 690f),
+            new Vector2(585f, 310f));
 
         var titleRibbon = EnsureImage(safeRoot, "PrivateRoomTitleRibbon");
-        ConfigureImage(
-            titleRibbon, titleRibbonSprite, false, Image.Type.Simple);
-        titleRibbonRect = titleRibbon.rectTransform;
+        ConfigureImage(titleRibbon, purple, false, Image.Type.Sliced);
+        titleRibbon.pixelsPerUnitMultiplier = 2f;
         Place(
-            titleRibbonRect, new Vector2(0f, 499f),
-            new Vector2(936f, 156f));
+            titleRibbon.rectTransform, new Vector2(0f, 500f),
+            new Vector2(900f, 150f));
 
         var title = EnsureText(
             titleRibbon.transform, "PrivateRoomTitle", 58f, displayFont,
             NearWhite, TextAlignmentOptions.Center);
-        StretchText(title.rectTransform, 70f, 24f);
-        ConfigureDisplayText(title, 44f, 60f);
-        title.fontStyle |= FontStyles.UpperCase;
+        StretchText(title.rectTransform, 54f, 20f);
+        ConfigureDisplayText(title, 42f, 58f);
         SetLocalized(title, "private_room_title");
 
-        BuildCreateCard(createCard, cyanAction, createIcon);
-        BuildJoinCard(joinCard, gold, purpleTrack);
-        BuildShareAndTip(
-            purpleAction, tipPanel, shareIcon, tip, six, seven);
+        BuildCreateCard(blue, boy, girl, createIcon);
+        BuildJoinCard(magenta, gold, purple, door);
+        BuildShareAndTip(purple, shareIcon, tip, six, seven);
 
         RefreshCopy();
         RefreshPlayerChip();
-        ApplyResponsiveLayout(true);
     }
 
     void BuildTopBar(
         Sprite chipSprite,
         Sprite avatar,
         Sprite pillSprite,
+        Sprite chevron,
         Sprite streakIcon)
     {
-        Reparent(backButton.transform, safeRoot);
-        backRect = (RectTransform)backButton.transform;
+        var step = EnsureImage(safeRoot, "PrivateRoomStepPill");
+        ConfigureImage(step, pillSprite, false, Image.Type.Sliced);
+        step.pixelsPerUnitMultiplier = 2f;
         Place(
-            backRect, new Vector2(-328f, 852f),
-            new Vector2(300f, 72f));
-        StyleButton(
-            backButton, pillSprite, NearWhite, 1f, Image.Type.Simple);
-        HideButtonLabels(backButton.transform);
+            step.rectTransform, new Vector2(-292f, 842f),
+            new Vector2(350f, 82f));
 
         stepText = EnsureText(
-            backButton.transform, "PrivateRoomStepText", 30f, displayFont,
+            step.transform, "PrivateRoomStepText", 28f, displayFont,
             NearWhite, TextAlignmentOptions.Center);
-        StretchText(stepText.rectTransform, 20f, 10f);
-        ConfigureDisplayText(stepText, 21f, 25f);
+        StretchText(stepText.rectTransform, 18f, 10f);
+        ConfigureDisplayText(stepText, 22f, 30f);
         SetLocalized(stepText, "private_room_step");
 
         var chip = EnsureImage(safeRoot, "PrivateRoomPlayerChip");
-        ConfigureImage(chip, chipSprite, false, Image.Type.Simple);
-        chipRect = chip.rectTransform;
+        ConfigureImage(chip, chipSprite, false, Image.Type.Sliced);
+        chip.pixelsPerUnitMultiplier = 2f;
         Place(
-            chipRect, new Vector2(338f, 826f),
-            new Vector2(300f, 134f));
+            chip.rectTransform, new Vector2(352f, 842f),
+            new Vector2(360f, 118f));
 
         var avatarImage = EnsureImage(
             chip.transform, "PrivateRoomPlayerAvatar");
         ConfigureImage(avatarImage, avatar, true, Image.Type.Simple);
         Place(
-            avatarImage.rectTransform, new Vector2(-104f, 0f),
-            new Vector2(92f, 92f));
+            avatarImage.rectTransform, new Vector2(-128f, 0f),
+            new Vector2(84f, 84f));
 
         playerNameText = EnsureText(
             chip.transform, "PrivateRoomPlayerName", 31f, bodyFont,
             NearWhite, TextAlignmentOptions.Center);
         Place(
-            playerNameText.rectTransform, new Vector2(42f, 27f),
-            new Vector2(184f, 46f));
+            playerNameText.rectTransform, new Vector2(38f, 22f),
+            new Vector2(210f, 42f));
         playerNameText.fontStyle = FontStyles.Bold;
         playerNameText.enableAutoSizing = true;
-        playerNameText.fontSizeMin = 25f;
-        playerNameText.fontSizeMax = 33f;
+        playerNameText.fontSizeMin = 24f;
+        playerNameText.fontSizeMax = 31f;
         playerNameText.overflowMode = TextOverflowModes.Ellipsis;
 
         streakText = EnsureText(
             chip.transform, "PrivateRoomStreak", 30f, bodyFont, GoldText,
             TextAlignmentOptions.Center);
         Place(
-            streakText.rectTransform, new Vector2(60f, -30f),
-            new Vector2(112f, 44f));
+            streakText.rectTransform, new Vector2(56f, -28f),
+            new Vector2(120f, 40f));
 
         var streakImage = EnsureImage(
             chip.transform, "PrivateRoomStreakIcon");
         ConfigureImage(streakImage, streakIcon, true, Image.Type.Simple);
         Place(
-            streakImage.rectTransform, new Vector2(-24f, -30f),
-            new Vector2(46f, 46f));
+            streakImage.rectTransform, new Vector2(-22f, -28f),
+            new Vector2(44f, 44f));
+
+        Reparent(backButton.transform, safeRoot);
+        Place(
+            (RectTransform)backButton.transform, new Vector2(-484f, 842f),
+            new Vector2(90f, 90f));
+        StyleButton(
+            backButton, pillSprite, NearWhite, 2f, Image.Type.Sliced);
+        HideButtonLabels(backButton.transform);
+
+        var backIcon = EnsureImage(
+            backButton.transform, "PrivateRoomBackIcon");
+        ConfigureImage(backIcon, chevron, true, Image.Type.Simple);
+        Place(
+            backIcon.rectTransform, Vector2.zero, new Vector2(46f, 58f));
+        backIcon.rectTransform.localScale = new Vector3(-1f, 1f, 1f);
     }
 
     void BuildCreateCard(
         Sprite frame,
-        Sprite actionFrame,
+        Sprite boy,
+        Sprite girl,
         Sprite createIcon)
     {
         var card = EnsureImage(safeRoot, "PrivateRoomCreateCard");
-        ConfigureImage(card, frame, false, Image.Type.Simple);
-        createCardRect = card.rectTransform;
+        ConfigureImage(card, frame, false, Image.Type.Sliced);
+        card.pixelsPerUnitMultiplier = 2f;
         Place(
-            createCardRect, new Vector2(0f, 169f),
-            new Vector2(970f, 480f));
+            card.rectTransform, new Vector2(0f, 205f),
+            new Vector2(930f, 430f));
+
+        var boyImage = EnsureImage(
+            card.transform, "PrivateRoomCreateBoy");
+        ConfigureImage(boyImage, boy, true, Image.Type.Simple);
+        Place(
+            boyImage.rectTransform, new Vector2(-300f, -8f),
+            new Vector2(360f, 370f));
+
+        var girlImage = EnsureImage(
+            card.transform, "PrivateRoomCreateGirl");
+        ConfigureImage(girlImage, girl, true, Image.Type.Simple);
+        Place(
+            girlImage.rectTransform, new Vector2(-130f, -8f),
+            new Vector2(345f, 360f));
 
         var createBadge = EnsureImage(
             card.transform, "PrivateRoomCreateIcon");
         ConfigureImage(createBadge, createIcon, true, Image.Type.Simple);
         Place(
-            createBadge.rectTransform, new Vector2(300f, 126f),
-            new Vector2(104f, 104f));
+            createBadge.rectTransform, new Vector2(282f, 130f),
+            new Vector2(90f, 90f));
 
         var heading = EnsureText(
             card.transform, "PrivateRoomCreateHeading", 46f, displayFont,
             NearWhite, TextAlignmentOptions.Center);
         Place(
-            heading.rectTransform, new Vector2(270f, 52f),
-            new Vector2(420f, 106f));
-        ConfigureDisplayText(heading, 36f, 49f);
+            heading.rectTransform, new Vector2(250f, 78f),
+            new Vector2(430f, 104f));
+        ConfigureDisplayText(heading, 34f, 46f);
         SetLocalized(heading, "private_room_create_title");
 
         var hint = EnsureText(
             card.transform, "PrivateRoomCreateHint", 28f, bodyFont,
             CyanText, TextAlignmentOptions.Center);
         Place(
-            hint.rectTransform, new Vector2(270f, -40f),
-            new Vector2(420f, 82f));
-        ConfigureBodyText(hint, 24f, 31f);
+            hint.rectTransform, new Vector2(250f, -4f),
+            new Vector2(420f, 86f));
+        ConfigureBodyText(hint, 22f, 29f);
         SetLocalized(hint, "private_room_create_hint");
 
         Reparent(createButton.transform, card.transform);
         Place(
             (RectTransform)createButton.transform,
-            new Vector2(270f, -148f), new Vector2(360f, 96f));
+            new Vector2(250f, -124f), new Vector2(370f, 104f));
         StyleButton(
-            createButton, actionFrame, NearWhite, 1f, Image.Type.Simple);
+            createButton, frame, DarkInk, 2f, Image.Type.Sliced);
         ConfigureButtonLabel(
             createButton, "private_room_create_action", 38f, NearWhite);
     }
@@ -387,39 +387,45 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
     void BuildJoinCard(
         Sprite magentaFrame,
         Sprite goldFrame,
-        Sprite inputFrame)
+        Sprite inputFrame,
+        Sprite door)
     {
         var card = EnsureImage(safeRoot, "PrivateRoomJoinCard");
-        ConfigureImage(card, magentaFrame, false, Image.Type.Simple);
-        joinCardRect = card.rectTransform;
+        ConfigureImage(card, magentaFrame, false, Image.Type.Sliced);
+        card.pixelsPerUnitMultiplier = 2f;
         Place(
-            joinCardRect, new Vector2(0f, -321f),
-            new Vector2(970f, 448f));
+            card.rectTransform, new Vector2(0f, -250f),
+            new Vector2(930f, 390f));
 
-        joinHeading = EnsureText(
+        var doorImage = EnsureImage(
+            card.transform, "PrivateRoomJoinDoor");
+        ConfigureImage(doorImage, door, true, Image.Type.Simple);
+        Place(
+            doorImage.rectTransform, new Vector2(-310f, 0f),
+            new Vector2(270f, 285f));
+
+        var heading = EnsureText(
             card.transform, "PrivateRoomJoinHeading", 43f, displayFont,
             NearWhite, TextAlignmentOptions.Center);
         Place(
-            joinHeading.rectTransform, new Vector2(220f, 126f),
-            new Vector2(520f, 92f));
-        ConfigureDisplayText(joinHeading, 23f, 43f);
-        joinHeading.overflowMode = TextOverflowModes.Truncate;
-        joinHeading.fontStyle |= FontStyles.UpperCase;
-        SetLocalized(joinHeading, "private_room_join_title");
+            heading.rectTransform, new Vector2(205f, 116f),
+            new Vector2(510f, 92f));
+        ConfigureDisplayText(heading, 32f, 44f);
+        SetLocalized(heading, "private_room_join_title");
 
         var codeCaption = EnsureText(
             card.transform, "PrivateRoomCodeCaption", 24f, bodyFont,
             MutedWhite, TextAlignmentOptions.Center);
         Place(
-            codeCaption.rectTransform, new Vector2(250f, 52f),
-            new Vector2(450f, 42f));
-        ConfigureBodyText(codeCaption, 22f, 27f);
+            codeCaption.rectTransform, new Vector2(205f, 55f),
+            new Vector2(430f, 38f));
+        ConfigureBodyText(codeCaption, 20f, 25f);
         SetLocalized(codeCaption, "pvp_enter_code");
 
         landingCodeInput = RuntimeUI.CreateInputField(
             card.transform, "PrivateRoomLandingCodeInput",
-            L10n.Get("pvp_enter_code"), new Vector2(250f, -12f),
-            new Vector2(460f, 88f), 5, TMP_InputField.ContentType.Standard);
+            L10n.Get("pvp_enter_code"), new Vector2(205f, 4f),
+            new Vector2(440f, 82f), 5, TMP_InputField.ContentType.Standard);
         landingCodeInput.onValidateInput = ValidateRoomCodeCharacter;
         landingCodeInput.onValueChanged.AddListener(NormalizeLandingCode);
         landingCodeInput.shouldHideMobileInput = true;
@@ -428,16 +434,16 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
         if (inputImage != null)
         {
             inputImage.sprite = inputFrame;
-            inputImage.type = Image.Type.Simple;
+            inputImage.type = Image.Type.Sliced;
             inputImage.color = Color.white;
-            inputImage.pixelsPerUnitMultiplier = 1f;
+            inputImage.pixelsPerUnitMultiplier = 2f;
             inputImage.raycastTarget = true;
         }
 
         if (landingCodeInput.textComponent != null)
         {
             landingCodeInput.textComponent.font = displayFont;
-            landingCodeInput.textComponent.fontSize = 42f;
+            landingCodeInput.textComponent.fontSize = 38f;
             landingCodeInput.textComponent.fontStyle = FontStyles.Bold;
             landingCodeInput.textComponent.color = NearWhite;
             landingCodeInput.textComponent.alignment =
@@ -449,7 +455,7 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
         if (placeholder != null)
         {
             placeholder.font = bodyFont;
-            placeholder.fontSize = 25f;
+            placeholder.fontSize = 23f;
             placeholder.color = MutedWhite;
             placeholder.alignment = TextAlignmentOptions.Center;
         }
@@ -458,17 +464,16 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
         Reparent(joinButton.transform, card.transform);
         Place(
             (RectTransform)joinButton.transform,
-            new Vector2(250f, -142f), new Vector2(460f, 98f));
+            new Vector2(205f, -116f), new Vector2(440f, 104f));
         StyleButton(
-            joinButton, goldFrame, DarkInk, 1f, Image.Type.Simple);
+            joinButton, goldFrame, DarkInk, 2f, Image.Type.Sliced);
         ConfigureButtonLabel(
             joinButton, "private_room_join_action", 42f, DarkInk);
         joinButton.onClick.AddListener(CopyLandingCodeIntoJoinFlow);
     }
 
     void BuildShareAndTip(
-        Sprite shareFrame,
-        Sprite tipFrame,
+        Sprite purpleFrame,
         Sprite shareIcon,
         Sprite tipIcon,
         Sprite six,
@@ -476,14 +481,14 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
     {
         var shareGo = RuntimeUI.CreateObject(
             "PrivateRoomShareButton", safeRoot);
-        shareRect = (RectTransform)shareGo.transform;
         Place(
-            shareRect, new Vector2(0f, -608f),
-            new Vector2(390f, 90f));
+            (RectTransform)shareGo.transform, new Vector2(0f, -515f),
+            new Vector2(430f, 92f));
 
         var shareImage = shareGo.AddComponent<Image>();
         ConfigureImage(
-            shareImage, shareFrame, false, Image.Type.Simple);
+            shareImage, purpleFrame, false, Image.Type.Sliced);
+        shareImage.pixelsPerUnitMultiplier = 2f;
         shareImage.raycastTarget = true;
 
         shareButton = shareGo.AddComponent<Button>();
@@ -495,8 +500,8 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
             shareGo.transform, "PrivateRoomShareIcon");
         ConfigureImage(icon, shareIcon, true, Image.Type.Simple);
         Place(
-            icon.rectTransform, new Vector2(-138f, 0f),
-            new Vector2(68f, 68f));
+            icon.rectTransform, new Vector2(-155f, 0f),
+            new Vector2(58f, 58f));
 
         var shareLabel = EnsureText(
             shareGo.transform, "PrivateRoomShareLabel", 36f, displayFont,
@@ -509,86 +514,41 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
         shareButton.onClick.AddListener(ShareAvailableCode);
 
         var tipCard = EnsureImage(safeRoot, "PrivateRoomTipCard");
-        ConfigureImage(tipCard, tipFrame, false, Image.Type.Simple);
-        tipCardRect = tipCard.rectTransform;
+        ConfigureImage(tipCard, purpleFrame, false, Image.Type.Sliced);
+        tipCard.pixelsPerUnitMultiplier = 2f;
         Place(
-            tipCardRect, new Vector2(0f, -792f),
-            new Vector2(460f, 206f));
+            tipCard.rectTransform, new Vector2(0f, -715f),
+            new Vector2(760f, 170f));
 
         var bulb = EnsureImage(
             tipCard.transform, "PrivateRoomTipIcon");
         ConfigureImage(bulb, tipIcon, true, Image.Type.Simple);
         Place(
-            bulb.rectTransform, new Vector2(-178f, 0f),
-            new Vector2(86f, 86f));
+            bulb.rectTransform, new Vector2(-310f, 0f),
+            new Vector2(82f, 82f));
 
         var tipText = EnsureText(
             tipCard.transform, "PrivateRoomTipText", 28f, bodyFont,
             NearWhite, TextAlignmentOptions.Left);
         Place(
-            tipText.rectTransform, new Vector2(48f, 0f),
-            new Vector2(340f, 154f));
-        ConfigureBodyText(tipText, 21f, 26f);
+            tipText.rectTransform, new Vector2(64f, 0f),
+            new Vector2(560f, 118f));
+        ConfigureBodyText(tipText, 22f, 29f);
         SetLocalized(tipText, "private_room_tip");
 
         var sixImage = EnsureImage(
             safeRoot, "PrivateRoomMascotSix");
         ConfigureImage(sixImage, six, true, Image.Type.Simple);
-        mascotSixRect = sixImage.rectTransform;
         Place(
-            mascotSixRect, new Vector2(-382f, -768f),
-            new Vector2(270f, 344f));
+            sixImage.rectTransform, new Vector2(-430f, -805f),
+            new Vector2(250f, 285f));
 
         var sevenImage = EnsureImage(
             safeRoot, "PrivateRoomMascotSeven");
         ConfigureImage(sevenImage, seven, true, Image.Type.Simple);
-        mascotSevenRect = sevenImage.rectTransform;
         Place(
-            mascotSevenRect, new Vector2(382f, -768f),
-            new Vector2(296f, 360f));
-    }
-
-    void ApplyResponsiveLayout(bool force = false)
-    {
-        if (outerFrameRect == null || backRect == null || chipRect == null ||
-            logoRect == null || titleRibbonRect == null ||
-            createCardRect == null || joinCardRect == null ||
-            shareRect == null || tipCardRect == null ||
-            mascotSixRect == null || mascotSevenRect == null)
-            return;
-
-        int width = Mathf.Max(1, Screen.width);
-        int height = Mathf.Max(1, Screen.height);
-        if (!force && width == lastLayoutWidth && height == lastLayoutHeight)
-            return;
-
-        lastLayoutWidth = width;
-        lastLayoutHeight = height;
-        float aspect = height / (float)width;
-        float tall = Mathf.InverseLerp(1.78f, 2.22f, aspect);
-
-        Place(outerFrameRect, Vector2.zero,
-            new Vector2(1056f, 1888f + 480f * tall));
-        Place(backRect, new Vector2(-328f, 852f + 185f * tall),
-            new Vector2(300f, 72f));
-        Place(chipRect, new Vector2(338f, 826f + 185f * tall),
-            new Vector2(300f, 134f));
-        Place(logoRect, new Vector2(-44f, 738f + 150f * tall),
-            new Vector2(442f, 318f));
-        Place(titleRibbonRect, new Vector2(0f, 499f + 100f * tall),
-            new Vector2(936f, 156f));
-        Place(createCardRect, new Vector2(0f, 169f + 40f * tall),
-            new Vector2(970f, 480f));
-        Place(joinCardRect, new Vector2(0f, -321f - 30f * tall),
-            new Vector2(970f, 448f));
-        Place(shareRect, new Vector2(0f, -608f - 90f * tall),
-            new Vector2(390f, 90f));
-        Place(tipCardRect, new Vector2(0f, -792f - 170f * tall),
-            new Vector2(460f, 206f));
-        Place(mascotSixRect, new Vector2(-382f, -768f - 180f * tall),
-            new Vector2(270f, 344f));
-        Place(mascotSevenRect, new Vector2(382f, -768f - 180f * tall),
-            new Vector2(296f, 360f));
+            sevenImage.rectTransform, new Vector2(430f, -805f),
+            new Vector2(250f, 285f));
     }
 
     static char ValidateRoomCodeCharacter(
@@ -663,14 +623,6 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
 
         if (stepText != null)
             stepText.text = L10n.Get("private_room_step");
-        if (joinHeading != null)
-        {
-            joinHeading.text = L10n.Get("private_room_join_title");
-            joinHeading.fontSizeMin = 23f;
-            joinHeading.fontSizeMax =
-                L10n.Current == L10n.Language.Greek ? 34f : 43f;
-            joinHeading.ForceMeshUpdate();
-        }
 
         RefreshPlayerChip();
     }
@@ -1011,23 +963,6 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
         rect.offsetMax = Vector2.zero;
         rect.localScale = Vector3.one;
         rect.localRotation = Quaternion.identity;
-    }
-
-    static void ApplyPortraitEnvelope(RectTransform rect)
-    {
-        if (rect == null) return;
-
-        rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
-        rect.pivot = new Vector2(0.5f, 0.5f);
-        rect.anchoredPosition = Vector2.zero;
-        rect.localRotation = Quaternion.identity;
-        rect.localScale = Vector3.one;
-
-        var fitter = rect.GetComponent<AspectRatioFitter>();
-        if (fitter == null)
-            fitter = rect.gameObject.AddComponent<AspectRatioFitter>();
-        fitter.aspectMode = AspectRatioFitter.AspectMode.EnvelopeParent;
-        fitter.aspectRatio = ReferenceWidth / ReferenceHeight;
     }
 
     static void StretchText(

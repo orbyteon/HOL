@@ -96,8 +96,7 @@ public class DailyHunt : MonoBehaviour
 
         var hunt = panel.AddComponent<DailyHunt>();
         hunt.ads = adsManager;
-        hunt.Build();
-        DailyHuntVisuals.Apply(panel.transform);
+        hunt.BindView(DailyHuntVisuals.Apply(panel.transform));
 
         panel.AddComponent<PanelAnimator>();
         panel.SetActive(false);
@@ -119,53 +118,31 @@ public class DailyHunt : MonoBehaviour
         return hunt;
     }
 
-    void Build()
+    void BindView(DailyHuntVisuals.ViewBindings view)
     {
-        RuntimeUI.CreateProductionFrame(transform, "Card", new Vector2(0f, -10f),
-            new Vector2(920f, 1340f), "mainmenu/mainmenu_tip_frame_9s", 2f);
+        if (view == null)
+            throw new InvalidOperationException(
+                "DailyHuntVisuals did not create the required live controls.");
 
-        title = RuntimeUI.CreateText(transform, "Title", "", 46,
-            new Vector2(0f, 550f), new Vector2(780f, 80f), HolUiStateColors.Gold);
+        title = view.Title;
+        status = view.Status;
+        trailText = view.Trail;
+        streakText = view.Streak;
+        input = view.Input;
+        guessButton = view.GuessButton;
+        reviveButton = view.ReviveButton;
+        shareButton = view.ShareButton;
+        reviveLabel = reviveButton.GetComponentInChildren<TMP_Text>(true);
 
-        status = RuntimeUI.CreateText(transform, "Status", "", 32,
-            new Vector2(0f, 400f), new Vector2(780f, 150f));
-
-        trailText = RuntimeUI.CreateText(transform, "Trail", "", 44,
-            new Vector2(0f, 200f), new Vector2(800f, 80f), HolUiStateColors.Cyan);
-
-        input = RuntimeUI.CreateInputField(transform, "GuessInput",
-            L10n.Get("number_placeholder"), new Vector2(0f, 40f), new Vector2(420f, 96f));
         RuntimeUI.LocalizePlaceholder(input, "number_placeholder");
         input.onSubmit.AddListener(_ => SubmitGuess());
-
-        // "Submit" in the name keeps this on the primary design sprite,
-        // and gold marks it as the screen's one action that matters.
-        guessButton = RuntimeUI.CreateButton(transform, "SubmitGuessButton",
-            L10n.Get("pvp_guess"), new Vector2(0f, -110f), new Vector2(460f, 96f),
-            HolUiStateColors.Gold, DarkLabel);
         RuntimeUI.Localize(guessButton, "pvp_guess");
         guessButton.onClick.AddListener(SubmitGuess);
-
-        reviveButton = RuntimeUI.CreateButton(transform, "ReviveButton",
-            L10n.Get("second_chance", ReviveGuesses), new Vector2(0f, -260f),
-            new Vector2(620f, 96f), HolUiStateColors.Gold, DarkLabel);
-        reviveLabel = reviveButton.GetComponentInChildren<TMP_Text>();
         reviveButton.onClick.AddListener(OnRevivePressed);
-
-        shareButton = RuntimeUI.CreateButton(transform, "ShareButton",
-            L10n.Get("share_result"), new Vector2(0f, -260f), new Vector2(460f, 96f),
-            HolUiStateColors.Cyan, DarkLabel);
         RuntimeUI.Localize(shareButton, "share_result");
         shareButton.onClick.AddListener(OnSharePressed);
-
-        streakText = RuntimeUI.CreateText(transform, "Streak", "", 28,
-            new Vector2(0f, -410f), new Vector2(600f, 44f), HolUiStateColors.TextSecondary);
-
-        var close = RuntimeUI.CreateButton(transform, "CloseButton",
-            L10n.Get("back"), new Vector2(0f, -540f), new Vector2(300f, 84f),
-            HolUiStateColors.SurfaceElevated);
-        RuntimeUI.Localize(close, "back");
-        close.onClick.AddListener(Close);
+        view.CloseButton.onClick.AddListener(Close);
+        view.StartButton.onClick.AddListener(StartChallenge);
     }
 
     public void Open()
@@ -454,9 +431,9 @@ public class DailyHunt : MonoBehaviour
     // Display swaps them for triangles/dot the font actually carries.
     static string DisplayTrail(string t)
     {
-        return t.Replace("\U0001F53A", "▲")
-                .Replace("\U0001F53B", "▼")
-                .Replace("\U0001F3AF", "●");
+        return t.Replace("\U0001F53A", "↑")
+                .Replace("\U0001F53B", "↓")
+                .Replace("\U0001F3AF", "•");
     }
 
     void Refresh()

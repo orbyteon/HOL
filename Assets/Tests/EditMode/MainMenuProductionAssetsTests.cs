@@ -52,7 +52,7 @@ public sealed class MainMenuProductionAssetsTests
     }
 
     [Test]
-    public void CurrentHomeAndPlayOwnersUseTheirApprovedBackgrounds()
+    public void CurrentHomeAndPlayOwnersNeverLoadRejectedCloudBackground()
     {
         const string rejected = "mainmenu/mainmenu_bg_stairs_clouds";
         foreach (string typeName in new[] { "MainMenuHomeVisuals", "MainMenuPlayVisuals" })
@@ -65,11 +65,8 @@ public sealed class MainMenuProductionAssetsTests
             Assert.That(resources, Is.Not.Null);
             Assert.That(resources, Does.Not.Contain(rejected),
                 typeName + " must not restore the rejected cloud/stairs background.");
-            string expected = typeName == "MainMenuHomeVisuals"
-                ? "cartoonui/v1/home/hol_home_background_v1"
-                : "phase2a/hol_neon_reference_bg_r3";
-            Assert.That(resources, Does.Contain(expected),
-                typeName + " must use its approved background: " + expected);
+            Assert.That(resources, Does.Contain("phase2a/hol_neon_reference_bg_r3"),
+                typeName + " must use the approved Revision 3 background.");
         }
     }
 
@@ -85,20 +82,20 @@ public sealed class MainMenuProductionAssetsTests
     }
 
     [Test]
-    public void HomeCopyMatchesTheTruthfulCartoonContractInBothLanguages()
+    public void HomeCopyMatchesTheTruthfulPhase2AContractInBothLanguages()
     {
         var l10n = RuntimeType("L10n");
         var original = l10n.GetProperty("Current").GetValue(null, null);
         try
         {
             AssertCopy(0,
-                "PLAY SOLO VS AI", "Play and beat your high score!",
+                "PLAY SOLO VS AI", "PLAY NOW",
                 "PRIVATE ROOM", "PLAY WITH A FRIEND",
                 "DAILY HUNT", "NEW CHALLENGE EVERY DAY",
                 "TIP:", "Every guess narrows the range!",
                 "LOADING...");
             AssertCopy(1,
-                "ΠΑΙΞΕ SOLO ΜΕ AI", "Παίξε και σπάσε το ρεκόρ σου!",
+                "ΠΑΙΞΕ SOLO ΜΕ AI", "ΑΜΕΣΟ ΠΑΙΧΝΙΔΙ",
                 "ΙΔΙΩΤΙΚΟ ΔΩΜΑΤΙΟ", "ΠΑΙΞΕ ΜΕ ΦΙΛΟ",
                 "ΚΥΝΗΓΙ ΗΜΕΡΑΣ", "ΝΕΑ ΠΡΟΚΛΗΣΗ ΚΑΘΕ ΜΕΡΑ",
                 "ΣΥΜΒΟΥΛΗ:", "Κάθε μαντεψιά μικραίνει το εύρος!",

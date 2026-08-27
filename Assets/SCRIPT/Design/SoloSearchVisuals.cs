@@ -13,26 +13,23 @@ public sealed class SoloSearchVisuals : MonoBehaviour
     public const string VisualRootName = "SoloSearchVisualRoot";
     public const string SafeRootName = "SoloSearchSafeRoot";
 
-    const string BackgroundResource = CartoonUiKit.Background;
-    const string LogoResource = CartoonUiKit.Logo;
-    const string PlayerResource = CartoonUiKit.PlayerAvatar;
-    const string AvatarResource = CartoonUiKit.PlayerAvatar;
-    const string MascotSixResource = CartoonUiKit.MascotSix;
-    const string MascotSevenResource = CartoonUiKit.MascotSeven;
-    const string RadarBaseResource = CartoonUiKit.RadarBase;
-    const string RadarSweepResource = CartoonUiKit.RadarSweep;
+    const string BackgroundResource = "phase2a/hol_neon_reference_bg_r3";
+    const string LogoResource = "reference/hol_logo_exact";
+    const string PlayerResource = "reference/char_boy_exact";
+    const string AvatarResource = "reference/player_cyan_exact";
+    const string MascotSixResource = "reference/mascot_6_exact";
+    const string MascotSevenResource = "reference/mascot_7_exact";
+    const string RadarBaseResource = "cartoon/cartoon_radar_base";
+    const string RadarSweepResource = "cartoon/cartoon_radar_sweep";
     const string StarsResource = "mainmenu/mainmenu_deco_stars";
     const string ConfettiResource = "mainmenu/mainmenu_deco_confetti";
-    const string TitleRibbonResource = CartoonUiKit.TitleRibbon;
-    const string CardFrameResource = "dailyhunt/v1/daily_challenge_board_v1";
-    const string BlueFrameResource = CartoonUiKit.CyanAction;
-    const string ChipFrameResource = CartoonUiKit.PlayerChip;
-    const string AvatarRingResource = CartoonUiKit.PlayerAvatarRing;
-    const string BackButtonResource = CartoonUiKit.BackButton;
-    const string PortalResource = CartoonUiKit.FloorPortal;
+    const string PurpleFrameResource = "mainmenu/mainmenu_tip_frame_9s";
+    const string BlueFrameResource = "phase2a/hol_cta_blue_r2_9s";
+    const string ChipFrameResource = "phase2a/hol_player_chip_r2_9s";
+    const string BackChevronResource = "phase2a/hol_chevron_r2";
     const string StreakIconResource = "mainmenu/mainmenu_icon_streak";
-    const string DisplayFontResource = CartoonUiKit.DisplayFont;
-    const string BodyFontResource = CartoonUiKit.BodyFont;
+    const string DisplayFontResource = "phase2a/fonts/HOL Menu Display SDF";
+    const string BodyFontResource = "phase2a/fonts/HOL Menu Body SDF";
 
     const float ReferenceWidth = 1080f;
     const float ReferenceHeight = 1920f;
@@ -54,40 +51,25 @@ public sealed class SoloSearchVisuals : MonoBehaviour
         RadarSweepResource,
         StarsResource,
         ConfettiResource,
-        TitleRibbonResource,
-        CardFrameResource,
+        PurpleFrameResource,
         BlueFrameResource,
         ChipFrameResource,
-        AvatarRingResource,
-        BackButtonResource,
-        PortalResource,
+        BackChevronResource,
         StreakIconResource,
     };
 
     FakeMatchmaking matchmaking;
     RectTransform visualRoot;
     RectTransform safeRoot;
-    RectTransform backRect;
-    RectTransform chipRect;
-    RectTransform logoRect;
-    RectTransform ribbonRect;
-    RectTransform cardRect;
-    RectTransform cancelRect;
-    RectTransform portalRect;
-    RectTransform mascotSixRect;
-    RectTransform mascotSevenRect;
     TMP_FontAsset displayFont;
     TMP_FontAsset bodyFont;
     TMP_Text chipName;
     TMP_Text chipStreak;
     TMP_Text titleText;
     TMP_Text modeBadgeText;
-    TMP_Text searchStatus;
     Button cancelButton;
     Button backButton;
     float nextChipRefresh;
-    int lastLayoutWidth = -1;
-    int lastLayoutHeight = -1;
 
     public bool IsReady { get; private set; }
 
@@ -133,27 +115,7 @@ public sealed class SoloSearchVisuals : MonoBehaviour
 
     void LateUpdate()
     {
-        if (!IsReady) return;
-        ApplyResponsiveLayout();
-
-        // The board initializes concurrently behind this modal. Keep the
-        // modal fully opaque and top-sorted even if legacy transition state
-        // touches the shared panel after it was activated.
-        var group = GetComponent<CanvasGroup>();
-        if (group != null)
-        {
-            group.alpha = 1f;
-            group.interactable = true;
-            group.blocksRaycasts = true;
-        }
-        var modalCanvas = GetComponent<Canvas>();
-        if (modalCanvas != null)
-        {
-            modalCanvas.overrideSorting = true;
-            modalCanvas.sortingOrder = 50;
-        }
-
-        if (Time.unscaledTime < nextChipRefresh) return;
+        if (!IsReady || Time.unscaledTime < nextChipRefresh) return;
         nextChipRefresh = Time.unscaledTime + 0.25f;
         RefreshPlayerChip();
     }
@@ -186,19 +148,15 @@ public sealed class SoloSearchVisuals : MonoBehaviour
         Sprite radarSweep = LoadRequired(RadarSweepResource);
         Sprite stars = LoadRequired(StarsResource);
         Sprite confetti = LoadRequired(ConfettiResource);
-        Sprite titleRibbon = LoadRequired(TitleRibbonResource);
-        Sprite cardFrame = LoadRequired(CardFrameResource);
+        Sprite purple = LoadRequired(PurpleFrameResource);
         Sprite blue = LoadRequired(BlueFrameResource);
         Sprite chip = LoadRequired(ChipFrameResource);
-        Sprite avatarRing = LoadRequired(AvatarRingResource);
-        Sprite backButtonSprite = LoadRequired(BackButtonResource);
-        Sprite portal = LoadRequired(PortalResource);
+        Sprite chevron = LoadRequired(BackChevronResource);
         Sprite streak = LoadRequired(StreakIconResource);
 
         IsReady = ArtReady(
             background, logo, player, avatar, six, seven, radarBase,
-            radarSweep, stars, confetti, titleRibbon, cardFrame, blue,
-            chip, avatarRing, backButtonSprite, portal,
+            radarSweep, stars, confetti, purple, blue, chip, chevron,
             streak) && displayFont != null && bodyFont != null;
 
         if (!IsReady)
@@ -214,17 +172,6 @@ public sealed class SoloSearchVisuals : MonoBehaviour
         group.alpha = 1f;
         group.interactable = true;
         group.blocksRaycasts = true;
-
-        // The duel board initializes while this modal is visible. Give the
-        // searching panel its own nested sorting boundary so the already-built
-        // duel header can never peek through on tall viewports.
-        var modalCanvas = GetComponent<Canvas>();
-        if (modalCanvas == null)
-            modalCanvas = gameObject.AddComponent<Canvas>();
-        modalCanvas.overrideSorting = true;
-        modalCanvas.sortingOrder = 50;
-        if (GetComponent<GraphicRaycaster>() == null)
-            gameObject.AddComponent<GraphicRaycaster>();
 
         var legacyImage = GetComponent<Image>();
         if (legacyImage != null)
@@ -265,6 +212,11 @@ public sealed class SoloSearchVisuals : MonoBehaviour
         Stretch(confettiImage.rectTransform);
         ConfigureImage(confettiImage, confetti, false, Image.Type.Simple);
 
+        var outer = EnsureImage(visualRoot, "SearchOuterFrame");
+        ConfigureImage(outer, purple, false, Image.Type.Sliced);
+        outer.pixelsPerUnitMultiplier = 2f;
+        Place(outer.rectTransform, Vector2.zero, new Vector2(1032f, 1872f));
+
         safeRoot = EnsureRect(visualRoot, SafeRootName);
         Stretch(safeRoot);
         Canvas canvas = GetComponentInParent<Canvas>();
@@ -275,47 +227,52 @@ public sealed class SoloSearchVisuals : MonoBehaviour
                 new Vector2(ReferenceWidth, ReferenceHeight));
         }
 
-        BuildTopBar(
-            safeRoot, backButtonSprite, chip, avatarRing, avatar, streak);
+        BuildTopBar(safeRoot, purple, chip, avatar, chevron, streak);
 
         var logoImage = EnsureImage(safeRoot, "SearchLogo");
         ConfigureImage(logoImage, logo, true, Image.Type.Simple);
-        logoRect = logoImage.rectTransform;
         Place(
-            logoRect, new Vector2(0f, 728f),
-            new Vector2(455f, 306f));
+            logoImage.rectTransform, new Vector2(0f, 690f),
+            new Vector2(585f, 310f));
 
         var ribbon = EnsureImage(safeRoot, "SearchTitleRibbon");
-        ConfigureImage(ribbon, titleRibbon, false, Image.Type.Simple);
-        ribbonRect = ribbon.rectTransform;
+        ConfigureImage(ribbon, purple, false, Image.Type.Sliced);
+        ribbon.pixelsPerUnitMultiplier = 2f;
         Place(
-            ribbonRect, new Vector2(0f, 560f),
-            new Vector2(940f, 164f));
+            ribbon.rectTransform, new Vector2(0f, 495f),
+            new Vector2(900f, 150f));
 
         titleText = EnsureText(
             ribbon.transform, "SearchTitle", 58f, displayFont, NearWhite,
             TextAlignmentOptions.Center);
         StretchText(titleText.rectTransform, 50f, 20f);
         ConfigureDisplayText(titleText, 40f, 58f);
-        titleText.fontStyle |= FontStyles.UpperCase;
         SetLocalized(titleText, "solo_search_title");
 
         var card = EnsureImage(safeRoot, "SearchCard");
-        ConfigureImage(card, cardFrame, false, Image.Type.Simple);
-        cardRect = card.rectTransform;
+        ConfigureImage(card, blue, false, Image.Type.Sliced);
+        card.pixelsPerUnitMultiplier = 2f;
         Place(
-            cardRect, new Vector2(0f, 130f),
-            new Vector2(1030f, 690f));
+            card.rectTransform, new Vector2(0f, 70f),
+            new Vector2(940f, 650f));
 
         var playerImage = EnsureImage(card.transform, "SearchPlayer");
         ConfigureImage(playerImage, player, true, Image.Type.Simple);
         Place(
-            playerImage.rectTransform, new Vector2(-326f, -4f),
-            new Vector2(385f, 520f));
+            playerImage.rectTransform, new Vector2(-305f, -10f),
+            new Vector2(365f, 440f));
+
+        modeBadgeText = EnsureText(
+            card.transform, "SearchModeBadge", 24f, bodyFont, Cyan,
+            TextAlignmentOptions.Center);
+        Place(
+            modeBadgeText.rectTransform, new Vector2(-302f, 245f),
+            new Vector2(300f, 46f));
+        ConfigureBodyText(modeBadgeText, 20f, 25f);
 
         var radarRoot = EnsureRect(card.transform, "SearchRadarRoot");
         Place(
-            radarRoot, new Vector2(12f, 18f), new Vector2(410f, 410f));
+            radarRoot, new Vector2(35f, 25f), new Vector2(340f, 340f));
 
         var radarBaseImage = EnsureImage(radarRoot, "SearchRadarBase");
         Stretch(radarBaseImage.rectTransform);
@@ -348,11 +305,9 @@ public sealed class SoloSearchVisuals : MonoBehaviour
         status.color = NearWhite;
         status.alignment = TextAlignmentOptions.Center;
         Place(
-            status.rectTransform, new Vector2(315f, -10f),
-            new Vector2(350f, 230f));
-        ConfigureDisplayText(status, 19f, 33f);
-        status.overflowMode = TextOverflowModes.Truncate;
-        searchStatus = status;
+            status.rectTransform, new Vector2(310f, -15f),
+            new Vector2(270f, 190f));
+        ConfigureDisplayText(status, 27f, 36f);
 
         var ellipsis = status.GetComponent<AnimatedEllipsis>();
         if (ellipsis == null)
@@ -361,93 +316,71 @@ public sealed class SoloSearchVisuals : MonoBehaviour
         ellipsis.stepSeconds = 0.32f;
 
         Reparent(cancelButton.transform, safeRoot);
-        cancelRect = (RectTransform)cancelButton.transform;
-        StyleButton(cancelButton, blue, NearWhite);
+        StyleButton(cancelButton, blue, Ink);
         Place(
-            cancelRect, new Vector2(0f, -290f),
-            new Vector2(520f, 150f));
-        ConfigureButtonLabel(cancelButton, "cancel", 52f, NearWhite);
-
-        var portalImage = EnsureImage(safeRoot, "SearchFloorPortal");
-        ConfigureImage(portalImage, portal, true, Image.Type.Simple);
-        portalRect = portalImage.rectTransform;
-        Place(
-            portalRect, new Vector2(0f, -600f),
-            new Vector2(660f, 185f));
+            (RectTransform)cancelButton.transform, new Vector2(0f, -500f),
+            new Vector2(520f, 112f));
+        ConfigureButtonLabel(cancelButton, "cancel", 44f, Ink);
 
         var sixImage = EnsureImage(safeRoot, "SearchMascotSix");
         ConfigureImage(sixImage, six, true, Image.Type.Simple);
-        mascotSixRect = sixImage.rectTransform;
         Place(
-            mascotSixRect, new Vector2(-392f, -560f),
-            new Vector2(300f, 360f));
+            sixImage.rectTransform, new Vector2(-410f, -790f),
+            new Vector2(265f, 300f));
 
         var sevenImage = EnsureImage(safeRoot, "SearchMascotSeven");
         ConfigureImage(sevenImage, seven, true, Image.Type.Simple);
-        mascotSevenRect = sevenImage.rectTransform;
         Place(
-            mascotSevenRect, new Vector2(392f, -560f),
-            new Vector2(300f, 360f));
+            sevenImage.rectTransform, new Vector2(410f, -790f),
+            new Vector2(265f, 300f));
 
         HideLegacyPresentation();
         RefreshCopy();
         RefreshPlayerChip();
-        ApplyResponsiveLayout(true);
     }
 
     void BuildTopBar(
         Transform safe,
-        Sprite backSprite,
+        Sprite purple,
         Sprite chip,
-        Sprite avatarRing,
         Sprite avatar,
+        Sprite chevron,
         Sprite streak)
     {
         backButton = RuntimeUI.CreateButton(
             safe, "SearchBackButton", string.Empty,
-            new Vector2(-450f, 840f), new Vector2(128f, 128f),
+            new Vector2(-484f, 842f), new Vector2(90f, 90f),
             Color.white, NearWhite);
         backButton.onClick.AddListener(matchmaking.CancelSearch);
-        StyleButton(backButton, backSprite, NearWhite);
-        backRect = (RectTransform)backButton.transform;
+        StyleButton(backButton, purple, NearWhite);
         HideButtonLabels(backButton.transform);
 
+        var backIcon = EnsureImage(backButton.transform, "SearchBackIcon");
+        ConfigureImage(backIcon, chevron, true, Image.Type.Simple);
+        Place(
+            backIcon.rectTransform, Vector2.zero, new Vector2(46f, 58f));
+        backIcon.rectTransform.localScale = new Vector3(-1f, 1f, 1f);
+
         var playerChip = EnsureImage(safe, "SearchPlayerChip");
-        ConfigureImage(playerChip, chip, false, Image.Type.Simple);
-        chipRect = playerChip.rectTransform;
+        ConfigureImage(playerChip, chip, false, Image.Type.Sliced);
+        playerChip.pixelsPerUnitMultiplier = 2f;
         Place(
-            chipRect, new Vector2(356f, 838f),
-            new Vector2(320f, 142f));
-
-        var ringImage = EnsureImage(
-            playerChip.transform, "SearchPlayerAvatarRing");
-        ConfigureImage(ringImage, avatarRing, true, Image.Type.Simple);
-        Place(
-            ringImage.rectTransform, new Vector2(-110f, 0f),
-            new Vector2(102f, 102f));
-
-        var avatarClip = EnsureRect(
-            playerChip.transform, "SearchPlayerAvatarClip");
-        Place(
-            avatarClip, new Vector2(-110f, 2f),
-            new Vector2(94f, 94f));
-        if (avatarClip.GetComponent<RectMask2D>() == null)
-            avatarClip.gameObject.AddComponent<RectMask2D>();
+            playerChip.rectTransform, new Vector2(350f, 842f),
+            new Vector2(365f, 118f));
 
         var avatarImage = EnsureImage(
-            avatarClip, "SearchPlayerAvatar");
+            playerChip.transform, "SearchPlayerAvatar");
         ConfigureImage(avatarImage, avatar, true, Image.Type.Simple);
         Place(
-            avatarImage.rectTransform, new Vector2(0f, -25f),
-            new Vector2(124f, 124f));
-        ringImage.transform.SetAsLastSibling();
+            avatarImage.rectTransform, new Vector2(-126f, 0f),
+            new Vector2(84f, 84f));
 
         chipName = EnsureText(
             playerChip.transform, "SearchPlayerName", 29f, bodyFont,
             NearWhite, TextAlignmentOptions.Center);
         Place(
-            chipName.rectTransform, new Vector2(45f, 27f),
-            new Vector2(190f, 44f));
+            chipName.rectTransform, new Vector2(44f, 23f),
+            new Vector2(205f, 40f));
         chipName.enableAutoSizing = true;
         chipName.fontSizeMin = 22f;
         chipName.fontSizeMax = 30f;
@@ -457,53 +390,15 @@ public sealed class SoloSearchVisuals : MonoBehaviour
             playerChip.transform, "SearchStreakIcon");
         ConfigureImage(streakIcon, streak, true, Image.Type.Simple);
         Place(
-            streakIcon.rectTransform, new Vector2(-20f, -30f),
-            new Vector2(44f, 44f));
+            streakIcon.rectTransform, new Vector2(-18f, -28f),
+            new Vector2(42f, 42f));
 
         chipStreak = EnsureText(
             playerChip.transform, "SearchStreak", 29f, bodyFont, Gold,
             TextAlignmentOptions.Center);
         Place(
-            chipStreak.rectTransform, new Vector2(62f, -30f),
+            chipStreak.rectTransform, new Vector2(62f, -28f),
             new Vector2(120f, 40f));
-    }
-
-    void ApplyResponsiveLayout(bool force = false)
-    {
-        if (backRect == null || chipRect == null || logoRect == null ||
-            ribbonRect == null || cardRect == null || cancelRect == null ||
-            portalRect == null || mascotSixRect == null ||
-            mascotSevenRect == null)
-            return;
-
-        int width = Mathf.Max(1, Screen.width);
-        int height = Mathf.Max(1, Screen.height);
-        if (!force && width == lastLayoutWidth && height == lastLayoutHeight)
-            return;
-
-        lastLayoutWidth = width;
-        lastLayoutHeight = height;
-        float aspect = height / (float)width;
-        float tall = Mathf.InverseLerp(1.78f, 2.22f, aspect);
-
-        Place(backRect, new Vector2(-450f, 840f + 185f * tall),
-            new Vector2(128f, 128f));
-        Place(chipRect, new Vector2(356f, 838f + 185f * tall),
-            new Vector2(320f, 142f));
-        Place(logoRect, new Vector2(0f, 728f + 150f * tall),
-            new Vector2(455f, 306f));
-        Place(ribbonRect, new Vector2(0f, 560f + 100f * tall),
-            new Vector2(940f, 164f));
-        Place(cardRect, new Vector2(0f, 130f + 20f * tall),
-            new Vector2(1030f, 690f));
-        Place(cancelRect, new Vector2(0f, -290f - 70f * tall),
-            new Vector2(520f, 150f));
-        Place(portalRect, new Vector2(0f, -600f - 220f * tall),
-            new Vector2(660f, 185f));
-        Place(mascotSixRect, new Vector2(-392f, -560f - 220f * tall),
-            new Vector2(300f, 360f));
-        Place(mascotSevenRect, new Vector2(392f, -560f - 220f * tall),
-            new Vector2(300f, 360f));
     }
 
     void RefreshCopy()
@@ -515,13 +410,6 @@ public sealed class SoloSearchVisuals : MonoBehaviour
             modeBadgeText.text = L10n.Current == L10n.Language.Greek
                 ? "SOLO • AI ΑΝΤΙΠΑΛΟΣ"
                 : "SOLO • AI OPPONENT";
-        }
-        if (searchStatus != null)
-        {
-            searchStatus.fontSizeMin = 19f;
-            searchStatus.fontSizeMax =
-                L10n.Current == L10n.Language.Greek ? 27f : 33f;
-            searchStatus.ForceMeshUpdate();
         }
 
         RefreshPlayerChip();
@@ -550,7 +438,6 @@ public sealed class SoloSearchVisuals : MonoBehaviour
             color, TextAlignmentOptions.Center);
         StretchText(label.rectTransform, 28f, 14f);
         ConfigureDisplayText(label, size - 10f, size);
-        label.fontStyle |= FontStyles.UpperCase;
         SetLocalized(label, key);
     }
 
@@ -563,8 +450,8 @@ public sealed class SoloSearchVisuals : MonoBehaviour
             image = button.gameObject.AddComponent<Image>();
         image.enabled = true;
         image.sprite = sprite;
-        image.type = Image.Type.Simple;
-        image.pixelsPerUnitMultiplier = 1f;
+        image.type = Image.Type.Sliced;
+        image.pixelsPerUnitMultiplier = 2f;
         image.preserveAspect = false;
         image.color = Color.white;
         image.raycastTarget = true;

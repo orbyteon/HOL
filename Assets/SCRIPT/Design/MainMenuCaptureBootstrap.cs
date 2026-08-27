@@ -14,6 +14,7 @@ public sealed class MainMenuCaptureBootstrap : MonoBehaviour
 
     static bool markerLogged;
     MainMenuHomeVisuals homeVisuals;
+    MainMenuHomeTypographyFidelity typographyFidelity;
     bool presentationWaitStarted;
     int presentationBarriersPassed;
 
@@ -127,6 +128,11 @@ public sealed class MainMenuCaptureBootstrap : MonoBehaviour
         if (homeVisuals == null || !homeVisuals.IsReady || !homeVisuals.IsSettled)
             return;
 
+        if (typographyFidelity == null)
+            typographyFidelity = FindTypographyInScene();
+        if (typographyFidelity == null || !typographyFidelity.IsApplied)
+            return;
+
         if (!presentationWaitStarted)
         {
             presentationWaitStarted = true;
@@ -147,7 +153,9 @@ public sealed class MainMenuCaptureBootstrap : MonoBehaviour
             markerLogged ||
             homeVisuals == null ||
             !homeVisuals.IsReady ||
-            !homeVisuals.IsSettled)
+            !homeVisuals.IsSettled ||
+            typographyFidelity == null ||
+            !typographyFidelity.IsApplied)
         {
             if (!CaptureRequested || markerLogged)
                 enabled = false;
@@ -186,4 +194,14 @@ public sealed class MainMenuCaptureBootstrap : MonoBehaviour
         return null;
     }
 
+    MainMenuHomeTypographyFidelity FindTypographyInScene()
+    {
+        foreach (var root in gameObject.scene.GetRootGameObjects())
+        {
+            var found = root.GetComponentInChildren<MainMenuHomeTypographyFidelity>(true);
+            if (found != null)
+                return found;
+        }
+        return null;
+    }
 }

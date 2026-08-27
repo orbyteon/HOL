@@ -9,6 +9,44 @@ using UnityEngine.UI;
 [DisallowMultipleComponent]
 public sealed class DailyHuntVisuals : MonoBehaviour
 {
+    public sealed class ViewBindings
+    {
+        public readonly TMP_Text Title;
+        public readonly TMP_Text Status;
+        public readonly TMP_Text Trail;
+        public readonly TMP_Text Streak;
+        public readonly TMP_InputField Input;
+        public readonly Button GuessButton;
+        public readonly Button ReviveButton;
+        public readonly Button ShareButton;
+        public readonly Button CloseButton;
+        public readonly Button StartButton;
+
+        public ViewBindings(
+            TMP_Text title,
+            TMP_Text status,
+            TMP_Text trail,
+            TMP_Text streak,
+            TMP_InputField input,
+            Button guessButton,
+            Button reviveButton,
+            Button shareButton,
+            Button closeButton,
+            Button startButton)
+        {
+            Title = title;
+            Status = status;
+            Trail = trail;
+            Streak = streak;
+            Input = input;
+            GuessButton = guessButton;
+            ReviveButton = reviveButton;
+            ShareButton = shareButton;
+            CloseButton = closeButton;
+            StartButton = startButton;
+        }
+    }
+
     public const string VisualRootName = "DailyHuntVisualRoot";
     public const string SafeRootName = "DailyHuntSafeRoot";
 
@@ -61,8 +99,10 @@ public sealed class DailyHuntVisuals : MonoBehaviour
 
     // Use the same approved display/body hierarchy as the established HOL
     // cartoon shell. Live EN/EL strings and numeric state remain real TMP.
-    const string DisplayFontResource = "phase2a/fonts/HOL Menu Display SDF";
-    const string BodyFontResource = "phase2a/fonts/HOL Menu Body SDF";
+    const string DisplayFontResource =
+        "dailyhunt/production/fonts/HOL Daily Display SDF";
+    const string BodyFontResource =
+        "dailyhunt/production/fonts/HOL Daily Body SDF";
 
     const float ReferenceWidth = 1080f;
     const float ReferenceHeight = 1920f;
@@ -171,6 +211,8 @@ public sealed class DailyHuntVisuals : MonoBehaviour
     int lastLayoutHeight = -1;
     L10n.Language lastLayoutLanguage;
     bool missionDashboardVisible = true;
+    ViewBindings viewBindings;
+    Button missionStartButton;
 
 #if DEVELOPMENT_BUILD
     int captureChipPoints = -1;
@@ -183,14 +225,15 @@ public sealed class DailyHuntVisuals : MonoBehaviour
     public TMP_FontAsset BodyFont => bodyFont;
     public TMP_FontAsset ProductionFont => bodyFont;
 
-    public static void Apply(Transform panel)
+    public static ViewBindings Apply(Transform panel)
     {
-        if (panel == null) return;
+        if (panel == null) return null;
 
         var owner = panel.GetComponent<DailyHuntVisuals>();
         if (owner == null)
             owner = panel.gameObject.AddComponent<DailyHuntVisuals>();
         owner.Build(panel);
+        return owner.viewBindings;
     }
 
 #if DEVELOPMENT_BUILD
@@ -318,29 +361,6 @@ public sealed class DailyHuntVisuals : MonoBehaviour
             panelImage.raycastTarget = false;
         }
 
-        TMP_Text title = Find<TMP_Text>(panel, "Title");
-        TMP_Text status = Find<TMP_Text>(panel, "Status");
-        TMP_Text trail = Find<TMP_Text>(panel, "Trail");
-        TMP_Text streak = Find<TMP_Text>(panel, "Streak");
-        TMP_InputField input = Find<TMP_InputField>(panel, "GuessInput");
-        Button submit = Find<Button>(panel, "SubmitGuessButton");
-        Button revive = Find<Button>(panel, "ReviveButton");
-        Button share = Find<Button>(panel, "ShareButton");
-        Button close = Find<Button>(panel, "CloseButton");
-
-        if (title == null || status == null || trail == null ||
-            streak == null || input == null || submit == null ||
-            revive == null || share == null || close == null)
-        {
-            IsReady = false;
-            Debug.LogError("[DailyHuntVisuals] Real Daily Hunt controls are missing.");
-            return;
-        }
-
-        Transform oldCard = Find<Transform>(panel, "Card");
-        if (oldCard != null)
-            oldCard.gameObject.SetActive(false);
-
         visualRoot = (RectTransform)RuntimeUI.CreateObject(
             VisualRootName, panel).transform;
         Stretch(visualRoot);
@@ -383,6 +403,10 @@ public sealed class DailyHuntVisuals : MonoBehaviour
                 new Vector2(ReferenceWidth, ReferenceHeight));
         }
 
+        Button close = RuntimeUI.CreateButton(
+            safeRoot, "CloseButton", string.Empty, Vector2.zero,
+            new Vector2(155f, 155f), Color.white);
+
         BuildTopBar(
             close, backButton, playerChip,
             playerAvatarRing, avatar, playerStar,
@@ -390,6 +414,16 @@ public sealed class DailyHuntVisuals : MonoBehaviour
 
         huntRoot = EnsureRect(safeRoot, "DailyNumberHuntRoot");
         Stretch(huntRoot);
+
+        Button submit = RuntimeUI.CreateButton(
+            huntRoot, "SubmitGuessButton", L10n.Get("pvp_guess"),
+            Vector2.zero, new Vector2(700f, 200f), Color.white);
+        Button revive = RuntimeUI.CreateButton(
+            huntRoot, "ReviveButton", L10n.Get("second_chance", 2),
+            Vector2.zero, new Vector2(700f, 200f), Color.white);
+        Button share = RuntimeUI.CreateButton(
+            huntRoot, "ShareButton", L10n.Get("share_result"),
+            Vector2.zero, new Vector2(700f, 200f), Color.white);
 
         var logoImage = EnsureImage(safeRoot, "DailyLogo");
         ConfigureImage(logoImage, logo, true, Image.Type.Simple);
@@ -428,8 +462,10 @@ public sealed class DailyHuntVisuals : MonoBehaviour
             headingFrame.rectTransform, new Vector2(198f, 280f),
             new Vector2(545f, 100f));
 
-        Reparent(title.transform, headingFrame.transform);
-        challengeTitle = title;
+        challengeTitle = EnsureText(
+            headingFrame.transform, "Title", 43f, displayFont,
+            Cyan, TextAlignmentOptions.Center);
+        TMP_Text title = challengeTitle;
         title.font = displayFont;
         title.color = Cyan;
         title.alignment = TextAlignmentOptions.Center;
@@ -444,8 +480,10 @@ public sealed class DailyHuntVisuals : MonoBehaviour
             statusFrame.rectTransform, new Vector2(198f, 165f),
             new Vector2(545f, 134f));
 
-        Reparent(status.transform, statusFrame.transform);
-        statusCopy = status;
+        statusCopy = EnsureText(
+            statusFrame.transform, "Status", 30f, bodyFont,
+            NearWhite, TextAlignmentOptions.Center);
+        TMP_Text status = statusCopy;
         status.font = bodyFont;
         status.color = NearWhite;
         status.alignment = TextAlignmentOptions.Center;
@@ -453,8 +491,10 @@ public sealed class DailyHuntVisuals : MonoBehaviour
         StretchText(status.rectTransform, 50f, 24f);
         ConfigureBodyText(status, 21f, 30f);
 
-        Reparent(trail.transform, challengeCard.transform);
-        trailText = trail;
+        trailText = EnsureText(
+            challengeCard.transform, "Trail", 44f, displayFont,
+            Cyan, TextAlignmentOptions.Center);
+        TMP_Text trail = trailText;
         trail.gameObject.SetActive(false);
 
         attemptHeading = EnsureText(
@@ -482,7 +522,10 @@ public sealed class DailyHuntVisuals : MonoBehaviour
             attemptSlotLabels[index] = slotLabel;
         }
 
-        Reparent(input.transform, challengeCard.transform);
+        TMP_InputField input = RuntimeUI.CreateInputField(
+            challengeCard.transform, "GuessInput",
+            L10n.Get("number_placeholder"), Vector2.zero,
+            new Vector2(545f, 124f));
         Place(
             (RectTransform)input.transform, new Vector2(198f, -8f),
             new Vector2(545f, 124f));
@@ -496,7 +539,6 @@ public sealed class DailyHuntVisuals : MonoBehaviour
             new Vector2(430f, 34f));
         ConfigureDisplayText(inputCaption, 21f, 27f);
 
-        Reparent(submit.transform, huntRoot);
         submitRect = (RectTransform)submit.transform;
         StyleButton(submit, guessAction, Ink, 66f);
 
@@ -512,8 +554,10 @@ public sealed class DailyHuntVisuals : MonoBehaviour
             new Vector2(520f, 72f));
         ConfigureDisplayText(rewardHeading, 32f, 46f);
 
-        Reparent(streak.transform, rewardCard.transform);
-        streakValue = streak;
+        streakValue = EnsureText(
+            rewardCard.transform, "Streak", 90f, displayFont,
+            Gold, TextAlignmentOptions.Center);
+        TMP_Text streak = streakValue;
         Place(
             streak.rectTransform, new Vector2(190f, -42f),
             new Vector2(520f, 132f));
@@ -523,11 +567,9 @@ public sealed class DailyHuntVisuals : MonoBehaviour
         streak.fontStyle = FontStyles.Bold;
         ConfigureDisplayText(streak, 62f, 90f);
 
-        Reparent(revive.transform, huntRoot);
         reviveRect = (RectTransform)revive.transform;
         StyleButton(revive, reviveAction, NearWhite, 36f);
 
-        Reparent(share.transform, huntRoot);
         shareRect = (RectTransform)share.transform;
         StyleButton(share, shareAction, NearWhite, 46f);
 
@@ -547,7 +589,9 @@ public sealed class DailyHuntVisuals : MonoBehaviour
             missionProgressMagenta, missionClock, missionPortal,
             playerStar);
 
-        HideLegacyPresentation(panel);
+        viewBindings = new ViewBindings(
+            title, status, trail, streak, input,
+            submit, revive, share, close, missionStartButton);
         ApplyResponsiveLayout(true);
         RefreshCopy();
         RefreshVisibleTrail();
@@ -806,9 +850,7 @@ public sealed class DailyHuntVisuals : MonoBehaviour
             startStarRight.rectTransform, new Vector2(225f, 0f),
             new Vector2(64f, 64f));
         startStarRight.transform.SetAsFirstSibling();
-        DailyHunt hunt = GetComponent<DailyHunt>();
-        if (hunt != null)
-            start.onClick.AddListener(hunt.StartChallenge);
+        missionStartButton = start;
     }
 
     void BuildTopBar(
@@ -835,22 +877,22 @@ public sealed class DailyHuntVisuals : MonoBehaviour
         ConfigureImage(
             playerChipShell, playerChipSprite, false, Image.Type.Simple);
         Place(
-            playerChipShell.rectTransform, new Vector2(-3f, -4f),
-            new Vector2(336f, 174f));
+            playerChipShell.rectTransform, new Vector2(-3f, -9f),
+            new Vector2(336f, 184f));
 
         var avatarRing = EnsureImage(
             playerChipRoot, "DailyPlayerAvatarRing");
         ConfigureImage(
             avatarRing, playerAvatarRing, true, Image.Type.Simple);
         Place(
-            avatarRing.rectTransform, new Vector2(-82f, 25f),
-            new Vector2(106f, 106f));
+            avatarRing.rectTransform, new Vector2(-120f, 5f),
+            new Vector2(122f, 122f));
 
         var avatarClip = EnsureRect(
             playerChipRoot, "DailyPlayerAvatarClip");
         Place(
-            avatarClip, new Vector2(-90f, 40f),
-            new Vector2(102f, 102f));
+            avatarClip, new Vector2(-128f, 20f),
+            new Vector2(118f, 118f));
         if (avatarClip.GetComponent<RectMask2D>() == null)
             avatarClip.gameObject.AddComponent<RectMask2D>();
 
@@ -859,43 +901,43 @@ public sealed class DailyHuntVisuals : MonoBehaviour
         ConfigureImage(avatarImage, avatar, true, Image.Type.Simple);
         Place(
             avatarImage.rectTransform, new Vector2(0f, -24f),
-            new Vector2(130f, 130f));
+            new Vector2(146f, 146f));
 
         chipName = EnsureText(
             playerChipRoot, "DailyPlayerName", 31f, displayFont,
             NearWhite, TextAlignmentOptions.Center);
         Place(
-            chipName.rectTransform, new Vector2(60f, 53f),
+            chipName.rectTransform, new Vector2(30f, 53f),
             new Vector2(170f, 40f));
         ConfigureDisplayText(chipName, 24f, 32f);
         chipName.enableAutoSizing = false;
-        chipName.fontSize = 36f;
+        chipName.fontSize = 34f;
         chipName.overflowMode = TextOverflowModes.Ellipsis;
 
         var star = EnsureImage(
             playerChipRoot, "DailyPlayerStar");
         ConfigureImage(star, playerStar, true, Image.Type.Simple);
         Place(
-            star.rectTransform, new Vector2(3f, 0f),
-            new Vector2(32f, 32f));
+            star.rectTransform, new Vector2(-9f, -4f),
+            new Vector2(30f, 30f));
 
         chipWins = EnsureText(
             playerChipRoot, "DailyPlayerWins", 28f, displayFont,
             NearWhite, TextAlignmentOptions.Center);
         Place(
-            chipWins.rectTransform, new Vector2(92f, 7f),
+            chipWins.rectTransform, new Vector2(58f, 3f),
             new Vector2(120f, 38f));
         ConfigureDisplayText(chipWins, 21f, 27f);
         chipWins.enableAutoSizing = false;
-        chipWins.fontSize = 32f;
+        chipWins.fontSize = 30f;
         chipWins.overflowMode = TextOverflowModes.Ellipsis;
 
         chipProgress = EnsureText(
             playerChipRoot, "DailyPlayerProgress", 25f, displayFont,
             NearWhite, TextAlignmentOptions.Center);
         Place(
-            chipProgress.rectTransform, new Vector2(68f, -47f),
-            new Vector2(190f, 36f));
+            chipProgress.rectTransform, new Vector2(45f, -71f),
+            new Vector2(176f, 36f));
         ConfigureDisplayText(chipProgress, 31f, 34f);
         chipProgress.enableAutoSizing = false;
         chipProgress.fontSize = 34f;
@@ -907,7 +949,7 @@ public sealed class DailyHuntVisuals : MonoBehaviour
             xpTrack, progressTrackSprite,
             false, Image.Type.Simple);
         Place(
-            xpTrack.rectTransform, new Vector2(74f, -20f),
+            xpTrack.rectTransform, new Vector2(48f, -20f),
             new Vector2(150f, 24f));
 
         var progressFillTrack = EnsureImage(
@@ -916,17 +958,17 @@ public sealed class DailyHuntVisuals : MonoBehaviour
             progressFillTrack, progressTrackSprite,
             false, Image.Type.Simple);
         Place(
-            progressFillTrack.rectTransform, new Vector2(74f, -75f),
-            new Vector2(150f, 22f));
+            progressFillTrack.rectTransform, new Vector2(-10f, -66f),
+            new Vector2(270f, 34f));
 
         var progressFillRoot = EnsureRect(
             playerChipRoot, "DailyPlayerProgressFillRoot");
-        // Keep the live fill on its own measured lower track. The top dark
-        // XP track and this lower progress track are intentionally separate
-        // rows, matching the approved chip hierarchy.
+        // The approved chip uses a wide lower track: the live yellow fill
+        // grows from its left edge while the numeric value remains readable
+        // over the unfilled dark portion on the same baseline.
         Place(
-            progressFillRoot, new Vector2(74f, -75f),
-            new Vector2(150f, 22f));
+            progressFillRoot, new Vector2(-10f, -66f),
+            new Vector2(270f, 34f));
 
         chipProgressFill = EnsureImage(
             progressFillRoot, "DailyPlayerProgressFill");
@@ -1110,7 +1152,7 @@ public sealed class DailyHuntVisuals : MonoBehaviour
         // the seven base slots keep their canonical size and breathing room.
         // A successful Revive deliberately reflows them upward and reveals a
         // second centred bonus row without shrinking either family.
-        float baseY = revived ? -216f : -254f;
+        float baseY = revived ? -190f : -254f;
         const float baseStep = 116f;
         for (int index = 0; index < 7; index++)
         {
@@ -1131,7 +1173,7 @@ public sealed class DailyHuntVisuals : MonoBehaviour
             if (!revived) continue;
             Place(
                 slot.rectTransform,
-                new Vector2(index == 7 ? -66f : 66f, -300f),
+                new Vector2(index == 7 ? -66f : 66f, -260f),
                 new Vector2(102f, 76f));
         }
 
@@ -1227,7 +1269,7 @@ public sealed class DailyHuntVisuals : MonoBehaviour
                 new Vector2(1060f, 425f));
         if (missionPortalRect != null)
             Place(
-                missionPortalRect, new Vector2(0f, -860f - 180f * tall),
+                missionPortalRect, new Vector2(0f, -860f - 240f * tall),
                 new Vector2(1110f, 205f));
 
         // Gameplay owns which of these three controls is active. Presentation
@@ -1240,16 +1282,16 @@ public sealed class DailyHuntVisuals : MonoBehaviour
         if (missionStartRect != null)
             Place(
                 missionStartRect,
-                new Vector2(0f, -771f - 125f * tall),
+                new Vector2(0f, -771f - 185f * tall),
                 new Vector2(595f, 230f));
 
         Place(
             mascotSixRect,
-            new Vector2(-372f, -754f - 105f * tall),
+            new Vector2(-372f, -754f - 165f * tall),
             new Vector2(322f, 375f));
         Place(
             mascotSevenRect,
-            new Vector2(363f, -748f - 105f * tall),
+            new Vector2(363f, -748f - 165f * tall),
             new Vector2(326f, 380f));
 
         if (ribbonTitle != null)
@@ -1387,29 +1429,6 @@ public sealed class DailyHuntVisuals : MonoBehaviour
                     label, Mathf.Max(23f, labelSize - 9f), labelSize);
             }
         }
-    }
-
-    static void HideLegacyPresentation(Transform panel)
-    {
-        foreach (string name in new[]
-        {
-            "Card",
-        })
-        {
-            Transform legacy = Find<Transform>(panel, name);
-            if (legacy != null && !IsDescendantOf(legacy, panel.Find(VisualRootName)))
-                legacy.gameObject.SetActive(false);
-        }
-    }
-
-    static bool IsDescendantOf(Transform child, Transform parent)
-    {
-        while (child != null)
-        {
-            if (child == parent) return true;
-            child = child.parent;
-        }
-        return false;
     }
 
     static void ClearButtonPresentation(Transform root)

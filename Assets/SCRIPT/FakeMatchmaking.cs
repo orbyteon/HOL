@@ -109,53 +109,13 @@ public class FakeMatchmaking : MonoBehaviour
     {
         if (searchingPanel == null) return;
 
-        if (visible)
-        {
-            // The scene originally nests PanelSearching under PanelPlay while
-            // PanelGAME is a sibling of PanelPlay. Move the modal to the root
-            // Canvas once so it can actually cover the initializing board.
-            Canvas rootCanvas = searchingPanel.transform.parent == null
-                ? null
-                : searchingPanel.transform.parent.GetComponentInParent<Canvas>();
-            if (rootCanvas != null && searchingPanel.transform.parent != rootCanvas.transform)
-            {
-                searchingPanel.transform.SetParent(rootCanvas.transform, false);
-                if (searchingPanel.transform is RectTransform modalRect)
-                {
-                    modalRect.anchorMin = Vector2.zero;
-                    modalRect.anchorMax = Vector2.one;
-                    modalRect.offsetMin = Vector2.zero;
-                    modalRect.offsetMax = Vector2.zero;
-                    modalRect.localScale = Vector3.one;
-                }
-            }
-        }
-
         var canvasGroup = searchingPanel.GetComponent<CanvasGroup>();
         if (canvasGroup == null)
             canvasGroup = searchingPanel.AddComponent<CanvasGroup>();
-
-        // PanelSearching lives under PanelPlay while the initializing duel
-        // board is a direct child of the root Canvas. Sibling order cannot
-        // cross that parent boundary, so the blocking modal needs an explicit
-        // nested-canvas order to remain visually authoritative during prep.
-        var modalCanvas = searchingPanel.GetComponent<Canvas>();
-        if (modalCanvas == null)
-            modalCanvas = searchingPanel.AddComponent<Canvas>();
-        modalCanvas.overrideSorting = true;
-        modalCanvas.sortingOrder = 50;
-
         canvasGroup.alpha = 1f;
         canvasGroup.interactable = visible;
         canvasGroup.blocksRaycasts = visible;
         searchingPanel.SetActive(visible);
-        if (visible)
-        {
-            // The real duel board initializes behind this blocking modal.
-            // Keep the search presentation above that sibling instead of
-            // allowing the board's later activation to cover it.
-            searchingPanel.transform.SetAsLastSibling();
-        }
     }
 
     void RefreshStatusCopy()
