@@ -1,5 +1,4 @@
-// Contract test: CloudScript's room view vs. PvpBackend.RoomState.
-// Run with: node --test tools/test/room-state-contract.test.mjs
+// Contract test: CloudScript's room view vs. HOL.Application/PvpRoomState.
 //
 // Unity's JsonUtility binds JSON to fields by exact name and silently leaves
 // anything it cannot match at its default. A renamed or mistyped key therefore
@@ -18,7 +17,12 @@ import { dirname, join } from "node:path";
 import { loadCloudScript, startMatch, guess, midpointSolver } from "./cloudscript-harness.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const ROOM_STATE = join(here, "..", "..", "Assets", "SCRIPT", "PvP", "PvpBackend.cs");
+const ROOM_STATE = join(
+  here, "..", "..", "Assets", "SCRIPT", "Application", "PvpRoomState.cs"
+);
+const BACKEND = join(
+  here, "..", "..", "Assets", "SCRIPT", "PvP", "PvpBackend.cs"
+);
 
 // Every key the server can put on the wire, gathered by walking a room through
 // waiting → play → done → rematch, plus a Lock and a Signal on the way.
@@ -65,17 +69,15 @@ function emittedKeys() {
 
 function roomStateFields() {
   const source = readFileSync(ROOM_STATE, "utf8");
-  const start = source.indexOf("class RoomState");
-  const end = source.indexOf("public string RoomCode");
-  assert.ok(start > 0 && end > start, "could not locate RoomState in PvpBackend.cs");
+  assert.match(source, /public\s+class\s+PvpRoomState/);
 
   return new Set(
-    [...source.slice(start, end).matchAll(/^\s*public\s+(?:string|int|bool)\s+(\w+)\s*[=;]/gm)]
+    [...source.matchAll(/^\s*public\s+(?:string|int|bool)\s+(\w+)\s*[=;]/gm)]
       .map((m) => m[1])
   );
 }
 
-test("every key CloudScript emits binds to a RoomState field", () => {
+test("every key CloudScript emits binds to a PvpRoomState field", () => {
   const emitted = emittedKeys();
   const fields = roomStateFields();
 
@@ -89,7 +91,7 @@ test("every key CloudScript emits binds to a RoomState field", () => {
   );
 });
 
-test("RoomState carries nothing the PlayFab view forgot to send", () => {
+test("PvpRoomState carries nothing the PlayFab view forgot to send", () => {
   const emitted = emittedKeys();
   const fields = roomStateFields();
 
@@ -100,4 +102,15 @@ test("RoomState carries nothing the PlayFab view forgot to send", () => {
     [],
     `these fields would sit at their default forever on PlayFab: ${unset.join(", ")}`
   );
+});
+
+test("PvpBackend keeps only a fieldless serializable compatibility shim", () => {
+  const backend = readFileSync(BACKEND, "utf8");
+
+  assert.match(
+    backend,
+    /\[Serializable\]\s*public\s+class\s+RoomState\s*:\s*PvpRoomState\s*\{\s*\}/s
+  );
+  assert.doesNotMatch(backend, /public\s+string\s+hostName\s*=/);
+  assert.doesNotMatch(backend, /public\s+int\s+matchIndex\s*;/);
 });

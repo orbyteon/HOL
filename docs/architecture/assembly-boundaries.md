@@ -66,8 +66,20 @@ Forbidden:
 - `UnityWebRequest`, PlayFab clients or transport scheduling;
 - ads, consent and release configuration.
 
-The initial slice moves `MatchOutcome` and `GameEvents` with their existing
-Unity GUIDs. `MatchOutcomeTests` now binds both types directly at compile time.
+The initial slice moved `MatchOutcome` and `GameEvents` with their existing
+Unity GUIDs. `MatchOutcomeTests` binds both types directly at compile time.
+
+`PvpRoomState` is the Unity-free public-room value contract shared by the
+application boundary and the existing PlayFab runtime. Its public primitive
+field names are the JsonUtility wire contract and stay mechanically compared
+with every key emitted by `playfab/cloudscript.js`.
+
+`PvpBackend.RoomState` remains temporarily as a serializable, fieldless subclass
+of `PvpRoomState`. That source-compatible shim lets existing Unity callers keep
+their current signatures while the state fields and helper behavior compile in
+`HOL.Application`. A later typed-backend slice will update those signatures and
+remove the shim.
+
 `AssemblyInfo.cs` temporarily grants internal access to `Assembly-CSharp` while
 callers remain in the predefined Unity assembly, plus `HOL.EditModeTests` for
 direct internal behavior tests. Remove the `Assembly-CSharp` friend when those
@@ -79,7 +91,9 @@ behavior-neutral move. Their eventual extraction belongs to
 new transport concerns to `HOL.Application`.
 
 `tools/test/application-assembly-boundary.test.mjs` locks the asmdef direction,
-forbidden dependencies, stable GUIDs and removal of the old reflection harness.
+forbidden dependencies, stable GUIDs, direct tests and transitional shims.
+`tools/test/room-state-contract.test.mjs` locks the complete CloudScript-to-C#
+field contract.
 
 ## Completed migrations
 
@@ -94,10 +108,21 @@ change must still update both the C# and CloudScript test suites.
 
 ### Phase 1B — application outcome/events
 
-`MatchOutcome.cs` and `GameEvents.cs` move from `SmartHooks/` to
+`MatchOutcome.cs` and `GameEvents.cs` moved from `SmartHooks/` to
 `Application/`. The event behavior, JSON field names and legacy win/loss
-compatibility stay unchanged. The only production source edit removes an unused
+compatibility stay unchanged. The only production source edit removed an unused
 `UnityEngine` import so the module can enforce `noEngineReferences: true`.
+
+### Phase 1C — PvP room-state contract
+
+The public room fields and pure side/match-point helpers moved from the nested
+`PvpBackend.RoomState` implementation into `Application/PvpRoomState.cs`.
+Existing callers still compile through the empty inherited compatibility shim;
+there is no transport, polling, controller, scene or gameplay change.
+
+`PvpRoomStateTests` now exercises the helpers through a direct
+`HOL.Application` reference. The Node room-state contract reads the application
+source of truth instead of scraping the Unity backend.
 
 ## Migration discipline
 
