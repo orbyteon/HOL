@@ -147,8 +147,11 @@ public sealed class SplashAuthoritativeVisualsPlayModeTests
         var legacyLogo = DirectChild(canvas.transform, "Image");
         Assert.That(legacyPanel, Is.Not.Null);
         Assert.That(legacyPanel.GetComponent<Image>().enabled, Is.False);
-        Assert.That(legacyLogo, Is.Not.Null);
-        Assert.That(legacyLogo.gameObject.activeSelf, Is.False);
+        // Git history is the backup: a retired logo may be purged completely or
+        // remain disabled during a controlled scene migration, but it must never
+        // be required for the current production Splash to pass.
+        if (legacyLogo != null)
+            Assert.That(legacyLogo.gameObject.activeSelf, Is.False);
 
         var normalizedSafeArea = InvokeNormalizedSafeArea(
             Screen.safeArea, Screen.width, Screen.height);

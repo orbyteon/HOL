@@ -38,10 +38,10 @@ public static class RuntimeUI
         return juice;
     }
 
-    // Neutral fallback only. Approved production screens must replace this
-    // with their real sprite before becoming visible. Keeping one cached
-    // fallback prevents runtime-created controls from becoming unclickable
-    // while a required-art failure is being surfaced in logs/tests.
+    // Neutral construction fallback only. Approved production screens must
+    // replace it with real artwork before becoming visible. ApplyProductionSprite
+    // removes and disables this fallback when required art is missing, so it can
+    // never silently become the shipping look.
     static Sprite roundedSprite;
 
     public static Sprite RoundedRectSprite
@@ -177,10 +177,22 @@ public static class RuntimeUI
         Image.Type type = Image.Type.Simple, bool preserveAspect = false,
         float pixelsPerUnitMultiplier = 1f)
     {
-        if (image == null || string.IsNullOrWhiteSpace(resourcePath)) return false;
+        if (image == null) return false;
+
+        if (string.IsNullOrWhiteSpace(resourcePath))
+        {
+            FailClosedProductionImage(image);
+            Debug.LogError("HOL UI: approved production sprite path is empty.");
+            return false;
+        }
+
         var sprite = Resources.Load<Sprite>(resourcePath);
         if (sprite == null)
         {
+            // A runtime-created button/input may already carry RoundedRectSprite.
+            // Remove it before reporting the failure so generic infrastructure
+            // cannot remain visible as an accidental production replacement.
+            FailClosedProductionImage(image);
             Debug.LogError("HOL UI: missing approved production sprite Resources/" +
                 resourcePath + ".");
             return false;
@@ -195,6 +207,26 @@ public static class RuntimeUI
         return true;
     }
 
+    static void FailClosedProductionImage(Image image)
+    {
+        image.sprite = null;
+        image.enabled = false;
+        image.type = Image.Type.Simple;
+        image.preserveAspect = false;
+        image.pixelsPerUnitMultiplier = 1f;
+        image.color = Color.white;
+        image.raycastTarget = false;
+
+        // A controller may later call SetActive(true) on this same button/input.
+        // Persist the failure independently of active state so the full child
+        // hierarchy remains invisible and non-interactive after reactivation.
+        var guard = image.GetComponent<RequiredProductionArtFailure>();
+        if (guard == null)
+            guard = image.gameObject.AddComponent<RequiredProductionArtFailure>();
+        guard.Apply();
+        image.gameObject.SetActive(false);
+    }
+
     // Neutral infrastructure for a caller-owned production frame. The
     // caller supplies the exact approved sprite path; RuntimeUI never chooses
     // a visual language or substitutes generated artwork.
@@ -206,8 +238,9 @@ public static class RuntimeUI
         Center(frame, position, size);
         ClampToSafeArea((RectTransform)frame.transform, size, position);
         var image = frame.AddComponent<Image>();
-        ApplyProductionSprite(image, resourcePath, Image.Type.Sliced, false,
-            pixelsPerUnitMultiplier);
+        if (!ApplyProductionSprite(image, resourcePath, Image.Type.Sliced, false,
+                pixelsPerUnitMultiplier))
+            frame.SetActive(false);
         image.raycastTarget = false;
         return frame;
     }

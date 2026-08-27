@@ -1,121 +1,33 @@
 using System;
-using System.Reflection;
 using NUnit.Framework;
 
-// The match-outcome record and the event hub that raises it.
-//
-// Two things are worth pinning down here. The first is the wire format: the
-// field names in MatchOutcome.BodyJson are a contract with whatever reads the
-// PlayStream events, and renaming one silently splits a metric in half across a
-// release boundary. The second is that adding the draw-capable event did not
-// change what the existing win/lose listeners see — ExtrasRuntimeWiring is
-// still bound to OnMatchEnded, and a draw must still not reach it, because
-// (bool, int) has no truthful way to say "draw".
-//
-// Reflection keeps the editor-only test assembly decoupled from
-// Assembly-CSharp, matching DuelRulesTests and L10nIntegrityTests.
+// Compile-time contracts for the Unity-free HOL.Application outcome and event
+// boundary. A rename or signature drift must fail compilation instead of a
+// reflection lookup at runtime.
 public class MatchOutcomeTests
 {
-    // ------------------------------------------------------------- reflection
-
-    static Type FindGameType(string name)
+    static MatchOutcome NewOutcome(
+        MatchOutcome.Mode mode,
+        MatchOutcome.Result result,
+        int guesses,
+        int opponentGuesses,
+        bool opened,
+        bool lockStaked,
+        int rematchIndex,
+        string version)
     {
-        foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+        return new MatchOutcome
         {
-            var t = asm.GetType(name);
-            if (t != null) return t;
-        }
-        Assert.Fail("Type '" + name + "' not found in loaded assemblies — renamed?");
-        return null;
+            PlayMode = mode,
+            Outcome = result,
+            Guesses = guesses,
+            OpponentGuesses = opponentGuesses,
+            Opened = opened,
+            LockStaked = lockStaked,
+            RematchIndex = rematchIndex,
+            AppVersion = version,
+        };
     }
-
-    static Type OutcomeType => FindGameType("MatchOutcome");
-    static Type EventsType => FindGameType("GameEvents");
-
-    static object NewOutcome(string mode, string result, int guesses, int opponentGuesses,
-                             bool opened, bool lockStaked, int rematchIndex, string version)
-    {
-        var t = OutcomeType;
-        object boxed = Activator.CreateInstance(t);
-
-        Set(boxed, "PlayMode", Enum.Parse(t.GetNestedType("Mode"), mode));
-        Set(boxed, "Outcome", Enum.Parse(t.GetNestedType("Result"), result));
-        Set(boxed, "Guesses", guesses);
-        Set(boxed, "OpponentGuesses", opponentGuesses);
-        Set(boxed, "Opened", opened);
-        Set(boxed, "LockStaked", lockStaked);
-        Set(boxed, "RematchIndex", rematchIndex);
-        Set(boxed, "AppVersion", version);
-        return boxed;
-    }
-
-    static void Set(object boxed, string field, object value)
-    {
-        var f = boxed.GetType().GetField(field);
-        Assert.IsNotNull(f, "MatchOutcome." + field + " not found — renamed?");
-        f.SetValue(boxed, value);
-    }
-
-    static string BodyJson(object outcome) =>
-        (string)OutcomeType.GetMethod("BodyJson").Invoke(outcome, null);
-
-    // ------------------------------------------------------------ wire format
-
-    [Test]
-    public void BodyJsonMatchesTheDocumentedContract()
-    {
-        var drawn = NewOutcome("Pvp", "Draw", 6, 6, true, false, 2, "0.3.0");
-
-        Assert.AreEqual(
-            "{\"mode\":\"pvp\",\"result\":\"draw\",\"guesses\":6,\"opponentGuesses\":6," +
-            "\"opened\":true,\"lockStaked\":false,\"rematchIndex\":2,\"appVersion\":\"0.3.0\"}",
-            BodyJson(drawn));
-    }
-
-    [Test]
-    public void ADrawIsExpressible()
-    {
-        // The reason this record exists: OnMatchEnded's (bool, int) cannot say
-        // "draw", so the draw paths had to route around analytics entirely.
-        StringAssert.Contains("\"result\":\"draw\"", BodyJson(NewOutcome(
-            "Pvp", "Draw", 5, 5, false, false, 0, "0.3.0")));
-    }
-
-    [Test]
-    public void ALossKeepsItsGuessCount()
-    {
-        // GameEvents.MatchEnded(false, 0) threw this away, which made the draw
-        // rate uninterpretable: you cannot tell a close duel from a rout.
-        StringAssert.Contains("\"guesses\":7", BodyJson(NewOutcome(
-            "Solo", "Loss", 7, 5, false, true, 0, "0.3.0")));
-    }
-
-    [Test]
-    public void PlayerEventWrapsTheBodyForPlayFab()
-    {
-        var outcome = NewOutcome("Solo", "Win", 4, 6, true, true, 0, "0.3.0");
-        string wrapped = (string)OutcomeType.GetMethod("PlayerEventJson")
-            .Invoke(outcome, new object[] { "match_completed" });
-
-        Assert.AreEqual(
-            "{\"EventName\":\"match_completed\",\"Body\":" + BodyJson(outcome) + "}",
-            wrapped);
-    }
-
-    [Test]
-    public void VersionStringIsEscaped()
-    {
-        string body = BodyJson(NewOutcome("Solo", "Win", 1, 1, true, false, 0, "0.3\"x\\y"));
-        StringAssert.Contains("\"appVersion\":\"0.3\\\"x\\\\y\"", body);
-    }
-
-    // -------------------------------------------------- event hub compatibility
-
-    FieldInfo MatchEndedField => EventsType.GetField("OnMatchEnded",
-        BindingFlags.Public | BindingFlags.Static);
-
-    FieldInfo StatsChangedField => EventsType.GetField("OnStatsChanged",
-        BindingFlags.Public | BindingFlags.Static);
 
     [SetUp]
     public void ClearBeforeEach() => ClearStaticHandlers();
@@ -123,92 +35,144 @@ public class MatchOutcomeTests
     [TearDown]
     public void ClearAfterEach() => ClearStaticHandlers();
 
-    // The hub's handlers are static, so a leaked subscription from one test
-    // would fire inside the next one.
-    void ClearStaticHandlers()
+    static void ClearStaticHandlers()
     {
-        MatchEndedField.SetValue(null, null);
-        StatsChangedField.SetValue(null, null);
-        EventsType.GetField("OnMatchCompleted", BindingFlags.Public | BindingFlags.Static)
-            .SetValue(null, null);
-    }
-
-    void RaiseCompleted(object outcome)
-    {
-        var m = EventsType.GetMethod("MatchCompleted",
-            BindingFlags.NonPublic | BindingFlags.Static);
-        Assert.IsNotNull(m, "GameEvents.MatchCompleted not found — renamed?");
-        m.Invoke(null, new[] { outcome });
+        GameEvents.OnMatchEnded = null;
+        GameEvents.OnMatchCompleted = null;
+        GameEvents.OnStatsChanged = null;
+        GameEvents.OnDailyStreak = null;
     }
 
     [Test]
-    public void AnalyticsEventExistsAndTakesAnOutcome()
+    public void BodyJsonMatchesTheDocumentedContract()
     {
-        var field = EventsType.GetField("OnMatchCompleted",
-            BindingFlags.Public | BindingFlags.Static);
+        var drawn = NewOutcome(MatchOutcome.Mode.Pvp, MatchOutcome.Result.Draw,
+            6, 6, true, false, 2, "0.3.0");
 
-        Assert.IsNotNull(field, "GameEvents.OnMatchCompleted not found — renamed?");
-        Assert.AreEqual(typeof(Action<>).MakeGenericType(OutcomeType), field.FieldType);
+        Assert.AreEqual(
+            "{\"mode\":\"pvp\",\"result\":\"draw\",\"guesses\":6,\"opponentGuesses\":6," +
+            "\"opened\":true,\"lockStaked\":false,\"rematchIndex\":2,\"appVersion\":\"0.3.0\"}",
+            drawn.BodyJson());
     }
 
     [Test]
-    public void AWinStillReachesTheLegacyListenersWithItsGuessCount()
+    public void ADrawIsExpressible()
     {
-        bool fired = false, wonArg = false;
-        int guessesArg = -1;
-        MatchEndedField.SetValue(null, (Action<bool, int>)((won, guesses) =>
+        StringAssert.Contains("\"result\":\"draw\"", NewOutcome(
+            MatchOutcome.Mode.Pvp, MatchOutcome.Result.Draw,
+            5, 5, false, false, 0, "0.3.0").BodyJson());
+    }
+
+    [Test]
+    public void ALossKeepsItsGuessCount()
+    {
+        StringAssert.Contains("\"guesses\":7", NewOutcome(
+            MatchOutcome.Mode.Solo, MatchOutcome.Result.Loss,
+            7, 5, false, true, 0, "0.3.0").BodyJson());
+    }
+
+    [Test]
+    public void PlayerEventWrapsTheBodyForPlayFab()
+    {
+        var outcome = NewOutcome(MatchOutcome.Mode.Solo, MatchOutcome.Result.Win,
+            4, 6, true, true, 0, "0.3.0");
+
+        Assert.AreEqual(
+            "{\"EventName\":\"match_completed\",\"Body\":" + outcome.BodyJson() + "}",
+            outcome.PlayerEventJson("match_completed"));
+    }
+
+    [Test]
+    public void VersionStringIsEscaped()
+    {
+        string body = NewOutcome(MatchOutcome.Mode.Solo, MatchOutcome.Result.Win,
+            1, 1, true, false, 0, "0.3\"x\\y").BodyJson();
+        StringAssert.Contains("\"appVersion\":\"0.3\\\"x\\\\y\"", body);
+    }
+
+    [Test]
+    public void CompletedEventCarriesTheTypedOutcome()
+    {
+        bool fired = false;
+        MatchOutcome received = default;
+        GameEvents.OnMatchCompleted = outcome =>
         {
-            fired = true; wonArg = won; guessesArg = guesses;
-        }));
+            fired = true;
+            received = outcome;
+        };
 
-        RaiseCompleted(NewOutcome("Pvp", "Win", 5, 6, true, false, 0, "0.3.0"));
+        var expected = NewOutcome(MatchOutcome.Mode.Pvp, MatchOutcome.Result.Draw,
+            6, 6, true, false, 1, "0.3.0");
+        GameEvents.MatchCompleted(expected);
 
-        Assert.IsTrue(fired, "a win must still raise OnMatchEnded");
+        Assert.IsTrue(fired);
+        Assert.AreEqual(expected.Outcome, received.Outcome);
+        Assert.AreEqual(expected.Guesses, received.Guesses);
+    }
+
+    [Test]
+    public void AWinStillReachesLegacyListenersWithItsGuessCount()
+    {
+        bool fired = false;
+        bool wonArg = false;
+        int guessesArg = -1;
+        GameEvents.OnMatchEnded = (won, guesses) =>
+        {
+            fired = true;
+            wonArg = won;
+            guessesArg = guesses;
+        };
+
+        GameEvents.MatchCompleted(NewOutcome(MatchOutcome.Mode.Pvp,
+            MatchOutcome.Result.Win, 5, 6, true, false, 0, "0.3.0"));
+
+        Assert.IsTrue(fired);
         Assert.IsTrue(wonArg);
         Assert.AreEqual(5, guessesArg);
     }
 
     [Test]
-    public void ALossStillReachesTheLegacyListenersAsZeroGuesses()
+    public void ALossStillReachesLegacyListenersAsZeroGuesses()
     {
-        // Deliberately unchanged: ExtrasRuntimeWiring's engagement hooks read
-        // this argument, and altering it here would be a silent behaviour
-        // change dressed up as a telemetry addition.
         int guessesArg = -1;
-        MatchEndedField.SetValue(null, (Action<bool, int>)((won, guesses) =>
+        GameEvents.OnMatchEnded = (won, guesses) =>
         {
-            Assert.IsFalse(won); guessesArg = guesses;
-        }));
+            Assert.IsFalse(won);
+            guessesArg = guesses;
+        };
 
-        RaiseCompleted(NewOutcome("Solo", "Loss", 7, 4, false, true, 0, "0.3.0"));
+        GameEvents.MatchCompleted(NewOutcome(MatchOutcome.Mode.Solo,
+            MatchOutcome.Result.Loss, 7, 4, false, true, 0, "0.3.0"));
 
         Assert.AreEqual(0, guessesArg);
     }
 
     [Test]
-    public void ADrawStillNeverReachesTheWinLoseListeners()
+    public void ADrawNeverReachesWinLoseListeners()
     {
         bool fired = false;
-        MatchEndedField.SetValue(null, (Action<bool, int>)((won, guesses) => fired = true));
+        GameEvents.OnMatchEnded = (_, __) => fired = true;
 
-        RaiseCompleted(NewOutcome("Pvp", "Draw", 6, 6, true, false, 1, "0.3.0"));
+        GameEvents.MatchCompleted(NewOutcome(MatchOutcome.Mode.Pvp,
+            MatchOutcome.Result.Draw, 6, 6, true, false, 1, "0.3.0"));
 
-        Assert.IsFalse(fired,
-            "a draw has no truthful (bool, int) form; it must not reach OnMatchEnded");
+        Assert.IsFalse(fired);
     }
 
     [Test]
-    public void EveryResultRefreshesTheStatsListeners()
+    public void EveryResultRefreshesStatsExactlyOnce()
     {
-        foreach (var result in new[] { "Win", "Loss", "Draw" })
+        foreach (MatchOutcome.Result result in Enum.GetValues(typeof(MatchOutcome.Result)))
         {
             ClearStaticHandlers();
-
             int calls = 0;
-            StatsChangedField.SetValue(null, (Action)(() => calls++));
-            RaiseCompleted(NewOutcome("Pvp", result, 5, 5, true, false, 0, "0.3.0"));
+            GameEvents.OnStatsChanged = () => calls++;
 
-            Assert.AreEqual(1, calls, result + " must refresh the stats listeners exactly once");
+            GameEvents.MatchCompleted(NewOutcome(MatchOutcome.Mode.Pvp,
+                result, 5, 5, true, false, 0, "0.3.0"));
+
+            Assert.AreEqual(1, calls,
+                result + " must refresh the stats listeners exactly once");
         }
     }
 }

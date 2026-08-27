@@ -71,7 +71,8 @@ public sealed class SettingsVisuals : MonoBehaviour
 
     static void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
-        if (!scene.IsValid() || !scene.isLoaded) return;
+        if (scene.name != "MainMenu" || !scene.IsValid() || !scene.isLoaded)
+            return;
         foreach (var sceneRoot in scene.GetRootGameObjects())
         {
             foreach (var canvas in sceneRoot.GetComponentsInChildren<Canvas>(true))

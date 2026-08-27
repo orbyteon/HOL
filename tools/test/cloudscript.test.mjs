@@ -428,8 +428,16 @@ test("a room survives a chain of rematches", () => {
     view = playToEnd(cs, roomId, view);
     assert.equal(view.matchIndex, match);
 
-    cs.call("requestRematch", "HOST", { roomId, secret: 20 + match });
-    const next = cs.call("requestRematch", "GUEST", { roomId, secret: 60 + match });
+    cs.call("requestRematch", "HOST", {
+      roomId,
+      secret: 20 + match,
+      matchIndex: view.matchIndex,
+    });
+    const next = cs.call("requestRematch", "GUEST", {
+      roomId,
+      secret: 60 + match,
+      matchIndex: view.matchIndex,
+    });
     assert.equal(next.ok, true, `rematch ${match + 1} failed: ${next.error}`);
     view = cs.view(next);
     assert.equal(view.phase, "play");
