@@ -176,11 +176,21 @@ jobs:
             return 1
           }
 
+          wait_for_package_manager() {
+            {
+              echo "Waiting for PackageManager handlers for $package_name"
+              adb shell cmd package wait-for-handler --timeout 60000
+              adb shell cmd package wait-for-background-handler --timeout 60000
+              adb shell pm path "$package_name"
+            } >> "$output/package-manager-wait.log" 2>&1
+          }
+
           wait_for_adb
           adb shell input keyevent KEYCODE_WAKEUP || true
           adb shell wm dismiss-keyguard || true
           adb shell settings put secure immersive_mode_confirmations confirmed || true
           adb install -r "$apk" > "$output/install.log" 2>&1
+          wait_for_package_manager
 
           capture_viewport() {
             lang="$1"
@@ -192,27 +202,56 @@ jobs:
             suffix="${lang}-${width}x${height}"
             start_log="$output/start-${suffix}.log"
             marker_log="$output/marker-${suffix}.log"
-
-            adb shell am force-stop "$package_name" || true
-            adb logcat -c >/dev/null 2>&1 || true
-            adb shell wm size "${width}x${height}"
-            adb shell wm density "$density"
-            adb shell am start -W -n "$package_name/$launch_activity" \
-              --es hol_capture_screen dailyhunt \
-              --es hol_capture_language "$lang" \
-              > "$start_log" 2>&1
-
             ready=0
-            for attempt in $(seq 1 180); do
-              adb logcat -d -v threadtime > "$marker_log" 2>/dev/null || true
-              if grep -Fq "$marker" "$marker_log"; then
-                ready=1
+            for launch_attempt in 1 2; do
+              attempt_start_log="$output/start-${suffix}-attempt${launch_attempt}.log"
+              attempt_marker_log="$output/marker-${suffix}-attempt${launch_attempt}.log"
+              pid_log="$output/pid-${suffix}-attempt${launch_attempt}.log"
+
+              adb shell am force-stop "$package_name" || true
+              adb logcat -c >/dev/null 2>&1 || true
+              adb shell wm size "${width}x${height}"
+              adb shell wm density "$density"
+              adb shell am start -W -n "$package_name/$launch_activity" \
+                --es hol_capture_screen dailyhunt \
+                --es hol_capture_language "$lang" \
+                > "$attempt_start_log" 2>&1
+
+              process_exited=0
+              for marker_attempt in $(seq 1 180); do
+                adb logcat -d -v threadtime > "$attempt_marker_log" 2>/dev/null || true
+                if grep -Fq "$marker" "$attempt_marker_log"; then
+                  ready=1
+                  break
+                fi
+                if ! adb shell pidof "$package_name" > "$pid_log" 2>&1; then
+                  process_exited=1
+                  break
+                fi
+                sleep 1
+              done
+
+              cp "$attempt_start_log" "$start_log"
+              cp "$attempt_marker_log" "$marker_log"
+              if [ "$ready" -eq 1 ]; then
                 break
               fi
-              sleep 1
+
+              if [ "$process_exited" -ne 1 ]; then
+                echo "::error::Timed out waiting for $marker at ${width}x${height}"
+                return 1
+              fi
+              if [ "$launch_attempt" -eq 2 ]; then
+                echo "::error::Daily Hunt exited before $marker at ${width}x${height} after retry"
+                return 1
+              fi
+
+              echo "Daily Hunt exited before capture readiness; waiting for package state and retrying once"
+              wait_for_package_manager
+              sleep 3
             done
             if [ "$ready" -ne 1 ]; then
-              echo "::error::Timed out waiting for $marker at ${width}x${height}"
+              echo "::error::Failed to reach $marker at ${width}x${height}"
               return 1
             fi
 
