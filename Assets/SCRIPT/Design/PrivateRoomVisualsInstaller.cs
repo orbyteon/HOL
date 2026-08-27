@@ -17,7 +17,8 @@ public sealed class PrivateRoomVisualsInstaller : MonoBehaviour
 
     static void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
-        if (!scene.IsValid() || !scene.isLoaded || scene.name == "SplashScene")
+        if (!scene.IsValid() || !scene.isLoaded || scene.name == "SplashScene" ||
+            !ContainsPvpRuntimeUi(scene))
             return;
 
         foreach (var root in scene.GetRootGameObjects())
@@ -27,6 +28,14 @@ public sealed class PrivateRoomVisualsInstaller : MonoBehaviour
         var host = new GameObject("PrivateRoomVisualsInstaller");
         SceneManager.MoveGameObjectToScene(host, scene);
         host.AddComponent<PrivateRoomVisualsInstaller>();
+    }
+
+    static bool ContainsPvpRuntimeUi(Scene scene)
+    {
+        foreach (var root in scene.GetRootGameObjects())
+            if (root.GetComponentInChildren<PvpRuntimeUI>(true) != null)
+                return true;
+        return false;
     }
 
     IEnumerator Start()

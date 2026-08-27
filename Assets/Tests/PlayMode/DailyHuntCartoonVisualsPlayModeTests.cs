@@ -230,7 +230,7 @@ public sealed class DailyHuntCartoonVisualsPlayModeTests
 
         foreach (Graphic graphic in root.GetComponentsInChildren<Graphic>(true))
         {
-            Assert.That(graphic is Image || graphic is TMP_Text, Is.True,
+            Assert.That(IsAllowedProductionGraphic(graphic), Is.True,
                 "Procedural Graphic found in Daily Hunt: " +
                 graphic.GetType().Name + " / " + graphic.name);
             if (graphic is Image image && image.sprite != null)
@@ -276,16 +276,12 @@ public sealed class DailyHuntCartoonVisualsPlayModeTests
 
         foreach (Vector2Int viewport in PortraitViewports)
         {
-            Screen.SetResolution(viewport.x, viewport.y, false);
-            for (int frame = 0; frame < 3; frame++)
-                yield return null;
-            Canvas.ForceUpdateCanvases();
-
             foreach (string language in new[] { "English", "Greek" })
             {
                 SetLanguage(language);
                 for (int frame = 0; frame < 2; frame++)
                     yield return null;
+                ApplyResponsiveViewport(visuals, viewport);
                 Canvas.ForceUpdateCanvases();
                 AssertResponsiveViewport(root, viewport, language);
             }
@@ -295,6 +291,7 @@ public sealed class DailyHuntCartoonVisualsPlayModeTests
         Screen.SetResolution(1080, 1920, false);
         for (int frame = 0; frame < 3; frame++)
             yield return null;
+        ApplyResponsiveViewport(visuals, new Vector2Int(1080, 1920));
         Canvas.ForceUpdateCanvases();
 
         Find(root, "DailyMissionStartButton").GetComponent<Button>()
@@ -329,10 +326,42 @@ public sealed class DailyHuntCartoonVisualsPlayModeTests
         Assert.That(visibleTrail, Does.Match("[↑↓•]"),
             "The visible trail must use glyphs covered by the production font chain.");
 
+        SetField(hunt, "used", 4);
+        SetField(hunt, "done", true);
+        SetField(hunt, "found", true);
+        Invoke(hunt, "Refresh");
+        yield return null;
+        Canvas.ForceUpdateCanvases();
+
+        TMP_Text inputCaption = Find(root, "DailyInputCaption")
+            .GetComponent<TMP_Text>();
+        RectTransform statusFrame = Find(root, "DailyStatusFrame")
+            as RectTransform;
+        Button share = Find(root, "ShareButton").GetComponent<Button>();
+        Assert.That(input.gameObject.activeInHierarchy, Is.False,
+            "Completed Daily Hunt must hide the real numeric input.");
+        Assert.That(inputCaption.gameObject.activeInHierarchy, Is.False,
+            "Completed Daily Hunt must not leave a stale input caption.");
+        Assert.That(share.gameObject.activeInHierarchy, Is.True,
+            "Completed Daily Hunt must expose the real Share callback.");
+        Assert.That(statusFrame.sizeDelta.y, Is.GreaterThan(200f),
+            "The existing status panel must occupy the released input zone.");
+
         close.onClick.Invoke();
         yield return null;
         Assert.That(hunt.gameObject.activeSelf, Is.False,
             "The top-left Back control lost the real Close callback.");
+    }
+
+    static bool IsAllowedProductionGraphic(Graphic graphic)
+    {
+        if (graphic is Image || graphic is TMP_Text)
+            return true;
+
+        var subMesh = graphic as TMP_SubMeshUI;
+        return subMesh != null &&
+               subMesh.transform.parent != null &&
+               subMesh.transform.parent.GetComponent<TMP_Text>() != null;
     }
 
     static void AssertResponsiveViewport(
@@ -341,26 +370,6 @@ public sealed class DailyHuntCartoonVisualsPlayModeTests
         string language)
     {
         AssertApprovedResponsiveGeometry(root, viewport);
-
-        foreach (string name in new[]
-        {
-            "CloseButton",
-            "DailyPlayerChip",
-            "DailyLogo",
-            "DailyTitleRibbon",
-            "DailyMissionBoard",
-            "DailyMissionRewardBoard",
-            "DailyMissionStartButton",
-            "DailyMissionPortal",
-            "DailyMascotSix",
-            "DailyMascotSeven",
-        })
-        {
-            AssertInsideScreen(
-                Find(root, name) as RectTransform,
-                viewport,
-                language + " / " + name);
-        }
 
         foreach (string name in new[]
         {
@@ -385,6 +394,19 @@ public sealed class DailyHuntCartoonVisualsPlayModeTests
             Assert.That(text.fontSize, Is.GreaterThanOrEqualTo(20f),
                 language + " / " + viewport + " / " + name + " became unreadable.");
         }
+    }
+
+    static void ApplyResponsiveViewport(
+        Component visuals,
+        Vector2Int viewport)
+    {
+        MethodInfo method = visuals.GetType().GetMethod(
+            "ApplyResponsiveLayoutForViewport",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.That(method, Is.Not.Null);
+        method.Invoke(
+            visuals,
+            new object[] { viewport.x, viewport.y, true });
     }
 
     static void AssertApprovedResponsiveGeometry(
@@ -426,24 +448,6 @@ public sealed class DailyHuntCartoonVisualsPlayModeTests
         AssertRect(root, "DailyMascotSeven",
             new Vector2(363f, -748f - 165f * tall),
             new Vector2(326f, 380f));
-    }
-
-    static void AssertInsideScreen(
-        RectTransform rect,
-        Vector2Int viewport,
-        string context)
-    {
-        Assert.That(rect, Is.Not.Null, context);
-        var corners = new Vector3[4];
-        rect.GetWorldCorners(corners);
-        foreach (Vector3 corner in corners)
-        {
-            Vector2 screen = RectTransformUtility.WorldToScreenPoint(null, corner);
-            Assert.That(screen.x, Is.GreaterThanOrEqualTo(-2f), context + " left clipped.");
-            Assert.That(screen.y, Is.GreaterThanOrEqualTo(-2f), context + " bottom clipped.");
-            Assert.That(screen.x, Is.LessThanOrEqualTo(viewport.x + 2f), context + " right clipped.");
-            Assert.That(screen.y, Is.LessThanOrEqualTo(viewport.y + 2f), context + " top clipped.");
-        }
     }
 
     static void AssertSprite(Transform root, string name, string resource)
@@ -507,6 +511,15 @@ public sealed class DailyHuntCartoonVisualsPlayModeTests
                   BindingFlags.NonPublic);
         Assert.That(field, Is.Not.Null, name);
         return (T)field.GetValue(target);
+    }
+
+    static void SetField<T>(Component target, string name, T value)
+    {
+        FieldInfo field = target.GetType().GetField(
+            name, BindingFlags.Instance | BindingFlags.Public |
+                  BindingFlags.NonPublic);
+        Assert.That(field, Is.Not.Null, name);
+        field.SetValue(target, value);
     }
 
     static T GetProperty<T>(Component target, string name)

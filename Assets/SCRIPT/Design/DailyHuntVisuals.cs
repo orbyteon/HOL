@@ -173,6 +173,7 @@ public sealed class DailyHuntVisuals : MonoBehaviour
     RectTransform missionRewardRect;
     RectTransform missionStartRect;
     RectTransform missionPortalRect;
+    RectTransform statusFrameRect;
     TMP_FontAsset displayFont;
     TMP_FontAsset bodyFont;
     TMP_Text chipName;
@@ -205,6 +206,7 @@ public sealed class DailyHuntVisuals : MonoBehaviour
     Sprite missionCheckCyanSprite;
     Sprite missionCheckMagentaSprite;
     bool lastRevivedLayout;
+    bool lastInputVisible = true;
     float nextChipRefresh;
     float nextMissionRefresh;
     int lastLayoutWidth = -1;
@@ -276,6 +278,7 @@ public sealed class DailyHuntVisuals : MonoBehaviour
         }
         else
         {
+            RefreshInteractionPresentation();
             RefreshVisibleTrail();
             RefreshStreakValue();
         }
@@ -476,8 +479,9 @@ public sealed class DailyHuntVisuals : MonoBehaviour
         var statusFrame = EnsureImage(
             challengeCard.transform, "DailyStatusFrame");
         ConfigureImage(statusFrame, infoPanel, false, Image.Type.Simple);
+        statusFrameRect = statusFrame.rectTransform;
         Place(
-            statusFrame.rectTransform, new Vector2(198f, 165f),
+            statusFrameRect, new Vector2(198f, 165f),
             new Vector2(545f, 134f));
 
         statusCopy = EnsureText(
@@ -1141,6 +1145,32 @@ public sealed class DailyHuntVisuals : MonoBehaviour
         }
     }
 
+    void RefreshInteractionPresentation()
+    {
+        if (viewBindings == null || viewBindings.Input == null ||
+            statusFrameRect == null || inputCaption == null)
+            return;
+
+        bool inputVisible = viewBindings.Input.gameObject.activeSelf;
+        if (inputVisible == lastInputVisible &&
+            inputCaption.gameObject.activeSelf == inputVisible)
+            return;
+
+        lastInputVisible = inputVisible;
+        inputCaption.gameObject.SetActive(inputVisible);
+
+        // While playing, status is a compact two-line information row above
+        // the real numeric input. Found/failed/revive states hide that input;
+        // the same approved info-panel asset then expands to its natural
+        // aspect and occupies the released interaction zone. This prevents a
+        // stale YOUR GUESS caption and a large dead gap without inventing a
+        // second panel, moving the challenge board, or changing gameplay.
+        Place(
+            statusFrameRect,
+            new Vector2(198f, inputVisible ? 165f : 74f),
+            new Vector2(545f, inputVisible ? 134f : 218f));
+    }
+
     void ApplyAttemptLayout(bool revived)
     {
         if (attemptSlots == null || attemptSlots.Length != 9) return;
@@ -1218,6 +1248,18 @@ public sealed class DailyHuntVisuals : MonoBehaviour
 
     void ApplyResponsiveLayout(bool force = false)
     {
+        ApplyResponsiveLayoutForViewport(Screen.width, Screen.height, force);
+    }
+
+    // Deterministic seam for exact responsive geometry tests. Runtime still
+    // enters through ApplyResponsiveLayout and therefore uses the real Screen
+    // dimensions; tests can validate every approved viewport even when the
+    // batchmode Game View ignores Screen.SetResolution.
+    void ApplyResponsiveLayoutForViewport(
+        int width,
+        int height,
+        bool force = false)
+    {
         if (closeRect == null || chipRect == null || logoRect == null ||
             ribbonRect == null || challengeCardRect == null ||
             rewardCardRect == null || submitRect == null ||
@@ -1225,8 +1267,6 @@ public sealed class DailyHuntVisuals : MonoBehaviour
             mascotSixRect == null || mascotSevenRect == null)
             return;
 
-        int width = Screen.width;
-        int height = Screen.height;
         L10n.Language language = L10n.Current;
         if (!force && width == lastLayoutWidth && height == lastLayoutHeight &&
             language == lastLayoutLanguage)
