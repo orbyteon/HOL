@@ -57,17 +57,27 @@ Allowed:
 
 - Unity-free match/application value contracts;
 - application-level events and orchestration contracts;
+- fixed wire/application protocols expressed with .NET primitive types;
 - use cases that depend only on `HOL.Core` and .NET base types.
 
 Forbidden:
 
 - `UnityEngine`, scenes, UI, `MonoBehaviour` or `ScriptableObject`;
-- `PlayerPrefs` or `Resources`;
+- `PlayerPrefs`, `Resources` or `L10n`;
 - `UnityWebRequest`, PlayFab clients or transport scheduling;
 - ads, consent and release configuration.
 
-The initial slice moved `MatchOutcome` and `GameEvents` with their existing
-Unity GUIDs. `MatchOutcomeTests` binds both types directly at compile time.
+`MatchOutcome` and `GameEvents` moved with their existing Unity GUIDs.
+`MatchOutcomeTests` binds both types directly at compile time.
+`AssemblyInfo.cs` temporarily grants internal access to `Assembly-CSharp` while
+callers remain in the predefined Unity assembly, plus `HOL.EditModeTests` for
+direct internal behavior tests. Remove the `Assembly-CSharp` friend when those
+callers move behind typed application entry points.
+
+`MatchOutcome` still contains its existing analytics JSON methods in this first
+behavior-neutral migration. Their eventual extraction belongs to
+`HOL.Infrastructure.PlayFab`; this temporary placement is not permission to add
+new transport concerns to `HOL.Application`.
 
 `PvpRoomState` is the Unity-free public-room value contract shared by the
 application boundary and the existing PlayFab runtime. Its public primitive
@@ -80,20 +90,16 @@ their current signatures while the state fields and helper behavior compile in
 `HOL.Application`. A later typed-backend slice will update those signatures and
 remove the shim.
 
-`AssemblyInfo.cs` temporarily grants internal access to `Assembly-CSharp` while
-callers remain in the predefined Unity assembly, plus `HOL.EditModeTests` for
-direct internal behavior tests. Remove the `Assembly-CSharp` friend when those
-callers move behind typed application entry points.
-
-`MatchOutcome` still contains its existing analytics JSON methods in this first
-behavior-neutral move. Their eventual extraction belongs to
-`HOL.Infrastructure.PlayFab`; this temporary placement is not permission to add
-new transport concerns to `HOL.Application`.
+`PvpSignalProtocol` owns the ordered six Signal localization keys and the
+per-side cap. Its ids are append-only wire protocol shared with CloudScript.
+The Unity `Signals` class remains a thin adapter for `L10n` and icon-facing
+runtime code; it must not carry a second copy of the vocabulary.
 
 `tools/test/application-assembly-boundary.test.mjs` locks the asmdef direction,
-forbidden dependencies, stable GUIDs, direct tests and transitional shims.
-`tools/test/room-state-contract.test.mjs` locks the complete CloudScript-to-C#
-field contract.
+forbidden dependencies, stable GUIDs and direct-test contracts.
+`tools/test/room-state-contract.test.mjs` locks CloudScript public-view parity.
+`tools/test/pvp-signal-protocol.test.mjs` locks Signal ordering/count/cap parity
+and the thin Unity adapter.
 
 ## Completed migrations
 
@@ -109,20 +115,21 @@ change must still update both the C# and CloudScript test suites.
 ### Phase 1B — application outcome/events
 
 `MatchOutcome.cs` and `GameEvents.cs` moved from `SmartHooks/` to
-`Application/`. The event behavior, JSON field names and legacy win/loss
-compatibility stay unchanged. The only production source edit removed an unused
-`UnityEngine` import so the module can enforce `noEngineReferences: true`.
+`Application/`. Event behavior, JSON field names and legacy win/loss
+compatibility stayed unchanged.
 
-### Phase 1C — PvP room-state contract
+### Phase 1C — PvP public room state
 
-The public room fields and pure side/match-point helpers moved from the nested
-`PvpBackend.RoomState` implementation into `Application/PvpRoomState.cs`.
-Existing callers still compile through the empty inherited compatibility shim;
-there is no transport, polling, controller, scene or gameplay change.
+`PvpRoomState` became the Unity-free source of truth for the public PlayFab room
+view. The existing nested `PvpBackend.RoomState` remains a fieldless derived
+compatibility type while runtime signatures are migrated later.
 
-`PvpRoomStateTests` now exercises the helpers through a direct
-`HOL.Application` reference. The Node room-state contract reads the application
-source of truth instead of scraping the Unity backend.
+### Phase 1D — fixed Signal protocol
+
+The ordered Signal keys, count, validation and per-side cap move into
+`PvpSignalProtocol`. `Signals` delegates protocol queries and owns only
+localization-facing behavior. Existing ids, keys, icon paths and CloudScript
+constants remain unchanged.
 
 ## Migration discipline
 
