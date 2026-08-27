@@ -3,6 +3,13 @@ using NUnit.Framework;
 // Compile-time behavior contracts for the Unity-free PvP public room view.
 public class PvpRoomStateTests
 {
+    // Mirrors the temporary PvpBackend.RoomState compatibility shim without
+    // introducing an EditMode-test dependency on Assembly-CSharp. JsonUtility
+    // must preserve inherited public fields because the shipping PlayFab client
+    // still deserializes through that derived runtime type.
+    [System.Serializable]
+    sealed class DerivedRoomState : PvpRoomState { }
+
     [Test]
     public void SideHelpersReadTheMatchingPublicFields()
     {
@@ -72,9 +79,9 @@ public class PvpRoomStateTests
     }
 
     [Test]
-    public void JsonUtilityRoundTripPreservesThePublicWireView()
+    public void JsonUtilityRoundTripPreservesInheritedWireFieldsUsedByRuntimeShim()
     {
-        var expected = new PvpRoomState
+        var expected = new DerivedRoomState
         {
             hostName = "Host",
             guestName = "Guest",
@@ -88,7 +95,7 @@ public class PvpRoomStateTests
         };
 
         string json = UnityEngine.JsonUtility.ToJson(expected);
-        var actual = UnityEngine.JsonUtility.FromJson<PvpRoomState>(json);
+        var actual = UnityEngine.JsonUtility.FromJson<DerivedRoomState>(json);
 
         Assert.IsNotNull(actual);
         Assert.AreEqual(expected.hostName, actual.hostName);

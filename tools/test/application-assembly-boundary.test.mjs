@@ -113,6 +113,11 @@ test("PvP room state is an application contract with a fieldless runtime shim", 
   assert.doesNotMatch(tests, /Activator\.CreateInstance/);
   assert.match(tests, /new PvpRoomState/);
   assert.match(tests, /IsMatchPointAgainst/);
+  assert.match(
+    tests,
+    /sealed\s+class\s+DerivedRoomState\s*:\s*PvpRoomState\s*\{\s*\}/s
+  );
+  assert.match(tests, /JsonUtility\.FromJson<DerivedRoomState>/);
 });
 
 test("Phase 1B keeps scoped agent, validation and release-note contracts", () => {
