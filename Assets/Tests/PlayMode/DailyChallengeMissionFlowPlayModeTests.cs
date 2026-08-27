@@ -28,24 +28,22 @@ public sealed class DailyChallengeMissionFlowPlayModeTests
         "DailyHuntMax",
     };
 
+    Scene testScene;
+
     [UnitySetUp]
     public IEnumerator SetUp()
     {
         Clear();
 
-        // Load the real empty scene through Unity's supported Single-scene
-        // transition. Do not enumerate and unload every loaded scene: the
-        // PlayMode test runner owns its own scene/lifecycle objects, and
-        // removing them can strand the entire GameCI run instead of failing
-        // one test with a useful result.
-        AsyncOperation load = SceneManager.LoadSceneAsync(
-            "SplashScene", LoadSceneMode.Single);
-        Assert.That(load, Is.Not.Null);
-        yield return load;
-
-        Assert.That(
-            SceneManager.GetActiveScene().name,
-            Is.EqualTo("SplashScene"));
+        // Own exactly one uniquely named additive scene for objects created by
+        // this fixture. Unity Test Framework may keep runner lifecycle objects
+        // in another loaded scene; this test must neither rename, replace nor
+        // unload anything it did not create itself.
+        testScene = SceneManager.CreateScene(
+            "DailyChallengeMissionFlowTests_" + Guid.NewGuid().ToString("N"));
+        Assert.That(testScene.IsValid(), Is.True);
+        Assert.That(testScene.isLoaded, Is.True);
+        Assert.That(SceneManager.SetActiveScene(testScene), Is.True);
         yield return null;
     }
 
@@ -53,6 +51,13 @@ public sealed class DailyChallengeMissionFlowPlayModeTests
     public IEnumerator TearDown()
     {
         Clear();
+        if (testScene.IsValid() && testScene.isLoaded)
+        {
+            AsyncOperation unload = SceneManager.UnloadSceneAsync(testScene);
+            Assert.That(unload, Is.Not.Null);
+            yield return unload;
+        }
+        testScene = default;
         yield return null;
     }
 

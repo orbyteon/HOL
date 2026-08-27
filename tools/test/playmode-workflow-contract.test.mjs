@@ -76,25 +76,35 @@ test("PlayMode failures always retain useful diagnostics", () => {
   assert.match(workflow, /retention-days:\s*7/);
 });
 
-test("Daily mission isolation uses a supported Single-scene transition", () => {
+test("Daily mission isolation owns and unloads only its unique test scene", () => {
   assert.match(
     missionFlow,
-    /SceneManager\.LoadSceneAsync\(\s*"SplashScene",\s*LoadSceneMode\.Single\s*\)/,
-    "the fixture must isolate itself through Unity's normal scene transition"
+    /Scene\s+testScene\s*;/,
+    "the fixture must retain the exact scene identity it owns"
+  );
+  assert.match(
+    missionFlow,
+    /SceneManager\.CreateScene\(\s*"DailyChallengeMissionFlowTests_"\s*\+\s*Guid\.NewGuid\(\)\.ToString\("N"\)\s*\)/,
+    "the fixture needs a unique non-production scene name"
+  );
+  assert.match(
+    missionFlow,
+    /SceneManager\.SetActiveScene\(testScene\)/,
+    "objects created by the fixture must enter the test-owned scene"
+  );
+  assert.match(
+    missionFlow,
+    /SceneManager\.UnloadSceneAsync\(testScene\)/,
+    "teardown must unload exactly the scene retained by the fixture"
   );
   assert.doesNotMatch(
     missionFlow,
-    /SceneManager\.UnloadSceneAsync/,
-    "a fixture must not enumerate and unload the Unity Test Runner scene"
+    /SceneManager\.sceneCount|SceneManager\.GetSceneAt/,
+    "the fixture must not enumerate scenes owned by Unity Test Framework"
   );
   assert.doesNotMatch(
     missionFlow,
-    /SceneManager\.CreateScene/,
-    "a synthetic scene with a production scene name can bypass normal lifecycle behavior"
-  );
-  assert.doesNotMatch(
-    missionFlow,
-    /SceneManager\.sceneCount/,
-    "the fixture must not take ownership of every loaded scene"
+    /"SplashScene"|LoadSceneMode\.Single/,
+    "component isolation must not start production splash lifecycle or replace runner scenes"
   );
 });
