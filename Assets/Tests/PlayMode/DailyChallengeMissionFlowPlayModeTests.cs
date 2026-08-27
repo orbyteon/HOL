@@ -32,21 +32,20 @@ public sealed class DailyChallengeMissionFlowPlayModeTests
     public IEnumerator SetUp()
     {
         Clear();
-        // The production lifecycle bridges intentionally ignore SplashScene.
-        // Reuse that empty scene name so isolated component tests do not spawn
-        // Main Menu/PvP installers whose controllers are absent by design.
-        Scene isolated = SceneManager.GetSceneByName("SplashScene");
-        if (!isolated.IsValid() || !isolated.isLoaded)
-            isolated = SceneManager.CreateScene("SplashScene");
-        SceneManager.SetActiveScene(isolated);
-        for (int index = SceneManager.sceneCount - 1; index >= 0; index--)
-        {
-            Scene loaded = SceneManager.GetSceneAt(index);
-            if (loaded == isolated || !loaded.isLoaded) continue;
-            AsyncOperation unload = SceneManager.UnloadSceneAsync(loaded);
-            if (unload != null)
-                yield return unload;
-        }
+
+        // Load the real empty scene through Unity's supported Single-scene
+        // transition. Do not enumerate and unload every loaded scene: the
+        // PlayMode test runner owns its own scene/lifecycle objects, and
+        // removing them can strand the entire GameCI run instead of failing
+        // one test with a useful result.
+        AsyncOperation load = SceneManager.LoadSceneAsync(
+            "SplashScene", LoadSceneMode.Single);
+        Assert.That(load, Is.Not.Null);
+        yield return load;
+
+        Assert.That(
+            SceneManager.GetActiveScene().name,
+            Is.EqualTo("SplashScene"));
         yield return null;
     }
 

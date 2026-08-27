@@ -32,6 +32,10 @@ jobs:
        github.event.action == 'labeled' &&
        github.event.label.name == 'preview-mainmenu')
     runs-on: ubuntu-latest
+    # Unity must never occupy a runner indefinitely. A hung PlayMode fixture is
+    # a failed gate; the always() diagnostics below still run during timeout
+    # cancellation and make the failure actionable.
+    timeout-minutes: 25
     permissions:
       checks: write
       contents: read

@@ -4,6 +4,9 @@ import fs from "node:fs";
 
 const workflowPath = ".github/workflows/playmode-tests.yml";
 const workflow = fs.readFileSync(workflowPath, "utf8");
+const missionFlowPath =
+  "Assets/Tests/PlayMode/DailyChallengeMissionFlowPlayModeTests.cs";
+const missionFlow = fs.readFileSync(missionFlowPath, "utf8");
 
 test("PlayMode workflow isolates its utility checkout from the Unity workspace", () => {
   assert.match(
@@ -58,9 +61,40 @@ test("PlayMode workflow proves that a complete Unity project exists before GameC
   assert.match(workflow, /projectPath:\s*\./);
 });
 
+test("PlayMode cannot occupy a runner indefinitely", () => {
+  assert.match(
+    workflow,
+    /exact-visuals-playmode:[\s\S]*?timeout-minutes:\s*25/,
+    "the Unity PlayMode job needs a hard timeout so a stranded fixture fails closed"
+  );
+});
+
 test("PlayMode failures always retain useful diagnostics", () => {
   assert.match(workflow, /artifactsPath:\s*artifacts\/playmode/);
   assert.match(workflow, /Collect Unity failure diagnostics/);
   assert.match(workflow, /if-no-files-found:\s*error/);
   assert.match(workflow, /retention-days:\s*7/);
+});
+
+test("Daily mission isolation uses a supported Single-scene transition", () => {
+  assert.match(
+    missionFlow,
+    /SceneManager\.LoadSceneAsync\(\s*"SplashScene",\s*LoadSceneMode\.Single\s*\)/,
+    "the fixture must isolate itself through Unity's normal scene transition"
+  );
+  assert.doesNotMatch(
+    missionFlow,
+    /SceneManager\.UnloadSceneAsync/,
+    "a fixture must not enumerate and unload the Unity Test Runner scene"
+  );
+  assert.doesNotMatch(
+    missionFlow,
+    /SceneManager\.CreateScene/,
+    "a synthetic scene with a production scene name can bypass normal lifecycle behavior"
+  );
+  assert.doesNotMatch(
+    missionFlow,
+    /SceneManager\.sceneCount/,
+    "the fixture must not take ownership of every loaded scene"
+  );
 });
