@@ -21,13 +21,20 @@ second UI, persistence, transport or service layer.
 
 ## Current transitional seams
 
-- `MatchOutcome` and `GameEvents` are the first application contracts.
+- `MatchOutcome` and `GameEvents` are application contracts.
 - Their event behavior, analytics field names and win/loss/draw semantics are
   compatibility contracts; preserve them unless a separately approved product
   migration changes the wire contract and its tests.
 - `MatchOutcome` still contains legacy JSON formatting methods. They are frozen
   transitional behavior and belong in `HOL.Infrastructure.PlayFab` in a later
   behavior-preserving slice. Do not add new transport concerns to them.
+- `PvpRoomState` owns the Unity-free public room view. Its wire field names are
+  exact compatibility contracts with the object emitted by
+  `playfab/cloudscript.js`; rename, add or remove one only with the matching
+  CloudScript and contract-test change.
+- `PvpBackend.RoomState` is a temporary fieldless compatibility shim that
+  inherits `PvpRoomState` while unmigrated Unity signatures still use the nested
+  type. Do not add fields or behavior back to the shim.
 - `AssemblyInfo.cs` grants `Assembly-CSharp` temporary internal access while
   unmigrated callers remain in Unity's predefined assembly. Do not add more
   friend assemblies without an explicit architecture reason. Remove the
@@ -42,6 +49,8 @@ second UI, persistence, transport or service layer.
 - Every new invariant requires focused tests plus an update to
   `tools/test/application-assembly-boundary.test.mjs` when structurally
   enforceable.
+- Keep `tools/test/room-state-contract.test.mjs` aligned with the authoritative
+  `PvpRoomState` source and every CloudScript-emitted public field.
 - Keep each PR behavior-neutral unless the owner explicitly authorizes a product
   or gameplay change.
 - No module change authorizes PlayFab/Azure deployment, signed builds,
