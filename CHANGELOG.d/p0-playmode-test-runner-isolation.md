@@ -10,6 +10,8 @@
 - Made chained PlayMode runs re-read their completed source CI run so a PR head
   is recovered even when GitHub's `workflow_run` event reports `main` and an
   empty pull-request array.
+- Isolated automatic PlayMode concurrency by PR number or unique source CI run
+  id so unrelated PRs cannot cancel each other through `playmode-main`.
 - Added requested branch to checkout diagnostics and structurally locked source
   run recovery, exact merge-ref selection and SHA evidence.
 - Added a hard 25-minute timeout so a stranded Unity fixture fails closed

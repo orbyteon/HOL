@@ -45,6 +45,19 @@ test("an explicit preview label can validate any PR without taxing ordinary PRs"
   );
 });
 
+test("automatic PlayMode concurrency cannot collapse unrelated PRs into main", () => {
+  const group = workflow.match(/concurrency:\s*\n\s*group:\s*([^\n]+)/)?.[1] ?? "";
+  assert.match(group, /github\.event\.pull_request\.number/);
+  assert.match(group, /github\.event\.workflow_run\.pull_requests\[0\]\.number/);
+  assert.match(group, /github\.event\.workflow_run\.id/);
+  assert.doesNotMatch(
+    group,
+    /github\.event\.workflow_run\.head_branch/,
+    "lossy workflow_run head_branch can report main for every PR and cause cross-PR cancellation"
+  );
+  assert.match(workflow, /cancel-in-progress:\s*true/);
+});
+
 test("workflow_run recovers the PR target from the authoritative source CI run", () => {
   assert.match(
     workflow,
