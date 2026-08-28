@@ -1,0 +1,109 @@
+name: Phase 1E typed room-state migration final
+
+on:
+  push:
+    branches:
+      - cto/phase1e-typed-pvp-room-state-20260828
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    if: github.actor != 'github-actions[bot]' && !contains(github.event.head_commit.message, '[phase1e-migrated]')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: cto/phase1e-typed-pvp-room-state-20260828
+          fetch-depth: 0
+
+      - name: Apply reviewed migration with all discovered contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap
+
+          workflow = Path(
+              ".github/workflows/phase1e-typed-room-state-migration.yml"
+          ).read_text(encoding="utf-8")
+          marker = "          python3 - <<'PY'\n"
+          start = workflow.index(marker) + len(marker)
+          end = workflow.index("\n          PY\n", start)
+          script = textwrap.dedent(workflow[start:end])
+          script = script.replace("controller_count != 6", "controller_count != 7")
+          script = script.replace(
+              "expected 6 PvpBackend.RoomState tokens",
+              "expected 7 PvpBackend.RoomState tokens",
+          )
+
+          insertion = r'''
+          l10n_integrity_path = "Assets/Tests/EditMode/L10nIntegrityTests.cs"
+          l10n_integrity = read(l10n_integrity_path)
+          old_l10n_test = '''    [Test]
+              public void PvpRoomStateContainsServerViewFields()
+              {
+                  var backend = FindGameType("PvpBackend");
+                  var room = backend.GetNestedType("RoomState", BindingFlags.Public);
+                  Assert.IsNotNull(room, "PvpBackend.RoomState missing");
+
+                  foreach (var name in new[] { "lastHint", "revealedSecret", "hostGuessCount", "guestGuessCount" })
+                      Assert.IsNotNull(room.GetField(name, BindingFlags.Public | BindingFlags.Instance),
+                          "RoomState is missing server-view field '" + name + "'");
+              }
+          '''.replace("              ", "")
+          new_l10n_test = '''    [Test]
+              public void PvpRoomStateContainsServerViewFields()
+              {
+                  var room = FindGameType("PvpRoomState");
+                  Assert.IsNotNull(room, "PvpRoomState missing");
+
+                  foreach (var name in new[] { "lastHint", "revealedSecret", "hostGuessCount", "guestGuessCount" })
+                      Assert.IsNotNull(room.GetField(name, BindingFlags.Public | BindingFlags.Instance),
+                          "PvpRoomState is missing server-view field '" + name + "'");
+              }
+          '''.replace("              ", "")
+          if l10n_integrity.count(old_l10n_test) != 1:
+              raise SystemExit("L10n integrity room-state contract drifted")
+          write(
+              l10n_integrity_path,
+              l10n_integrity.replace(old_l10n_test, new_l10n_test),
+          )
+
+          '''
+          insertion = textwrap.dedent(insertion)
+          anchor = "offenders = []\n"
+          if script.count(anchor) != 1:
+              raise SystemExit("migration offender-scan anchor drifted")
+          script = script.replace(anchor, insertion + anchor)
+          exec(compile(script, "phase1e-migration", "exec"), {"__name__": "__main__"})
+          PY
+
+      - name: Validate repository contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          node --test tools/test/*.test.mjs
+
+      - name: Commit migration to the feature branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Assets/SCRIPT/PvP/PvpBackend.cs \
+                  Assets/SCRIPT/PvP/PlayFabPvpClient.cs \
+                  Assets/SCRIPT/PvP/PvpGameController.cs \
+                  Assets/SCRIPT/Application/AGENTS.md \
+                  Assets/Tests/EditMode/PvpRoomStateTests.cs \
+                  Assets/Tests/EditMode/L10nIntegrityTests.cs \
+                  tools/test/application-assembly-boundary.test.mjs \
+                  docs/architecture/assembly-boundaries.md \
+                  docs/architecture/phase-1e-typed-room-state-validation.md \
+                  CHANGELOG.d/phase-1e-typed-room-state.md
+          git commit -m "refactor(pvp): consume PvpRoomState directly [phase1e-migrated]"
+          git push origin HEAD:cto/phase1e-typed-pvp-room-state-20260828
