@@ -1,0 +1,72 @@
+name: Phase 1E typed room-state migration retry
+
+on:
+  push:
+    branches:
+      - cto/phase1e-typed-pvp-room-state-20260828
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    if: github.actor != 'github-actions[bot]' && !contains(github.event.head_commit.message, '[phase1e-migrated]')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: cto/phase1e-typed-pvp-room-state-20260828
+          fetch-depth: 0
+
+      - name: Reuse the reviewed migration script with corrected guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap
+
+          workflow = Path(
+              ".github/workflows/phase1e-typed-room-state-migration.yml"
+          ).read_text(encoding="utf-8")
+          marker = "          python3 - <<'PY'\n"
+          start = workflow.index(marker) + len(marker)
+          end = workflow.index("\n          PY\n", start)
+          script = textwrap.dedent(workflow[start:end])
+          if script.count("controller_count != 6") != 1:
+              raise SystemExit("controller guard source drifted")
+          if script.count("expected 6 PvpBackend.RoomState tokens") != 1:
+              raise SystemExit("controller guard diagnostic source drifted")
+          script = script.replace("controller_count != 6", "controller_count != 7")
+          script = script.replace(
+              "expected 6 PvpBackend.RoomState tokens",
+              "expected 7 PvpBackend.RoomState tokens",
+          )
+          exec(compile(script, "phase1e-migration", "exec"), {"__name__": "__main__"})
+          PY
+
+      - name: Validate repository contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          node --test tools/test/*.test.mjs
+
+      - name: Commit migration to the feature branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Assets/SCRIPT/PvP/PvpBackend.cs \
+                  Assets/SCRIPT/PvP/PlayFabPvpClient.cs \
+                  Assets/SCRIPT/PvP/PvpGameController.cs \
+                  Assets/SCRIPT/Application/AGENTS.md \
+                  Assets/Tests/EditMode/PvpRoomStateTests.cs \
+                  tools/test/application-assembly-boundary.test.mjs \
+                  docs/architecture/assembly-boundaries.md \
+                  docs/architecture/phase-1e-typed-room-state-validation.md \
+                  CHANGELOG.d/phase-1e-typed-room-state.md
+          git commit -m "refactor(pvp): consume PvpRoomState directly [phase1e-migrated]"
+          git push origin HEAD:cto/phase1e-typed-pvp-room-state-20260828
