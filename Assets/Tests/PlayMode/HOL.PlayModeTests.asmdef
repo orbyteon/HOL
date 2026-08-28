@@ -3,7 +3,8 @@
     "rootNamespace": "",
     "references": [
         "UnityEngine.TestRunner",
-        "Unity.TextMeshPro"
+        "Unity.TextMeshPro",
+        "HOL.Application"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

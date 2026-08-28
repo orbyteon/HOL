@@ -54,6 +54,40 @@ Automatic concurrency uses the event PR number when available and otherwise the
 unique source CI run id. It must never use the lossy `workflow_run.head_branch`
 as the sole group identity.
 
+## Incident 3 — stale Unity compilation and application binding
+
+PlayMode #462 terminated and uploaded results, but it executed the removed
+`DailyHuntPanel_StaysInsideSafeAreaAcrossCommonPortraits` test. Its source was
+absent from the exact checked-out candidate, proving that a restored
+`Library/ScriptAssemblies` or Bee product had outlived the C# source that built
+it.
+
+The same run's Daily Challenge fixture failed to find `GameEvents` because its
+runtime resolver assumed every type lived in `Assembly-CSharp`. `GameEvents` and
+`MatchOutcome` are now contracts in `HOL.Application`, where module tests are
+required to bind them directly at compile time.
+
+### Compilation-cache invariant
+
+PlayMode Library reuse is valid only for the exact Unity and C# assembly graph.
+Its cache key therefore fingerprints `ProjectSettings/ProjectVersion.txt`, both
+package manifests, every `Assets/**/*.cs`, every `Assets/**/*.asmdef` and every
+`Assets/**/*.asmref`. It has no broad `restore-keys` prefix.
+
+Even on an exact cache hit, the workflow removes `Library/ScriptAssemblies`,
+`Library/Bee`, `Library/BuildCache` and `Library/BuildPlayerData` before GameCI.
+Imported asset state may be reused; compiled C# and player-build products must be
+regenerated from the checked-out candidate.
+
+### Application-binding invariant
+
+`HOL.PlayModeTests` references `HOL.Application` directly. The mission-flow
+fixture invokes typed `GameEvents` methods and constructs a typed
+`MatchOutcome`; a narrowly documented `InternalsVisibleTo` keeps those semantic
+raise points internal to production callers while making the integration
+contract testable. Reflection remains only at genuine Unity component/default-
+assembly boundaries that have not yet migrated.
+
 ## Workflow fail-safe
 
 The `Exact visuals PlayMode` job has a hard 25-minute timeout. A timeout is a

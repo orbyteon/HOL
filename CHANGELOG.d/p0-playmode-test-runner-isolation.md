@@ -16,6 +16,13 @@
   run recovery, exact merge-ref selection and SHA evidence.
 - Added a hard 25-minute timeout so a stranded Unity fixture fails closed
   instead of consuming a runner indefinitely.
+- Fingerprinted the Unity version, packages and complete `.cs`/`.asmdef`/
+  `.asmref` graph for PlayMode Library reuse, with no broad cache-prefix restore.
+- Discarded restored `ScriptAssemblies`, Bee, build-cache and player-build
+  compilation products before GameCI so removed tests cannot survive in CI.
+- Bound the Daily Challenge PlayMode fixture directly to `HOL.Application`
+  `GameEvents` and `MatchOutcome` contracts instead of assuming
+  `Assembly-CSharp`, with structural regression coverage.
 
 No gameplay, Daily Hunt progression, visual composition, localization,
 networking, persistence, deployment or release behavior changed.

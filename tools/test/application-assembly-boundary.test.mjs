@@ -6,6 +6,10 @@ import path from "node:path";
 const appDir = "Assets/SCRIPT/Application";
 const asmdefPath = `${appDir}/HOL.Application.asmdef`;
 const testsAsmdefPath = "Assets/Tests/EditMode/HOL.EditModeTests.asmdef";
+const playModeTestsAsmdefPath =
+  "Assets/Tests/PlayMode/HOL.PlayModeTests.asmdef";
+const missionFlowPlayModeTestsPath =
+  "Assets/Tests/PlayMode/DailyChallengeMissionFlowPlayModeTests.cs";
 const outcomeTestsPath = "Assets/Tests/EditMode/MatchOutcomeTests.cs";
 const roomStatePath = `${appDir}/PvpRoomState.cs`;
 const roomStateTestsPath = "Assets/Tests/EditMode/PvpRoomStateTests.cs";
@@ -82,6 +86,7 @@ test("outcome and event contracts moved with stable Unity identities", () => {
   const friends = read(`${appDir}/AssemblyInfo.cs`);
   assert.match(friends, /InternalsVisibleTo\("Assembly-CSharp"\)/);
   assert.match(friends, /InternalsVisibleTo\("HOL.EditModeTests"\)/);
+  assert.match(friends, /InternalsVisibleTo\("HOL.PlayModeTests"\)/);
 });
 
 test("EditMode outcome tests bind HOL.Application without reflection", () => {
@@ -95,6 +100,26 @@ test("EditMode outcome tests bind HOL.Application without reflection", () => {
   assert.doesNotMatch(source, /GetMethod\s*\(/);
   assert.match(source, /new MatchOutcome/);
   assert.match(source, /GameEvents\.MatchCompleted/);
+});
+
+test("PlayMode mission flow binds HOL.Application semantic events directly", () => {
+  const testAsmdef = JSON.parse(read(playModeTestsAsmdefPath));
+  assert.ok(
+    testAsmdef.references.includes("HOL.Application"),
+    "PlayMode tests must reference HOL.Application directly"
+  );
+
+  const source = read(missionFlowPlayModeTestsPath);
+  assert.match(source, /GameEvents\.CorrectGuess\(\)/);
+  assert.match(source, /GameEvents\.RoomShared\(\)/);
+  assert.match(
+    source,
+    /GameEvents\.MatchCompleted\(WinningOutcome\(\)\)/
+  );
+  assert.match(source, /new MatchOutcome/);
+  assert.doesNotMatch(source, /RuntimeType\("GameEvents"\)/);
+  assert.doesNotMatch(source, /RuntimeType\("MatchOutcome"\)/);
+  assert.doesNotMatch(source, /InvokeStatic\("GameEvents"/);
 });
 
 test("PvP room state is an application contract with a fieldless runtime shim", () => {

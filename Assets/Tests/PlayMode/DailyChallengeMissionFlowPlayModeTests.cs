@@ -68,11 +68,11 @@ public sealed class DailyChallengeMissionFlowPlayModeTests
         host.AddComponent(RuntimeType("DailyChallengeTracker"));
         yield return null;
 
-        InvokeStatic("GameEvents", "CorrectGuess");
-        InvokeStatic("GameEvents", "CorrectGuess");
-        InvokeStatic("GameEvents", "CorrectGuess");
-        InvokeStatic("GameEvents", "RoomShared");
-        InvokeStatic("GameEvents", "MatchCompleted", WinningOutcome());
+        GameEvents.CorrectGuess();
+        GameEvents.CorrectGuess();
+        GameEvents.CorrectGuess();
+        GameEvents.RoomShared();
+        GameEvents.MatchCompleted(WinningOutcome());
         yield return null;
 
         object state = GetStatic("DailyChallengeProgress", "Current");
@@ -82,9 +82,9 @@ public sealed class DailyChallengeMissionFlowPlayModeTests
         Assert.That(GetField<bool>(state, "RewardClaimed"), Is.True);
         Assert.That(GetField<int>(state, "Points"), Is.EqualTo(500));
 
-        InvokeStatic("GameEvents", "CorrectGuess");
-        InvokeStatic("GameEvents", "RoomShared");
-        InvokeStatic("GameEvents", "MatchCompleted", WinningOutcome());
+        GameEvents.CorrectGuess();
+        GameEvents.RoomShared();
+        GameEvents.MatchCompleted(WinningOutcome());
         state = GetStatic("DailyChallengeProgress", "Current");
         Assert.That(GetField<int>(state, "Points"), Is.EqualTo(500));
 
@@ -168,23 +168,12 @@ public sealed class DailyChallengeMissionFlowPlayModeTests
         yield return null;
     }
 
-    static object WinningOutcome()
+    static MatchOutcome WinningOutcome()
     {
-        Type type = RuntimeType("MatchOutcome");
-        object value = Activator.CreateInstance(type);
-        FieldInfo result = type.GetField("Outcome");
-        Assert.That(result, Is.Not.Null);
-        result.SetValue(value, Enum.Parse(result.FieldType, "Win"));
-        return value;
-    }
-
-    static object InvokeStatic(string typeName, string name, params object[] args)
-    {
-        MethodInfo method = RuntimeType(typeName).GetMethod(
-            name,
-            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-        Assert.That(method, Is.Not.Null, typeName + "." + name);
-        return method.Invoke(null, args);
+        return new MatchOutcome
+        {
+            Outcome = MatchOutcome.Result.Win,
+        };
     }
 
     static object GetStatic(string typeName, string name)

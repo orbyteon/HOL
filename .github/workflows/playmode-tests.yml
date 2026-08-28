@@ -160,14 +160,23 @@ jobs:
           echo "Disk after cleanup:"
           df -h /
 
+      # Imported assets may be reused only for the exact code/assembly graph.
+      # Compiled C# state is discarded below even on an exact cache hit.
       - name: Cache Library
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: Library
-          key: Library-PlayMode-${{ hashFiles('Packages/manifest.json', 'Packages/packages-lock.json') }}
-          restore-keys: |
-            Library-PlayMode-
-            Library-
+          key: Library-PlayMode-${{ hashFiles('ProjectSettings/ProjectVersion.txt', 'Packages/manifest.json', 'Packages/packages-lock.json', 'Assets/**/*.cs', 'Assets/**/*.asmdef', 'Assets/**/*.asmref') }}
+
+      - name: Invalidate restored Unity compilation state
+        shell: bash
+        run: |
+          set -euxo pipefail
+          rm -rf \
+            Library/ScriptAssemblies \
+            Library/Bee \
+            Library/BuildCache \
+            Library/BuildPlayerData
 
       - name: Run PlayMode tests
         uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9 # v4

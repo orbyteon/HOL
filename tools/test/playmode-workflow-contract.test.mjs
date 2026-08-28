@@ -102,6 +102,31 @@ test("PlayMode cannot occupy a runner indefinitely", () => {
   );
 });
 
+test("PlayMode never reuses cached C# compilation products", () => {
+  const cacheBlock =
+    workflow.match(/- name: Cache Library([\s\S]*?)(?=\n\s*- name:)/)?.[1] ?? "";
+
+  assert.match(cacheBlock, /ProjectSettings\/ProjectVersion\.txt/);
+  assert.match(cacheBlock, /Assets\/\*\*\/\*\.cs/);
+  assert.match(cacheBlock, /Assets\/\*\*\/\*\.asmdef/);
+  assert.match(cacheBlock, /Assets\/\*\*\/\*\.asmref/);
+  assert.doesNotMatch(
+    cacheBlock,
+    /restore-keys:/,
+    "a broad prefix restore can replay a test assembly built from removed source"
+  );
+
+  const invalidationBlock =
+    workflow.match(
+      /- name: Invalidate restored Unity compilation state([\s\S]*?)(?=\n\s*- name:)/
+    )?.[1] ?? "";
+
+  assert.match(invalidationBlock, /Library\/ScriptAssemblies/);
+  assert.match(invalidationBlock, /Library\/Bee/);
+  assert.match(invalidationBlock, /Library\/BuildCache/);
+  assert.match(invalidationBlock, /Library\/BuildPlayerData/);
+});
+
 test("PlayMode failures always retain useful diagnostics", () => {
   assert.match(workflow, /artifactsPath:\s*artifacts\/playmode/);
   assert.match(workflow, /Collect Unity failure diagnostics/);
