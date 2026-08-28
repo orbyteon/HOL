@@ -1,0 +1,435 @@
+name: Phase 1E typed room-state migration
+
+on:
+  push:
+    branches:
+      - cto/phase1e-typed-pvp-room-state-20260828
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    if: github.actor != 'github-actions[bot]' && !contains(github.event.head_commit.message, '[phase1e-migrated]')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: cto/phase1e-typed-pvp-room-state-20260828
+          fetch-depth: 0
+
+      - name: Apply fail-closed typed room-state migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          def read(path):
+              return Path(path).read_text(encoding="utf-8")
+
+          def write(path, content):
+              Path(path).parent.mkdir(parents=True, exist_ok=True)
+              Path(path).write_text(content, encoding="utf-8")
+
+          def replace_exact(path, old, new, expected=1):
+              text = read(path)
+              found = text.count(old)
+              if found != expected:
+                  raise SystemExit(f"{path}: expected {expected} exact replacement(s), found {found}")
+              write(path, text.replace(old, new))
+
+          backend_path = "Assets/SCRIPT/PvP/PvpBackend.cs"
+          backend = read(backend_path)
+          old_shim = '''    // Transitional source-compatibility shim. The wire fields and pure helper
+              // behavior now live in HOL.Application/PvpRoomState. Existing Unity callers
+              // keep their PvpBackend.RoomState type until a later typed-backend slice
+              // updates the remaining signatures in one controlled change.
+              [Serializable]
+              public class RoomState : PvpRoomState { }
+
+          '''.replace("              ", "")
+          new_contract = '''    // HOL.Application/PvpRoomState is the one authoritative public room
+              // snapshot contract. Backends, transport and controllers consume it directly;
+              // no runtime compatibility subtype is permitted.
+
+          '''.replace("              ", "")
+          if backend.count(old_shim) != 1:
+              raise SystemExit("PvpBackend compatibility shim did not match exactly once")
+          backend = backend.replace(old_shim, new_contract)
+          backend = backend.replace("RoomState current", "PvpRoomState current")
+          backend = backend.replace("Action<RoomState> onState", "Action<PvpRoomState> onState")
+          if re.search(r"\bRoomState\b", backend):
+              raise SystemExit("PvpBackend still contains RoomState after migration")
+          write(backend_path, backend)
+
+          client_path = "Assets/SCRIPT/PvP/PlayFabPvpClient.cs"
+          client = read(client_path)
+          client_count = len(re.findall(r"\bRoomState\b", client))
+          if client_count != 10:
+              raise SystemExit(f"PlayFabPvpClient expected 10 RoomState tokens, found {client_count}")
+          client = re.sub(r"\bRoomState\b", "PvpRoomState", client)
+          if re.search(r"\bRoomState\b", client):
+              raise SystemExit("PlayFabPvpClient still contains RoomState")
+          write(client_path, client)
+
+          controller_path = "Assets/SCRIPT/PvP/PvpGameController.cs"
+          controller = read(controller_path)
+          controller_count = controller.count("PvpBackend.RoomState")
+          if controller_count != 6:
+              raise SystemExit(
+                  f"PvpGameController expected 6 PvpBackend.RoomState tokens, found {controller_count}")
+          controller = controller.replace("PvpBackend.RoomState", "PvpRoomState")
+          if "PvpBackend.RoomState" in controller:
+              raise SystemExit("PvpGameController still contains nested room-state type")
+          write(controller_path, controller)
+
+          room_tests = '''using NUnit.Framework;
+
+          // Compile-time behavior contracts for the Unity-free PvP public room view.
+          public class PvpRoomStateTests
+          {
+              [Test]
+              public void SideHelpersReadTheMatchingPublicFields()
+              {
+                  var state = new PvpRoomState
+                  {
+                      hostLockUsed = true,
+                      guestLockUsed = false,
+                      hostSkipNext = false,
+                      guestSkipNext = true,
+                      hostGuessCount = 4,
+                      guestGuessCount = 7,
+                  };
+
+                  Assert.IsTrue(state.LockUsedBy("host"));
+                  Assert.IsFalse(state.LockUsedBy("guest"));
+                  Assert.IsFalse(state.ForfeitPendingFor("host"));
+                  Assert.IsTrue(state.ForfeitPendingFor("guest"));
+                  Assert.AreEqual(4, state.GuessCountFor("host"));
+                  Assert.AreEqual(7, state.GuessCountFor("guest"));
+              }
+
+              [Test]
+              public void MatchPointRequiresALivePlayPhaseAndTheOtherPendingWinner()
+              {
+                  var state = new PvpRoomState
+                  {
+                      phase = "play",
+                      pendingWin = "host",
+                  };
+
+                  Assert.IsFalse(state.IsMatchPointAgainst("host"));
+                  Assert.IsTrue(state.IsMatchPointAgainst("guest"));
+
+                  state.phase = "done";
+                  Assert.IsFalse(state.IsMatchPointAgainst("guest"));
+
+                  state.phase = "play";
+                  state.pendingWin = "";
+                  Assert.IsFalse(state.IsMatchPointAgainst("guest"));
+              }
+
+              [Test]
+              public void WireFieldsAreDirectlyWritableWithoutUnityTypes()
+              {
+                  var state = new PvpRoomState
+                  {
+                      hostName = "Host",
+                      guestName = "Guest",
+                      turn = "guest",
+                      phase = "play",
+                      lastGuess = 51,
+                      lastHint = "lower",
+                      matchIndex = 3,
+                      signalId = 5,
+                      signalSeq = 9,
+                  };
+
+                  Assert.AreEqual("Host", state.hostName);
+                  Assert.AreEqual("Guest", state.guestName);
+                  Assert.AreEqual("guest", state.turn);
+                  Assert.AreEqual("play", state.phase);
+                  Assert.AreEqual(51, state.lastGuess);
+                  Assert.AreEqual("lower", state.lastHint);
+                  Assert.AreEqual(3, state.matchIndex);
+                  Assert.AreEqual(5, state.signalId);
+                  Assert.AreEqual(9, state.signalSeq);
+              }
+
+              [Test]
+              public void JsonUtilityRoundTripPreservesDirectWireFields()
+              {
+                  var expected = new PvpRoomState
+                  {
+                      hostName = "Host",
+                      guestName = "Guest",
+                      phase = "done",
+                      winner = "draw",
+                      revealedSecret = 42,
+                      hostGuessCount = 6,
+                      guestGuessCount = 6,
+                      matchIndex = 4,
+                      opponentLeft = true,
+                  };
+
+                  string json = UnityEngine.JsonUtility.ToJson(expected);
+                  var actual = UnityEngine.JsonUtility.FromJson<PvpRoomState>(json);
+
+                  Assert.IsNotNull(actual);
+                  Assert.AreEqual(expected.hostName, actual.hostName);
+                  Assert.AreEqual(expected.guestName, actual.guestName);
+                  Assert.AreEqual(expected.phase, actual.phase);
+                  Assert.AreEqual(expected.winner, actual.winner);
+                  Assert.AreEqual(expected.revealedSecret, actual.revealedSecret);
+                  Assert.AreEqual(expected.hostGuessCount, actual.hostGuessCount);
+                  Assert.AreEqual(expected.guestGuessCount, actual.guestGuessCount);
+                  Assert.AreEqual(expected.matchIndex, actual.matchIndex);
+                  Assert.AreEqual(expected.opponentLeft, actual.opponentLeft);
+              }
+          }
+          '''
+          write(
+              "Assets/Tests/EditMode/PvpRoomStateTests.cs",
+              "\n".join(line[10:] if line.startswith("          ") else line for line in room_tests.splitlines()) + "\n",
+          )
+
+          boundary_path = "tools/test/application-assembly-boundary.test.mjs"
+          boundary = read(boundary_path)
+          constants_old = '''const pvpBackendPath = "Assets/SCRIPT/PvP/PvpBackend.cs";
+          const scopedAgentPath = `${appDir}/AGENTS.md`;
+          '''.replace("          ", "")
+          constants_new = '''const pvpBackendPath = "Assets/SCRIPT/PvP/PvpBackend.cs";
+          const playFabPvpClientPath = "Assets/SCRIPT/PvP/PlayFabPvpClient.cs";
+          const pvpGameControllerPath = "Assets/SCRIPT/PvP/PvpGameController.cs";
+          const scopedAgentPath = `${appDir}/AGENTS.md`;
+          '''.replace("          ", "")
+          if boundary.count(constants_old) != 1:
+              raise SystemExit("application boundary constants insertion point drifted")
+          boundary = boundary.replace(constants_old, constants_new)
+
+          validation_constants_old = '''const phase1dChangelogFragmentPath =
+            "CHANGELOG.d/phase-1d-signal-protocol.md";
+          '''.replace("          ", "")
+          validation_constants_new = '''const phase1dChangelogFragmentPath =
+            "CHANGELOG.d/phase-1d-signal-protocol.md";
+          const phase1eValidationDocPath =
+            "docs/architecture/phase-1e-typed-room-state-validation.md";
+          const phase1eChangelogFragmentPath =
+            "CHANGELOG.d/phase-1e-typed-room-state.md";
+          '''.replace("          ", "")
+          if boundary.count(validation_constants_old) != 1:
+              raise SystemExit("Phase 1E validation constants insertion point drifted")
+          boundary = boundary.replace(validation_constants_old, validation_constants_new)
+
+          start = boundary.index('test("PvP room state is an application contract with a fieldless runtime shim"')
+          end = boundary.index('\ntest("fixed Signal protocol belongs to HOL.Application with direct tests"', start)
+          direct_test = r'''test("PvP room state is consumed directly across runtime boundaries", () => {
+            const state = read(roomStatePath);
+            assert.match(state, /\[Serializable\]/);
+            assert.match(state, /public\s+class\s+PvpRoomState/);
+            assert.match(state, /public\s+string\s+hostName\s*=/);
+            assert.match(state, /public\s+int\s+matchIndex\s*;/);
+            assert.match(state, /public\s+bool\s+IsMatchPointAgainst\s*\(/);
+
+            assert.match(read(`${roomStatePath}.meta`),
+              /guid:\s*cfd673ea22ec47f0b612e95424861e0b/);
+
+            const backend = read(pvpBackendPath);
+            assert.doesNotMatch(backend, /class\s+RoomState\b/);
+            assert.match(
+              backend,
+              /SubmitGuess\(int guess, bool useLock, PvpRoomState current/
+            );
+            assert.match(backend, /StartPolling\(Action<PvpRoomState> onState\)/);
+
+            const client = read(playFabPvpClientPath);
+            assert.doesNotMatch(client, /\bRoomState\b/);
+            assert.match(client, /SubmitGuess\(int guess, bool useLock, PvpRoomState current/);
+            assert.match(client, /JsonUtility\.FromJson<PvpRoomState>/);
+
+            const controller = read(pvpGameControllerPath);
+            assert.doesNotMatch(controller, /PvpBackend\.RoomState/);
+            assert.match(controller, /PvpRoomState\s+lastState/);
+            assert.match(controller, /void\s+OnState\(PvpRoomState\s+s\)/);
+
+            const tests = read(roomStateTestsPath);
+            assert.doesNotMatch(tests, /System\.Reflection/);
+            assert.doesNotMatch(tests, /Activator\.CreateInstance/);
+            assert.doesNotMatch(tests, /DerivedRoomState/);
+            assert.match(tests, /new PvpRoomState/);
+            assert.match(tests, /JsonUtility\.FromJson<PvpRoomState>/);
+            assert.match(tests, /IsMatchPointAgainst/);
+          });
+          '''
+          direct_test = "\n".join(
+              line[10:] if line.startswith("          ") else line
+              for line in direct_test.splitlines()
+          )
+          boundary = boundary[:start] + direct_test + boundary[end:]
+
+          phase1c_old = '''  assert.match(scopedAgent, /`PvpRoomState`/);
+            assert.match(scopedAgent, /wire field names/);
+            assert.match(scopedAgent, /fieldless compatibility shim/);
+          '''.replace("          ", "")
+          phase1c_new = '''  assert.match(scopedAgent, /`PvpRoomState`/);
+            assert.match(scopedAgent, /wire field names/);
+            assert.match(scopedAgent, /consumed directly/);
+            assert.doesNotMatch(scopedAgent, /fieldless compatibility shim/);
+          '''.replace("          ", "")
+          if boundary.count(phase1c_old) != 1:
+              raise SystemExit("Phase 1C scoped-agent assertion drifted")
+          boundary = boundary.replace(phase1c_old, phase1c_new)
+
+          phase1e_test = r'''
+          test("Phase 1E keeps direct room-state guidance, validation and release notes", () => {
+            const scopedAgent = read(scopedAgentPath);
+            assert.match(scopedAgent, /consumed directly/);
+            assert.match(scopedAgent, /Do not reintroduce/);
+
+            const validation = read(phase1eValidationDocPath);
+            assert.match(validation, /exact PR merge candidate/);
+            assert.match(validation, /wire JSON/);
+            assert.match(validation, /Automatic PlayMode/);
+
+            const fragment = read(phase1eChangelogFragmentPath);
+            assert.match(fragment, /Removed the transitional `PvpBackend\.RoomState`/);
+            assert.match(fragment, /`PvpRoomState` directly/);
+            assert.match(fragment, /No wire JSON, polling, callback/);
+          });
+          '''
+          phase1e_test = "\n".join(
+              line[10:] if line.startswith("          ") else line
+              for line in phase1e_test.splitlines()
+          )
+          boundary = boundary.rstrip() + "\n" + phase1e_test.lstrip("\n") + "\n"
+          write(boundary_path, boundary)
+
+          agent_path = "Assets/SCRIPT/Application/AGENTS.md"
+          agent = read(agent_path)
+          old_agent = '''- `PvpBackend.RoomState` is a temporary fieldless compatibility shim that
+            inherits `PvpRoomState` while unmigrated Unity signatures still use the nested
+            type. Do not add fields or behavior back to the shim.
+          '''.replace("          ", "")
+          new_agent = '''- `PvpRoomState` is consumed directly by `PvpBackend`, `PlayFabPvpClient`
+            and `PvpGameController`. Do not reintroduce a `RoomState` alias, derived
+            compatibility subtype or duplicate public wire fields.
+          '''.replace("          ", "")
+          if agent.count(old_agent) != 1:
+              raise SystemExit("Application AGENTS transitional shim paragraph drifted")
+          write(agent_path, agent.replace(old_agent, new_agent))
+
+          validation_doc = '''# Phase 1E — direct typed PvP room state validation
+
+          This slice removes only the transitional runtime subtype. It may merge only
+          when the exact PR merge candidate satisfies every gate below.
+
+          ## Structural contract
+
+          - `PvpRoomState` remains the single Unity-free public room snapshot type.
+          - `PvpBackend`, `PlayFabPvpClient` and `PvpGameController` consume it directly.
+          - No `RoomState` alias, nested compatibility class or duplicate wire field exists.
+          - `PlayFabPvpClient` deserializes every room snapshot with
+            `JsonUtility.FromJson<PvpRoomState>`.
+          - EditMode tests round-trip `PvpRoomState` itself, not a derived surrogate.
+
+          ## Behavior contract
+
+          - The CloudScript-emitted wire JSON field names and types do not change.
+          - Polling cadence, retry behavior, callbacks and room lifecycle do not change.
+          - Match-generation fencing, Signals, rematch, acknowledgement and leave behavior
+            do not change.
+          - Controller rendering, analytics, gameplay and localization do not change.
+
+          ## Required evidence
+
+          1. Node/architecture and CloudScript contracts pass on the exact PR merge candidate.
+          2. Unity EditMode passes on the same merge candidate.
+          3. Android compile passes on the same merge candidate.
+          4. Production Visual Integrity passes.
+          5. Automatic PlayMode checks out and passes the same exact candidate.
+          6. No unresolved review thread remains.
+
+          No successful gate authorizes PlayFab/Azure deployment, a signed build,
+          `minVersion` change or store publication.
+          '''
+          validation_doc = "\n".join(
+              line[10:] if line.startswith("          ") else line
+              for line in validation_doc.splitlines()
+          ) + "\n"
+          write("docs/architecture/phase-1e-typed-room-state-validation.md", validation_doc)
+
+          changelog = '''# Phase 1E — direct typed PvP room state
+
+          ## Changed
+
+          - Removed the transitional `PvpBackend.RoomState` compatibility subtype.
+          - Updated `PvpBackend`, `PlayFabPvpClient` and `PvpGameController` to consume
+            `PvpRoomState` directly.
+          - Updated direct EditMode serialization coverage and structural architecture
+            contracts so the nested shim cannot return.
+
+          No wire JSON, polling, callback, room lifecycle, gameplay, UI, localization,
+          persistence, deployment or release behavior changed.
+          '''
+          changelog = "\n".join(
+              line[10:] if line.startswith("          ") else line
+              for line in changelog.splitlines()
+          ) + "\n"
+          write("CHANGELOG.d/phase-1e-typed-room-state.md", changelog)
+
+          assembly_doc_path = "docs/architecture/assembly-boundaries.md"
+          assembly_doc = read(assembly_doc_path)
+          marker = "### Phase 1E — direct typed PvP room state"
+          if marker not in assembly_doc:
+              assembly_doc = assembly_doc.rstrip() + '''
+
+          ### Phase 1E — direct typed PvP room state
+
+          `PvpBackend`, `PlayFabPvpClient` and `PvpGameController` now consume the
+          Unity-free `PvpRoomState` contract directly. The transitional nested
+          `PvpBackend.RoomState` subtype has been removed. This changes only compile-time
+          ownership: wire JSON, polling, callbacks and gameplay behavior remain unchanged.
+          '''.replace("          ", "") + "\n"
+              write(assembly_doc_path, assembly_doc)
+
+          offenders = []
+          for path in Path("Assets").rglob("*.cs"):
+              source = read(path)
+              if "PvpBackend.RoomState" in source:
+                  offenders.append(f"{path}: nested type reference")
+              if re.search(r"class\s+RoomState\b", source):
+                  offenders.append(f"{path}: compatibility class")
+          if offenders:
+              raise SystemExit("\n".join(offenders))
+
+          if "JsonUtility.FromJson<PvpRoomState>" not in read(client_path):
+              raise SystemExit("PlayFab client no longer deserializes direct PvpRoomState")
+          PY
+
+      - name: Validate repository contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          node --test tools/test/*.test.mjs
+
+      - name: Commit migration to the feature branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Assets/SCRIPT/PvP/PvpBackend.cs \
+                  Assets/SCRIPT/PvP/PlayFabPvpClient.cs \
+                  Assets/SCRIPT/PvP/PvpGameController.cs \
+                  Assets/SCRIPT/Application/AGENTS.md \
+                  Assets/Tests/EditMode/PvpRoomStateTests.cs \
+                  tools/test/application-assembly-boundary.test.mjs \
+                  docs/architecture/assembly-boundaries.md \
+                  docs/architecture/phase-1e-typed-room-state-validation.md \
+                  CHANGELOG.d/phase-1e-typed-room-state.md
+          git commit -m "refactor(pvp): consume PvpRoomState directly [phase1e-migrated]"
+          git push origin HEAD:cto/phase1e-typed-pvp-room-state-20260828
