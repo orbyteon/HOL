@@ -88,6 +88,23 @@ raise points internal to production callers while making the integration
 contract testable. Reflection remains only at genuine Unity component/default-
 assembly boundaries that have not yet migrated.
 
+## Incident 4 — stale generic responsive ownership
+
+The fresh-compile PlayMode #463 cleared both #462 failures and then exposed one
+current assertion: `ResponsiveUIFoundationPlayModeTests` still required a
+generic child named `Card` under `DailyHuntPanel`. The approved Daily Hunt owner
+explicitly prohibits that legacy hierarchy and instead builds `DailyHuntVisualRoot`
+with named production cards and its own deterministic responsive seam.
+
+### Responsive-owner invariant
+
+The shared `ResponsivePageLayout` matrix validates only screens that use that
+generic owner. Daily Hunt is validated by
+`DailyHuntCartoonVisualsPlayModeTests`, which asserts that the retired `Card` is
+absent and runs the screen-owned `DailyHuntVisuals` layout across the required
+English/Greek portrait matrix. A generic test must not claim or rename that
+production hierarchy merely to reuse a different responsive abstraction.
+
 ## Workflow fail-safe
 
 The `Exact visuals PlayMode` job has a hard 25-minute timeout. A timeout is a

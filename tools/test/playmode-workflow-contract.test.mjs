@@ -7,6 +7,12 @@ const workflow = fs.readFileSync(workflowPath, "utf8");
 const missionFlowPath =
   "Assets/Tests/PlayMode/DailyChallengeMissionFlowPlayModeTests.cs";
 const missionFlow = fs.readFileSync(missionFlowPath, "utf8");
+const responsiveFoundationPath =
+  "Assets/Tests/PlayMode/ResponsiveUIFoundationPlayModeTests.cs";
+const responsiveFoundation = fs.readFileSync(responsiveFoundationPath, "utf8");
+const dailyHuntVisualsPath =
+  "Assets/Tests/PlayMode/DailyHuntCartoonVisualsPlayModeTests.cs";
+const dailyHuntVisuals = fs.readFileSync(dailyHuntVisualsPath, "utf8");
 
 test("PlayMode workflow isolates its utility checkout from the Unity workspace", () => {
   assert.match(
@@ -125,6 +131,34 @@ test("PlayMode never reuses cached C# compilation products", () => {
   assert.match(invalidationBlock, /Library\/Bee/);
   assert.match(invalidationBlock, /Library\/BuildCache/);
   assert.match(invalidationBlock, /Library\/BuildPlayerData/);
+});
+
+test("responsive matrices respect Daily Hunt's sole layout owner", () => {
+  assert.doesNotMatch(
+    responsiveFoundation,
+    /Find\([^\n]*"DailyHuntPanel"/,
+    "the generic ResponsivePageLayout matrix must not claim Daily Hunt's screen-owned hierarchy"
+  );
+  assert.match(
+    responsiveFoundation,
+    /DailyHuntCartoonVisualsPlayModeTests/,
+    "the generic test must name the dedicated Daily Hunt responsive contract"
+  );
+  assert.match(
+    dailyHuntVisuals,
+    /Find\(hunt\.transform,\s*"Card"\),\s*Is\.Null/,
+    "the dedicated test must keep the retired generic Card hierarchy absent"
+  );
+  assert.match(
+    dailyHuntVisuals,
+    /foreach\s*\(Vector2Int viewport in PortraitViewports\)/,
+    "Daily Hunt must retain its own required portrait matrix"
+  );
+  assert.match(
+    dailyHuntVisuals,
+    /ApplyResponsiveViewport\(visuals,\s*viewport\)/,
+    "Daily Hunt responsive evidence must run through its sole visual owner"
+  );
 });
 
 test("PlayMode failures always retain useful diagnostics", () => {

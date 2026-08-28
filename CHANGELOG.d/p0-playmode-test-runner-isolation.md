@@ -23,6 +23,9 @@
 - Bound the Daily Challenge PlayMode fixture directly to `HOL.Application`
   `GameEvents` and `MatchOutcome` contracts instead of assuming
   `Assembly-CSharp`, with structural regression coverage.
+- Removed the retired generic Daily Hunt `Card` hierarchy from the shared
+  `ResponsivePageLayout` matrix; the production screen remains governed by its
+  sole `DailyHuntVisuals` owner and dedicated EN/EL portrait-matrix test.
 
 No gameplay, Daily Hunt progression, visual composition, localization,
 networking, persistence, deployment or release behavior changed.
