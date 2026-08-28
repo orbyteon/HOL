@@ -28,25 +28,22 @@ public sealed class DailyChallengeMissionFlowPlayModeTests
         "DailyHuntMax",
     };
 
+    Scene testScene;
+
     [UnitySetUp]
     public IEnumerator SetUp()
     {
         Clear();
-        // The production lifecycle bridges intentionally ignore SplashScene.
-        // Reuse that empty scene name so isolated component tests do not spawn
-        // Main Menu/PvP installers whose controllers are absent by design.
-        Scene isolated = SceneManager.GetSceneByName("SplashScene");
-        if (!isolated.IsValid() || !isolated.isLoaded)
-            isolated = SceneManager.CreateScene("SplashScene");
-        SceneManager.SetActiveScene(isolated);
-        for (int index = SceneManager.sceneCount - 1; index >= 0; index--)
-        {
-            Scene loaded = SceneManager.GetSceneAt(index);
-            if (loaded == isolated || !loaded.isLoaded) continue;
-            AsyncOperation unload = SceneManager.UnloadSceneAsync(loaded);
-            if (unload != null)
-                yield return unload;
-        }
+
+        // Own exactly one uniquely named additive scene for objects created by
+        // this fixture. Unity Test Framework may keep runner lifecycle objects
+        // in another loaded scene; this test must neither rename, replace nor
+        // unload anything it did not create itself.
+        testScene = SceneManager.CreateScene(
+            "DailyChallengeMissionFlowTests_" + Guid.NewGuid().ToString("N"));
+        Assert.That(testScene.IsValid(), Is.True);
+        Assert.That(testScene.isLoaded, Is.True);
+        Assert.That(SceneManager.SetActiveScene(testScene), Is.True);
         yield return null;
     }
 
@@ -54,6 +51,13 @@ public sealed class DailyChallengeMissionFlowPlayModeTests
     public IEnumerator TearDown()
     {
         Clear();
+        if (testScene.IsValid() && testScene.isLoaded)
+        {
+            AsyncOperation unload = SceneManager.UnloadSceneAsync(testScene);
+            Assert.That(unload, Is.Not.Null);
+            yield return unload;
+        }
+        testScene = default;
         yield return null;
     }
 
@@ -64,11 +68,11 @@ public sealed class DailyChallengeMissionFlowPlayModeTests
         host.AddComponent(RuntimeType("DailyChallengeTracker"));
         yield return null;
 
-        InvokeStatic("GameEvents", "CorrectGuess");
-        InvokeStatic("GameEvents", "CorrectGuess");
-        InvokeStatic("GameEvents", "CorrectGuess");
-        InvokeStatic("GameEvents", "RoomShared");
-        InvokeStatic("GameEvents", "MatchCompleted", WinningOutcome());
+        GameEvents.CorrectGuess();
+        GameEvents.CorrectGuess();
+        GameEvents.CorrectGuess();
+        GameEvents.RoomShared();
+        GameEvents.MatchCompleted(WinningOutcome());
         yield return null;
 
         object state = GetStatic("DailyChallengeProgress", "Current");
@@ -78,9 +82,9 @@ public sealed class DailyChallengeMissionFlowPlayModeTests
         Assert.That(GetField<bool>(state, "RewardClaimed"), Is.True);
         Assert.That(GetField<int>(state, "Points"), Is.EqualTo(500));
 
-        InvokeStatic("GameEvents", "CorrectGuess");
-        InvokeStatic("GameEvents", "RoomShared");
-        InvokeStatic("GameEvents", "MatchCompleted", WinningOutcome());
+        GameEvents.CorrectGuess();
+        GameEvents.RoomShared();
+        GameEvents.MatchCompleted(WinningOutcome());
         state = GetStatic("DailyChallengeProgress", "Current");
         Assert.That(GetField<int>(state, "Points"), Is.EqualTo(500));
 
@@ -164,23 +168,12 @@ public sealed class DailyChallengeMissionFlowPlayModeTests
         yield return null;
     }
 
-    static object WinningOutcome()
+    static MatchOutcome WinningOutcome()
     {
-        Type type = RuntimeType("MatchOutcome");
-        object value = Activator.CreateInstance(type);
-        FieldInfo result = type.GetField("Outcome");
-        Assert.That(result, Is.Not.Null);
-        result.SetValue(value, Enum.Parse(result.FieldType, "Win"));
-        return value;
-    }
-
-    static object InvokeStatic(string typeName, string name, params object[] args)
-    {
-        MethodInfo method = RuntimeType(typeName).GetMethod(
-            name,
-            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-        Assert.That(method, Is.Not.Null, typeName + "." + name);
-        return method.Invoke(null, args);
+        return new MatchOutcome
+        {
+            Outcome = MatchOutcome.Result.Win,
+        };
     }
 
     static object GetStatic(string typeName, string name)

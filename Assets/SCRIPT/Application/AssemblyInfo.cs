@@ -5,3 +5,6 @@ using System.Runtime.CompilerServices;
 // have moved behind typed HOL.Application entry points.
 [assembly: InternalsVisibleTo("Assembly-CSharp")]
 [assembly: InternalsVisibleTo("HOL.EditModeTests")]
+// PlayMode mission integration verifies semantic event subscriber behavior
+// without widening the production API surface.
+[assembly: InternalsVisibleTo("HOL.PlayModeTests")]

@@ -55,11 +55,10 @@ public sealed class ResponsiveUIFoundationPlayModeTests
             "EnglishButton", "GreekButton", "Difficulty0",
             "Difficulty3", "AdsPrivacyButton");
 
-        Transform daily = Find(canvas.transform, "DailyHuntPanel");
-        Assert.That(daily, Is.Not.Null);
-        AddTargets(targets, daily,
-            "Card", "Status", "Trail", "GuessInput", "SubmitGuessButton",
-            "ReviveButton", "ShareButton", "Streak", "CloseButton");
+        // Daily Hunt intentionally has one screen-owned responsive writer and
+        // its own EN/EL portrait matrix in DailyHuntCartoonVisualsPlayModeTests.
+        // It must not be forced back through the generic ResponsivePageLayout
+        // hierarchy or its retired pre-production generic-card contract.
 
         var pvp = FindInScene(RuntimeType("PvpGameController"));
         Assert.That(pvp, Is.Not.Null);
