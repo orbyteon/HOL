@@ -537,7 +537,10 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         image.enabled = true;
         image.sprite = null;
         image.type = Image.Type.Simple;
-        image.color = new Color(1f, 1f, 1f, 0.001f);
+        // This Image is an intentional raycast-only accessibility surface. Keep it
+        // fully transparent; a near-zero alpha can leak a faint rectangle on some
+        // renderers and violates the production UI integrity contract.
+        image.color = Color.clear;
         image.raycastTarget = true;
         button.targetGraphic = image;
         ConfigureButtonState(button);

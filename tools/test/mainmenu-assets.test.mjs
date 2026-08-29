@@ -13,7 +13,7 @@ const dimensions = png => ({
 const colorType = png => png[25];
 
 const approvedBackground =
-  "Assets/newdesign/Resources/phase2a/hol_neon_reference_bg_r3.png";
+  "Assets/newdesign/Resources/settings/hol_settings_bg_r1.png";
 const rejectedCloudBackground =
   "Assets/newdesign/Resources/mainmenu/mainmenu_bg_stairs_clouds.png";
 
@@ -49,7 +49,7 @@ test("approved number six stays byte-exact", () => {
     "067beafc207aea302e0993a3bacdb2b69478429aa3685f275bb6705bd902ac4b");
 });
 
-test("approved Revision 3 Home background is high-resolution 9:16 art", () => {
+test("approved spotlight Home background is high-resolution 9:16 art", () => {
   const png = read(approvedBackground);
   const { width, height } = dimensions(png);
   assert.ok(width >= 900,
@@ -125,6 +125,7 @@ test("Home chrome PNGs stay text-free RGBA overlays or 9-slices", () => {
 test("Home owner uses approved background and cannot restore rejected one", () => {
   const owner = "Assets/SCRIPT/Design/MainMenuHomeVisuals.cs";
   const source = read(owner).toString("utf8");
-  assert.match(source, /phase2a\/hol_neon_reference_bg_r3/);
+  assert.match(source, /settings\/hol_settings_bg_r1/);
+  assert.equal(source.includes("phase2a/hol_neon_reference_bg_r3"), false);
   assert.equal(source.includes("mainmenu_bg_stairs_clouds"), false);
 });
