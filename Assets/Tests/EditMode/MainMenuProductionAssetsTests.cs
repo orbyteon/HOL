@@ -25,6 +25,14 @@ public sealed class MainMenuProductionAssetsTests
     [TestCase("phase2a/hol_loading_track_r2_9s")]
     [TestCase("mainmenu/mainmenu_icon_streak")]
     [TestCase("mainmenu/mainmenu_icon_tip_bulb")]
+    [TestCase("mainmenu/mainmenu_icon_daily_hunt")]
+    [TestCase("cartoon/cartoon_speech_bubble_raster")]
+    [TestCase("cartoon/cartoon_vs_burst_base_raster")]
+    [TestCase("cartoon/cartoon_friend_base_raster")]
+    [TestCase("cartoon/cartoon_radar_base_raster")]
+    [TestCase("mainmenu/mainmenu_outer_frame_reference_v1")]
+    [TestCase("mainmenu/mainmenu_daily_gift_reference_v1")]
+    [TestCase("dailyhunt/production/daily_floor_portal")]
     public void HomeSpriteLoads(string path)
     {
         Assert.That(Resources.Load<Sprite>(path), Is.Not.Null,
@@ -65,8 +73,11 @@ public sealed class MainMenuProductionAssetsTests
             Assert.That(resources, Is.Not.Null);
             Assert.That(resources, Does.Not.Contain(rejected),
                 typeName + " must not restore the rejected cloud/stairs background.");
-            Assert.That(resources, Does.Contain("phase2a/hol_neon_reference_bg_r3"),
-                typeName + " must use the approved Revision 3 background.");
+            string approvedBackground = typeName == "MainMenuHomeVisuals"
+                ? "settings/hol_settings_bg_r1"
+                : "phase2a/hol_neon_reference_bg_r3";
+            Assert.That(resources, Does.Contain(approvedBackground),
+                typeName + " must use its approved production background.");
         }
     }
 
@@ -89,15 +100,15 @@ public sealed class MainMenuProductionAssetsTests
         try
         {
             AssertCopy(0,
-                "PLAY SOLO VS AI", "PLAY NOW",
-                "PRIVATE ROOM", "PLAY WITH A FRIEND",
-                "DAILY HUNT", "NEW CHALLENGE EVERY DAY",
+                "PLAY SOLO", "Play and beat your high score!",
+                "PLAY WITH A FRIEND", "Create a room & play together!",
+                "DAILY HUNT", "A new challenge every day, big rewards!",
                 "TIP:", "Every guess narrows the range!",
                 "LOADING...");
             AssertCopy(1,
-                "ΠΑΙΞΕ SOLO ΜΕ AI", "ΑΜΕΣΟ ΠΑΙΧΝΙΔΙ",
-                "ΙΔΙΩΤΙΚΟ ΔΩΜΑΤΙΟ", "ΠΑΙΞΕ ΜΕ ΦΙΛΟ",
-                "ΚΥΝΗΓΙ ΗΜΕΡΑΣ", "ΝΕΑ ΠΡΟΚΛΗΣΗ ΚΑΘΕ ΜΕΡΑ",
+                "ΠΑΙΞΕ SOLO", "Παίξε και σπάσε το ρεκόρ σου!",
+                "ΠΑΙΞΕ ΜΕ ΦΙΛΟ", "Δημιούργησε δωμάτιο & παίξε μαζί!",
+                "DAILY HUNT", "Πρόκληση κάθε μέρα, μεγάλα έπαθλα!",
                 "ΣΥΜΒΟΥΛΗ:", "Κάθε μαντεψιά μικραίνει το εύρος!",
                 "ΦΟΡΤΩΣΗ...");
         }

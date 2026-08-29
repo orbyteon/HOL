@@ -58,15 +58,16 @@ public sealed class MainMenuHomeSubtitlePlayModeTests
             Assert.That(subtitle.gameObject.activeInHierarchy, Is.True);
             Assert.That(subtitle.text, Is.EqualTo(Localized("home_solo_subtitle")));
             Assert.That(subtitle.raycastTarget, Is.False);
-            Assert.That(subtitle.color.r, Is.GreaterThanOrEqualTo(0.80f));
-            Assert.That(subtitle.color.g, Is.GreaterThanOrEqualTo(0.80f));
-            Assert.That(subtitle.color.b, Is.GreaterThanOrEqualTo(0.80f),
-                "Solo subtitle sits on the dark lower bevel and must use the readable light treatment.");
+            Assert.That(subtitle.color.r, Is.LessThan(0.25f));
+            Assert.That(subtitle.color.g, Is.LessThan(0.25f));
+            Assert.That(subtitle.color.b, Is.LessThan(0.30f),
+                "Solo subtitle must retain the approved dark-ink treatment on gold.");
 
             SetLanguage(1);
             Assert.That(subtitle.text,
                 Is.EqualTo(Localized("home_solo_subtitle")));
-            Assert.That(subtitle.text, Is.EqualTo("ΑΜΕΣΟ ΠΑΙΧΝΙΔΙ"));
+            Assert.That(subtitle.text,
+                Is.EqualTo("Παίξε και σπάσε το ρεκόρ σου!"));
             Assert.That(solo.GetComponentsInChildren<TMP_Text>(false),
                 Has.Length.EqualTo(2));
         }

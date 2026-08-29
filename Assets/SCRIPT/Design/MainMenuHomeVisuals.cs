@@ -22,38 +22,54 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
     public const string ConfettiName = "HomeConfetti";
     public const string LogoName = "HomeLogo";
     public const string HeroBoyName = "HomeHeroBoy";
+    public const string HeroGirlName = "HomeHeroGirl";
     public const string SpeechBubbleName = "HomeSpeechBubble";
     public const string ChipName = "HomePlayerChip";
     public const string ChipTextName = "HomePlayerChipText";
+    public const string ChipScoreName = "HomePlayerChipScore";
     public const string SoloIconName = "HomeSoloIcon";
     public const string PvpIconName = "HomePvpIcon";
     public const string FriendIconName = "HomeFriendIcon";
     public const string DailyIconName = "HomeDailyIcon";
+    public const string DailyGiftName = "HomeDailyGift";
     public const string PromoName = "HomeDailyPromo";
+    public const string PortalName = "HomePortal";
     public const string MascotSixName = "HomeMascotSix";
     public const string MascotSevenName = "HomeMascotSeven";
     public const string FriendButtonName = "ButtonPrivateRoom";
+    public const string CtaFrameName = "HomeCtaFrame";
 
-    const string BackgroundResource = "phase2a/hol_neon_reference_bg_r3";
+    const string BackgroundResource = "settings/hol_settings_bg_r1";
     const string LogoResource = "reference/hol_logo_exact";
     const string AvatarResource = "reference/player_cyan_exact";
-    const string HeroBoyResource = "reference/char_boy_exact";
+    const string HeroBoyResource = "phase2a/hol_menu_boy_arms_crossed_r3";
+    const string HeroGirlResource = "phase2a/hol_menu_girl_forward_fist_r3";
     const string MascotSixResource = "reference/mascot_6_exact";
     const string MascotSevenResource = "reference/mascot_7_exact";
-    const string TrophyResource = "reference/board_trophy_exact";
-    const string VsResource = "reference/board_vs_burst_exact";
-    const string FriendResource = "reference/board_friend_exact";
-    const string SoloResource = "phase2a/hol_mode_solo_r2";
-    const string DailyResource = "phase2a/hol_mode_daily_r2";
-    const string SpeechBubbleResource = "cartoon/cartoon_speech_bubble";
+    const string TrophyResource =
+        "dailyhunt/production/daily_mission_icon_trophy";
+    const string VsResource = "cartoon/cartoon_vs_burst_base_raster";
+    const string FriendResource = "cartoon/cartoon_friend_base_raster";
+    const string DailyResource = "cartoon/cartoon_radar_base_raster";
+    const string DailyGiftResource =
+        "mainmenu/mainmenu_daily_gift_reference_v1";
+    const string SpeechBubbleResource = "cartoon/cartoon_speech_bubble_raster";
+    const string OuterFrameResource =
+        "mainmenu/mainmenu_outer_frame_reference_v1";
+    const string PortalResource = "dailyhunt/production/daily_floor_portal";
+    const string PromoStarResource = "dailyhunt/production/daily_player_star";
     const string StarsResource = "mainmenu/mainmenu_deco_stars";
     const string ConfettiResource = "mainmenu/mainmenu_deco_confetti";
 
     const string GoldCtaResource = "phase2a/hol_cta_gold_r2_9s";
     const string MagentaCtaResource = "phase2a/hol_cta_magenta_r2_9s";
     const string BlueCtaResource = "phase2a/hol_cta_blue_r2_9s";
-    const string PurpleFrameResource = "mainmenu/mainmenu_tip_frame_9s";
-    const string ChipFrameResource = "phase2a/hol_player_chip_r2_9s";
+    const string DailyCtaResource = "dailyhunt/v1/daily_action_revive_v1";
+    const string PromoFrameResource = "dailyhunt/v1/daily_input_shell_v1";
+    const string ChipFrameResource =
+        "dailyhunt/production/daily_player_chip_shell_v3";
+    const string ChipAvatarRingResource =
+        "dailyhunt/production/daily_player_avatar_ring_v1";
     const string GearResource = "phase2a/hol_settings_gear_r2";
     const string DisplayFontResource = "phase2a/fonts/HOL Menu Display SDF";
     const string BodyFontResource = "phase2a/fonts/HOL Menu Body SDF";
@@ -65,6 +81,7 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
     static readonly Color NearWhite = new Color(0.985f, 0.975f, 1f, 1f);
     static readonly Color Cyan = new Color(0.18f, 0.92f, 1f, 1f);
     static readonly Color Gold = new Color(1f, 0.80f, 0.20f, 1f);
+    static readonly Color DailyMuted = new Color(0.82f, 0.52f, 1f, 1f);
     static readonly Color Muted = new Color(0.87f, 0.84f, 0.96f, 0.90f);
 
     public static readonly string[] LoadedResources =
@@ -73,21 +90,27 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         LogoResource,
         AvatarResource,
         HeroBoyResource,
+        HeroGirlResource,
         MascotSixResource,
         MascotSevenResource,
         TrophyResource,
         VsResource,
         FriendResource,
-        SoloResource,
         DailyResource,
+        DailyGiftResource,
         SpeechBubbleResource,
+        OuterFrameResource,
+        PortalResource,
+        PromoStarResource,
         StarsResource,
         ConfettiResource,
         GoldCtaResource,
         MagentaCtaResource,
         BlueCtaResource,
-        PurpleFrameResource,
+        DailyCtaResource,
+        PromoFrameResource,
         ChipFrameResource,
+        ChipAvatarRingResource,
         GearResource,
     };
 
@@ -101,6 +124,7 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
     RectTransform safeRoot;
     RectTransform logoRect;
     RectTransform heroBoyRect;
+    RectTransform heroGirlRect;
     RectTransform speechBubbleRect;
     RectTransform gearRect;
     RectTransform chipRect;
@@ -109,12 +133,14 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
     RectTransform friendButtonRect;
     RectTransform dailyButtonRect;
     RectTransform promoRect;
+    RectTransform portalRect;
     RectTransform mascotSixRect;
     RectTransform mascotSevenRect;
 
     TMP_FontAsset displayFont;
     TMP_FontAsset bodyFont;
     TMP_Text chipText;
+    TMP_Text chipScoreText;
     TMP_Text speechText;
     Button friendButton;
     PvpGameController pvpController;
@@ -234,29 +260,37 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         Sprite logo = LoadRequired(LogoResource);
         Sprite avatar = LoadRequired(AvatarResource);
         Sprite heroBoy = LoadRequired(HeroBoyResource);
+        Sprite heroGirl = LoadRequired(HeroGirlResource);
         Sprite six = LoadRequired(MascotSixResource);
         Sprite seven = LoadRequired(MascotSevenResource);
         Sprite trophy = LoadRequired(TrophyResource);
         Sprite vs = LoadRequired(VsResource);
         Sprite friend = LoadRequired(FriendResource);
-        Sprite solo = LoadRequired(SoloResource);
         Sprite daily = LoadRequired(DailyResource);
+        Sprite dailyGift = LoadRequired(DailyGiftResource);
         Sprite speech = LoadRequired(SpeechBubbleResource);
+        Sprite outerFrame = LoadRequired(OuterFrameResource);
+        Sprite portal = LoadRequired(PortalResource);
+        Sprite promoStar = LoadRequired(PromoStarResource);
         Sprite stars = LoadRequired(StarsResource);
         Sprite confetti = LoadRequired(ConfettiResource);
         Sprite goldFrame = LoadRequired(GoldCtaResource);
         Sprite magentaFrame = LoadRequired(MagentaCtaResource);
         Sprite blueFrame = LoadRequired(BlueCtaResource);
-        Sprite purpleFrame = LoadRequired(PurpleFrameResource);
+        Sprite dailyFrame = LoadRequired(DailyCtaResource);
+        Sprite promoFrame = LoadRequired(PromoFrameResource);
         Sprite chipFrame = LoadRequired(ChipFrameResource);
+        Sprite avatarRing = LoadRequired(ChipAvatarRingResource);
         Sprite gear = LoadRequired(GearResource);
         displayFont = Resources.Load<TMP_FontAsset>(DisplayFontResource);
         bodyFont = Resources.Load<TMP_FontAsset>(BodyFontResource);
 
         IsReady = ArtReady(
-            background, logo, avatar, heroBoy, six, seven, trophy, vs,
-            friend, solo, daily, speech, stars, confetti, goldFrame,
-            magentaFrame, blueFrame, purpleFrame, chipFrame, gear) &&
+            background, logo, avatar, heroBoy, heroGirl, six, seven, trophy, vs,
+            friend, daily, dailyGift, speech, outerFrame, portal, promoStar,
+            stars, confetti, goldFrame,
+            magentaFrame, blueFrame, dailyFrame, promoFrame, chipFrame,
+            avatarRing, gear) &&
             displayFont != null &&
             bodyFont != null &&
             pvpController != null;
@@ -289,15 +323,17 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         var starsImage = EnsureImage(visualRoot, StarsName);
         Stretch(starsImage.rectTransform);
         ConfigureImage(starsImage, stars, false, Image.Type.Simple);
+        starsImage.gameObject.SetActive(false);
 
         var confettiImage = EnsureImage(visualRoot, ConfettiName);
         Stretch(confettiImage.rectTransform);
         ConfigureImage(confettiImage, confetti, false, Image.Type.Simple);
+        confettiImage.gameObject.SetActive(false);
 
         var outer = EnsureImage(visualRoot, OuterFrameName);
-        ConfigureImage(outer, purpleFrame, false, Image.Type.Sliced);
-        outer.pixelsPerUnitMultiplier = 2f;
-        Place(outer.rectTransform, Vector2.zero, new Vector2(1032f, 1872f));
+        ConfigureImage(outer, outerFrame, false, Image.Type.Simple);
+        Place(outer.rectTransform, Vector2.zero,
+            new Vector2(ReferenceWidth, ReferenceHeight));
 
         safeRoot = EnsureRect(visualRoot, SafeRootName);
         Stretch(safeRoot);
@@ -305,7 +341,7 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
             safeRoot, (RectTransform)canvas.transform,
             new Vector2(ReferenceWidth, ReferenceHeight));
 
-        BuildTopBar(safeRoot, gear, chipFrame, avatar, trophy);
+        BuildTopBar(safeRoot, gear, chipFrame, avatarRing, avatar, trophy);
 
         var logoImage = EnsureImage(safeRoot, LogoName);
         ConfigureImage(logoImage, logo, true, Image.Type.Simple);
@@ -315,44 +351,62 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         ConfigureImage(heroImage, heroBoy, true, Image.Type.Simple);
         heroBoyRect = heroImage.rectTransform;
 
+        var heroineImage = EnsureImage(safeRoot, HeroGirlName);
+        ConfigureImage(heroineImage, heroGirl, true, Image.Type.Simple);
+        heroGirlRect = heroineImage.rectTransform;
+
         var bubble = EnsureImage(safeRoot, SpeechBubbleName);
         ConfigureImage(bubble, speech, false, Image.Type.Sliced);
         bubble.pixelsPerUnitMultiplier = 2f;
         speechBubbleRect = bubble.rectTransform;
+        // The approved bubble overlaps the hero art, so it must paint above the
+        // two characters while remaining below the interactive CTA layer.
+        bubble.transform.SetAsLastSibling();
 
         speechText = EnsureText(
-            bubble.transform, "HomeSpeechText", 32f, bodyFont, Ink,
+            bubble.transform, "HomeSpeechText", 32f, displayFont, Ink,
             TextAlignmentOptions.Center);
         StretchText(speechText.rectTransform, 34f, 32f);
         ConfigureBodyText(speechText, 25f, 34f);
-        SetLocalized(speechText, "home_tip_body");
+        SetLocalized(speechText, "home_hero_speech");
 
         soloButtonRect = RestyleCta(
-            safeRoot, FindButton("ButtonPlay"), goldFrame, solo,
+            safeRoot, FindButton("ButtonPlay"), goldFrame, trophy,
             SoloIconName, "HomeSoloTitle", "home_solo_title",
-            "HomeSoloSubtitle", "home_solo_subtitle", true, Ink);
+            "HomeSoloSubtitle", "home_solo_subtitle", true, NearWhite);
 
         pvpButtonRect = RestyleCta(
             safeRoot, FindButton("ButtonPvP"), magentaFrame, vs,
-            PvpIconName, "HomePvpTitle", "pvp_duel",
-            "HomePvpSubtitle", "prebattle_rule", false, NearWhite);
+            PvpIconName, "HomePvpTitle", "home_pvp_title",
+            "HomePvpSubtitle", "home_pvp_subtitle", false, NearWhite);
 
         friendButton = EnsureFriendButton(safeRoot);
         friendButtonRect = RestyleCta(
             safeRoot, friendButton, blueFrame, friend,
-            FriendIconName, "HomeFriendTitle", "private_room_title",
-            "HomeFriendSubtitle", "private_room_create_hint", false,
+            FriendIconName, "HomeFriendTitle", "home_private_title",
+            "HomeFriendSubtitle", "home_private_subtitle", false,
             NearWhite);
 
         dailyButtonRect = RestyleCta(
-            safeRoot, FindButton("DailyHuntButton"), purpleFrame, daily,
+            safeRoot, FindButton("DailyHuntButton"), dailyFrame, daily,
             DailyIconName, "HomeDailyTitle", "home_daily_title",
             "HomeDailySubtitle", "home_daily_subtitle", false,
             NearWhite);
 
-        BuildBottomPromo(safeRoot, purpleFrame, trophy, six, seven);
+        var dailyGiftImage = EnsureImage(dailyButtonRect, DailyGiftName);
+        ConfigureImage(dailyGiftImage, dailyGift, true, Image.Type.Simple);
+        Place(dailyGiftImage.rectTransform, new Vector2(390f, 1f),
+            new Vector2(158f, 150f));
+
+        BuildBottomPromo(
+            safeRoot, promoFrame, trophy, promoStar, six, seven, portal);
+
+        // The bezel is the final non-interactive paint layer. It must mask the
+        // composition edges instead of allowing decorative art over the frame.
+        outer.transform.SetAsLastSibling();
 
         ApplyResponsiveLayout(true);
+        ApplyTypographyLayout();
         RefreshChip();
     }
 
@@ -360,6 +414,7 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         Transform safe,
         Sprite gear,
         Sprite chipFrame,
+        Sprite avatarRing,
         Sprite avatar,
         Sprite trophy)
     {
@@ -379,44 +434,74 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         }
 
         var chip = EnsureImage(safe, ChipName);
-        ConfigureImage(chip, chipFrame, false, Image.Type.Sliced);
-        chip.pixelsPerUnitMultiplier = 2f;
+        ConfigureImage(chip, chipFrame, false, Image.Type.Simple);
         chipRect = chip.rectTransform;
+
+        var avatarRingImage = EnsureImage(chip.transform, "HomePlayerAvatarRing");
+        ConfigureImage(avatarRingImage, avatarRing, true, Image.Type.Simple);
+        Place(
+            avatarRingImage.rectTransform, new Vector2(-126f, 0f),
+            new Vector2(108f, 108f));
 
         var avatarImage = EnsureImage(chip.transform, "HomePlayerAvatar");
         ConfigureImage(avatarImage, avatar, true, Image.Type.Simple);
         Place(
-            avatarImage.rectTransform, new Vector2(-122f, 0f),
-            new Vector2(82f, 82f));
+            avatarImage.rectTransform, new Vector2(-126f, 0f),
+            new Vector2(92f, 92f));
 
         var trophyImage = EnsureImage(chip.transform, "HomeTrophyIcon");
         ConfigureImage(trophyImage, trophy, true, Image.Type.Simple);
         Place(
-            trophyImage.rectTransform, new Vector2(-28f, -26f),
-            new Vector2(42f, 42f));
+            trophyImage.rectTransform, new Vector2(0f, -30f),
+            new Vector2(44f, 44f));
 
         chipText = EnsureText(
-            chip.transform, ChipTextName, 28f, bodyFont, NearWhite,
-            TextAlignmentOptions.Center);
+            chip.transform, ChipTextName, 35f, displayFont, NearWhite,
+            TextAlignmentOptions.Left);
         Place(
-            chipText.rectTransform, new Vector2(56f, 3f),
-            new Vector2(190f, 82f));
+            chipText.rectTransform, new Vector2(72f, 29f),
+            new Vector2(220f, 48f));
         chipText.enableAutoSizing = true;
-        chipText.fontSizeMin = 22f;
-        chipText.fontSizeMax = 29f;
-        chipText.overflowMode = TextOverflowModes.Ellipsis;
+        chipText.fontSizeMin = 27f;
+        chipText.fontSizeMax = 36f;
+        chipText.overflowMode = TextOverflowModes.Overflow;
+        chipText.outlineColor = Ink;
+        chipText.outlineWidth = 0.11f;
+
+        chipScoreText = EnsureText(
+            chip.transform, ChipScoreName, 38f, displayFont, NearWhite,
+            TextAlignmentOptions.Left);
+        Place(
+            chipScoreText.rectTransform, new Vector2(108f, -30f),
+            new Vector2(164f, 52f));
+        chipScoreText.enableAutoSizing = true;
+        chipScoreText.fontSizeMin = 30f;
+        chipScoreText.fontSizeMax = 40f;
+        chipScoreText.overflowMode = TextOverflowModes.Overflow;
+        chipScoreText.outlineColor = Ink;
+        chipScoreText.outlineWidth = 0.11f;
     }
 
     Button EnsureFriendButton(Transform parent)
     {
-        Transform existing = DeepFind(transform, FriendButtonName);
+        // Home owns this button. Never steal a same-named control from one of
+        // the PvP/private-room panels, because that creates a second layout
+        // writer and moves the Home CTA after our measured layout pass.
+        Transform existing = DirectChild(parent, FriendButtonName);
         Button button = existing == null ? null : existing.GetComponent<Button>();
         if (button == null)
         {
-            button = RuntimeUI.CreateButton(
-                parent, FriendButtonName, L10n.Get("private_room_title"),
-                Vector2.zero, new Vector2(930f, 160f), Color.white,
-                NearWhite);
+            // Do not use RuntimeUI.CreateButton here. That helper registers a
+            // generic ResponsivePageLayout writer, while this screen's one
+            // measured presentation owner is MainMenuHomeVisuals.
+            RectTransform rect = EnsureRect(parent, FriendButtonName);
+            var image = rect.GetComponent<Image>();
+            if (image == null)
+                image = rect.gameObject.AddComponent<Image>();
+            button = rect.GetComponent<Button>();
+            if (button == null)
+                button = rect.gameObject.AddComponent<Button>();
+            button.targetGraphic = image;
             button.onClick.AddListener(pvpController.OpenPvpMenu);
         }
 
@@ -446,39 +531,77 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         if (image == null)
             image = button.gameObject.AddComponent<Image>();
 
-        ConfigureInteractiveImage(image, frame, false, Image.Type.Sliced, 2f);
+        // Keep the real hit rectangle compact and non-overlapping. The larger
+        // reference-faithful painted frame is a non-raycast child, so adjacent
+        // visual glows never create ambiguous touch ownership.
+        image.enabled = true;
+        image.sprite = null;
+        image.type = Image.Type.Simple;
+        image.color = new Color(1f, 1f, 1f, 0.001f);
+        image.raycastTarget = true;
         button.targetGraphic = image;
         ConfigureButtonState(button);
-        RuntimeUI.AttachJuice(button);
+        button.transition = Selectable.Transition.None;
+
+        var visualFrame = EnsureImage(button.transform, CtaFrameName);
+        ConfigureImage(visualFrame, frame, false, Image.Type.Simple);
+        Vector2 visualSize = button.name == "ButtonPlay"
+            ? new Vector2(990f, 255f)
+            : button.name == "DailyHuntButton"
+                ? new Vector2(990f, 235f)
+                : new Vector2(990f, 250f);
+        Place(visualFrame.rectTransform, Vector2.zero, visualSize);
+        visualFrame.transform.SetAsFirstSibling();
+        var juice = RuntimeUI.AttachJuice(button);
+        rect.localScale = Vector3.one;
+        if (juice != null)
+            juice.ResetBaseScale(Vector3.one);
 
         if (icon != null)
         {
             var iconImage = EnsureImage(button.transform, iconName);
             ConfigureImage(iconImage, icon, true, Image.Type.Simple);
+            float iconSize = primary ? 188f :
+                iconName == PvpIconName ? 220f :
+                iconName == FriendIconName ? 200f : 185f;
             Place(
                 iconImage.rectTransform, new Vector2(-350f, 0f),
-                new Vector2(primary ? 118f : 104f, primary ? 118f : 104f));
+                new Vector2(iconSize, iconSize));
+
+            if (iconName == PvpIconName)
+            {
+                var vsText = EnsureText(
+                    iconImage.transform, "HomePvpIconText", 53f,
+                    displayFont, Ink, TextAlignmentOptions.Center);
+                StretchText(vsText.rectTransform, 10f, 10f);
+                ConfigureDisplayText(vsText, 42f, 56f);
+                vsText.text = "VS";
+                AddTextShadow(vsText, 0.30f);
+            }
         }
 
         var title = EnsureText(
-            button.transform, titleName, primary ? 52f : 46f,
+            button.transform, titleName, primary ? 64f : 60f,
             displayFont, labelColor, TextAlignmentOptions.Center);
         Place(
-            title.rectTransform, new Vector2(60f, 25f),
-            new Vector2(690f, 70f));
+            title.rectTransform, new Vector2(60f, 24f),
+            new Vector2(700f, 78f));
         ConfigureDisplayText(
-            title, primary ? 40f : 34f, primary ? 54f : 48f);
+            title, primary ? 48f : 40f, primary ? 66f : 62f);
         SetLocalized(title, titleKey);
 
+        Color subtitleColor = button.name == "DailyHuntButton"
+            ? DailyMuted
+            : Ink;
         var subtitle = EnsureText(
-            button.transform, subtitleName, primary ? 25f : 23f,
-            bodyFont, primary ? NearWhite : Muted,
+            button.transform, subtitleName, primary ? 31f : 29f,
+            displayFont, subtitleColor,
             TextAlignmentOptions.Center);
         Place(
-            subtitle.rectTransform, new Vector2(60f, -43f),
-            new Vector2(690f, 50f));
-        ConfigureBodyText(
-            subtitle, primary ? 20f : 18f, primary ? 26f : 24f);
+            subtitle.rectTransform, new Vector2(60f, -39f),
+            new Vector2(700f, 54f));
+        ConfigureDisplayText(
+            subtitle, primary ? 24f : 22f, primary ? 32f : 30f);
         SetLocalized(subtitle, subtitleKey);
 
         return rect;
@@ -488,37 +611,53 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         Transform safe,
         Sprite frame,
         Sprite trophy,
+        Sprite star,
         Sprite six,
-        Sprite seven)
+        Sprite seven,
+        Sprite portal)
     {
         var promo = EnsureImage(safe, PromoName);
-        ConfigureImage(promo, frame, false, Image.Type.Sliced);
-        promo.pixelsPerUnitMultiplier = 2f;
+        ConfigureImage(promo, frame, false, Image.Type.Simple);
         promoRect = promo.rectTransform;
 
         var trophyImage = EnsureImage(promo.transform, "HomePromoTrophy");
         ConfigureImage(trophyImage, trophy, true, Image.Type.Simple);
         Place(
-            trophyImage.rectTransform, new Vector2(-260f, 0f),
-            new Vector2(78f, 78f));
+            trophyImage.rectTransform, new Vector2(-168f, -48f),
+            new Vector2(68f, 68f));
+
+        var leftStar = EnsureImage(promo.transform, "HomePromoStarLeft");
+        ConfigureImage(leftStar, star, true, Image.Type.Simple);
+        Place(leftStar.rectTransform, new Vector2(-178f, 38f),
+            new Vector2(38f, 38f));
+
+        var rightStar = EnsureImage(promo.transform, "HomePromoStarRight");
+        ConfigureImage(rightStar, star, true, Image.Type.Simple);
+        Place(rightStar.rectTransform, new Vector2(220f, 38f),
+            new Vector2(38f, 38f));
 
         var promoTitle = EnsureText(
             promo.transform, "HomePromoTitle", 31f, displayFont, Cyan,
             TextAlignmentOptions.Center);
         Place(
-            promoTitle.rectTransform, new Vector2(55f, 29f),
-            new Vector2(520f, 50f));
+            promoTitle.rectTransform, new Vector2(42f, 47f),
+            new Vector2(360f, 48f));
         ConfigureDisplayText(promoTitle, 24f, 32f);
-        SetLocalized(promoTitle, "home_daily_subtitle");
+        SetLocalized(promoTitle, "home_reward_title");
 
         var promoBody = EnsureText(
-            promo.transform, "HomePromoBody", 27f, bodyFont, Gold,
+            promo.transform, "HomePromoBody", 29f, displayFont, Gold,
             TextAlignmentOptions.Center);
         Place(
-            promoBody.rectTransform, new Vector2(55f, -30f),
-            new Vector2(520f, 54f));
-        ConfigureBodyText(promoBody, 21f, 28f);
-        SetLocalized(promoBody, "home_tip_body");
+            promoBody.rectTransform, new Vector2(42f, -27f),
+            new Vector2(360f, 88f));
+        ConfigureDisplayText(promoBody, 24f, 34f);
+        SetLocalized(promoBody, "home_reward_body");
+
+        var portalImage = EnsureImage(safe, PortalName);
+        ConfigureImage(portalImage, portal, true, Image.Type.Simple);
+        portalRect = portalImage.rectTransform;
+        portalImage.transform.SetSiblingIndex(promo.transform.GetSiblingIndex());
 
         var sixImage = EnsureImage(safe, MascotSixName);
         ConfigureImage(sixImage, six, true, Image.Type.Simple);
@@ -533,19 +672,19 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
     {
         RefreshChip();
         ApplyResponsiveLayout(true);
+        ApplyTypographyLayout();
     }
 
     void RefreshChip()
     {
-        if (chipText == null) return;
+        if (chipText == null || chipScoreText == null) return;
 
         string player = PlayerPrefs.GetString("PlayerName", "");
         if (string.IsNullOrWhiteSpace(player))
             player = L10n.Get("player_default");
 
-        chipText.text = "<b>" + player + "</b>\n<size=82%>" +
-                        L10n.Get("stats_wins") + ": " +
-                        GameStats.Wins + "</size>";
+        chipText.text = player;
+        chipScoreText.text = GameStats.Wins.ToString("N0");
     }
 
     void ApplyResponsiveLayout(bool force = false)
@@ -564,10 +703,10 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         int height,
         bool force = false)
     {
-        if (logoRect == null || heroBoyRect == null ||
+        if (logoRect == null || heroBoyRect == null || heroGirlRect == null ||
             speechBubbleRect == null || soloButtonRect == null ||
             pvpButtonRect == null || friendButtonRect == null ||
-            dailyButtonRect == null || promoRect == null ||
+            dailyButtonRect == null || promoRect == null || portalRect == null ||
             mascotSixRect == null || mascotSevenRect == null)
             return;
 
@@ -588,43 +727,49 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         float tall = Mathf.InverseLerp(1.78f, 2.22f, aspect);
 
         Place(
-            gearRect, new Vector2(-478f, 842f + 165f * tall),
-            new Vector2(106f, 106f));
+            gearRect, new Vector2(-432f, 838f + 45f * tall),
+            new Vector2(124f, 124f));
         Place(
-            chipRect, new Vector2(350f, 842f + 165f * tall),
-            new Vector2(365f, 118f));
+            chipRect, new Vector2(325f, 838f + 45f * tall),
+            new Vector2(360f, 140f));
         Place(
-            logoRect, new Vector2(0f, 690f + 110f * tall),
-            new Vector2(585f, 310f));
+            logoRect, new Vector2(-42f, 797f + 110f * tall),
+            new Vector2(580f, 306f));
         Place(
-            heroBoyRect, new Vector2(-75f, 395f + 62f * tall),
-            new Vector2(500f, 500f));
+            heroBoyRect, new Vector2(-205f, 430f + 62f * tall),
+            new Vector2(455f, 455f));
         Place(
-            speechBubbleRect, new Vector2(310f, 400f + 62f * tall),
-            new Vector2(340f, 190f));
+            heroGirlRect, new Vector2(92f, 425f + 62f * tall),
+            new Vector2(460f, 460f));
+        Place(
+            speechBubbleRect, new Vector2(350f, 390f + 62f * tall),
+            new Vector2(300f, 200f));
 
         float buttonShift = 30f * tall;
         Place(
-            soloButtonRect, new Vector2(0f, 115f + buttonShift),
-            new Vector2(930f, 164f));
+            soloButtonRect, new Vector2(0f, 105f + buttonShift),
+            new Vector2(990f, 190f));
         Place(
-            pvpButtonRect, new Vector2(0f, -70f + buttonShift),
-            new Vector2(930f, 164f));
+            pvpButtonRect, new Vector2(0f, -92f + buttonShift),
+            new Vector2(990f, 180f));
         Place(
-            friendButtonRect, new Vector2(0f, -255f + buttonShift),
-            new Vector2(930f, 164f));
+            friendButtonRect, new Vector2(0f, -288f + buttonShift),
+            new Vector2(990f, 180f));
         Place(
-            dailyButtonRect, new Vector2(0f, -440f + buttonShift),
-            new Vector2(930f, 164f));
+            dailyButtonRect, new Vector2(0f, -478f + buttonShift),
+            new Vector2(990f, 175f));
         Place(
-            promoRect, new Vector2(0f, -655f - 30f * tall),
-            new Vector2(650f, 155f));
+            promoRect, new Vector2(0f, -710f - 34f * tall),
+            new Vector2(500f, 220f));
         Place(
-            mascotSixRect, new Vector2(-430f, -805f - 45f * tall),
-            new Vector2(245f, 280f));
+            portalRect, new Vector2(0f, -876f - 42f * tall),
+            new Vector2(650f, 180f));
         Place(
-            mascotSevenRect, new Vector2(430f, -805f - 45f * tall),
-            new Vector2(245f, 280f));
+            mascotSixRect, new Vector2(-380f, -735f - 44f * tall),
+            new Vector2(300f, 350f));
+        Place(
+            mascotSevenRect, new Vector2(335f, -735f - 44f * tall),
+            new Vector2(300f, 350f));
 
         // Greek needs the full title bounds, never a tiny-font fallback.
         foreach (string textName in new[]
@@ -638,9 +783,110 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
             Transform found = DeepFind(safeRoot, textName);
             TMP_Text text = found == null ? null : found.GetComponent<TMP_Text>();
             if (text == null) continue;
-            text.fontSizeMin = language == L10n.Language.Greek ? 32f : 34f;
-            text.fontSizeMax = textName == "HomeSoloTitle" ? 54f : 48f;
+            text.fontSizeMin = language == L10n.Language.Greek ? 38f : 40f;
+            text.fontSizeMax = textName == "HomeSoloTitle" ? 66f : 62f;
         }
+
+        ApplyTypographyLayout();
+    }
+
+    void ApplyTypographyLayout()
+    {
+        if (safeRoot == null) return;
+
+        if (speechText != null)
+        {
+            speechText.color = Ink;
+            speechText.alignment = TextAlignmentOptions.Center;
+            speechText.enableAutoSizing = true;
+            speechText.fontSizeMin = 23f;
+            speechText.fontSizeMax = 30f;
+            speechText.enableWordWrapping = true;
+            speechText.overflowMode = TextOverflowModes.Truncate;
+            StretchText(speechText.rectTransform, 26f, 25f);
+            AddTextShadow(speechText, 0.22f);
+        }
+
+        if (chipText != null)
+        {
+            chipText.alignment = TextAlignmentOptions.Left;
+            chipText.enableAutoSizing = true;
+            chipText.fontSizeMin = 27f;
+            chipText.fontSizeMax = 36f;
+            chipText.enableWordWrapping = false;
+            chipText.overflowMode = TextOverflowModes.Overflow;
+            Place(chipText.rectTransform, new Vector2(72f, 29f),
+                new Vector2(220f, 48f));
+        }
+
+        if (chipScoreText != null)
+        {
+            chipScoreText.alignment = TextAlignmentOptions.Left;
+            chipScoreText.enableAutoSizing = true;
+            chipScoreText.fontSizeMin = 30f;
+            chipScoreText.fontSizeMax = 40f;
+            chipScoreText.enableWordWrapping = false;
+            chipScoreText.overflowMode = TextOverflowModes.Overflow;
+            Place(chipScoreText.rectTransform, new Vector2(108f, -30f),
+                new Vector2(164f, 52f));
+        }
+
+        ConfigureCtaTypography(
+            "HomeSoloTitle", "HomeSoloSubtitle", true);
+        ConfigureCtaTypography(
+            "HomePvpTitle", "HomePvpSubtitle", false);
+        ConfigureCtaTypography(
+            "HomeFriendTitle", "HomeFriendSubtitle", false);
+        ConfigureCtaTypography(
+            "HomeDailyTitle", "HomeDailySubtitle", false);
+    }
+
+    void ConfigureCtaTypography(
+        string titleName,
+        string subtitleName,
+        bool primary)
+    {
+        TMP_Text title = FindText(titleName);
+        TMP_Text subtitle = FindText(subtitleName);
+
+        if (title != null)
+        {
+            bool daily = titleName == "HomeDailyTitle";
+            bool friend = titleName == "HomeFriendTitle";
+            float fixedSize = primary ? 88f : daily ? 76f : friend ? 70f : 86f;
+            title.alignment = TextAlignmentOptions.Center;
+            title.enableAutoSizing = false;
+            title.fontSize = fixedSize;
+            title.outlineColor = Ink;
+            title.outlineWidth = 0.16f;
+            title.enableWordWrapping = false;
+            title.overflowMode = TextOverflowModes.Overflow;
+            Place(title.rectTransform, new Vector2(daily ? 0f : 58f, 25f),
+                new Vector2(daily ? 680f : 730f, 108f));
+        }
+
+        if (subtitle != null)
+        {
+            subtitle.color = titleName == "HomeDailyTitle"
+                ? new Color(0.88f, 0.50f, 1f, 1f)
+                : Ink;
+            subtitle.alignment = TextAlignmentOptions.Center;
+            subtitle.enableAutoSizing = true;
+            subtitle.fontSizeMin = primary ? 25f : 23f;
+            subtitle.fontSizeMax = primary ? 36f : 33f;
+            subtitle.enableWordWrapping = false;
+            subtitle.overflowMode = TextOverflowModes.Overflow;
+            bool daily = titleName == "HomeDailyTitle";
+            Place(subtitle.rectTransform,
+                new Vector2(daily ? 0f : 58f, -28f),
+                new Vector2(daily ? 650f : 700f, 52f));
+        }
+    }
+
+    TMP_Text FindText(string name)
+    {
+        Transform found = DeepFind(safeRoot, name);
+        return found == null ? null : found.GetComponent<TMP_Text>();
     }
 
     static void ConfigureDisplayText(
