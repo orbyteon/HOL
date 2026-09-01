@@ -35,11 +35,11 @@ const chunk = (type, data) => {
   return result;
 };
 
-const rgbaPng = (width, height, compressed) => {
+const colorPng = (width, height, colorType, compressed) => {
   const ihdr = Buffer.alloc(13);
   ihdr.writeUInt32BE(width, 0);
   ihdr.writeUInt32BE(height, 4);
-  ihdr.set([8, 6, 0, 0, 0], 8);
+  ihdr.set([8, colorType, 0, 0, 0], 8);
   return Buffer.concat([
     Buffer.from("89504e470d0a1a0a", "hex"),
     chunk("IHDR", ihdr),
@@ -47,6 +47,12 @@ const rgbaPng = (width, height, compressed) => {
     chunk("IEND", Buffer.alloc(0)),
   ]);
 };
+
+const rgbaPng = (width, height, compressed) =>
+  colorPng(width, height, 6, compressed);
+
+const rgbPng = (width, height, compressed) =>
+  colorPng(width, height, 2, compressed);
 
 const syntheticRgbaPng = (pixel, width = 1080, height = 1920) => {
   const stride = width * 4;
@@ -64,6 +70,23 @@ const syntheticRgbaPng = (pixel, width = 1080, height = 1920) => {
     }
   }
   return rgbaPng(width, height, zlib.deflateSync(raw));
+};
+
+const syntheticRgbPng = (pixel, width = 1080, height = 1920) => {
+  const stride = width * 3;
+  const raw = Buffer.allocUnsafe((stride + 1) * height);
+  for (let y = 0; y < height; y++) {
+    const row = y * (stride + 1);
+    raw[row] = 0;
+    for (let x = 0; x < width; x++) {
+      const [r, g, b] = pixel(x, y, width, height);
+      const offset = row + 1 + x * 3;
+      raw[offset] = r;
+      raw[offset + 1] = g;
+      raw[offset + 2] = b;
+    }
+  }
+  return rgbPng(width, height, zlib.deflateSync(raw));
 };
 
 test("dimensions fail before malformed image data is inflated", () => {
@@ -110,6 +133,21 @@ test("varied 1080x1920 Home screenshot passes content validation", () => {
     x < width / 2 && y < height / 2
       ? [16, 8, 48, 255]
       : [240, 196, 72, 255]);
+
+  const result = validateMainMenuPng(png);
+
+  assert.equal(result.width, 1080);
+  assert.equal(result.height, 1920);
+  assert.ok(result.sampledColors > 1);
+  assert.ok(result.luminanceRange > 0);
+  assert.ok(result.channelRange > 0);
+});
+
+test("varied 24-bit RGB Home screenshot passes content validation", () => {
+  const png = syntheticRgbPng((x, y, width, height) =>
+    x < width / 2 && y < height / 2
+      ? [16, 8, 48]
+      : [240, 196, 72]);
 
   const result = validateMainMenuPng(png);
 

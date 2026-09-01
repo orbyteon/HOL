@@ -142,6 +142,8 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
     TMP_Text chipText;
     TMP_Text chipScoreText;
     TMP_Text speechText;
+    TMP_Text promoTitleText;
+    TMP_Text promoBodyText;
     Button friendButton;
     PvpGameController pvpController;
     bool laidOut;
@@ -639,23 +641,17 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         Place(rightStar.rectTransform, new Vector2(220f, 38f),
             new Vector2(38f, 38f));
 
-        var promoTitle = EnsureText(
+        promoTitleText = EnsureText(
             promo.transform, "HomePromoTitle", 31f, displayFont, Cyan,
             TextAlignmentOptions.Center);
-        Place(
-            promoTitle.rectTransform, new Vector2(42f, 47f),
-            new Vector2(360f, 48f));
-        ConfigureDisplayText(promoTitle, 24f, 32f);
-        SetLocalized(promoTitle, "home_reward_title");
+        ConfigureDisplayText(promoTitleText, 24f, 32f);
+        SetLocalized(promoTitleText, "home_reward_title");
 
-        var promoBody = EnsureText(
+        promoBodyText = EnsureText(
             promo.transform, "HomePromoBody", 29f, displayFont, Gold,
             TextAlignmentOptions.Center);
-        Place(
-            promoBody.rectTransform, new Vector2(42f, -27f),
-            new Vector2(360f, 88f));
-        ConfigureDisplayText(promoBody, 24f, 34f);
-        SetLocalized(promoBody, "home_reward_body");
+        ConfigureDisplayText(promoBodyText, 23f, 34f);
+        SetLocalized(promoBodyText, "home_reward_body");
 
         var portalImage = EnsureImage(safe, PortalName);
         ConfigureImage(portalImage, portal, true, Image.Type.Simple);
@@ -804,10 +800,43 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
             speechText.enableAutoSizing = true;
             speechText.fontSizeMin = 23f;
             speechText.fontSizeMax = 30f;
-            speechText.enableWordWrapping = true;
-            speechText.overflowMode = TextOverflowModes.Truncate;
-            StretchText(speechText.rectTransform, 26f, 25f);
+            speechText.enableWordWrapping = false;
+            speechText.overflowMode = TextOverflowModes.Overflow;
+            speechText.lineSpacing = 0f;
+            // Deliberately stay inside the bubble's flat cream body. The tail
+            // begins below this rectangle, so the emphasis line cannot paint
+            // across the purple outline even on the narrow 720px viewport.
+            Place(speechText.rectTransform, new Vector2(0f, 22f),
+                new Vector2(248f, 150f));
             AddTextShadow(speechText, 0.22f);
+        }
+
+        if (promoTitleText != null)
+        {
+            promoTitleText.alignment = TextAlignmentOptions.Center;
+            promoTitleText.enableAutoSizing = true;
+            promoTitleText.fontSizeMin = 24f;
+            promoTitleText.fontSizeMax = 32f;
+            promoTitleText.enableWordWrapping = false;
+            promoTitleText.overflowMode = TextOverflowModes.Overflow;
+            promoTitleText.lineSpacing = 0f;
+            Place(promoTitleText.rectTransform, new Vector2(42f, 47f),
+                new Vector2(360f, 48f));
+        }
+
+        if (promoBodyText != null)
+        {
+            promoBodyText.alignment = TextAlignmentOptions.Center;
+            promoBodyText.enableAutoSizing = true;
+            promoBodyText.fontSizeMin = 23f;
+            promoBodyText.fontSizeMax = 34f;
+            promoBodyText.enableWordWrapping = false;
+            promoBodyText.overflowMode = TextOverflowModes.Overflow;
+            promoBodyText.lineSpacing = 0f;
+            // The narrower, raised body block preserves a real gap beside the
+            // trophy and clears the lower cyan frame without moving any art.
+            Place(promoBodyText.rectTransform, new Vector2(35f, -17f),
+                new Vector2(340f, 88f));
         }
 
         if (chipText != null)

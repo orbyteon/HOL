@@ -15,6 +15,14 @@ public sealed class MainMenuHomeVisualsPlayModeTests
     const BindingFlags InstanceFlags =
         BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
 
+    static readonly Rect SpeechCreamSafeRect =
+        Rect.MinMaxRect(-128f, -35f, 127f, 78f);
+    static readonly Rect PromoInnerSafeRect =
+        Rect.MinMaxRect(-205f, -60f, 205f, 60f);
+    // Alpha-tested edge of the unchanged trophy sprite in its 68x68 placement;
+    // the RectTransform itself includes transparent source-image padding.
+    const float PromoTrophyOpaqueRight = -143f;
+
     [UnityTest]
     public IEnumerator HomeMatchesApprovedFourModeCartoonCompositionAndRemainsPlayable()
     {
@@ -201,6 +209,226 @@ public sealed class MainMenuHomeVisualsPlayModeTests
         yield return null;
         Assert.That(pvpMenu.activeSelf, Is.True,
             "Play With A Friend entry is not wired to the real room hub.");
+    }
+
+    [UnityTest]
+    public IEnumerator HomeLocalizedGlyphsStayInsideApprovedArtSafeAreas()
+    {
+        Screen.SetResolution(1080, 1920, false);
+        InvokeInstaller("MainMenuHomeVisuals");
+        yield return SceneManager.LoadSceneAsync("MainMenu", LoadSceneMode.Single);
+
+        Component owner = null;
+        for (int frame = 0; frame < 160; frame++)
+        {
+            owner = FindInScene(RuntimeType("MainMenuHomeVisuals"));
+            if (owner != null &&
+                GetProperty<bool>(owner, "IsReady") &&
+                GetProperty<bool>(owner, "IsSettled"))
+                break;
+            yield return null;
+        }
+
+        Assert.That(owner, Is.Not.Null);
+        Assert.That(GetProperty<bool>(owner, "IsReady"), Is.True);
+        Assert.That(GetProperty<bool>(owner, "IsSettled"), Is.True);
+
+        Canvas canvas = owner.GetComponent<Canvas>();
+        Transform root = Find(canvas.transform, "HomeVisualRoot");
+        RectTransform bubble = Find(root, "HomeSpeechBubble") as RectTransform;
+        RectTransform promo = Find(root, "HomeDailyPromo") as RectTransform;
+        RectTransform trophy = Find(root, "HomePromoTrophy") as RectTransform;
+        RectTransform mascotSix = Find(root, "HomeMascotSix") as RectTransform;
+        RectTransform mascotSeven = Find(root, "HomeMascotSeven") as RectTransform;
+        TMP_Text speech = Find(root, "HomeSpeechText").GetComponent<TMP_Text>();
+        TMP_Text promoTitle = Find(root, "HomePromoTitle").GetComponent<TMP_Text>();
+        TMP_Text promoBody = Find(root, "HomePromoBody").GetComponent<TMP_Text>();
+
+        var viewports = new[]
+        {
+            new Vector2Int(720, 1280),
+            new Vector2Int(1080, 1920),
+            new Vector2Int(1080, 2400),
+            new Vector2Int(1179, 2556),
+        };
+        MethodInfo applyViewport = owner.GetType().GetMethod(
+            "ApplyResponsiveLayoutForViewport", InstanceFlags);
+        Assert.That(applyViewport, Is.Not.Null);
+
+        for (int language = 0; language <= 1; language++)
+        {
+            SetLanguage(language);
+            yield return null;
+
+            foreach (Vector2Int viewport in viewports)
+            {
+                string lane = (language == 0 ? "EN " : "EL ") +
+                              viewport.x + "x" + viewport.y;
+                applyViewport.Invoke(
+                    owner, new object[] { viewport.x, viewport.y, true });
+                Canvas.ForceUpdateCanvases();
+                speech.ForceMeshUpdate(true, true);
+                promoTitle.ForceMeshUpdate(true, true);
+                promoBody.ForceMeshUpdate(true, true);
+
+                Assert.That(speech.textInfo.lineCount, Is.EqualTo(3), lane);
+                Assert.That(promoTitle.textInfo.lineCount, Is.EqualTo(1), lane);
+                Assert.That(promoBody.textInfo.lineCount, Is.EqualTo(2), lane);
+                Assert.That(speech.isTextOverflowing, Is.False, lane);
+                Assert.That(promoTitle.isTextOverflowing, Is.False, lane);
+                Assert.That(promoBody.isTextOverflowing, Is.False, lane);
+                Assert.That(speech.fontSize, Is.GreaterThanOrEqualTo(23f), lane);
+                Assert.That(promoTitle.fontSize, Is.GreaterThanOrEqualTo(24f), lane);
+                Assert.That(promoBody.fontSize, Is.GreaterThanOrEqualTo(23f), lane);
+
+                Rect speechLine0 = GlyphBounds(speech, bubble, 0);
+                Rect speechLine1 = GlyphBounds(speech, bubble, 1);
+                Rect speechBody = Union(speechLine0, speechLine1);
+                Rect speechEmphasis = GlyphBounds(speech, bubble, 2);
+                AssertContained(
+                    SpeechCreamSafeRect, speechBody, 4f, lane + " speech body");
+                AssertContained(
+                    SpeechCreamSafeRect, speechEmphasis, 4f,
+                    lane + " speech emphasis");
+                Assert.That(
+                    speechLine0.yMin - speechLine1.yMax,
+                    Is.GreaterThanOrEqualTo(2f), lane + " speech body lines");
+                Assert.That(
+                    speechBody.yMin - speechEmphasis.yMax,
+                    Is.GreaterThanOrEqualTo(8f), lane + " speech emphasis gap");
+
+                Rect titleGlyphs = GlyphBounds(promoTitle, promo, 0);
+                Rect rewardLine0 = GlyphBounds(promoBody, promo, 0);
+                Rect rewardLine1 = GlyphBounds(promoBody, promo, 1);
+                AssertInside(
+                    PromoInnerSafeRect, titleGlyphs, lane + " promo title");
+                AssertInside(
+                    PromoInnerSafeRect, rewardLine0, lane + " promo reward");
+                AssertInside(
+                    PromoInnerSafeRect, rewardLine1, lane + " promo footer");
+                Assert.That(
+                    PromoInnerSafeRect.yMax - titleGlyphs.yMax,
+                    Is.GreaterThanOrEqualTo(2f), lane + " promo top padding");
+                Assert.That(
+                    rewardLine1.yMin - PromoInnerSafeRect.yMin,
+                    Is.GreaterThanOrEqualTo(6f), lane + " promo bottom padding");
+                Assert.That(
+                    titleGlyphs.yMin - rewardLine0.yMax,
+                    Is.GreaterThanOrEqualTo(6f), lane + " promo title gap");
+                Assert.That(
+                    rewardLine0.yMin - rewardLine1.yMax,
+                    Is.GreaterThanOrEqualTo(6f), lane + " promo line gap");
+
+                Assert.That(
+                    rewardLine1.xMin - PromoTrophyOpaqueRight,
+                    Is.GreaterThanOrEqualTo(8f), lane + " trophy/text gap");
+                AssertRectTransform(
+                    trophy, new Vector2(-168f, -48f),
+                    new Vector2(68f, 68f), lane + " promo trophy");
+
+                float aspect = viewport.y / (float)viewport.x;
+                float tall = Mathf.InverseLerp(1.78f, 2.22f, aspect);
+                AssertRectTransform(
+                    mascotSix, new Vector2(-380f, -735f - 44f * tall),
+                    new Vector2(300f, 350f), lane + " mascot 6");
+                AssertRectTransform(
+                    mascotSeven, new Vector2(335f, -735f - 44f * tall),
+                    new Vector2(300f, 350f), lane + " mascot 7");
+            }
+        }
+
+        SetLanguage(0);
+    }
+
+    static Rect GlyphBounds(
+        TMP_Text text,
+        RectTransform container,
+        params int[] includedLines)
+    {
+        bool found = false;
+        Vector2 minimum = new Vector2(float.PositiveInfinity, float.PositiveInfinity);
+        Vector2 maximum = new Vector2(float.NegativeInfinity, float.NegativeInfinity);
+        TMP_TextInfo info = text.textInfo;
+        for (int index = 0; index < info.characterCount; index++)
+        {
+            TMP_CharacterInfo character = info.characterInfo[index];
+            if (!character.isVisible || !Contains(includedLines, character.lineNumber))
+                continue;
+
+            Vector3 bottomLeft = container.InverseTransformPoint(
+                text.rectTransform.TransformPoint(character.bottomLeft));
+            Vector3 topRight = container.InverseTransformPoint(
+                text.rectTransform.TransformPoint(character.topRight));
+            minimum = Vector2.Min(minimum, bottomLeft);
+            maximum = Vector2.Max(maximum, topRight);
+            found = true;
+        }
+
+        Assert.That(found, Is.True, text.name + " has no visible glyphs.");
+        return Rect.MinMaxRect(minimum.x, minimum.y, maximum.x, maximum.y);
+    }
+
+    static Rect Union(Rect first, Rect second)
+    {
+        return Rect.MinMaxRect(
+            Mathf.Min(first.xMin, second.xMin),
+            Mathf.Min(first.yMin, second.yMin),
+            Mathf.Max(first.xMax, second.xMax),
+            Mathf.Max(first.yMax, second.yMax));
+    }
+
+    static bool Contains(int[] values, int value)
+    {
+        foreach (int candidate in values)
+        {
+            if (candidate == value)
+                return true;
+        }
+        return false;
+    }
+
+    static void AssertContained(
+        Rect safe,
+        Rect actual,
+        float padding,
+        string label)
+    {
+        Assert.That(actual.xMin, Is.GreaterThanOrEqualTo(safe.xMin + padding),
+            label + " left padding");
+        Assert.That(actual.xMax, Is.LessThanOrEqualTo(safe.xMax - padding),
+            label + " right padding");
+        Assert.That(actual.yMin, Is.GreaterThanOrEqualTo(safe.yMin + padding),
+            label + " bottom padding");
+        Assert.That(actual.yMax, Is.LessThanOrEqualTo(safe.yMax - padding),
+            label + " top padding");
+    }
+
+    static void AssertInside(Rect safe, Rect actual, string label)
+    {
+        Assert.That(actual.xMin, Is.GreaterThanOrEqualTo(safe.xMin),
+            label + " left containment");
+        Assert.That(actual.xMax, Is.LessThanOrEqualTo(safe.xMax),
+            label + " right containment");
+        Assert.That(actual.yMin, Is.GreaterThanOrEqualTo(safe.yMin),
+            label + " bottom containment");
+        Assert.That(actual.yMax, Is.LessThanOrEqualTo(safe.yMax),
+            label + " top containment");
+    }
+
+    static void AssertRectTransform(
+        RectTransform rect,
+        Vector2 expectedPosition,
+        Vector2 expectedSize,
+        string label)
+    {
+        Assert.That(rect.anchoredPosition.x,
+            Is.EqualTo(expectedPosition.x).Within(0.01f), label + " x");
+        Assert.That(rect.anchoredPosition.y,
+            Is.EqualTo(expectedPosition.y).Within(0.01f), label + " y");
+        Assert.That(rect.sizeDelta.x,
+            Is.EqualTo(expectedSize.x).Within(0.01f), label + " width");
+        Assert.That(rect.sizeDelta.y,
+            Is.EqualTo(expectedSize.y).Within(0.01f), label + " height");
     }
 
     static bool IsAllowedProductionGraphic(Graphic graphic)
