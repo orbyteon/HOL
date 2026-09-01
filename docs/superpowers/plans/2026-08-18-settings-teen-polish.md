@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- Stack on `cursor/result-teen-polish-291c`.
+- Stack on `feature/result-teen-polish-20260818`.
 - No new Button, Toggle, InputField, Store, Profile, currency, or settings category.
 - All new user-facing labels use EN/EL `L10n`.
 - Use exact approved logo, boy/girl-independent 6 and 7 decor, 1080×1920 portrait and safe margins.

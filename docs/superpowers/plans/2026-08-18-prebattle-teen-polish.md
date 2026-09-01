@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- This branch stacks on `cursor/private-room-teen-polish-291c` and does not modify PlayFab or duel rules.
+- This branch stacks on `feature/private-room-teen-polish-20260818` and does not modify PlayFab or duel rules.
 - Use 1080×1920 portrait coordinates and safe-area clamping.
 - Every user-facing string uses EN/EL `L10n`; tests access game types through reflection only.
 - Use exact approved art: HOL logo, boy, girl, 6, 7, VS burst, rocket.

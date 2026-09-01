@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- Use a new `cursor/private-room-teen-polish-291c` branch from `main`.
+- Use a new `feature/private-room-teen-polish-20260818` branch from `main`.
 - Keep PlayFab server authority, room-code normalization, secrets, callbacks, and controller state transitions unchanged.
 - Use runtime wiring; do not edit `MainMenu.unity`.
 - Every user-facing string must use `L10n` with EN and EL entries.

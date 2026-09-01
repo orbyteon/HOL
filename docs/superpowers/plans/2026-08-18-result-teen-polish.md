@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- Stack on `cursor/prebattle-teen-polish-291c`; do not modify CloudScript or duel rules.
+- Stack on `feature/prebattle-teen-polish-20260818`; do not modify CloudScript or duel rules.
 - Use 1080×1920 portrait geometry and exact approved logo/boy/girl/6/7/trophy art.
 - Dynamic result supports win, loss, and draw without geometry changes.
 - Display only authoritative host/guest guess counts and revealed secret.

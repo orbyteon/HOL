@@ -26,7 +26,7 @@ ARM64 Android compile artifact.
 
 ## Global Constraints
 
-- Work only on `cursor/splash-six-seven-291c`, based on fresh `main`
+- Work only on `feature/splash-six-seven-20260817`, based on fresh `main`
   `6bd79b30a01044f87d9155bf2bcc22f2c3293d6d`.
 - Splash screen only. Do not change Main Menu, Profile, Settings, Store, PvP,
   gameplay, backend, ads, or release behavior.
@@ -160,7 +160,7 @@ Commit only the tests and metas, then push:
 git add Assets/Tests/EditMode/SplashProductionAssetsTests.cs*
 git add tools/test/splash-assets.test.mjs
 git commit -m "test: define authoritative Splash art contract"
-git push -u origin cursor/splash-six-seven-291c
+git push -u origin feature/splash-six-seven-20260817
 ```
 
 Expected RED: mascot 6, Splash background, and Splash glow are absent.
@@ -240,7 +240,7 @@ at full size and against both light/dark checkerboards. Commit and push:
 ```bash
 git add Assets/newdesign/Resources Assets/Tests/EditMode tools/test
 git commit -m "assets: add authoritative six-seven Splash art"
-git push -u origin cursor/splash-six-seven-291c
+git push -u origin feature/splash-six-seven-20260817
 ```
 
 ---
@@ -385,7 +385,7 @@ Require zero errors. Run PlayMode/EditMode through CI, commit, and push:
 ```bash
 git add Assets/SCRIPT/Design Assets/Tests
 git commit -m "feat: own authoritative six-seven Splash presentation"
-git push -u origin cursor/splash-six-seven-291c
+git push -u origin feature/splash-six-seven-20260817
 ```
 
 ---
