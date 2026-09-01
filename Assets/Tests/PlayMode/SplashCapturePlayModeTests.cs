@@ -9,10 +9,34 @@ using UnityEngine.TestTools;
 
 public sealed class SplashCapturePlayModeTests
 {
+    const string PlayerNameKey = "PlayerName";
     const BindingFlags StaticFlags =
         BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
     const BindingFlags InstanceFlags =
         BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+    bool hadPlayerName;
+    string previousPlayerName;
+
+    [SetUp]
+    public void UseReturningPlayerSplashFixture()
+    {
+        hadPlayerName = PlayerPrefs.HasKey(PlayerNameKey);
+        previousPlayerName = PlayerPrefs.GetString(
+            PlayerNameKey, string.Empty);
+        PlayerPrefs.SetString(PlayerNameKey, "CaptureTester");
+        PlayerPrefs.Save();
+    }
+
+    [TearDown]
+    public void RestoreReturningPlayerSplashFixture()
+    {
+        if (hadPlayerName)
+            PlayerPrefs.SetString(
+                PlayerNameKey, previousPlayerName);
+        else
+            PlayerPrefs.DeleteKey(PlayerNameKey);
+        PlayerPrefs.Save();
+    }
 
     [TestCase(true, true, "splash", true)]
     [TestCase(false, true, "splash", false)]

@@ -4,7 +4,7 @@ using UnityEngine.UI;
 // Owns presentation only for the scene-authored Splash. SplashLoader remains
 // the sole owner of timing, taps, and the transition to MainMenu.
 [DefaultExecutionOrder(-2000)]
-public sealed class SplashDesign : MonoBehaviour
+public sealed partial class SplashDesign : MonoBehaviour
 {
     const string BackgroundResource = "splash/splash_bg_stairs_clouds";
     const string DecoStarsResource = "splash/splash_deco_stars";
@@ -51,6 +51,12 @@ public sealed class SplashDesign : MonoBehaviour
         }
 
         HideLegacyPresentation(canvas.transform);
+
+        if (OnboardingProfile.ShouldRun)
+        {
+            BuildOnboarding(canvas);
+            return;
+        }
 
         var background = LoadSprite(BackgroundResource);
         var decoStars = LoadSprite(DecoStarsResource);
@@ -129,6 +135,11 @@ public sealed class SplashDesign : MonoBehaviour
     void Update()
     {
         if (!IsReady) return;
+        if (IsOnboardingVisible)
+        {
+            UpdateOnboardingLayout();
+            return;
+        }
 
         elapsed += Time.unscaledDeltaTime;
         if (progressFill != null)
