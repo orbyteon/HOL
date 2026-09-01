@@ -10,6 +10,30 @@ using UnityEngine.UI;
 public sealed class SplashAuthoritativeVisualsPlayModeTests
 {
     const float Tolerance = 0.01f;
+    const string PlayerNameKey = "PlayerName";
+    bool hadPlayerName;
+    string previousPlayerName;
+
+    [SetUp]
+    public void UseReturningPlayerSplashFixture()
+    {
+        hadPlayerName = PlayerPrefs.HasKey(PlayerNameKey);
+        previousPlayerName = PlayerPrefs.GetString(
+            PlayerNameKey, string.Empty);
+        PlayerPrefs.SetString(PlayerNameKey, "SplashTester");
+        PlayerPrefs.Save();
+    }
+
+    [TearDown]
+    public void RestoreReturningPlayerSplashFixture()
+    {
+        if (hadPlayerName)
+            PlayerPrefs.SetString(
+                PlayerNameKey, previousPlayerName);
+        else
+            PlayerPrefs.DeleteKey(PlayerNameKey);
+        PlayerPrefs.Save();
+    }
 
     struct LayoutExpectation
     {

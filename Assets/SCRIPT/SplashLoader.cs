@@ -13,6 +13,9 @@ public class SplashLoader : MonoBehaviour
 
     void Start()
     {
+        if (OnboardingProfile.ShouldRun)
+            return;
+
         float timeout = ResolveTimeout(
             SplashCaptureBootstrap.CaptureRequested, waitTime);
         Invoke(nameof(LoadMenu), timeout);
@@ -20,9 +23,17 @@ public class SplashLoader : MonoBehaviour
 
     void Update()
     {
+        if (OnboardingProfile.ShouldRun)
+            return;
+
         // Tap/click anywhere to skip the splash.
         if (Input.GetMouseButtonDown(0))
             LoadMenu();
+    }
+
+    public void ContinueToMainMenu()
+    {
+        LoadMenu();
     }
 
     void LoadMenu()
