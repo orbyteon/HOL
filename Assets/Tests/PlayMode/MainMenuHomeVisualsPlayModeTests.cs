@@ -23,6 +23,14 @@ public sealed class MainMenuHomeVisualsPlayModeTests
     // the RectTransform itself includes transparent source-image padding.
     const float PromoTrophyOpaqueRight = -143f;
 
+    struct SavedPreference
+    {
+        public bool Exists;
+        public bool IsInteger;
+        public int Integer;
+        public string Text;
+    }
+
     [UnityTest]
     public IEnumerator HomeMatchesApprovedFourModeCartoonCompositionAndRemainsPlayable()
     {
@@ -209,6 +217,205 @@ public sealed class MainMenuHomeVisualsPlayModeTests
         yield return null;
         Assert.That(pvpMenu.activeSelf, Is.True,
             "Play With A Friend entry is not wired to the real room hub.");
+    }
+
+    [UnityTest]
+    public IEnumerator HomeProfileAvatarUsesCanonicalOnboardingSelectionWithoutMovingLayout()
+    {
+        Type profile = RuntimeType("OnboardingProfile");
+        string avatarKey = (string)profile.GetField("AvatarKey", StaticFlags)
+            .GetRawConstantValue();
+        string versionKey = (string)profile.GetField("VersionKey", StaticFlags)
+            .GetRawConstantValue();
+        int currentVersion = (int)profile.GetField("CurrentVersion", StaticFlags)
+            .GetRawConstantValue();
+        SavedPreference savedAvatar = CapturePreference(avatarKey);
+        SavedPreference savedVersion = CapturePreference(versionKey);
+
+        PlayerPrefs.SetInt(versionKey, currentVersion);
+        PlayerPrefs.SetInt(avatarKey, 1);
+        PlayerPrefs.Save();
+
+        try
+        {
+            Screen.SetResolution(1080, 1920, false);
+            InvokeInstaller("MainMenuHomeVisuals");
+            yield return SceneManager.LoadSceneAsync("MainMenu", LoadSceneMode.Single);
+
+            Component owner = null;
+            for (int frame = 0; frame < 160; frame++)
+            {
+                owner = FindInScene(RuntimeType("MainMenuHomeVisuals"));
+                if (owner != null &&
+                    GetProperty<bool>(owner, "IsReady") &&
+                    GetProperty<bool>(owner, "IsSettled"))
+                    break;
+                yield return null;
+            }
+
+            Assert.That(owner, Is.Not.Null);
+            Transform root = Find(owner.transform, "HomeVisualRoot");
+            Assert.That(root, Is.Not.Null);
+            Transform chip = Find(root, "HomePlayerChip");
+            Image portrait = Find(chip, "HomePlayerAvatar").GetComponent<Image>();
+            Image ring = Find(chip, "HomePlayerAvatarRing").GetComponent<Image>();
+            Sprite cyan = Resources.Load<Sprite>("reference/player_cyan_exact");
+            MethodInfo refresh = owner.GetType().GetMethod("RefreshChip", InstanceFlags);
+            MethodInfo applyViewport = owner.GetType().GetMethod(
+                "ApplyResponsiveLayoutForViewport", InstanceFlags);
+            MethodInfo isValid = profile.GetMethod("IsValidAvatar", StaticFlags);
+            Type catalog = RuntimeType("OnboardingAvatarCatalog");
+            int avatarCount = (int)catalog.GetProperty("Count", StaticFlags)
+                .GetValue(null, null);
+
+            Assert.That(portrait.sprite, Is.SameAs(CatalogAvatarSprite(1)));
+            Sprite first = portrait.sprite;
+            PlayerPrefs.SetInt(avatarKey, 6);
+            refresh.Invoke(owner, null);
+            Assert.That(portrait.sprite, Is.SameAs(CatalogAvatarSprite(6)));
+            Assert.That(portrait.sprite, Is.Not.SameAs(first),
+                "Distinct saved avatars must render distinct profile portraits.");
+
+            for (int index = 0; index < avatarCount; index++)
+            {
+                PlayerPrefs.SetInt(avatarKey, index);
+                refresh.Invoke(owner, null);
+                bool valid = (bool)isValid.Invoke(null, new object[] { index });
+                Sprite expected = valid ? CatalogAvatarSprite(index) : cyan;
+                Assert.That(portrait.sprite, Is.SameAs(expected),
+                    "Canonical avatar " + index);
+            }
+
+            PlayerPrefs.DeleteKey(avatarKey);
+            refresh.Invoke(owner, null);
+            Assert.That(portrait.sprite, Is.SameAs(cyan), "missing avatar fallback");
+            PlayerPrefs.SetString(avatarKey, string.Empty);
+            refresh.Invoke(owner, null);
+            Assert.That(portrait.sprite, Is.SameAs(cyan), "empty avatar fallback");
+            PlayerPrefs.SetString(avatarKey, "avatar_02_cap_boy");
+            refresh.Invoke(owner, null);
+            Assert.That(portrait.sprite, Is.SameAs(cyan), "legacy avatar fallback");
+            foreach (int invalid in new[] { -1, avatarCount, int.MaxValue })
+            {
+                PlayerPrefs.SetInt(avatarKey, invalid);
+                refresh.Invoke(owner, null);
+                Assert.That(portrait.sprite, Is.SameAs(cyan),
+                    "invalid avatar fallback " + invalid);
+            }
+
+            Assert.That(chip.GetComponentsInChildren<Selectable>(true), Is.Empty,
+                "The display-only profile chip must not gain an interaction owner.");
+            foreach (Graphic graphic in chip.GetComponentsInChildren<Graphic>(true))
+                Assert.That(graphic.raycastTarget, Is.False,
+                    graphic.name + " must remain raycast-transparent.");
+            Assert.That(portrait.type, Is.EqualTo(Image.Type.Simple));
+            Assert.That(portrait.preserveAspect, Is.True);
+            Assert.That(portrait.color.a, Is.EqualTo(1f).Within(0.001f));
+            Assert.That(ring.type, Is.EqualTo(Image.Type.Simple));
+            Assert.That(ring.preserveAspect, Is.True);
+            Assert.That(ring.color.a, Is.EqualTo(1f).Within(0.001f));
+            foreach (RectTransform rect in new[]
+            {
+                ring.rectTransform,
+                portrait.rectTransform,
+            })
+            {
+                Assert.That(rect.anchorMin, Is.EqualTo(new Vector2(0.5f, 0.5f)));
+                Assert.That(rect.anchorMax, Is.EqualTo(new Vector2(0.5f, 0.5f)));
+                Assert.That(rect.pivot, Is.EqualTo(new Vector2(0.5f, 0.5f)));
+            }
+
+            var viewports = new[]
+            {
+                new Vector2Int(720, 1280),
+                new Vector2Int(1080, 1920),
+                new Vector2Int(1080, 2400),
+                new Vector2Int(1179, 2556),
+            };
+            string[] trackedNames =
+            {
+                "Buttonsettings", "HomePlayerChip", "HomePlayerAvatarRing",
+                "HomePlayerAvatar", "HomeLogo", "HomeHeroBoy", "HomeHeroGirl",
+                "HomeSpeechBubble", "ButtonPlay", "ButtonPvP",
+                "ButtonPrivateRoom", "DailyHuntButton", "HomeDailyPromo",
+                "HomePortal", "HomeMascotSix", "HomeMascotSeven",
+            };
+            foreach (Vector2Int viewport in viewports)
+            {
+                applyViewport.Invoke(owner, new object[]
+                {
+                    viewport.x, viewport.y, true,
+                });
+                string lane = viewport.x + "x" + viewport.y;
+                RectTransform[] tracked = FindRects(root, trackedNames);
+
+                PlayerPrefs.SetInt(avatarKey, 1);
+                refresh.Invoke(owner, null);
+                Vector4[] baseline = CaptureLayout(tracked);
+                PlayerPrefs.SetInt(avatarKey, 6);
+                refresh.Invoke(owner, null);
+                AssertLayout(tracked, baseline, lane + " second avatar");
+                PlayerPrefs.DeleteKey(avatarKey);
+                refresh.Invoke(owner, null);
+                AssertLayout(tracked, baseline, lane + " fallback avatar");
+
+                float tall = Mathf.InverseLerp(
+                    1.78f, 2.22f, viewport.y / (float)viewport.x);
+                AssertRectTransform(tracked[0],
+                    new Vector2(-432f, 838f + 45f * tall),
+                    new Vector2(124f, 124f), lane + " settings");
+                AssertRectTransform(tracked[1],
+                    new Vector2(325f, 838f + 45f * tall),
+                    new Vector2(360f, 140f), lane + " chip");
+                AssertRectTransform(tracked[2], new Vector2(-126f, 0f),
+                    new Vector2(108f, 108f), lane + " avatar ring");
+                AssertRectTransform(tracked[3], new Vector2(-126f, 0f),
+                    new Vector2(92f, 92f), lane + " avatar portrait");
+                AssertRectTransform(tracked[4],
+                    new Vector2(-42f, 797f + 110f * tall),
+                    new Vector2(580f, 306f), lane + " logo");
+                AssertRectTransform(tracked[5],
+                    new Vector2(-205f, 430f + 62f * tall),
+                    new Vector2(455f, 455f), lane + " hero boy");
+                AssertRectTransform(tracked[6],
+                    new Vector2(92f, 425f + 62f * tall),
+                    new Vector2(460f, 460f), lane + " hero girl");
+                AssertRectTransform(tracked[7],
+                    new Vector2(350f, 390f + 62f * tall),
+                    new Vector2(300f, 200f), lane + " speech bubble");
+                float buttonShift = 30f * tall;
+                AssertRectTransform(tracked[8],
+                    new Vector2(0f, 105f + buttonShift),
+                    new Vector2(990f, 190f), lane + " solo");
+                AssertRectTransform(tracked[9],
+                    new Vector2(0f, -92f + buttonShift),
+                    new Vector2(990f, 180f), lane + " pvp");
+                AssertRectTransform(tracked[10],
+                    new Vector2(0f, -288f + buttonShift),
+                    new Vector2(990f, 180f), lane + " friend");
+                AssertRectTransform(tracked[11],
+                    new Vector2(0f, -478f + buttonShift),
+                    new Vector2(990f, 175f), lane + " daily");
+                AssertRectTransform(tracked[12],
+                    new Vector2(0f, -710f - 34f * tall),
+                    new Vector2(500f, 220f), lane + " promo");
+                AssertRectTransform(tracked[13],
+                    new Vector2(0f, -876f - 42f * tall),
+                    new Vector2(650f, 180f), lane + " portal");
+                AssertRectTransform(tracked[14],
+                    new Vector2(-380f, -735f - 44f * tall),
+                    new Vector2(300f, 350f), lane + " mascot six");
+                AssertRectTransform(tracked[15],
+                    new Vector2(335f, -735f - 44f * tall),
+                    new Vector2(300f, 350f), lane + " mascot seven");
+            }
+        }
+        finally
+        {
+            RestorePreference(avatarKey, savedAvatar);
+            RestorePreference(versionKey, savedVersion);
+            PlayerPrefs.Save();
+        }
     }
 
     [UnityTest]
@@ -429,6 +636,93 @@ public sealed class MainMenuHomeVisualsPlayModeTests
             Is.EqualTo(expectedSize.x).Within(0.01f), label + " width");
         Assert.That(rect.sizeDelta.y,
             Is.EqualTo(expectedSize.y).Within(0.01f), label + " height");
+    }
+
+    static Sprite CatalogAvatarSprite(int index)
+    {
+        Type catalog = RuntimeType("OnboardingAvatarCatalog");
+        object entry = catalog.GetMethod("Get", StaticFlags)
+            .Invoke(null, new object[] { index });
+        string resource = (string)entry.GetType().GetProperty("ResourcePath")
+            .GetValue(entry, null);
+        Sprite sprite = Resources.Load<Sprite>(resource);
+        Assert.That(sprite, Is.Not.Null, resource);
+        return sprite;
+    }
+
+    static SavedPreference CapturePreference(string key)
+    {
+        var saved = new SavedPreference
+        {
+            Exists = PlayerPrefs.HasKey(key),
+        };
+        if (!saved.Exists) return saved;
+
+        const string sentinel = "<HOL_PLAYER_PREFS_TYPE_SENTINEL>";
+        string text = PlayerPrefs.GetString(key, sentinel);
+        saved.IsInteger = text == sentinel;
+        if (saved.IsInteger)
+            saved.Integer = PlayerPrefs.GetInt(key, 0);
+        else
+            saved.Text = text;
+        return saved;
+    }
+
+    static void RestorePreference(string key, SavedPreference saved)
+    {
+        PlayerPrefs.DeleteKey(key);
+        if (!saved.Exists) return;
+        if (saved.IsInteger)
+            PlayerPrefs.SetInt(key, saved.Integer);
+        else
+            PlayerPrefs.SetString(key, saved.Text ?? string.Empty);
+    }
+
+    static RectTransform[] FindRects(Transform root, string[] names)
+    {
+        var rects = new RectTransform[names.Length];
+        for (int index = 0; index < names.Length; index++)
+        {
+            rects[index] = Find(root, names[index]) as RectTransform;
+            Assert.That(rects[index], Is.Not.Null, names[index]);
+        }
+        return rects;
+    }
+
+    static Vector4[] CaptureLayout(RectTransform[] rects)
+    {
+        var states = new Vector4[rects.Length];
+        for (int index = 0; index < rects.Length; index++)
+            states[index] = new Vector4(
+                rects[index].anchoredPosition.x,
+                rects[index].anchoredPosition.y,
+                rects[index].sizeDelta.x,
+                rects[index].sizeDelta.y);
+        return states;
+    }
+
+    static void AssertLayout(
+        RectTransform[] rects,
+        Vector4[] expected,
+        string label)
+    {
+        Assert.That(rects.Length, Is.EqualTo(expected.Length));
+        for (int index = 0; index < rects.Length; index++)
+        {
+            Vector4 actual = new Vector4(
+                rects[index].anchoredPosition.x,
+                rects[index].anchoredPosition.y,
+                rects[index].sizeDelta.x,
+                rects[index].sizeDelta.y);
+            Assert.That(actual.x, Is.EqualTo(expected[index].x).Within(0.01f),
+                label + " " + rects[index].name + " x");
+            Assert.That(actual.y, Is.EqualTo(expected[index].y).Within(0.01f),
+                label + " " + rects[index].name + " y");
+            Assert.That(actual.z, Is.EqualTo(expected[index].z).Within(0.01f),
+                label + " " + rects[index].name + " width");
+            Assert.That(actual.w, Is.EqualTo(expected[index].w).Within(0.01f),
+                label + " " + rects[index].name + " height");
+        }
     }
 
     static bool IsAllowedProductionGraphic(Graphic graphic)

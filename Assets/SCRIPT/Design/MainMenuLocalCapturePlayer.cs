@@ -14,6 +14,7 @@ public sealed class MainMenuLocalCapturePlayer : MonoBehaviour
     const string WidthArgument = "-holMainMenuCaptureWidth";
     const string HeightArgument = "-holMainMenuCaptureHeight";
     const string ScaleArgument = "-holMainMenuCaptureScale";
+    const string AvatarArgument = "-holMainMenuCaptureAvatar";
 
     static string capturePath;
     static string language;
@@ -51,6 +52,7 @@ public sealed class MainMenuLocalCapturePlayer : MonoBehaviour
         PlayerPrefs.SetString(
             "PlayerName", language == "el" ? "Παίκτης" : "Player");
         PlayerPrefs.SetInt("StatWins", 2450);
+        ApplyCaptureAvatar(ReadArgument(AvatarArgument));
         PlayerPrefs.Save();
 
         Screen.SetResolution(
@@ -196,6 +198,27 @@ public sealed class MainMenuLocalCapturePlayer : MonoBehaviour
         return int.TryParse(value, out int parsed) && parsed > 0
             ? parsed
             : fallback;
+    }
+
+    static void ApplyCaptureAvatar(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value) ||
+            string.Equals(value, "missing", StringComparison.OrdinalIgnoreCase))
+        {
+            PlayerPrefs.DeleteKey(OnboardingProfile.AvatarKey);
+            PlayerPrefs.SetInt(
+                OnboardingProfile.VersionKey, OnboardingProfile.CurrentVersion);
+            return;
+        }
+
+        if (!int.TryParse(value, out int avatarIndex) ||
+            !OnboardingProfile.IsValidAvatar(avatarIndex))
+            throw new InvalidOperationException(
+                "Capture avatar must be a valid Onboarding index or 'missing'.");
+
+        PlayerPrefs.SetInt(OnboardingProfile.AvatarKey, avatarIndex);
+        PlayerPrefs.SetInt(
+            OnboardingProfile.VersionKey, OnboardingProfile.CurrentVersion);
     }
 
     static string ReadArgument(string key)

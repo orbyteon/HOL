@@ -139,6 +139,8 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
 
     TMP_FontAsset displayFont;
     TMP_FontAsset bodyFont;
+    Sprite defaultAvatarSprite;
+    Image chipAvatarImage;
     TMP_Text chipText;
     TMP_Text chipScoreText;
     TMP_Text speechText;
@@ -261,6 +263,7 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         Sprite background = LoadRequired(BackgroundResource);
         Sprite logo = LoadRequired(LogoResource);
         Sprite avatar = LoadRequired(AvatarResource);
+        defaultAvatarSprite = avatar;
         Sprite heroBoy = LoadRequired(HeroBoyResource);
         Sprite heroGirl = LoadRequired(HeroGirlResource);
         Sprite six = LoadRequired(MascotSixResource);
@@ -445,10 +448,10 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
             avatarRingImage.rectTransform, new Vector2(-126f, 0f),
             new Vector2(108f, 108f));
 
-        var avatarImage = EnsureImage(chip.transform, "HomePlayerAvatar");
-        ConfigureImage(avatarImage, avatar, true, Image.Type.Simple);
+        chipAvatarImage = EnsureImage(chip.transform, "HomePlayerAvatar");
+        ConfigureImage(chipAvatarImage, avatar, true, Image.Type.Simple);
         Place(
-            avatarImage.rectTransform, new Vector2(-126f, 0f),
+            chipAvatarImage.rectTransform, new Vector2(-126f, 0f),
             new Vector2(92f, 92f));
 
         var trophyImage = EnsureImage(chip.transform, "HomeTrophyIcon");
@@ -676,6 +679,9 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
 
     void RefreshChip()
     {
+        if (chipAvatarImage != null)
+            chipAvatarImage.sprite = ResolveProfileAvatar(defaultAvatarSprite);
+
         if (chipText == null || chipScoreText == null) return;
 
         string player = PlayerPrefs.GetString("PlayerName", "");
@@ -684,6 +690,20 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
 
         chipText.text = player;
         chipScoreText.text = GameStats.Wins.ToString("N0");
+    }
+
+    static Sprite ResolveProfileAvatar(Sprite fallback)
+    {
+        if (!OnboardingProfile.TryLoadCommittedAvatar(out int avatarIndex))
+            return fallback;
+
+        OnboardingAvatarCatalog.Entry entry =
+            OnboardingAvatarCatalog.Get(avatarIndex);
+        if (string.IsNullOrWhiteSpace(entry.ResourcePath))
+            return fallback;
+
+        Sprite selected = Resources.Load<Sprite>(entry.ResourcePath);
+        return selected != null ? selected : fallback;
     }
 
     void ApplyResponsiveLayout(bool force = false)

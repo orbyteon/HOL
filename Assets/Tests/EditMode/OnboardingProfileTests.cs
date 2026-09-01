@@ -129,6 +129,49 @@ public sealed class OnboardingProfileTests
             new[] { "Free", "Coins", "Experience", "Locked" }, kinds);
     }
 
+    [Test]
+    public void CommittedAvatarReadUsesTheCanonicalCatalogAndRejectsFallbackCases()
+    {
+        AssertCommittedAvatar(false, -1, "missing profile");
+
+        PlayerPrefs.SetInt(AvatarKey, 1);
+        AssertCommittedAvatar(false, -1, "incomplete profile");
+        PlayerPrefs.SetInt(VersionKey, 1);
+
+        Type catalog = RuntimeType("OnboardingAvatarCatalog");
+        int count = (int)catalog.GetProperty("Count", StaticFlags)
+            .GetValue(null, null);
+        MethodInfo get = catalog.GetMethod("Get", StaticFlags);
+        MethodInfo valid = RuntimeType("OnboardingProfile")
+            .GetMethod("IsValidAvatar", StaticFlags);
+
+        for (int index = 0; index < count; index++)
+        {
+            bool selectable = (bool)valid.Invoke(null, new object[] { index });
+            PlayerPrefs.SetInt(AvatarKey, index);
+            AssertCommittedAvatar(selectable, selectable ? index : -1,
+                "catalog avatar " + index);
+
+            object entry = get.Invoke(null, new object[] { index });
+            string resource = (string)entry.GetType()
+                .GetProperty("ResourcePath").GetValue(entry, null);
+            if (selectable)
+                Assert.That(Resources.Load<Sprite>(resource), Is.Not.Null,
+                    "Missing canonical avatar resource " + resource);
+        }
+
+        PlayerPrefs.DeleteKey(AvatarKey);
+        AssertCommittedAvatar(false, -1, "missing avatar key");
+        PlayerPrefs.SetString(AvatarKey, string.Empty);
+        AssertCommittedAvatar(false, -1, "empty legacy avatar");
+        PlayerPrefs.SetString(AvatarKey, "avatar_02_cap_boy");
+        AssertCommittedAvatar(false, -1, "string legacy avatar");
+        PlayerPrefs.SetInt(AvatarKey, -1);
+        AssertCommittedAvatar(false, -1, "negative avatar");
+        PlayerPrefs.SetInt(AvatarKey, count);
+        AssertCommittedAvatar(false, -1, "out-of-range avatar");
+    }
+
     static bool TryCommit(string name, int gender, int avatar, int age)
     {
         Type profile = RuntimeType("OnboardingProfile");
@@ -142,6 +185,19 @@ public sealed class OnboardingProfileTests
             avatar,
             Enum.ToObject(ageType, age),
         });
+    }
+
+    static void AssertCommittedAvatar(
+        bool expectedResult,
+        int expectedAvatar,
+        string label)
+    {
+        object[] arguments = { -1 };
+        bool result = (bool)RuntimeType("OnboardingProfile")
+            .GetMethod("TryLoadCommittedAvatar", StaticFlags)
+            .Invoke(null, arguments);
+        Assert.That(result, Is.EqualTo(expectedResult), label);
+        Assert.That((int)arguments[0], Is.EqualTo(expectedAvatar), label);
     }
 
     static bool GetBool(string property)
