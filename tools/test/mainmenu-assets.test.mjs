@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
 import fs from "node:fs";
+import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 const root = new URL("../../", import.meta.url);
 const read = relative => fs.readFileSync(new URL(relative, root));
@@ -11,9 +13,20 @@ const dimensions = png => ({
   height: png.readUInt32BE(20),
 });
 const colorType = png => png[25];
+const rootPath = fileURLToPath(root);
+
+const filesBelow = directory => {
+  const found = [];
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    const full = path.join(directory, entry.name);
+    if (entry.isDirectory()) found.push(...filesBelow(full));
+    else found.push(full);
+  }
+  return found;
+};
 
 const approvedBackground =
-  "Assets/newdesign/Resources/phase2a/hol_neon_reference_bg_r3.png";
+  "Assets/newdesign/Resources/settings/hol_settings_bg_r1.png";
 const rejectedCloudBackground =
   "Assets/newdesign/Resources/mainmenu/mainmenu_bg_stairs_clouds.png";
 
@@ -49,7 +62,7 @@ test("approved number six stays byte-exact", () => {
     "067beafc207aea302e0993a3bacdb2b69478429aa3685f275bb6705bd902ac4b");
 });
 
-test("approved Revision 3 Home background is high-resolution 9:16 art", () => {
+test("approved spotlight Home background is high-resolution 9:16 art", () => {
   const png = read(approvedBackground);
   const { width, height } = dimensions(png);
   assert.ok(width >= 900,
@@ -125,6 +138,40 @@ test("Home chrome PNGs stay text-free RGBA overlays or 9-slices", () => {
 test("Home owner uses approved background and cannot restore rejected one", () => {
   const owner = "Assets/SCRIPT/Design/MainMenuHomeVisuals.cs";
   const source = read(owner).toString("utf8");
-  assert.match(source, /phase2a\/hol_neon_reference_bg_r3/);
+  assert.match(source, /settings\/hol_settings_bg_r1/);
+  assert.equal(source.includes("phase2a/hol_neon_reference_bg_r3"), false);
   assert.equal(source.includes("mainmenu_bg_stairs_clouds"), false);
+});
+
+test("Home profile avatar reuses the sole Onboarding key and catalog mapping", () => {
+  const scriptRoot = path.join(rootPath, "Assets", "SCRIPT");
+  const scripts = filesBelow(scriptRoot).filter(file => file.endsWith(".cs"));
+  const keyOwners = scripts
+    .filter(file => fs.readFileSync(file, "utf8").includes(
+      '"HOL.Onboarding.Avatar"'))
+    .map(file => path.relative(scriptRoot, file).replaceAll("\\", "/"));
+  const pathOwners = scripts
+    .filter(file => /"onboarding\/avatars\/avatar_\d+/.test(
+      fs.readFileSync(file, "utf8")))
+    .map(file => path.relative(scriptRoot, file).replaceAll("\\", "/"));
+
+  assert.deepEqual(keyOwners, ["Onboarding/OnboardingProfile.cs"]);
+  assert.deepEqual(pathOwners, ["Onboarding/OnboardingAvatarCatalog.cs"]);
+
+  const owner = read("Assets/SCRIPT/Design/MainMenuHomeVisuals.cs")
+    .toString("utf8");
+  assert.match(owner, /OnboardingProfile\.TryLoadCommittedAvatar/);
+  assert.match(owner, /OnboardingAvatarCatalog\.Get/);
+  assert.match(owner, /reference\/player_cyan_exact/);
+  assert.equal(owner.includes("HOL.Onboarding.Avatar"), false);
+  assert.equal(/onboarding\/avatars\/avatar_\d+/.test(owner), false);
+
+  const capture = read("Assets/SCRIPT/Design/MainMenuLocalCapturePlayer.cs")
+    .toString("utf8").trim();
+  assert.ok(capture.startsWith(
+    "#if UNITY_STANDALONE_WIN && DEVELOPMENT_BUILD"));
+  assert.ok(capture.endsWith("#endif"));
+  assert.match(capture, /OnboardingProfile\.AvatarKey/);
+  assert.match(capture, /OnboardingProfile\.VersionKey/);
+  assert.equal(capture.includes("HOL.Onboarding.Avatar"), false);
 });

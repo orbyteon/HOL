@@ -81,6 +81,20 @@ public static class OnboardingProfile
         return OnboardingAvatarCatalog.CanEverSelect(avatarIndex);
     }
 
+    public static bool TryLoadCommittedAvatar(out int avatarIndex)
+    {
+        avatarIndex = -1;
+        if (!IsComplete || !PlayerPrefs.HasKey(AvatarKey))
+            return false;
+
+        int saved = PlayerPrefs.GetInt(AvatarKey, int.MinValue);
+        if (!IsValidAvatar(saved))
+            return false;
+
+        avatarIndex = saved;
+        return true;
+    }
+
     public static bool TryCommit(
         string playerName,
         GenderChoice gender,

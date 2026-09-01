@@ -52,13 +52,29 @@ public static class L10n
         { "play",                    new[] { "Play", "Παίξε" } },
         { "play_solo",               new[] { "Play Solo vs AI", "Παίξε Solo με AI" } },
         { "private_room",            new[] { "Private Room", "Ιδιωτικό δωμάτιο" } },
-        { "home_solo_title",         new[] { "PLAY SOLO VS AI", "ΠΑΙΞΕ SOLO ΜΕ AI" } },
-        { "home_solo_subtitle",      new[] { "PLAY NOW", "ΑΜΕΣΟ ΠΑΙΧΝΙΔΙ" } },
-        { "home_private_title",      new[] { "PRIVATE ROOM", "ΙΔΙΩΤΙΚΟ ΔΩΜΑΤΙΟ" } },
-        { "home_private_subtitle",   new[] { "PLAY WITH A FRIEND", "ΠΑΙΞΕ ΜΕ ΦΙΛΟ" } },
-        { "home_daily_title",        new[] { "DAILY HUNT", "ΚΥΝΗΓΙ ΗΜΕΡΑΣ" } },
+        { "home_solo_title",         new[] { "PLAY SOLO", "ΠΑΙΞΕ SOLO" } },
+        { "home_solo_subtitle",      new[] {
+            "Play and beat your high score!", "Παίξε και σπάσε το ρεκόρ σου!" } },
+        { "home_pvp_title",          new[] { "PVP DUEL", "PVP DUEL" } },
+        { "home_pvp_subtitle",       new[] {
+            "Face players online!", "Αντιμετώπισε παίκτες online!" } },
+        { "home_private_title",      new[] {
+            "PLAY WITH A FRIEND", "ΠΑΙΞΕ ΜΕ ΦΙΛΟ" } },
+        { "home_private_subtitle",   new[] {
+            "Create a room & play together!",
+            "Δημιούργησε δωμάτιο & παίξε μαζί!" } },
+        { "home_daily_title",        new[] { "DAILY HUNT", "DAILY HUNT" } },
         { "home_daily_subtitle",     new[] {
-            "NEW CHALLENGE EVERY DAY", "ΝΕΑ ΠΡΟΚΛΗΣΗ ΚΑΘΕ ΜΕΡΑ" } },
+            "A new challenge every day, big rewards!",
+            "Πρόκληση κάθε μέρα, μεγάλα έπαθλα!" } },
+        { "home_hero_speech",        new[] {
+            "Ready for\naction?\n<color=#E62C78>LET'S GO!</color>",
+            "Έτοιμος\nγια δράση;\n<color=#E62C78>ΠΑΜΕΕΕ!</color>" } },
+        { "home_reward_title",       new[] {
+            "PLAY EVERY DAY", "ΠΑΙΞΕ ΚΑΘΕ ΜΕΡΑ" } },
+        { "home_reward_body",        new[] {
+            "<color=#FFD43B>WIN</color>\n<color=#FFFFFF>& AWESOME REWARDS!</color>",
+            "<color=#FFD43B>ΚΕΡΔΙΣΕ</color>\n<color=#FFFFFF>& ΑΠΙΘΑΝΑ ΕΠΑΘΛΑ!</color>" } },
         { "home_tip_title",          new[] { "TIP:", "ΣΥΜΒΟΥΛΗ:" } },
         { "home_tip_body",           new[] {
             "Every guess narrows the range!",

@@ -15,6 +15,22 @@ public sealed class MainMenuHomeVisualsPlayModeTests
     const BindingFlags InstanceFlags =
         BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
 
+    static readonly Rect SpeechCreamSafeRect =
+        Rect.MinMaxRect(-128f, -35f, 127f, 78f);
+    static readonly Rect PromoInnerSafeRect =
+        Rect.MinMaxRect(-205f, -60f, 205f, 60f);
+    // Alpha-tested edge of the unchanged trophy sprite in its 68x68 placement;
+    // the RectTransform itself includes transparent source-image padding.
+    const float PromoTrophyOpaqueRight = -143f;
+
+    struct SavedPreference
+    {
+        public bool Exists;
+        public bool IsInteger;
+        public int Integer;
+        public string Text;
+    }
+
     [UnityTest]
     public IEnumerator HomeMatchesApprovedFourModeCartoonCompositionAndRemainsPlayable()
     {
@@ -53,18 +69,22 @@ public sealed class MainMenuHomeVisualsPlayModeTests
             "HomeSafeAreaRoot",
             "HomeLogo",
             "HomeHeroBoy",
+            "HomeHeroGirl",
             "HomeSpeechBubble",
             "HomeSpeechText",
             "HomePlayerChip",
             "HomePlayerAvatar",
             "HomeTrophyIcon",
             "HomePlayerChipText",
+            "HomePlayerChipScore",
             "HomeSoloIcon",
             "HomePvpIcon",
             "HomeFriendIcon",
             "HomeDailyIcon",
+            "HomeDailyGift",
             "HomeDailyPromo",
             "HomePromoTrophy",
+            "HomePortal",
             "HomeMascotSix",
             "HomeMascotSeven",
         };
@@ -83,7 +103,6 @@ public sealed class MainMenuHomeVisualsPlayModeTests
             "HomeDecoLightning",
             "HomeDecoConfetti",
             "HomeDecoNumbers",
-            "HomeHeroGirl",
         })
         {
             Transform found = Find(canvas.transform, retired);
@@ -92,13 +111,21 @@ public sealed class MainMenuHomeVisualsPlayModeTests
         }
 
         AssertSprite(root, "HomeBackground",
-            "phase2a/hol_neon_reference_bg_r3", Image.Type.Simple);
+            "settings/hol_settings_bg_r1", Image.Type.Simple);
         AssertSprite(root, "HomeLogo",
             "reference/hol_logo_exact", Image.Type.Simple);
         AssertSprite(root, "HomeHeroBoy",
-            "reference/char_boy_exact", Image.Type.Simple);
+            "phase2a/hol_menu_boy_arms_crossed_r3", Image.Type.Simple);
+        AssertSprite(root, "HomeHeroGirl",
+            "phase2a/hol_menu_girl_forward_fist_r3", Image.Type.Simple);
         AssertSprite(root, "HomeSpeechBubble",
-            "cartoon/cartoon_speech_bubble", Image.Type.Sliced);
+            "cartoon/cartoon_speech_bubble_raster", Image.Type.Sliced);
+        AssertSprite(root, "HomeOuterFrame",
+            "mainmenu/mainmenu_outer_frame_reference_v1", Image.Type.Simple);
+        AssertSprite(root, "HomePortal",
+            "dailyhunt/production/daily_floor_portal", Image.Type.Simple);
+        AssertSprite(root, "HomeDailyGift",
+            "mainmenu/mainmenu_daily_gift_reference_v1", Image.Type.Simple);
 
         Button solo = Find(canvas.transform, "ButtonPlay").GetComponent<Button>();
         Button pvp = Find(canvas.transform, "ButtonPvP").GetComponent<Button>();
@@ -116,7 +143,7 @@ public sealed class MainMenuHomeVisualsPlayModeTests
         AssertProductionButton(solo, "phase2a/hol_cta_gold_r2_9s");
         AssertProductionButton(pvp, "phase2a/hol_cta_magenta_r2_9s");
         AssertProductionButton(friend, "phase2a/hol_cta_blue_r2_9s");
-        AssertProductionButton(daily, "mainmenu/mainmenu_tip_frame_9s");
+        AssertProductionButton(daily, "dailyhunt/v1/daily_action_revive_v1");
 
         Assert.That(PersistentMethods(solo), Does.Contain("OnPlayPressed"));
         Assert.That(PersistentMethods(settings), Does.Contain("OpenSettings"));
@@ -125,26 +152,7 @@ public sealed class MainMenuHomeVisualsPlayModeTests
             "ApplyResponsiveLayoutForWidth", InstanceFlags)
             .Invoke(owner, new object[] { 1080, true });
 
-        AssertRect(root, "HomeLogo",
-            new Vector2(0f, 690f), new Vector2(585f, 310f));
-        AssertRect(root, "HomeHeroBoy",
-            new Vector2(-75f, 395f), new Vector2(500f, 500f));
-        AssertRect(root, "HomeSpeechBubble",
-            new Vector2(310f, 400f), new Vector2(340f, 190f));
-        AssertRect(canvas.transform, "ButtonPlay",
-            new Vector2(0f, 115f), new Vector2(930f, 164f));
-        AssertRect(canvas.transform, "ButtonPvP",
-            new Vector2(0f, -70f), new Vector2(930f, 164f));
-        AssertRect(canvas.transform, "ButtonPrivateRoom",
-            new Vector2(0f, -255f), new Vector2(930f, 164f));
-        AssertRect(canvas.transform, "DailyHuntButton",
-            new Vector2(0f, -440f), new Vector2(930f, 164f));
-        AssertRect(root, "HomeDailyPromo",
-            new Vector2(0f, -655f), new Vector2(650f, 155f));
-        AssertRect(root, "HomeMascotSix",
-            new Vector2(-430f, -805f), new Vector2(245f, 280f));
-        AssertRect(root, "HomeMascotSeven",
-            new Vector2(430f, -805f), new Vector2(245f, 280f));
+        AssertReferenceComposition(root, solo, pvp, friend, daily);
 
         foreach (string titleName in new[]
         {
@@ -157,8 +165,9 @@ public sealed class MainMenuHomeVisualsPlayModeTests
             TMP_Text title = Find(root, titleName).GetComponent<TMP_Text>();
             Assert.That(title.font, Is.SameAs(Resources.Load<TMP_FontAsset>(
                 "phase2a/fonts/HOL Menu Display SDF")));
-            Assert.That(title.enableAutoSizing, Is.True);
-            Assert.That(title.fontSizeMin, Is.GreaterThanOrEqualTo(32f), titleName);
+            Assert.That(title.enableAutoSizing, Is.False,
+                titleName + " must not shrink to make rejected geometry fit.");
+            Assert.That(title.fontSize, Is.GreaterThanOrEqualTo(70f), titleName);
             Assert.That(title.overflowMode, Is.EqualTo(TextOverflowModes.Overflow));
         }
 
@@ -178,13 +187,15 @@ public sealed class MainMenuHomeVisualsPlayModeTests
         owner.GetType().GetMethod("RefreshChip", InstanceFlags).Invoke(owner, null);
         string chipText = Find(root, "HomePlayerChipText")
             .GetComponent<TMP_Text>().text;
-        Assert.That(chipText, Does.Contain("Marinos"));
-        Assert.That(chipText, Does.Contain("12"));
+        string chipScore = Find(root, "HomePlayerChipScore")
+            .GetComponent<TMP_Text>().text;
+        Assert.That(chipText, Is.EqualTo("Marinos"));
+        Assert.That(chipScore, Is.EqualTo("12"));
 
         AssertLocalizedHomeCopy(root, 0,
-            "PLAY SOLO VS AI", "PvP Duel", "Play with a friend", "DAILY HUNT");
+            "PLAY SOLO", "PVP DUEL", "PLAY WITH A FRIEND", "DAILY HUNT");
         AssertLocalizedHomeCopy(root, 1,
-            "ΠΑΙΞΕ SOLO ΜΕ AI", "Μονομαχία PvP", "Παίξε με φίλο", "ΚΥΝΗΓΙ ΗΜΕΡΑΣ");
+            "ΠΑΙΞΕ SOLO", "PVP DUEL", "ΠΑΙΞΕ ΜΕ ΦΙΛΟ", "DAILY HUNT");
         SetLanguage(0);
 
         // Both online entries must route into the controller-owned room hub.
@@ -206,6 +217,512 @@ public sealed class MainMenuHomeVisualsPlayModeTests
         yield return null;
         Assert.That(pvpMenu.activeSelf, Is.True,
             "Play With A Friend entry is not wired to the real room hub.");
+    }
+
+    [UnityTest]
+    public IEnumerator HomeProfileAvatarUsesCanonicalOnboardingSelectionWithoutMovingLayout()
+    {
+        Type profile = RuntimeType("OnboardingProfile");
+        string avatarKey = (string)profile.GetField("AvatarKey", StaticFlags)
+            .GetRawConstantValue();
+        string versionKey = (string)profile.GetField("VersionKey", StaticFlags)
+            .GetRawConstantValue();
+        int currentVersion = (int)profile.GetField("CurrentVersion", StaticFlags)
+            .GetRawConstantValue();
+        SavedPreference savedAvatar = CapturePreference(avatarKey);
+        SavedPreference savedVersion = CapturePreference(versionKey);
+
+        PlayerPrefs.SetInt(versionKey, currentVersion);
+        PlayerPrefs.SetInt(avatarKey, 1);
+        PlayerPrefs.Save();
+
+        try
+        {
+            Screen.SetResolution(1080, 1920, false);
+            InvokeInstaller("MainMenuHomeVisuals");
+            yield return SceneManager.LoadSceneAsync("MainMenu", LoadSceneMode.Single);
+
+            Component owner = null;
+            for (int frame = 0; frame < 160; frame++)
+            {
+                owner = FindInScene(RuntimeType("MainMenuHomeVisuals"));
+                if (owner != null &&
+                    GetProperty<bool>(owner, "IsReady") &&
+                    GetProperty<bool>(owner, "IsSettled"))
+                    break;
+                yield return null;
+            }
+
+            Assert.That(owner, Is.Not.Null);
+            Transform root = Find(owner.transform, "HomeVisualRoot");
+            Assert.That(root, Is.Not.Null);
+            Transform chip = Find(root, "HomePlayerChip");
+            Image portrait = Find(chip, "HomePlayerAvatar").GetComponent<Image>();
+            Image ring = Find(chip, "HomePlayerAvatarRing").GetComponent<Image>();
+            Sprite cyan = Resources.Load<Sprite>("reference/player_cyan_exact");
+            MethodInfo refresh = owner.GetType().GetMethod("RefreshChip", InstanceFlags);
+            MethodInfo applyViewport = owner.GetType().GetMethod(
+                "ApplyResponsiveLayoutForViewport", InstanceFlags);
+            MethodInfo isValid = profile.GetMethod("IsValidAvatar", StaticFlags);
+            Type catalog = RuntimeType("OnboardingAvatarCatalog");
+            int avatarCount = (int)catalog.GetProperty("Count", StaticFlags)
+                .GetValue(null, null);
+
+            Assert.That(portrait.sprite, Is.SameAs(CatalogAvatarSprite(1)));
+            Sprite first = portrait.sprite;
+            PlayerPrefs.SetInt(avatarKey, 6);
+            refresh.Invoke(owner, null);
+            Assert.That(portrait.sprite, Is.SameAs(CatalogAvatarSprite(6)));
+            Assert.That(portrait.sprite, Is.Not.SameAs(first),
+                "Distinct saved avatars must render distinct profile portraits.");
+
+            for (int index = 0; index < avatarCount; index++)
+            {
+                PlayerPrefs.SetInt(avatarKey, index);
+                refresh.Invoke(owner, null);
+                bool valid = (bool)isValid.Invoke(null, new object[] { index });
+                Sprite expected = valid ? CatalogAvatarSprite(index) : cyan;
+                Assert.That(portrait.sprite, Is.SameAs(expected),
+                    "Canonical avatar " + index);
+            }
+
+            PlayerPrefs.DeleteKey(avatarKey);
+            refresh.Invoke(owner, null);
+            Assert.That(portrait.sprite, Is.SameAs(cyan), "missing avatar fallback");
+            PlayerPrefs.SetString(avatarKey, string.Empty);
+            refresh.Invoke(owner, null);
+            Assert.That(portrait.sprite, Is.SameAs(cyan), "empty avatar fallback");
+            PlayerPrefs.SetString(avatarKey, "avatar_02_cap_boy");
+            refresh.Invoke(owner, null);
+            Assert.That(portrait.sprite, Is.SameAs(cyan), "legacy avatar fallback");
+            foreach (int invalid in new[] { -1, avatarCount, int.MaxValue })
+            {
+                PlayerPrefs.SetInt(avatarKey, invalid);
+                refresh.Invoke(owner, null);
+                Assert.That(portrait.sprite, Is.SameAs(cyan),
+                    "invalid avatar fallback " + invalid);
+            }
+
+            Assert.That(chip.GetComponentsInChildren<Selectable>(true), Is.Empty,
+                "The display-only profile chip must not gain an interaction owner.");
+            foreach (Graphic graphic in chip.GetComponentsInChildren<Graphic>(true))
+                Assert.That(graphic.raycastTarget, Is.False,
+                    graphic.name + " must remain raycast-transparent.");
+            Assert.That(portrait.type, Is.EqualTo(Image.Type.Simple));
+            Assert.That(portrait.preserveAspect, Is.True);
+            Assert.That(portrait.color.a, Is.EqualTo(1f).Within(0.001f));
+            Assert.That(ring.type, Is.EqualTo(Image.Type.Simple));
+            Assert.That(ring.preserveAspect, Is.True);
+            Assert.That(ring.color.a, Is.EqualTo(1f).Within(0.001f));
+            foreach (RectTransform rect in new[]
+            {
+                ring.rectTransform,
+                portrait.rectTransform,
+            })
+            {
+                Assert.That(rect.anchorMin, Is.EqualTo(new Vector2(0.5f, 0.5f)));
+                Assert.That(rect.anchorMax, Is.EqualTo(new Vector2(0.5f, 0.5f)));
+                Assert.That(rect.pivot, Is.EqualTo(new Vector2(0.5f, 0.5f)));
+            }
+
+            var viewports = new[]
+            {
+                new Vector2Int(720, 1280),
+                new Vector2Int(1080, 1920),
+                new Vector2Int(1080, 2400),
+                new Vector2Int(1179, 2556),
+            };
+            string[] trackedNames =
+            {
+                "Buttonsettings", "HomePlayerChip", "HomePlayerAvatarRing",
+                "HomePlayerAvatar", "HomeLogo", "HomeHeroBoy", "HomeHeroGirl",
+                "HomeSpeechBubble", "ButtonPlay", "ButtonPvP",
+                "ButtonPrivateRoom", "DailyHuntButton", "HomeDailyPromo",
+                "HomePortal", "HomeMascotSix", "HomeMascotSeven",
+            };
+            foreach (Vector2Int viewport in viewports)
+            {
+                applyViewport.Invoke(owner, new object[]
+                {
+                    viewport.x, viewport.y, true,
+                });
+                string lane = viewport.x + "x" + viewport.y;
+                RectTransform[] tracked = FindRects(root, trackedNames);
+
+                PlayerPrefs.SetInt(avatarKey, 1);
+                refresh.Invoke(owner, null);
+                Vector4[] baseline = CaptureLayout(tracked);
+                PlayerPrefs.SetInt(avatarKey, 6);
+                refresh.Invoke(owner, null);
+                AssertLayout(tracked, baseline, lane + " second avatar");
+                PlayerPrefs.DeleteKey(avatarKey);
+                refresh.Invoke(owner, null);
+                AssertLayout(tracked, baseline, lane + " fallback avatar");
+
+                float tall = Mathf.InverseLerp(
+                    1.78f, 2.22f, viewport.y / (float)viewport.x);
+                AssertRectTransform(tracked[0],
+                    new Vector2(-432f, 838f + 45f * tall),
+                    new Vector2(124f, 124f), lane + " settings");
+                AssertRectTransform(tracked[1],
+                    new Vector2(325f, 838f + 45f * tall),
+                    new Vector2(360f, 140f), lane + " chip");
+                AssertRectTransform(tracked[2], new Vector2(-126f, 0f),
+                    new Vector2(108f, 108f), lane + " avatar ring");
+                AssertRectTransform(tracked[3], new Vector2(-126f, 0f),
+                    new Vector2(92f, 92f), lane + " avatar portrait");
+                AssertRectTransform(tracked[4],
+                    new Vector2(-42f, 797f + 110f * tall),
+                    new Vector2(580f, 306f), lane + " logo");
+                AssertRectTransform(tracked[5],
+                    new Vector2(-205f, 430f + 62f * tall),
+                    new Vector2(455f, 455f), lane + " hero boy");
+                AssertRectTransform(tracked[6],
+                    new Vector2(92f, 425f + 62f * tall),
+                    new Vector2(460f, 460f), lane + " hero girl");
+                AssertRectTransform(tracked[7],
+                    new Vector2(350f, 390f + 62f * tall),
+                    new Vector2(300f, 200f), lane + " speech bubble");
+                float buttonShift = 30f * tall;
+                AssertRectTransform(tracked[8],
+                    new Vector2(0f, 105f + buttonShift),
+                    new Vector2(990f, 190f), lane + " solo");
+                AssertRectTransform(tracked[9],
+                    new Vector2(0f, -92f + buttonShift),
+                    new Vector2(990f, 180f), lane + " pvp");
+                AssertRectTransform(tracked[10],
+                    new Vector2(0f, -288f + buttonShift),
+                    new Vector2(990f, 180f), lane + " friend");
+                AssertRectTransform(tracked[11],
+                    new Vector2(0f, -478f + buttonShift),
+                    new Vector2(990f, 175f), lane + " daily");
+                AssertRectTransform(tracked[12],
+                    new Vector2(0f, -710f - 34f * tall),
+                    new Vector2(500f, 220f), lane + " promo");
+                AssertRectTransform(tracked[13],
+                    new Vector2(0f, -876f - 42f * tall),
+                    new Vector2(650f, 180f), lane + " portal");
+                AssertRectTransform(tracked[14],
+                    new Vector2(-380f, -735f - 44f * tall),
+                    new Vector2(300f, 350f), lane + " mascot six");
+                AssertRectTransform(tracked[15],
+                    new Vector2(335f, -735f - 44f * tall),
+                    new Vector2(300f, 350f), lane + " mascot seven");
+            }
+        }
+        finally
+        {
+            RestorePreference(avatarKey, savedAvatar);
+            RestorePreference(versionKey, savedVersion);
+            PlayerPrefs.Save();
+        }
+    }
+
+    [UnityTest]
+    public IEnumerator HomeLocalizedGlyphsStayInsideApprovedArtSafeAreas()
+    {
+        Screen.SetResolution(1080, 1920, false);
+        InvokeInstaller("MainMenuHomeVisuals");
+        yield return SceneManager.LoadSceneAsync("MainMenu", LoadSceneMode.Single);
+
+        Component owner = null;
+        for (int frame = 0; frame < 160; frame++)
+        {
+            owner = FindInScene(RuntimeType("MainMenuHomeVisuals"));
+            if (owner != null &&
+                GetProperty<bool>(owner, "IsReady") &&
+                GetProperty<bool>(owner, "IsSettled"))
+                break;
+            yield return null;
+        }
+
+        Assert.That(owner, Is.Not.Null);
+        Assert.That(GetProperty<bool>(owner, "IsReady"), Is.True);
+        Assert.That(GetProperty<bool>(owner, "IsSettled"), Is.True);
+
+        Canvas canvas = owner.GetComponent<Canvas>();
+        Transform root = Find(canvas.transform, "HomeVisualRoot");
+        RectTransform bubble = Find(root, "HomeSpeechBubble") as RectTransform;
+        RectTransform promo = Find(root, "HomeDailyPromo") as RectTransform;
+        RectTransform trophy = Find(root, "HomePromoTrophy") as RectTransform;
+        RectTransform mascotSix = Find(root, "HomeMascotSix") as RectTransform;
+        RectTransform mascotSeven = Find(root, "HomeMascotSeven") as RectTransform;
+        TMP_Text speech = Find(root, "HomeSpeechText").GetComponent<TMP_Text>();
+        TMP_Text promoTitle = Find(root, "HomePromoTitle").GetComponent<TMP_Text>();
+        TMP_Text promoBody = Find(root, "HomePromoBody").GetComponent<TMP_Text>();
+
+        var viewports = new[]
+        {
+            new Vector2Int(720, 1280),
+            new Vector2Int(1080, 1920),
+            new Vector2Int(1080, 2400),
+            new Vector2Int(1179, 2556),
+        };
+        MethodInfo applyViewport = owner.GetType().GetMethod(
+            "ApplyResponsiveLayoutForViewport", InstanceFlags);
+        Assert.That(applyViewport, Is.Not.Null);
+
+        for (int language = 0; language <= 1; language++)
+        {
+            SetLanguage(language);
+            yield return null;
+
+            foreach (Vector2Int viewport in viewports)
+            {
+                string lane = (language == 0 ? "EN " : "EL ") +
+                              viewport.x + "x" + viewport.y;
+                applyViewport.Invoke(
+                    owner, new object[] { viewport.x, viewport.y, true });
+                Canvas.ForceUpdateCanvases();
+                speech.ForceMeshUpdate(true, true);
+                promoTitle.ForceMeshUpdate(true, true);
+                promoBody.ForceMeshUpdate(true, true);
+
+                Assert.That(speech.textInfo.lineCount, Is.EqualTo(3), lane);
+                Assert.That(promoTitle.textInfo.lineCount, Is.EqualTo(1), lane);
+                Assert.That(promoBody.textInfo.lineCount, Is.EqualTo(2), lane);
+                Assert.That(speech.isTextOverflowing, Is.False, lane);
+                Assert.That(promoTitle.isTextOverflowing, Is.False, lane);
+                Assert.That(promoBody.isTextOverflowing, Is.False, lane);
+                Assert.That(speech.fontSize, Is.GreaterThanOrEqualTo(23f), lane);
+                Assert.That(promoTitle.fontSize, Is.GreaterThanOrEqualTo(24f), lane);
+                Assert.That(promoBody.fontSize, Is.GreaterThanOrEqualTo(23f), lane);
+
+                Rect speechLine0 = GlyphBounds(speech, bubble, 0);
+                Rect speechLine1 = GlyphBounds(speech, bubble, 1);
+                Rect speechBody = Union(speechLine0, speechLine1);
+                Rect speechEmphasis = GlyphBounds(speech, bubble, 2);
+                AssertContained(
+                    SpeechCreamSafeRect, speechBody, 4f, lane + " speech body");
+                AssertContained(
+                    SpeechCreamSafeRect, speechEmphasis, 4f,
+                    lane + " speech emphasis");
+                Assert.That(
+                    speechLine0.yMin - speechLine1.yMax,
+                    Is.GreaterThanOrEqualTo(2f), lane + " speech body lines");
+                Assert.That(
+                    speechBody.yMin - speechEmphasis.yMax,
+                    Is.GreaterThanOrEqualTo(8f), lane + " speech emphasis gap");
+
+                Rect titleGlyphs = GlyphBounds(promoTitle, promo, 0);
+                Rect rewardLine0 = GlyphBounds(promoBody, promo, 0);
+                Rect rewardLine1 = GlyphBounds(promoBody, promo, 1);
+                AssertInside(
+                    PromoInnerSafeRect, titleGlyphs, lane + " promo title");
+                AssertInside(
+                    PromoInnerSafeRect, rewardLine0, lane + " promo reward");
+                AssertInside(
+                    PromoInnerSafeRect, rewardLine1, lane + " promo footer");
+                Assert.That(
+                    PromoInnerSafeRect.yMax - titleGlyphs.yMax,
+                    Is.GreaterThanOrEqualTo(2f), lane + " promo top padding");
+                Assert.That(
+                    rewardLine1.yMin - PromoInnerSafeRect.yMin,
+                    Is.GreaterThanOrEqualTo(6f), lane + " promo bottom padding");
+                Assert.That(
+                    titleGlyphs.yMin - rewardLine0.yMax,
+                    Is.GreaterThanOrEqualTo(6f), lane + " promo title gap");
+                Assert.That(
+                    rewardLine0.yMin - rewardLine1.yMax,
+                    Is.GreaterThanOrEqualTo(6f), lane + " promo line gap");
+
+                Assert.That(
+                    rewardLine1.xMin - PromoTrophyOpaqueRight,
+                    Is.GreaterThanOrEqualTo(8f), lane + " trophy/text gap");
+                AssertRectTransform(
+                    trophy, new Vector2(-168f, -48f),
+                    new Vector2(68f, 68f), lane + " promo trophy");
+
+                float aspect = viewport.y / (float)viewport.x;
+                float tall = Mathf.InverseLerp(1.78f, 2.22f, aspect);
+                AssertRectTransform(
+                    mascotSix, new Vector2(-380f, -735f - 44f * tall),
+                    new Vector2(300f, 350f), lane + " mascot 6");
+                AssertRectTransform(
+                    mascotSeven, new Vector2(335f, -735f - 44f * tall),
+                    new Vector2(300f, 350f), lane + " mascot 7");
+            }
+        }
+
+        SetLanguage(0);
+    }
+
+    static Rect GlyphBounds(
+        TMP_Text text,
+        RectTransform container,
+        params int[] includedLines)
+    {
+        bool found = false;
+        Vector2 minimum = new Vector2(float.PositiveInfinity, float.PositiveInfinity);
+        Vector2 maximum = new Vector2(float.NegativeInfinity, float.NegativeInfinity);
+        TMP_TextInfo info = text.textInfo;
+        for (int index = 0; index < info.characterCount; index++)
+        {
+            TMP_CharacterInfo character = info.characterInfo[index];
+            if (!character.isVisible || !Contains(includedLines, character.lineNumber))
+                continue;
+
+            Vector3 bottomLeft = container.InverseTransformPoint(
+                text.rectTransform.TransformPoint(character.bottomLeft));
+            Vector3 topRight = container.InverseTransformPoint(
+                text.rectTransform.TransformPoint(character.topRight));
+            minimum = Vector2.Min(minimum, bottomLeft);
+            maximum = Vector2.Max(maximum, topRight);
+            found = true;
+        }
+
+        Assert.That(found, Is.True, text.name + " has no visible glyphs.");
+        return Rect.MinMaxRect(minimum.x, minimum.y, maximum.x, maximum.y);
+    }
+
+    static Rect Union(Rect first, Rect second)
+    {
+        return Rect.MinMaxRect(
+            Mathf.Min(first.xMin, second.xMin),
+            Mathf.Min(first.yMin, second.yMin),
+            Mathf.Max(first.xMax, second.xMax),
+            Mathf.Max(first.yMax, second.yMax));
+    }
+
+    static bool Contains(int[] values, int value)
+    {
+        foreach (int candidate in values)
+        {
+            if (candidate == value)
+                return true;
+        }
+        return false;
+    }
+
+    static void AssertContained(
+        Rect safe,
+        Rect actual,
+        float padding,
+        string label)
+    {
+        Assert.That(actual.xMin, Is.GreaterThanOrEqualTo(safe.xMin + padding),
+            label + " left padding");
+        Assert.That(actual.xMax, Is.LessThanOrEqualTo(safe.xMax - padding),
+            label + " right padding");
+        Assert.That(actual.yMin, Is.GreaterThanOrEqualTo(safe.yMin + padding),
+            label + " bottom padding");
+        Assert.That(actual.yMax, Is.LessThanOrEqualTo(safe.yMax - padding),
+            label + " top padding");
+    }
+
+    static void AssertInside(Rect safe, Rect actual, string label)
+    {
+        Assert.That(actual.xMin, Is.GreaterThanOrEqualTo(safe.xMin),
+            label + " left containment");
+        Assert.That(actual.xMax, Is.LessThanOrEqualTo(safe.xMax),
+            label + " right containment");
+        Assert.That(actual.yMin, Is.GreaterThanOrEqualTo(safe.yMin),
+            label + " bottom containment");
+        Assert.That(actual.yMax, Is.LessThanOrEqualTo(safe.yMax),
+            label + " top containment");
+    }
+
+    static void AssertRectTransform(
+        RectTransform rect,
+        Vector2 expectedPosition,
+        Vector2 expectedSize,
+        string label)
+    {
+        Assert.That(rect.anchoredPosition.x,
+            Is.EqualTo(expectedPosition.x).Within(0.01f), label + " x");
+        Assert.That(rect.anchoredPosition.y,
+            Is.EqualTo(expectedPosition.y).Within(0.01f), label + " y");
+        Assert.That(rect.sizeDelta.x,
+            Is.EqualTo(expectedSize.x).Within(0.01f), label + " width");
+        Assert.That(rect.sizeDelta.y,
+            Is.EqualTo(expectedSize.y).Within(0.01f), label + " height");
+    }
+
+    static Sprite CatalogAvatarSprite(int index)
+    {
+        Type catalog = RuntimeType("OnboardingAvatarCatalog");
+        object entry = catalog.GetMethod("Get", StaticFlags)
+            .Invoke(null, new object[] { index });
+        string resource = (string)entry.GetType().GetProperty("ResourcePath")
+            .GetValue(entry, null);
+        Sprite sprite = Resources.Load<Sprite>(resource);
+        Assert.That(sprite, Is.Not.Null, resource);
+        return sprite;
+    }
+
+    static SavedPreference CapturePreference(string key)
+    {
+        var saved = new SavedPreference
+        {
+            Exists = PlayerPrefs.HasKey(key),
+        };
+        if (!saved.Exists) return saved;
+
+        const string sentinel = "<HOL_PLAYER_PREFS_TYPE_SENTINEL>";
+        string text = PlayerPrefs.GetString(key, sentinel);
+        saved.IsInteger = text == sentinel;
+        if (saved.IsInteger)
+            saved.Integer = PlayerPrefs.GetInt(key, 0);
+        else
+            saved.Text = text;
+        return saved;
+    }
+
+    static void RestorePreference(string key, SavedPreference saved)
+    {
+        PlayerPrefs.DeleteKey(key);
+        if (!saved.Exists) return;
+        if (saved.IsInteger)
+            PlayerPrefs.SetInt(key, saved.Integer);
+        else
+            PlayerPrefs.SetString(key, saved.Text ?? string.Empty);
+    }
+
+    static RectTransform[] FindRects(Transform root, string[] names)
+    {
+        var rects = new RectTransform[names.Length];
+        for (int index = 0; index < names.Length; index++)
+        {
+            rects[index] = Find(root, names[index]) as RectTransform;
+            Assert.That(rects[index], Is.Not.Null, names[index]);
+        }
+        return rects;
+    }
+
+    static Vector4[] CaptureLayout(RectTransform[] rects)
+    {
+        var states = new Vector4[rects.Length];
+        for (int index = 0; index < rects.Length; index++)
+            states[index] = new Vector4(
+                rects[index].anchoredPosition.x,
+                rects[index].anchoredPosition.y,
+                rects[index].sizeDelta.x,
+                rects[index].sizeDelta.y);
+        return states;
+    }
+
+    static void AssertLayout(
+        RectTransform[] rects,
+        Vector4[] expected,
+        string label)
+    {
+        Assert.That(rects.Length, Is.EqualTo(expected.Length));
+        for (int index = 0; index < rects.Length; index++)
+        {
+            Vector4 actual = new Vector4(
+                rects[index].anchoredPosition.x,
+                rects[index].anchoredPosition.y,
+                rects[index].sizeDelta.x,
+                rects[index].sizeDelta.y);
+            Assert.That(actual.x, Is.EqualTo(expected[index].x).Within(0.01f),
+                label + " " + rects[index].name + " x");
+            Assert.That(actual.y, Is.EqualTo(expected[index].y).Within(0.01f),
+                label + " " + rects[index].name + " y");
+            Assert.That(actual.z, Is.EqualTo(expected[index].z).Within(0.01f),
+                label + " " + rects[index].name + " width");
+            Assert.That(actual.w, Is.EqualTo(expected[index].w).Within(0.01f),
+                label + " " + rects[index].name + " height");
+        }
     }
 
     static bool IsAllowedProductionGraphic(Graphic graphic)
@@ -237,30 +754,67 @@ public sealed class MainMenuHomeVisualsPlayModeTests
 
     static void AssertProductionButton(Button button, string resource)
     {
-        Image image = button.GetComponent<Image>();
+        Image hitImage = button.GetComponent<Image>();
+        Transform frameTransform = Find(button.transform, "HomeCtaFrame");
+        Image frame = frameTransform == null
+            ? null
+            : frameTransform.GetComponent<Image>();
         Sprite sprite = Resources.Load<Sprite>(resource);
-        Assert.That(image, Is.Not.Null, button.name);
+        Assert.That(hitImage, Is.Not.Null, button.name);
+        Assert.That(frame, Is.Not.Null, button.name + " visual frame");
         Assert.That(sprite, Is.Not.Null, resource);
-        Assert.That(image.sprite, Is.SameAs(sprite), button.name);
-        Assert.That(image.type, Is.EqualTo(Image.Type.Sliced), button.name);
-        Assert.That(image.color.a, Is.EqualTo(1f).Within(0.001f), button.name);
-        Assert.That(image.raycastTarget, Is.True, button.name);
-        Assert.That(button.targetGraphic, Is.SameAs(image), button.name);
-        Assert.That(button.colors.fadeDuration, Is.LessThanOrEqualTo(0.08f));
+        Assert.That(frame.sprite, Is.SameAs(sprite), button.name);
+        Assert.That(frame.type, Is.EqualTo(Image.Type.Simple), button.name);
+        Assert.That(frame.color.a, Is.EqualTo(1f).Within(0.001f), button.name);
+        Assert.That(frame.raycastTarget, Is.False, button.name);
+        Assert.That(hitImage.sprite, Is.Null, button.name);
+        Assert.That(hitImage.raycastTarget, Is.True, button.name);
+        Assert.That(button.targetGraphic, Is.SameAs(hitImage), button.name);
+        Assert.That(button.transition, Is.EqualTo(Selectable.Transition.None));
+        Assert.That(button.interactable, Is.True, button.name);
     }
 
-    static void AssertRect(
+    static void AssertReferenceComposition(
         Transform root,
-        string objectName,
-        Vector2 expectedPosition,
-        Vector2 expectedSize)
+        params Button[] buttons)
     {
-        RectTransform rect = Find(root, objectName) as RectTransform;
-        Assert.That(rect, Is.Not.Null, objectName);
-        Assert.That(Vector2.Distance(rect.anchoredPosition, expectedPosition),
-            Is.LessThan(1f), objectName + " position drifted.");
-        Assert.That(Vector2.Distance(rect.sizeDelta, expectedSize),
-            Is.LessThan(1f), objectName + " size drifted.");
+        RectTransform logo = Find(root, "HomeLogo") as RectTransform;
+        RectTransform boy = Find(root, "HomeHeroBoy") as RectTransform;
+        RectTransform girl = Find(root, "HomeHeroGirl") as RectTransform;
+        RectTransform bubble = Find(root, "HomeSpeechBubble") as RectTransform;
+        RectTransform promo = Find(root, "HomeDailyPromo") as RectTransform;
+        RectTransform six = Find(root, "HomeMascotSix") as RectTransform;
+        RectTransform seven = Find(root, "HomeMascotSeven") as RectTransform;
+
+        Assert.That(logo.sizeDelta.x, Is.GreaterThanOrEqualTo(540f));
+        Assert.That(boy.sizeDelta.x, Is.GreaterThanOrEqualTo(420f));
+        Assert.That(girl.sizeDelta.x, Is.GreaterThanOrEqualTo(420f));
+        Assert.That(bubble.anchoredPosition.x, Is.GreaterThan(250f));
+        Assert.That(promo.sizeDelta.x, Is.GreaterThanOrEqualTo(480f));
+        Assert.That(six.anchoredPosition.x, Is.LessThan(-250f));
+        Assert.That(seven.anchoredPosition.x, Is.GreaterThan(250f));
+
+        for (int i = 0; i < buttons.Length; i++)
+        {
+            RectTransform hit = buttons[i].transform as RectTransform;
+            RectTransform visual = Find(buttons[i].transform, "HomeCtaFrame")
+                as RectTransform;
+            Assert.That(hit.sizeDelta.x, Is.GreaterThanOrEqualTo(960f),
+                buttons[i].name + " hit width");
+            Assert.That(visual.sizeDelta.x, Is.GreaterThanOrEqualTo(980f),
+                buttons[i].name + " visual width");
+            Assert.That(visual.sizeDelta.y, Is.GreaterThan(hit.sizeDelta.y),
+                buttons[i].name + " keeps visual glow outside its hit rect");
+            if (i == 0) continue;
+
+            RectTransform previous = buttons[i - 1].transform as RectTransform;
+            float previousBottom = previous.anchoredPosition.y -
+                                   previous.sizeDelta.y * 0.5f;
+            float currentTop = hit.anchoredPosition.y + hit.sizeDelta.y * 0.5f;
+            Assert.That(previousBottom, Is.GreaterThan(currentTop),
+                buttons[i - 1].name + " and " + buttons[i].name +
+                " must not have overlapping touch ownership.");
+        }
     }
 
     static void AssertLocalizedHomeCopy(

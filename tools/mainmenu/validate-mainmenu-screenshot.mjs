@@ -78,40 +78,65 @@ export const decodeRgbaPng = (png, options = {}) => {
   requireCondition(
     width === expected.width && height === expected.height,
     `Expected ${expected.width}x${expected.height}, got ${width}x${height}`);
+  const bitDepth = ihdr[8];
+  const colorType = ihdr[9];
+  const compressionMethod = ihdr[10];
+  const filterMethod = ihdr[11];
+  const interlaceMethod = ihdr[12];
   requireCondition(
-    [...ihdr.subarray(8, 13)].join(",") === "8,6,0,0,0",
-    "Expected a non-interlaced 8-bit RGBA PNG");
+    bitDepth === 8 &&
+      (colorType === 2 || colorType === 6) &&
+      compressionMethod === 0 &&
+      filterMethod === 0 &&
+      interlaceMethod === 0,
+    "Expected a non-interlaced 8-bit RGB or RGBA PNG");
 
-  const bytesPerPixel = 4;
-  const stride = width * bytesPerPixel;
-  const expectedScanlineBytes = (stride + 1) * height;
+  const sourceBytesPerPixel = colorType === 2 ? 3 : 4;
+  const sourceStride = width * sourceBytesPerPixel;
+  const expectedScanlineBytes = (sourceStride + 1) * height;
   const filtered = zlib.inflateSync(
     Buffer.concat(idat),
     { maxOutputLength: expectedScanlineBytes });
   requireCondition(
     filtered.length === expectedScanlineBytes,
     "Screenshot PNG decompressed to an unexpected size");
-  const rgba = Buffer.allocUnsafe(stride * height);
+  const decoded = Buffer.allocUnsafe(sourceStride * height);
 
   for (let y = 0; y < height; y++) {
-    const filteredRow = y * (stride + 1);
-    const outputRow = y * stride;
+    const filteredRow = y * (sourceStride + 1);
+    const outputRow = y * sourceStride;
     const filter = filtered[filteredRow];
     requireCondition(filter <= 4, "Unsupported PNG filter " + filter);
-    for (let x = 0; x < stride; x++) {
+    for (let x = 0; x < sourceStride; x++) {
       const encoded = filtered[filteredRow + x + 1];
       const output = outputRow + x;
-      const left = x >= bytesPerPixel ? rgba[output - bytesPerPixel] : 0;
-      const up = y > 0 ? rgba[output - stride] : 0;
-      const upperLeft = y > 0 && x >= bytesPerPixel
-        ? rgba[output - stride - bytesPerPixel]
+      const left = x >= sourceBytesPerPixel
+        ? decoded[output - sourceBytesPerPixel]
+        : 0;
+      const up = y > 0 ? decoded[output - sourceStride] : 0;
+      const upperLeft = y > 0 && x >= sourceBytesPerPixel
+        ? decoded[output - sourceStride - sourceBytesPerPixel]
         : 0;
       let predictor = 0;
       if (filter === 1) predictor = left;
       else if (filter === 2) predictor = up;
       else if (filter === 3) predictor = Math.floor((left + up) / 2);
       else if (filter === 4) predictor = paeth(left, up, upperLeft);
-      rgba[output] = (encoded + predictor) & 0xff;
+      decoded[output] = (encoded + predictor) & 0xff;
+    }
+  }
+
+  let rgba = decoded;
+  if (colorType === 2) {
+    const pixelCount = width * height;
+    rgba = Buffer.allocUnsafe(pixelCount * 4);
+    for (let pixel = 0; pixel < pixelCount; pixel++) {
+      const source = pixel * 3;
+      const target = pixel * 4;
+      rgba[target] = decoded[source];
+      rgba[target + 1] = decoded[source + 1];
+      rgba[target + 2] = decoded[source + 2];
+      rgba[target + 3] = 255;
     }
   }
 

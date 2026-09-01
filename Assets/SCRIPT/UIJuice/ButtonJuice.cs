@@ -27,6 +27,18 @@ public class ButtonJuice : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
         transform.localScale = baseScale;
     }
 
+    // Presentation owners that adopt a runtime-built button can call this
+    // after reparenting it. RuntimeUI may have created the button under a
+    // responsive page whose temporary scale is no longer valid in the new
+    // owner; retaining that old base would make the button spring back to the
+    // rejected scale every frame.
+    public void ResetBaseScale(Vector3 scale)
+    {
+        baseScale = scale;
+        target = 1f;
+        transform.localScale = scale;
+    }
+
     void Update()
     {
         if (baseScale.x == 0f) return; // authored at zero scale — nothing to animate
