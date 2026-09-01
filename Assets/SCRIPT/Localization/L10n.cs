@@ -64,6 +64,67 @@ public static class L10n
             "Every guess narrows the range!",
             "Κάθε μαντεψιά μικραίνει το εύρος!" } },
         { "splash_loading",          new[] { "LOADING...", "ΦΟΡΤΩΣΗ..." } },
+        { "onboarding_welcome_title", new[] {
+            "Welcome to\n<color=#FF36AD><size=240%>HOL!</size></color>",
+            "Καλώς ήρθες στο\n<color=#FF36AD><size=240%>HOL!</size></color>" } },
+        { "onboarding_welcome_body", new[] {
+            "Get ready for battles of mind and skill!",
+            "Ετοιμάσου για μάχες μυαλού με τον αντίπαλό σου!" } },
+        { "onboarding_go",           new[] { "LET'S GO!", "ΠΑΜΕ!" } },
+        { "onboarding_continue",     new[] { "CONTINUE", "ΣΥΝΕΧΕΙΑ" } },
+        { "onboarding_back",         new[] { "BACK", "ΠΙΣΩ" } },
+        { "onboarding_skip",         new[] { "SKIP", "ΠΑΡΑΛΕΙΨΗ" } },
+        { "onboarding_name_title",   new[] {
+            "What should we call you?", "Πώς σε λένε;" } },
+        { "onboarding_name_subtitle", new[] {
+            "Choose a nickname\nthat will represent you!",
+            "Διάλεξε ένα nickname\nπου θα σε αντιπροσωπεύει!" } },
+        { "onboarding_name_placeholder", new[] {
+            "Type here...", "Γράψε εδώ..." } },
+        { "onboarding_name_hint",    new[] {
+            "3–12 characters", "3–12 χαρακτήρες" } },
+        { "onboarding_gender_title", new[] {
+            "Choose gender", "Διάλεξε φύλο" } },
+        { "onboarding_gender_subtitle", new[] {
+            "Choose what represents you!",
+            "Επίλεξε αυτό που σε εκφράζει!" } },
+        { "onboarding_gender_boy",   new[] { "BOY", "ΑΓΟΡΙ" } },
+        { "onboarding_gender_girl",  new[] { "GIRL", "ΚΟΡΙΤΣΙ" } },
+        { "onboarding_gender_other", new[] { "OTHER", "ΑΛΛΟ" } },
+        { "onboarding_gender_other_hint", new[] {
+            "PREFER\nNOT TO\nSAY", "ΠΡΟΤΙΜΩ\nΝΑ ΜΗΝ\nΠΩ" } },
+        { "onboarding_avatar_title", new[] {
+            "Choose avatar", "Διάλεξε avatar" } },
+        { "onboarding_avatar_subtitle", new[] {
+            "Choose your character!", "Επίλεξε τον χαρακτήρα σου!" } },
+        { "onboarding_avatar_shop",  new[] {
+            "More avatars in the Shop!", "Περισσότερα avatar στο Shop!" } },
+        { "onboarding_avatar_filter_all", new[] { "ALL", "ΟΛΑ" } },
+        { "onboarding_avatar_filter_boys", new[] { "BOYS", "ΑΓΟΡΙΑ" } },
+        { "onboarding_avatar_filter_girls", new[] { "GIRLS", "ΚΟΡΙΤΣΙΑ" } },
+        { "onboarding_avatar_filter_cool", new[] { "COOL", "COOL" } },
+        { "onboarding_avatar_filter_epic", new[] { "EPIC", "EPIC" } },
+        { "onboarding_avatar_free", new[] { "FREE", "ΔΩΡΕΑΝ" } },
+        { "onboarding_avatar_coins", new[] { "{0} COINS", "{0} COINS" } },
+        { "onboarding_avatar_xp", new[] { "{0} XP", "{0} XP" } },
+        { "onboarding_avatar_locked", new[] { "LOCKED", "ΚΛΕΙΔΩΜΕΝΟ" } },
+        { "onboarding_avatar_choose_preview", new[] {
+            "SELECT AN AVATAR", "ΔΙΑΛΕΞΕ AVATAR" } },
+        { "onboarding_avatar_selected", new[] {
+            "AVATAR {0} • {1}", "AVATAR {0} • {1}" } },
+        { "onboarding_age_title",    new[] {
+            "What is your age\ncategory?",
+            "Ποια είναι η ηλικιακή σου\nκατηγορία;" } },
+        { "onboarding_age_subtitle", new[] {
+            "This helps us prepare the best\nexperience for you!",
+            "Βοηθάει να φτιάξουμε την καλύτερη\nεμπειρία για σένα!" } },
+        { "onboarding_age_under13",  new[] {
+            "Under 13", "Κάτω από 13" } },
+        { "onboarding_age_teen",     new[] { "13–17", "13–17" } },
+        { "onboarding_age_adult",    new[] { "18+", "18+" } },
+        { "onboarding_age_privacy",  new[] {
+            "We do not store your exact birth date. This choice only helps tailor the experience.",
+            "Δεν αποθηκεύουμε την ακριβή ημερομηνία γέννησής σου. Η επιλογή βοηθά μόνο την εμπειρία." } },
         { "back",                    new[] { "Back", "Πίσω" } },
         { "quit",                    new[] { "Quit", "Έξοδος" } },
         { "save",                    new[] { "Save", "Αποθήκευση" } },
