@@ -177,6 +177,15 @@ public static class L10n
         { "enter_your_number",       new[] { "Enter your number", "Βάλε τον αριθμό σου" } },
         { "number_placeholder",      new[] { "1-100", "1-100" } },
         { "confirm",                 new[] { "Confirm", "Επιβεβαίωση" } },
+        { "solo_submit",             new[] { "SUBMIT!", "ΣΤΕΙΛΕ!" } },
+        { "solo_ai_taunt",           new[] { "You won't\nfind it!", "Δεν θα\nτο βρεις!" } },
+        { "solo_guess_number",        new[] { "GUESS THE NUMBER!", "ΜΑΝΤΕΨΕ ΤΟ ΝΟΥΜΕΡΟ!" } },
+        { "solo_history_higher",      new[] { "HIGHER", "ΠΙΟ ΨΗΛΑ" } },
+        { "solo_history_lower",       new[] { "LOWER", "ΠΙΟ ΧΑΜΗΛΑ" } },
+        { "solo_history_correct",     new[] { "CORRECT!", "ΣΩΣΤΟ!" } },
+        { "solo_tip_range",           new[] { "The correct number is\nbetween {0} and {1}!", "Ο σωστός αριθμός είναι\nανάμεσα σε {0} και {1}!" } },
+        { "solo_you_header",          new[] { "YOU", "ΕΣΥ" } },
+        { "solo_tip_heading",         new[] { "TIP:", "TIP:" } },
         { "invalid_number",          new[] { "Enter a valid number", "Βάλε έγκυρο αριθμό" } },
         { "number_out_of_range",     new[] { "Number must be between 1 and 100", "Ο αριθμός πρέπει να είναι από 1 έως 100" } },
 
@@ -194,6 +203,12 @@ public static class L10n
         { "between_range",           new[] { "Between {0} and {1}", "Ανάμεσα σε {0} και {1}" } },
         { "already_know_range",      new[] { "You already know it's between {0} and {1}!", "Ξέρεις ήδη ότι είναι ανάμεσα σε {0} και {1}!" } },
         { "opponent_found_number",   new[] { "{0} found your number!", "{0} βρήκε τον αριθμό σου!" } },
+        { "solo_choose_secret",       new[] { "CHOOSE YOUR SECRET NUMBER", "ΔΙΑΛΕΞΕ ΤΟΝ ΚΡΥΦΟ ΑΡΙΘΜΟ ΣΟΥ" } },
+        { "solo_secret_unset",        new[] { "Choose a number for the AI to find", "Διάλεξε τον αριθμό που πρέπει να βρει το AI" } },
+        { "solo_secret_value",        new[] { "Your secret: {0}", "Ο κρυφός σου: {0}" } },
+        { "your_number_is_higher",    new[] { "YOUR NUMBER IS HIGHER", "Ο ΑΡΙΘΜΟΣ ΣΟΥ ΕΙΝΑΙ ΜΕΓΑΛΥΤΕΡΟΣ" } },
+        { "your_number_is_lower",     new[] { "YOUR NUMBER IS LOWER", "Ο ΑΡΙΘΜΟΣ ΣΟΥ ΕΙΝΑΙ ΜΙΚΡΟΤΕΡΟΣ" } },
+        { "your_number_is_correct",   new[] { "YOUR NUMBER IS CORRECT!", "ΒΡΗΚΕ ΤΟΝ ΑΡΙΘΜΟ ΣΟΥ!" } },
 
         // result
         { "you_win",                 new[] { "YOU WIN!", "ΚΕΡΔΙΣΕΣ!" } },

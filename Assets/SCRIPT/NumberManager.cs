@@ -63,9 +63,6 @@ public class NumberManager : MonoBehaviour
             RefreshPlayerLabel();
 
             stopButton.SetActive(true);
-            playerGuessesPanel.SetActive(true);
-            aiGuessesPanel.SetActive(true);
-
             gameManager.SetPlayerNumber(playerNumber);
             gameManager.StartGame();
         }
@@ -111,13 +108,9 @@ public class NumberManager : MonoBehaviour
     void RefreshPlayerLabel()
     {
         if (playerNumberText == null) return;
-        playerNumberText.text = DisplayPlayerName() + ": " + (gameStarted ? playerNumber.ToString() : "?");
-    }
-
-    static string DisplayPlayerName()
-    {
-        string playerName = PlayerPrefs.GetString("PlayerName", "");
-        return string.IsNullOrWhiteSpace(playerName) ? L10n.Get("player_default") : playerName;
+        playerNumberText.text = gameStarted
+            ? L10n.Get("solo_secret_value", playerNumber)
+            : L10n.Get("solo_secret_unset");
     }
 
     public void ExitToMenu()

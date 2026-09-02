@@ -5,9 +5,10 @@ using UnityEngine;
 // Truthful Solo-vs-AI preparation transition.
 //
 // This is not public matchmaking and never claims that a remote human is being
-// searched. The approved radar modal remains visible only while the existing
-// local duel board performs its real first-frame construction. Gameplay remains
-// owned by GameManager, NumberManager and DuelRules.
+// searched. Production opens the real local duel board immediately; the retired
+// radar modal is available only to an explicit compatibility capture while the
+// board performs its real first-frame construction. Gameplay remains owned by
+// GameManager, NumberManager and DuelRules.
 public class FakeMatchmaking : MonoBehaviour
 {
     public GameObject searchingPanel;
@@ -18,7 +19,7 @@ public class FakeMatchmaking : MonoBehaviour
     bool readyPhase;
 
     // Non-serialized lifecycle seam used by EditMode tests. Production leaves
-    // this null and therefore validates the real HolDuelBoardLayout controls.
+    // this null and therefore validates the real SoloDuelVisuals controls.
     internal Func<bool> BoardReadyProbe { get; set; }
 
     public bool IsPreparing { get; private set; }
@@ -86,7 +87,7 @@ public class FakeMatchmaking : MonoBehaviour
         if (panelGame == null || !panelGame.activeInHierarchy)
             return false;
 
-        var layout = panelGame.GetComponentInChildren<HolDuelBoardLayout>(true);
+        var layout = panelGame.GetComponentInChildren<SoloDuelVisuals>(true);
         return layout != null &&
                layout.KeypadRoot != null &&
                layout.SubmitControl != null;
@@ -109,13 +110,21 @@ public class FakeMatchmaking : MonoBehaviour
     {
         if (searchingPanel == null) return;
 
+        // PanelSearching is serialized under the retired PanelPlay hierarchy.
+        // Production Solo entry keeps that parent disabled and reveals the
+        // real board directly. Explicit compatibility captures can still
+        // activate the parent before starting this deterministic lifecycle.
+        bool parentVisible = searchingPanel.transform.parent == null ||
+                             searchingPanel.transform.parent.gameObject.activeInHierarchy;
+        bool show = visible && parentVisible;
+
         var canvasGroup = searchingPanel.GetComponent<CanvasGroup>();
         if (canvasGroup == null)
             canvasGroup = searchingPanel.AddComponent<CanvasGroup>();
         canvasGroup.alpha = 1f;
-        canvasGroup.interactable = visible;
-        canvasGroup.blocksRaycasts = visible;
-        searchingPanel.SetActive(visible);
+        canvasGroup.interactable = show;
+        canvasGroup.blocksRaycasts = show;
+        searchingPanel.SetActive(show);
     }
 
     void RefreshStatusCopy()

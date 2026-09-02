@@ -45,10 +45,15 @@ public sealed class ResponsiveUIFoundationPlayModeTests
         AssertSingleSafeOwner(playSafe);
 
         var targets = new List<RectTransform>();
-        AddTargets(targets, panelGame.transform,
-            "DuelBack", "PlayerCard", "OpponentCard", "RoundLabel",
-            "HistoryCard", "NumberKeypad", "ButtonConfirm",
-            "ButtonHIGHER", "ButtonCORRECT", "ButtonLOWER");
+        Component soloOwner = FindInScene(RuntimeType("SoloDuelVisuals"));
+        Assert.That(soloOwner, Is.Not.Null);
+        Transform soloSafe = Find(panelGame.transform, "SoloDuelSafeRoot");
+        Assert.That(soloSafe, Is.Not.Null);
+        Assert.That(soloSafe.GetComponent(RuntimeType("ResponsiveSafeAreaRoot")),
+            Is.Not.Null);
+        Assert.That(soloSafe.GetComponent(RuntimeType("ResponsivePageLayout")),
+            Is.Null,
+            "SoloDuelVisuals owns its measured composition; a generic second writer is forbidden.");
 
         var settingsPanel = (GameObject)Field(menu, "settingsPanel");
         AddTargets(targets, settingsPanel.transform,

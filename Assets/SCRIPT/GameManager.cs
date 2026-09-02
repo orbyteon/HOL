@@ -16,6 +16,7 @@ public class GameManager : MonoBehaviour
     // more human opponent.
     const string DifficultyPrefKey = "AIDifficulty";
     static readonly float[] DifficultyRandomChance = { 0.6f, 0.2f, 0f, -1f };
+    const float OpponentFeedbackSeconds = 2.4f;
 
     // The player is always the host seat; nothing in the rules depends on which
     // seat is which, only on who opens, and that is a coin flip each match.
@@ -27,7 +28,7 @@ public class GameManager : MonoBehaviour
     public TMP_Text turnText;
     public TMP_Text opponentNameText;
 
-    // Runtime bindings populated by HolDuelBoardLayout. The presenter is the
+    // Runtime bindings populated by SoloDuelVisuals. The presenter is the
     // only writer of these fields; they stay public because the current visual
     // polish layer reads their references without owning their content.
     public TMP_Text rangeText;
@@ -65,6 +66,7 @@ public class GameManager : MonoBehaviour
 
     readonly DuelRules rules = new DuelRules();
     bool awaitingAnswer;
+    DuelRules.Hint pendingAiHint;
     bool lockArmed;
 
     // True from StartGame until RestartMatch clears the board. It stays true
@@ -90,7 +92,7 @@ public class GameManager : MonoBehaviour
     int playerGuessCount;
 
     string currentOpponent;
-    HolDuelBoardLayout boardPresenter;
+    SoloDuelVisuals boardPresenter;
 
     // Built at runtime next to the stop button, the same way the rewarded
     // streak-save offer is, so no scene surgery is needed.
@@ -139,6 +141,7 @@ public class GameManager : MonoBehaviour
         playerMax = 100;
 
         awaitingAnswer = false;
+        pendingAiHint = DuelRules.Hint.None;
         lockArmed = false;
         matchSetUp = true;
         lockRevealedThisMatch = false;
@@ -207,7 +210,7 @@ public class GameManager : MonoBehaviour
 
         aiNumberText.text = currentOpponent + ": " + aiGuess +
                             (aiLocks ? "  [" + L10n.Get("lock_armed") + "]" : "");
-        Presenter()?.RecordAiGuess(aiGuess);
+        Presenter()?.RecordAiGuess(aiGuess, move.Hint);
 
         // If that guess closed the round the match is already decided, so do
         // not make the player answer a guess nobody can act on — it would put
@@ -218,34 +221,58 @@ public class GameManager : MonoBehaviour
                 aiAnswerText.text = L10n.Get("opponent_found_number", currentOpponent);
 
             awaitingAnswer = false;
+            pendingAiHint = DuelRules.Hint.None;
             HideButtons();
             ContinueAfterMove();
             return;
         }
 
-        // The player still confirms the answer, so the hint the rules computed
-        // decides which single button is offered — a player cannot lie.
+        // Solo owns the player's secret, so asking the player to repeat the
+        // one truthful Higher/Lower/Correct answer adds no decision. Show a
+        // readable feedback beat, then resolve it automatically. PvP keeps
+        // its server-authoritative acknowledgement path independently.
+        pendingAiHint = move.Hint;
         awaitingAnswer = true;
-        Present(SoloBoardPhase.AnswerOpponent, SoloBoardPrompt.AnswerOpponent, 0, submittedRound);
+        Present(SoloBoardPhase.AnswerOpponent,
+            OpponentFeedbackPrompt(move.Hint), aiGuess, submittedRound);
         HideButtons();
-
-        if (move.Hint == DuelRules.Hint.Higher) higherButton.SetActive(true);
-        else if (move.Hint == DuelRules.Hint.Lower) lowerButton.SetActive(true);
-        else correctButton.SetActive(true);
-
+        aiAnswerText.text = OpponentFeedbackText(move.Hint);
         RefreshLockButton();
+        Invoke(nameof(ResolveAiAnswerAutomatically), OpponentFeedbackSeconds);
+    }
+
+    static SoloBoardPrompt OpponentFeedbackPrompt(DuelRules.Hint hint)
+    {
+        if (hint == DuelRules.Hint.Higher)
+            return SoloBoardPrompt.OpponentGuessedHigher;
+        if (hint == DuelRules.Hint.Lower)
+            return SoloBoardPrompt.OpponentGuessedLower;
+        return SoloBoardPrompt.OpponentGuessedCorrect;
+    }
+
+    static string OpponentFeedbackText(DuelRules.Hint hint)
+    {
+        if (hint == DuelRules.Hint.Higher)
+            return L10n.Get("your_number_is_higher");
+        if (hint == DuelRules.Hint.Lower)
+            return L10n.Get("your_number_is_lower");
+        return L10n.Get("your_number_is_correct");
+    }
+
+    void ResolveAiAnswerAutomatically()
+    {
+        if (!awaitingAnswer) return;
+        AnswerGiven(pendingAiHint);
     }
 
     public void Higher()
     {
-        min = aiGuess + 1;
-        AnswerGiven();
+        AnswerGiven(DuelRules.Hint.Higher);
     }
 
     public void Lower()
     {
-        max = aiGuess - 1;
-        AnswerGiven();
+        AnswerGiven(DuelRules.Hint.Lower);
     }
 
     // The opponent found the player's number. Under the equal-turns rule that
@@ -253,15 +280,26 @@ public class GameManager : MonoBehaviour
     // guess before the match is called.
     public void Correct()
     {
-        aiAnswerText.text = L10n.Get("opponent_found_number", currentOpponent);
-        AnswerGiven();
+        AnswerGiven(DuelRules.Hint.Correct);
     }
 
-    void AnswerGiven()
+    void AnswerGiven(DuelRules.Hint answer)
     {
-        if (!awaitingAnswer) return;
+        // The rule engine already computed the truthful hint. Public button
+        // callbacks may arrive late or be miswired, so they must never mutate
+        // the AI's search interval unless they match that pending authority.
+        if (!awaitingAnswer || answer != pendingAiHint) return;
+
+        if (pendingAiHint == DuelRules.Hint.Higher)
+            min = aiGuess + 1;
+        else if (pendingAiHint == DuelRules.Hint.Lower)
+            max = aiGuess - 1;
+        else if (pendingAiHint == DuelRules.Hint.Correct)
+            aiAnswerText.text = L10n.Get(
+                "opponent_found_number", currentOpponent);
 
         awaitingAnswer = false;
+        pendingAiHint = DuelRules.Hint.None;
         HideButtons();
         ContinueAfterMove();
     }
@@ -322,7 +360,7 @@ public class GameManager : MonoBehaviour
             playerLabel += "  [" + L10n.Get("lock_armed") + "]";
 
         aiAnswerText.text = playerLabel + ": " + guess;
-        Presenter()?.RecordPlayerGuess(guess);
+        Presenter()?.RecordPlayerGuess(guess, move.Hint);
 
         if (move.Hint == DuelRules.Hint.Correct)
         {
@@ -384,6 +422,7 @@ public class GameManager : MonoBehaviour
     void EndGame()
     {
         awaitingAnswer = false;
+        pendingAiHint = DuelRules.Hint.None;
         lockArmed = false;
 
         HideButtons();
@@ -453,7 +492,7 @@ public class GameManager : MonoBehaviour
 
     public void OnLockTogglePressed()
     {
-        if (!matchSetUp || rules.Finished) return;
+        if (!IsPlayerTurn) return;
         if (!rules.LockAvailable(PlayerSide)) return;
 
         lockArmed = !lockArmed;
@@ -478,6 +517,7 @@ public class GameManager : MonoBehaviour
 
         btn.onClick.AddListener(OnLockTogglePressed);
         lockButton = btn;
+        Presenter()?.RegisterLockControl(lockButton);
 
         lockButtonLabel = btn.GetComponentInChildren<TMP_Text>();
         if (lockButtonLabel != null) lockButtonLabel.fontSize = 26;
@@ -493,8 +533,8 @@ public class GameManager : MonoBehaviour
         // feel like plain higher-or-lower, and staking the Lock on an opening
         // guess is a trap rather than a choice.
         bool revealed = rules.GuessCount(PlayerSide) > 0;
-        bool available = matchSetUp && !rules.Finished && revealed &&
-                         rules.LockAvailable(PlayerSide);
+        bool available = IsPlayerTurn && revealed &&
+                          rules.LockAvailable(PlayerSide);
 
         lockButton.gameObject.SetActive(available);
         if (!available) return;
@@ -562,6 +602,7 @@ public class GameManager : MonoBehaviour
         rect.anchoredPosition = stopRect.anchoredPosition + new Vector2(0f, 120f);
 
         streakSaveButton = btn.gameObject;
+        Presenter()?.RegisterSaveStreakControl(btn);
         btn.onClick.AddListener(() =>
         {
             bool shown = adsManager.ShowRewardedAd(() =>
@@ -606,6 +647,7 @@ public class GameManager : MonoBehaviour
         // Clearing this is what re-opens number entry for the next match.
         matchSetUp = false;
         awaitingAnswer = false;
+        pendingAiHint = DuelRules.Hint.None;
         lockArmed = false;
         lockRevealedThisMatch = false;
         playerMin = 1;
@@ -631,10 +673,10 @@ public class GameManager : MonoBehaviour
         currentOpponent = fakeNames[randomIndex];
     }
 
-    HolDuelBoardLayout Presenter()
+    SoloDuelVisuals Presenter()
     {
         if (boardPresenter == null)
-            boardPresenter = FindObjectOfType<HolDuelBoardLayout>(true);
+            boardPresenter = FindObjectOfType<SoloDuelVisuals>(true);
         return boardPresenter;
     }
 

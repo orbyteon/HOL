@@ -24,7 +24,22 @@ public sealed class MainMenuPlayVisualsPlayModeTests
 
         var menu = Object.FindObjectOfType(RuntimeType("MenuManager")) as Component;
         Assert.That(menu, Is.Not.Null);
-        menu.SendMessage("OnPlayPressed", SendMessageOptions.RequireReceiver);
+        var panelPlay = menu.GetType().GetField("panelPlay").GetValue(menu) as GameObject;
+        var mainMenuPanel = menu.GetType().GetField("mainMenuPanel").GetValue(menu) as GameObject;
+        var searching = menu.GetType().GetField("panelSearching").GetValue(menu) as GameObject;
+        Assert.That(panelPlay, Is.Not.Null);
+        Assert.That(mainMenuPanel, Is.Not.Null);
+        Assert.That(searching, Is.Not.Null);
+        Assert.That(CountInScene(RuntimeType("SoloSearchVisuals")), Is.Zero,
+            "The retired Solo Search owner must be absent from normal MainMenu startup.");
+        Assert.That(Find(searching.transform, "SoloSearchVisualRoot"), Is.Null);
+        Assert.That(CountNamedButtons(searching.transform, "CancelButton"), Is.Zero);
+        Assert.That(CountNamedButtons(searching.transform, "SearchBackButton"), Is.Zero);
+
+        // PanelPlay remains available only as an isolated compatibility/capture
+        // seam. Production PLAY SOLO bypasses it completely.
+        mainMenuPanel.SetActive(false);
+        panelPlay.SetActive(true);
         for (int i = 0; i < 8; i++)
             yield return null;
         yield return new WaitForSecondsRealtime(0.35f);
@@ -59,9 +74,7 @@ public sealed class MainMenuPlayVisualsPlayModeTests
         Assert.That(find.GetComponent<Image>().sprite.name, Does.Contain("gold"));
         Assert.That(back.GetComponent<Image>().sprite.name, Does.Contain("blue"));
 
-        var panelPlay = menu.GetType().GetField("panelPlay").GetValue(menu) as GameObject;
         Assert.That(panelPlay.activeSelf, Is.True);
-        var searching = menu.GetType().GetField("panelSearching").GetValue(menu) as GameObject;
         Assert.That(searching.activeSelf, Is.False);
 
         var exactLogo = Find(canvas.transform, "ExactPlayLogo");
@@ -125,45 +138,34 @@ public sealed class MainMenuPlayVisualsPlayModeTests
         yield return null;
         Assert.That(pvpMenu.activeSelf, Is.False);
 
-        menu.SendMessage("OnPlayPressed", SendMessageOptions.RequireReceiver);
+        Transform soloEntryTransform = Find(canvas.transform, "ButtonPlay");
+        Assert.That(soloEntryTransform, Is.Not.Null,
+            "The direct-entry proof must find the real Home Solo button.");
+        Button soloEntry = soloEntryTransform.GetComponent<Button>();
+        Assert.That(soloEntry, Is.Not.Null);
+        soloEntry.onClick.Invoke();
         yield return null;
-        Assert.That(panelPlay.activeSelf, Is.True);
+        Assert.That(panelPlay.activeSelf, Is.False,
+            "Production Solo entry must not expose the retired PanelPlay screen.");
 
         var matchmaking = Object.FindObjectOfType(RuntimeType("FakeMatchmaking")) as Component;
         Assert.That(matchmaking, Is.Not.Null);
         var panelGame = matchmaking.GetType().GetField("panelGame").GetValue(matchmaking) as GameObject;
         Assert.That(panelGame, Is.Not.Null);
-        Assert.That(panelGame.activeSelf, Is.False);
-
-        // The real board is activated in the same call, while the truthful
-        // blocking modal remains visible until its keypad and submit control
-        // exist. There is no fake timer or remote-matchmaking claim.
-        matchmaking.SendMessage("StartSearch", SendMessageOptions.RequireReceiver);
-        Assert.That(searching.activeSelf, Is.True);
-        Assert.That(panelGame.activeSelf, Is.True);
+        Assert.That(mainMenuPanel.activeSelf, Is.False);
+        Assert.That(panelGame.activeSelf, Is.True,
+            "The real Solo board must activate in the same Home CTA call.");
+        Assert.That(searching.activeSelf, Is.False,
+            "Production direct entry cannot expose the retired search screen.");
+        Assert.That(CountInScene(RuntimeType("SoloSearchVisuals")), Is.Zero);
+        Assert.That(Find(searching.transform, "SoloSearchVisualRoot"), Is.Null);
+        Assert.That(CountNamedButtons(searching.transform, "CancelButton"), Is.Zero);
+        Assert.That(CountNamedButtons(searching.transform, "SearchBackButton"), Is.Zero);
         Assert.That(IsPreparing(matchmaking), Is.True);
         for (int frame = 0; frame < 120 && IsPreparing(matchmaking); frame++)
             yield return null;
         Assert.That(IsPreparing(matchmaking), Is.False,
             "Solo preparation did not finish after the real board became ready.");
-        Assert.That(searching.activeSelf, Is.False);
-        Assert.That(panelGame.activeSelf, Is.True);
-
-        // Verify the actual runtime lifecycle rather than assuming EditMode
-        // invokes MonoBehaviour disable callbacks.
-        panelGame.SetActive(false);
-        searching.SetActive(true);
-        ((Behaviour)matchmaking).enabled = false;
-        Assert.That(searching.activeSelf, Is.False);
-        Assert.That(panelGame.activeSelf, Is.False);
-        ((Behaviour)matchmaking).enabled = true;
-        matchmaking.SendMessage("StartSearch", SendMessageOptions.RequireReceiver);
-        Assert.That(searching.activeSelf, Is.True);
-        Assert.That(panelGame.activeSelf, Is.True);
-        for (int frame = 0; frame < 120 && IsPreparing(matchmaking); frame++)
-            yield return null;
-        Assert.That(IsPreparing(matchmaking), Is.False,
-            "Re-enabled Solo preparation did not finish on the ready board.");
         Assert.That(searching.activeSelf, Is.False);
         Assert.That(panelGame.activeSelf, Is.True);
     }
@@ -205,6 +207,25 @@ public sealed class MainMenuPlayVisualsPlayModeTests
         var install = type.GetMethod("Install", StaticFlags);
         Assert.That(install, Is.Not.Null);
         install.Invoke(null, null);
+    }
+
+    static int CountInScene(System.Type type)
+    {
+        int count = 0;
+        foreach (GameObject root in SceneManager.GetActiveScene().GetRootGameObjects())
+            count += root.GetComponentsInChildren(type, true).Length;
+        return count;
+    }
+
+    static int CountNamedButtons(Transform root, string name)
+    {
+        int count = 0;
+        foreach (Button button in root.GetComponentsInChildren<Button>(true))
+        {
+            if (button.name == name)
+                count++;
+        }
+        return count;
     }
 
     static Transform Find(Transform root, string name)

@@ -44,6 +44,21 @@ public sealed class SoloBoardPresentationStateTests
             .Select(Convert.ToInt32).ToArray();
     }
 
+    static string[] HintHistory(object state, string property)
+    {
+        return ((IEnumerable)Property(state, property)).Cast<object>()
+            .Select(value => value.ToString()).ToArray();
+    }
+
+    static void Record(object model, string method, int guess, string hint)
+    {
+        model.GetType().GetMethod(method).Invoke(model, new[]
+        {
+            (object)guess,
+            EnumValue("DuelRules+Hint", hint),
+        });
+    }
+
     static void Begin(object model, string opponent)
     {
         model.GetType().GetMethod("BeginNewMatch").Invoke(model, new object[] { opponent });
@@ -99,15 +114,19 @@ public sealed class SoloBoardPresentationStateTests
     {
         object model = NewModel();
         Begin(model, "Kostas");
-        model.GetType().GetMethod("RecordPlayerGuess").Invoke(model, new object[] { 42 });
-        model.GetType().GetMethod("RecordPlayerGuess").Invoke(model, new object[] { 42 });
-        model.GetType().GetMethod("RecordAiGuess").Invoke(model, new object[] { 50 });
-        model.GetType().GetMethod("RecordAiGuess").Invoke(model, new object[] { 50 });
+        Record(model, "RecordPlayerGuess", 42, "Higher");
+        Record(model, "RecordPlayerGuess", 42, "Correct");
+        Record(model, "RecordAiGuess", 50, "Lower");
+        Record(model, "RecordAiGuess", 50, "Higher");
 
         Present(model, "AnswerOpponent", "AnswerOpponent", 3, 43, 81);
         object state = Current(model);
         CollectionAssert.AreEqual(new[] { 42, 42 }, History(state, "PlayerGuessHistory"));
         CollectionAssert.AreEqual(new[] { 50, 50 }, History(state, "AiGuessHistory"));
+        CollectionAssert.AreEqual(new[] { "Higher", "Correct" },
+            HintHistory(state, "PlayerGuessHints"));
+        CollectionAssert.AreEqual(new[] { "Lower", "Higher" },
+            HintHistory(state, "AiGuessHints"));
         Assert.That(Property(state, "RoundNumber"), Is.EqualTo(3));
         Assert.That(Property(state, "RangeMin"), Is.EqualTo(43));
         Assert.That(Property(state, "RangeMax"), Is.EqualTo(81));
@@ -118,7 +137,7 @@ public sealed class SoloBoardPresentationStateTests
     {
         object model = NewModel();
         Begin(model, "Marco");
-        model.GetType().GetMethod("RecordPlayerGuess").Invoke(model, new object[] { 25 });
+        Record(model, "RecordPlayerGuess", 25, "Higher");
         Present(model, "OpponentThinking", "OpponentThinking", 2, 26, 100);
         Assert.That(History(Current(model), "PlayerGuessHistory"), Has.Length.EqualTo(1));
 

@@ -27,7 +27,7 @@ public sealed class SoloBoardPresenterPlayModeTests
 
         game = FindInScene(RuntimeType("GameManager"));
         numberManager = FindInScene(RuntimeType("NumberManager"));
-        layout = FindInScene(RuntimeType("HolDuelBoardLayout"));
+        layout = FindInScene(RuntimeType("SoloDuelVisuals"));
         menuManager = FindInScene(RuntimeType("MenuManager"));
         Assert.That(game, Is.Not.Null);
         Assert.That(numberManager, Is.Not.Null);
@@ -56,7 +56,7 @@ public sealed class SoloBoardPresenterPlayModeTests
     {
         AssertPhase("ChooseSecret");
         Assert.That(((TMP_Text)Field(game, "turnText")).text,
-            Is.EqualTo(Localized("enter_your_number")));
+            Is.EqualTo(Localized("solo_choose_secret")));
         Assert.That(input.shouldHideMobileInput, Is.True);
         Assert.That(input.shouldHideSoftKeyboard, Is.True);
 
@@ -83,13 +83,78 @@ public sealed class SoloBoardPresenterPlayModeTests
     }
 
     [UnityTest]
-    public IEnumerator PlayerOpeningPublishesRangeHistoriesAndAnswerLockTruthfully()
+    public IEnumerator OnScreenKeypadEditsAndSubmitsTheLiveNumericInput()
+    {
+        AssertPhase("ChooseSecret");
+        Assert.That(input.text, Is.Empty,
+            "Instructional copy must be placeholder text, not the input value.");
+
+        Button key4 = Find(panel.transform, "Key_4").GetComponent<Button>();
+        Button key2 = Find(panel.transform, "Key_2").GetComponent<Button>();
+        Assert.That(key4.interactable, Is.True);
+        Assert.That(key2.interactable, Is.True);
+
+        key4.onClick.Invoke();
+        yield return null;
+        Assert.That(input.text, Is.EqualTo("4"));
+        Assert.That(RenderedInputText(), Is.EqualTo("4"));
+
+        key2.onClick.Invoke();
+        yield return null;
+        Assert.That(input.text, Is.EqualTo("42"));
+        Assert.That(RenderedInputText(), Is.EqualTo("42"));
+
+        Submit().onClick.Invoke();
+        ((MonoBehaviour)game).CancelInvoke("AIGuess");
+
+        Assert.That(Field(numberManager, "playerNumber"), Is.EqualTo(42));
+        Assert.That(Property(State(), "Phase").ToString(),
+            Is.EqualTo("PlayerGuess").Or.EqualTo("OpponentThinking"));
+    }
+
+    [UnityTest]
+    public IEnumerator SecretInputRejectsInvalidAndOutOfRangeValuesAndAcceptsLowerBoundary()
+    {
+        AssertPhase("ChooseSecret");
+        TMP_Text message = (TMP_Text)Field(numberManager, "messageText");
+
+        input.text = string.Empty;
+        Submit().onClick.Invoke();
+        AssertPhase("ChooseSecret");
+        Assert.That(message.gameObject.activeSelf, Is.True);
+        Assert.That(message.text, Is.EqualTo(Localized("invalid_number")));
+
+        foreach (string rejected in new[] { "0", "101" })
+        {
+            input.text = rejected;
+            Submit().onClick.Invoke();
+            AssertPhase("ChooseSecret");
+            Assert.That(message.gameObject.activeSelf, Is.True);
+            Assert.That(message.text,
+                Is.EqualTo(Localized("number_out_of_range")));
+            Assert.That(Field(numberManager, "gameStarted"), Is.EqualTo(false));
+        }
+
+        input.text = "1";
+        Submit().onClick.Invoke();
+        ((MonoBehaviour)game).CancelInvoke("AIGuess");
+
+        Assert.That(Field(numberManager, "playerNumber"), Is.EqualTo(1));
+        Assert.That(Field(numberManager, "gameStarted"), Is.EqualTo(true));
+        Assert.That(Property(State(), "Phase").ToString(),
+            Is.EqualTo("PlayerGuess").Or.EqualTo("OpponentThinking"));
+        yield return null;
+    }
+
+    [UnityTest]
+    public IEnumerator PlayerOpeningPublishesAutomaticAiFeedbackThenReturnsToInput()
     {
         StartWithOpener("Host", 101);
         SetField(game, "aiSecretNumber", 90);
 
         AssertPhase("PlayerGuess");
-        Assert.That(((TMP_Text)Field(game, "turnText")).text, Is.EqualTo(Localized("your_guess")));
+        Assert.That(((TMP_Text)Field(game, "turnText")).text,
+            Is.EqualTo(Localized("solo_guess_number")));
         Assert.That(input.interactable, Is.True);
         Assert.That(Submit().gameObject.activeSelf, Is.True);
 
@@ -103,6 +168,7 @@ public sealed class SoloBoardPresenterPlayModeTests
 
         ((MonoBehaviour)game).CancelInvoke("AIGuess");
         Invoke(game, "AIGuess");
+        ((MonoBehaviour)game).CancelInvoke("ResolveAiAnswerAutomatically");
         AssertPhase("AnswerOpponent");
         Assert.That(Property(State(), "RoundNumber"), Is.EqualTo(1),
             "Acknowledging the closing guess still belongs to the round it was made in.");
@@ -110,9 +176,37 @@ public sealed class SoloBoardPresenterPlayModeTests
         Assert.That(input.gameObject.activeSelf, Is.False);
         Assert.That(Submit().gameObject.activeSelf, Is.False);
 
-        GameObject[] actions = AnswerActions();
-        Assert.That(actions.Count(action => action.activeSelf), Is.EqualTo(1));
-        actions.Single(action => action.activeSelf).GetComponent<Button>().onClick.Invoke();
+        Assert.That(AnswerActions().Any(action => action.activeSelf), Is.False,
+            "Solo already knows the truthful hint; no manual answer controls should appear.");
+        Assert.That(Find(panel.transform, "LockButton").gameObject.activeSelf, Is.False,
+            "LOCK belongs only to the player's numeric turn.");
+
+        object feedbackState = State();
+        int publishedGuess = (int)Field(game, "aiGuess");
+        Assert.That(Property(feedbackState, "Prompt").ToString(),
+            Is.EqualTo("OpponentGuessedHigher"));
+        Assert.That(Property(feedbackState, "DetailValue"), Is.EqualTo(publishedGuess));
+        Assert.That(History("AiGuessHistory").Last(), Is.EqualTo(publishedGuess),
+            "The final Solo owner must publish the accepted AI guess in its presentation state.");
+        TMP_Text visiblePrompt = (TMP_Text)Field(game, "turnText");
+        Assert.That(visiblePrompt.gameObject.activeInHierarchy, Is.True);
+        Assert.That(visiblePrompt.text, Is.EqualTo(Localized("your_number_is_higher")),
+            "The retired SoloPhaseFeedback object is replaced by the owner's live phase prompt.");
+        Transform promptRibbon = Find(panel.transform, "SoloPromptRibbon");
+        Assert.That(promptRibbon, Is.Not.Null);
+        Assert.That(visiblePrompt.transform.parent, Is.SameAs(promptRibbon),
+            "The final Solo presentation owner must seat the live prompt in its ribbon.");
+        visiblePrompt.ForceMeshUpdate();
+        Assert.That(visiblePrompt.isTextOverflowing, Is.False,
+            "The semantic replacement for SoloPhaseFeedback must remain readable.");
+        Assert.That(visiblePrompt.textBounds.size.x,
+            Is.LessThanOrEqualTo(visiblePrompt.rectTransform.rect.width + 0.5f));
+        Assert.That(visiblePrompt.textBounds.size.y,
+            Is.LessThanOrEqualTo(visiblePrompt.rectTransform.rect.height + 0.5f));
+        Assert.That(Find(panel.transform, "SoloPhaseFeedback"), Is.Null,
+            "The retired feedback GameObject must not be recreated.");
+
+        Invoke(game, "ResolveAiAnswerAutomatically");
 
         AssertPhase("PlayerGuess");
         Assert.That(Property(State(), "RoundNumber"), Is.EqualTo(2));
@@ -127,24 +221,112 @@ public sealed class SoloBoardPresenterPlayModeTests
     }
 
     [UnityTest]
-    public IEnumerator AiOpeningRequiresTruthfulAcknowledgementBeforeNumericInput()
+    public IEnumerator RapidDuplicatePlayerSubmissionCreatesOnlyOneTurnAndHistoryEntry()
+    {
+        StartWithOpener("Host", 73);
+        SetField(game, "aiSecretNumber", 90);
+
+        Assert.That(Invoke(game, "PlayerGuess", 50), Is.EqualTo(true));
+        Assert.That(Invoke(game, "PlayerGuess", 60), Is.EqualTo(false),
+            "Turn ownership must reject a second submit before AI resolves.");
+        Assert.That(History("PlayerGuessHistory"), Is.EqualTo(new[] { 50 }));
+        Assert.That(Property(State(), "Phase").ToString(),
+            Is.EqualTo("OpponentThinking"));
+        ((MonoBehaviour)game).CancelInvoke("AIGuess");
+        yield return null;
+    }
+
+    [UnityTest]
+    public IEnumerator AiOpeningAutoResolvesBeforeNumericInput()
     {
         StartWithOpener("Guest", 101);
         AssertPhase("OpponentThinking");
         Assert.That(input.gameObject.activeSelf, Is.False);
 
         Invoke(game, "AIGuess");
+        ((MonoBehaviour)game).CancelInvoke("ResolveAiAnswerAutomatically");
         AssertPhase("AnswerOpponent");
         Assert.That(History("AiGuessHistory"), Has.Length.EqualTo(1));
-        Assert.That(AnswerActions().Count(action => action.activeSelf), Is.EqualTo(1));
+        Assert.That(AnswerActions().Any(action => action.activeSelf), Is.False);
         Assert.That(input.gameObject.activeSelf, Is.False);
         Assert.That(Submit().gameObject.activeSelf, Is.False);
 
-        AnswerActions().Single(action => action.activeSelf).GetComponent<Button>().onClick.Invoke();
+        Invoke(game, "ResolveAiAnswerAutomatically");
         AssertPhase("PlayerGuess");
         Assert.That(Property(State(), "RoundNumber"), Is.EqualTo(1));
         Assert.That(input.gameObject.activeSelf, Is.True);
         Assert.That(Submit().gameObject.activeSelf, Is.True);
+        yield return null;
+    }
+
+    [UnityTest]
+    public IEnumerator AiFeedbackAdvancesWithoutAnyPlayerTap()
+    {
+        var difficulty = new PrefValue("AIDifficulty");
+        try
+        {
+            PlayerPrefs.SetInt("AIDifficulty", 2);
+            StartWithOpener("Guest", 80);
+            Invoke(game, "AIGuess");
+
+            AssertPhase("AnswerOpponent");
+            Assert.That(AnswerActions().Any(action => action.activeSelf), Is.False);
+            Assert.That(input.gameObject.activeSelf, Is.False);
+
+            yield return new WaitForSeconds(2.7f);
+
+            AssertPhase("PlayerGuess");
+            Assert.That(input.gameObject.activeSelf, Is.True);
+            Assert.That(Submit().gameObject.activeSelf, Is.True);
+            Assert.That(Field(game, "min"), Is.EqualTo(51));
+            Assert.That(Field(game, "max"), Is.EqualTo(100));
+        }
+        finally
+        {
+            difficulty.Restore();
+        }
+    }
+
+    [UnityTest]
+    public IEnumerator AutomaticAiFeedbackCannotBeCorruptedByLegacyCallbacks()
+    {
+        var difficulty = new PrefValue("AIDifficulty");
+        try
+        {
+            // Hard opens at the midpoint. With the player's secret at 80 the
+            // only truthful response to 50 is Higher.
+            PlayerPrefs.SetInt("AIDifficulty", 2);
+            StartWithOpener("Guest", 80);
+            Invoke(game, "AIGuess");
+            ((MonoBehaviour)game).CancelInvoke("ResolveAiAnswerAutomatically");
+
+            AssertPhase("AnswerOpponent");
+            Assert.That(Field(game, "aiGuess"), Is.EqualTo(50));
+            Assert.That(AnswerActions().Any(action => action.activeSelf), Is.False);
+
+            // A stale/miswired hidden callback must neither advance the turn
+            // nor change the AI bounds.
+            Invoke(game, "Lower");
+            AssertPhase("AnswerOpponent");
+            Assert.That(Field(game, "min"), Is.EqualTo(1));
+            Assert.That(Field(game, "max"), Is.EqualTo(100));
+
+            Invoke(game, "ResolveAiAnswerAutomatically");
+            AssertPhase("PlayerGuess");
+            Assert.That(Field(game, "min"), Is.EqualTo(51));
+            Assert.That(Field(game, "max"), Is.EqualTo(100));
+
+            // Duplicate input after acknowledgement is also a no-op.
+            Invoke(game, "Lower");
+            AssertPhase("PlayerGuess");
+            Assert.That(Field(game, "min"), Is.EqualTo(51));
+            Assert.That(Field(game, "max"), Is.EqualTo(100));
+        }
+        finally
+        {
+            difficulty.Restore();
+        }
+
         yield return null;
     }
 
@@ -183,7 +365,7 @@ public sealed class SoloBoardPresenterPlayModeTests
             Assert.That(Property(State(), "OpponentName"),
                 Is.EqualTo(Property(game, "CurrentOpponentName")));
             Assert.That(((TMP_Text)Field(game, "turnText")).text,
-                Is.EqualTo(Localized("enter_your_number")));
+                Is.EqualTo(Localized("solo_choose_secret")));
             Assert.That(input.gameObject.activeSelf, Is.True);
             Assert.That(Submit().gameObject.activeSelf, Is.True);
         }
@@ -248,6 +430,13 @@ public sealed class SoloBoardPresenterPlayModeTests
     Button Submit()
     {
         return (Button)Property(layout, "SubmitControl");
+    }
+
+    string RenderedInputText()
+    {
+        // TMP appends a zero-width caret marker to its render string while
+        // the field is active. It is not part of the submitted value.
+        return input.textComponent.text.TrimEnd('\u200B');
     }
 
     GameObject[] AnswerActions()

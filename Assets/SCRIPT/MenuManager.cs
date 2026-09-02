@@ -24,7 +24,10 @@ public class MenuManager : MonoBehaviour
 
     void Start()
     {
-        gameManager = FindObjectOfType<GameManager>();
+        // PanelGAME is serialized inactive on MainMenu startup. Include it so
+        // decided-result Back can distinguish a finished match from a live one
+        // as soon as direct Solo entry activates the board.
+        gameManager = FindObjectOfType<GameManager>(true);
     }
 
     void Update()
@@ -43,8 +46,8 @@ public class MenuManager : MonoBehaviour
             // Mid-match exit, same as the old stop button: reload the scene
             // for a clean state. Solo only — live PvP duels keep their
             // explicit Leave button so the room closes cleanly.
-            // Checked BEFORE panelPlay: panelPlay stays active for the
-            // whole match, so it must not shadow this branch.
+            // Checked before compatibility panels so an explicitly activated
+            // capture seam can never shadow the real Solo board.
             ConfirmMatchExit();
         }
         else if (panelPlay != null && panelPlay.activeSelf)
@@ -55,6 +58,9 @@ public class MenuManager : MonoBehaviour
 
     void ConfirmMatchExit()
     {
+        if (gameManager == null)
+            gameManager = FindObjectOfType<GameManager>(true);
+
         // A decided match has nothing to forfeit — exit on the first press.
         bool matchLive = gameManager == null || !gameManager.IsMatchOver;
 
@@ -125,12 +131,22 @@ public class MenuManager : MonoBehaviour
         // Ads moved to match end (GameManager.EndGame): gating every Play
         // press with an interstitial hurt retention and monetized the fake
         // "opponent not found" retry loop.
-        OpenFindChallengerPanel();
-    }
+        if (matchmaking == null)
+            matchmaking = FindObjectOfType<FakeMatchmaking>();
+        if (matchmaking == null || matchmaking.panelGame == null)
+        {
+            Debug.LogError(
+                "[MenuManager] Solo match cannot start: " +
+                "FakeMatchmaking/panelGame is missing.");
+            return;
+        }
 
-    void OpenFindChallengerPanel()
-    {
-        mainMenuPanel.SetActive(false);
-        panelPlay.SetActive(true);
+        // Solo is a local AI match. Enter the real board in the same call and
+        // never expose the retired find-challenger/search presentation.
+        if (settingsPanel != null) settingsPanel.SetActive(false);
+        if (panelPlay != null) panelPlay.SetActive(false);
+        if (panelSearching != null) panelSearching.SetActive(false);
+        if (mainMenuPanel != null) mainMenuPanel.SetActive(false);
+        matchmaking.StartSearch();
     }
 }

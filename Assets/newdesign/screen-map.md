@@ -7,14 +7,14 @@ Approved references and screen-specific production sprites remain the visual sou
 |---|---|---|
 | Splash / loading | `SplashDesign` | `SplashLoader` |
 | Home / mode selection | `MainMenuHomeVisuals` | `MenuManager`, runtime entry wiring |
-| Solo entry / PanelPlay | `MainMenuPlayVisuals` | `MenuManager`, `FakeMatchmaking` |
+| Solo compatibility preview / PanelPlay | `MainMenuPlayVisuals` | explicit capture/test seams only |
 | Private Room landing | `PrivateRoomVisuals` | `PvpGameController`, `PvpRuntimeUI` functional roots |
 | Private Room prebattle | `PvpRuntimeUI` screen-local production helpers | `PvpGameController` |
-| Solo duel board | `HolDuelBoardLayout` | `NumberManager`, `GameManager`, `DuelRules` |
+| Solo duel board | `SoloDuelVisuals` | `NumberManager`, `GameManager`, `DuelRules` |
 | PvP duel / result / terminal | `PvpRuntimeUI` screen-local production helpers | `PvpGameController` |
 | Settings | `SettingsVisuals` | `MenuManager`, localization/settings controllers |
 | Daily Hunt | `DailyHuntVisuals` | `DailyHunt` |
-| Solo search fallback | `SoloSearchVisuals` | `FakeMatchmaking` |
+| Solo search compatibility capture | `SoloSearchVisuals` | `FakeMatchmaking` capture seam |
 | Consent / force update | controller-local production surfaces | `ConsentManager`, `ForceUpdate` |
 | Motion / feedback | additive `UIJuice/*` only | existing Button callbacks/controllers |
 
