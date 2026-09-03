@@ -12,9 +12,30 @@ public sealed class MainMenuPlayVisualsPlayModeTests
     const BindingFlags StaticFlags =
         BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
 
+    [UnityTearDown]
+    public IEnumerator RestoreFixtureState()
+    {
+        Scene active = SceneManager.GetActiveScene();
+        Scene quiescent = SceneManager.CreateScene(
+            "MainMenuPlayVisualsQuiescent");
+        SceneManager.SetActiveScene(quiescent);
+        if (active.IsValid() && active.isLoaded &&
+            active.handle != quiescent.handle)
+            yield return SceneManager.UnloadSceneAsync(active);
+        yield return null;
+#if UNITY_EDITOR
+        FirstLaunchSoloEndToEndPlayModeTests
+            .RestoreEditorWindowAfterSettlement();
+#endif
+    }
+
     [UnityTest]
     public IEnumerator SoloAiEntryIsImmediateWhilePrivateRoomRemainsSeparate()
     {
+#if UNITY_EDITOR
+        FirstLaunchSoloEndToEndPlayModeTests
+            .FocusGameViewForEndOfFrameSettlement();
+#endif
         InvokeInstaller("MainMenuHomeVisuals");
         InvokeInstaller("MainMenuPlayVisuals");
         yield return SceneManager.LoadSceneAsync("MainMenu", LoadSceneMode.Single);

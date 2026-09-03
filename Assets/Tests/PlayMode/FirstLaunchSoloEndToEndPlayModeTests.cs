@@ -15,6 +15,12 @@ public sealed class FirstLaunchSoloEndToEndPlayModeTests
 {
     const string PlayerName = "SmokePlayer";
 
+#if UNITY_EDITOR
+    static UnityEngine.Object settlementGameView;
+    static UnityEngine.Object previouslyFocusedEditorWindow;
+    static HashSet<int> preexistingGameViewInstanceIds;
+#endif
+
     static readonly string[] StringPreferenceKeys =
     {
         "PlayerName",
@@ -95,6 +101,9 @@ public sealed class FirstLaunchSoloEndToEndPlayModeTests
         if (active.IsValid() && active.isLoaded)
             yield return SceneManager.UnloadSceneAsync(active);
         yield return null;
+#if UNITY_EDITOR
+        RestoreEditorWindowAfterSettlement();
+#endif
 
         foreach (PreferenceSnapshot preference in preferences)
             preference.Restore();
@@ -149,6 +158,10 @@ public sealed class FirstLaunchSoloEndToEndPlayModeTests
 
         Click(onboarding, "AgeCard2");
         Click(onboarding, "AgeContinue");
+#if UNITY_EDITOR
+        FocusGameViewForEndOfFrameSettlement();
+        yield return null;
+#endif
 
         yield return WaitForScene("MainMenu", 5f);
 
@@ -163,14 +176,28 @@ public sealed class FirstLaunchSoloEndToEndPlayModeTests
             Is.False);
 
         Component homeOwner = null;
-        yield return WaitUntilOrFail(() =>
+        for (int frame = 0; frame < 160; frame++)
         {
             homeOwner = FindInScene(
                 SceneManager.GetActiveScene(), RuntimeType("MainMenuHomeVisuals"));
-            return homeOwner != null &&
-                   GetProperty<bool>(homeOwner, "IsReady") &&
-                   GetProperty<bool>(homeOwner, "IsSettled");
-        }, 8f, "Main Menu Home did not become ready and settled.");
+            if (homeOwner != null &&
+                GetProperty<bool>(homeOwner, "IsReady") &&
+                GetProperty<bool>(homeOwner, "IsSettled"))
+                break;
+#if UNITY_EDITOR
+            FocusGameViewForEndOfFrameSettlement();
+#endif
+            yield return null;
+        }
+
+        Assert.That(homeOwner, Is.Not.Null,
+            "Main Menu Home owner did not appear within 160 Unity frames.");
+        Assert.That(GetProperty<bool>(homeOwner, "IsReady"), Is.True,
+            "Main Menu Home owner appeared but its production dependencies were not ready.");
+        Assert.That(GetProperty<bool>(homeOwner, "IsSettled"), Is.True,
+            "Main Menu Home was ready but its production presentation did not settle within 160 Unity frames.");
+        yield return null;
+        Canvas.ForceUpdateCanvases();
 
         Assert.That(CountInScene(
             SceneManager.GetActiveScene(), RuntimeType("MainMenuHomeVisuals")),
@@ -237,44 +264,66 @@ public sealed class FirstLaunchSoloEndToEndPlayModeTests
         Assert.That(GetField<int>(numberManager, "playerNumber"), Is.EqualTo(100));
 
         // The real submit above deliberately uses the product's random opener.
-        // Reset that just-started match through the existing test seam so the
-        // remainder is deterministic while all gameplay still runs through
-        // GameManager, NumberManager and DuelRules.
-        ((MonoBehaviour)game).CancelInvoke();
+        // Reset that just-started match through the production rematch path,
+        // then choose a deterministic opener while every move still runs
+        // through GameManager, NumberManager and canonical DuelRules.
+        Invoke(game, "RestartMatch");
+        Invoke(game, "SetPlayerNumber", 100);
+        SetField(numberManager, "playerNumber", 100);
+        SetField(numberManager, "gameStarted", true);
         SetField(game, "adsManager", null);
         StartWithOpener(game, "Host");
         SetField(game, "aiSecretNumber", 77);
-        AssertPhase(soloOwner, "PlayerGuess");
+        AssertPhase(soloOwner, "StarterReveal");
         Assert.That(Convert.ToInt32(StateProperty(soloOwner, "RoundNumber")),
             Is.EqualTo(1));
+
+        Invoke(game, "AcknowledgePresentation");
+        AssertPhase(soloOwner, "PlayerGuess");
 
         PressKey(gamePanel.transform, "5");
         PressKey(gamePanel.transform, "0");
         Click(GetProperty<Button>(soloOwner, "SubmitControl"));
-        ((MonoBehaviour)game).CancelInvoke("AIGuess");
 
-        AssertPhase(soloOwner, "OpponentThinking");
+        AssertPhase(soloOwner, "PlayerOutcome");
         CollectionAssert.AreEqual(new[] { 50 }, History(soloOwner, "PlayerGuessHistory"));
-        Invoke(game, "AIGuess");
-        ((MonoBehaviour)game).CancelInvoke("ResolveAiAnswerAutomatically");
+        Assert.That(StateProperty(soloOwner, "Prompt").ToString(),
+            Is.EqualTo("PlayerGuessedHigher"));
 
-        AssertPhase(soloOwner, "AnswerOpponent");
+        yield return null;
+        Invoke(game, "AcknowledgePresentation");
+        AssertPhase(soloOwner, "OpponentThinking");
+        CollectionAssert.IsEmpty(History(soloOwner, "AiGuessHistory"));
+
+        yield return null;
+        Invoke(game, "AcknowledgePresentation");
+        AssertPhase(soloOwner, "OpponentGuess");
         Assert.That(GetField<int>(game, "aiGuess"), Is.EqualTo(50));
         CollectionAssert.AreEqual(new[] { 50 }, History(soloOwner, "AiGuessHistory"));
+
+        yield return null;
+        Invoke(game, "AcknowledgePresentation");
+        AssertPhase(soloOwner, "AnswerOpponent");
         Assert.That(StateProperty(soloOwner, "Prompt").ToString(),
             Is.EqualTo("OpponentGuessedHigher"));
 
         TMP_Text phasePrompt = GetField<TMP_Text>(game, "turnText");
         Assert.That(phasePrompt.gameObject.activeInHierarchy, Is.True);
-        Assert.That(phasePrompt.text,
-            Is.EqualTo(Localized("your_number_is_higher")));
-        phasePrompt.ForceMeshUpdate();
-        Assert.That(phasePrompt.isTextOverflowing, Is.False,
-            "The owner-owned automatic AI feedback must remain fully readable.");
+        TMP_Text centralOutcome = Find(gamePanel.transform, "CentralOutcome")
+            .GetComponent<TMP_Text>();
+        Assert.That(centralOutcome.text,
+            Does.Contain(Localized("solo_history_higher")));
+        centralOutcome.ForceMeshUpdate();
+        Assert.That(centralOutcome.isTextOverflowing, Is.False,
+            "The acknowledged AI outcome must remain fully readable.");
 
         Assert.That(AnswerActions(game).Any(action => action.activeSelf), Is.False,
-            "Solo AI feedback must resolve automatically without legacy buttons.");
-        Invoke(game, "ResolveAiAnswerAutomatically");
+            "Truthful Solo feedback must not expose manual answer controls.");
+
+        yield return null;
+        Invoke(game, "AcknowledgePresentation");
+        yield return null;
+        Canvas.ForceUpdateCanvases();
 
         AssertPhase(soloOwner, "PlayerGuess");
         Assert.That(Convert.ToInt32(StateProperty(soloOwner, "RoundNumber")),
@@ -284,12 +333,25 @@ public sealed class FirstLaunchSoloEndToEndPlayModeTests
         PressKey(gamePanel.transform, "7");
         PressKey(gamePanel.transform, "7");
         Click(GetProperty<Button>(soloOwner, "SubmitControl"));
-        ((MonoBehaviour)game).CancelInvoke("AIGuess");
 
-        AssertPhase(soloOwner, "OpponentThinking");
+        AssertPhase(soloOwner, "PlayerOutcome");
         CollectionAssert.AreEqual(new[] { 50, 77 },
             History(soloOwner, "PlayerGuessHistory"));
-        Invoke(game, "AIGuess");
+
+        yield return null;
+        Invoke(game, "AcknowledgePresentation");
+        AssertPhase(soloOwner, "OpponentThinking");
+
+        yield return null;
+        Invoke(game, "AcknowledgePresentation");
+        AssertPhase(soloOwner, "OpponentGuess");
+
+        yield return null;
+        Invoke(game, "AcknowledgePresentation");
+        AssertPhase(soloOwner, "AnswerOpponent");
+
+        yield return null;
+        Invoke(game, "AcknowledgePresentation");
 
         AssertPhase(soloOwner, "MatchResult");
         Assert.That(StateProperty(soloOwner, "Prompt").ToString(), Is.EqualTo("Win"));
@@ -473,6 +535,132 @@ public sealed class FirstLaunchSoloEndToEndPlayModeTests
             yield return null;
         Assert.That(predicate(), Is.True, failure);
     }
+
+#if UNITY_EDITOR
+    internal static void FocusGameViewForEndOfFrameSettlement()
+    {
+        if (Application.isBatchMode)
+            return;
+
+        Type editorWindowType = Type.GetType("UnityEditor.EditorWindow, UnityEditor");
+        Type gameViewType = Type.GetType("UnityEditor.GameView, UnityEditor");
+        Assert.That(editorWindowType, Is.Not.Null,
+            "Unity EditorWindow type is required to exercise the real end-of-frame settlement path.");
+        Assert.That(gameViewType, Is.Not.Null,
+            "Unity Game View type is required to exercise the real end-of-frame settlement path.");
+
+        PropertyInfo focusedWindow = editorWindowType.GetProperty(
+            "focusedWindow", BindingFlags.Public | BindingFlags.Static);
+        Assert.That(focusedWindow, Is.Not.Null,
+            "Unity EditorWindow.focusedWindow is required to restore the test runner after settlement.");
+
+        if (preexistingGameViewInstanceIds == null)
+        {
+            previouslyFocusedEditorWindow =
+                focusedWindow.GetValue(null, null) as UnityEngine.Object;
+            preexistingGameViewInstanceIds = new HashSet<int>(
+                Resources.FindObjectsOfTypeAll(gameViewType)
+                    .Select(view => view.GetInstanceID()));
+        }
+
+        if (settlementGameView == null)
+        {
+            Type editorApplicationType = Type.GetType(
+                "UnityEditor.EditorApplication, UnityEditor");
+            MethodInfo executeMenuItem = editorApplicationType == null
+                ? null
+                : editorApplicationType.GetMethod(
+                    "ExecuteMenuItem",
+                    BindingFlags.Public | BindingFlags.Static,
+                    null,
+                    new[] { typeof(string) },
+                    null);
+            Assert.That(executeMenuItem, Is.Not.Null,
+                "Unity EditorApplication.ExecuteMenuItem is required to open the real Game View.");
+            Assert.That((bool)executeMenuItem.Invoke(
+                    null, new object[] { "Window/General/Game" }),
+                Is.True, "Unity did not open its real Game View.");
+
+            MethodInfo getWindow = editorWindowType.GetMethod(
+                "GetWindow",
+                BindingFlags.Public | BindingFlags.Static,
+                null,
+                new[] { typeof(Type) },
+                null);
+            Assert.That(getWindow, Is.Not.Null,
+                "Unity EditorWindow.GetWindow(Type) is required to acquire the real Game View.");
+            settlementGameView = getWindow.Invoke(
+                null, new object[] { gameViewType }) as UnityEngine.Object;
+            Assert.That(settlementGameView, Is.Not.Null,
+                "Unity did not provide its real Game View for the presentation settlement path.");
+        }
+
+        MethodInfo showTab = editorWindowType.GetMethod(
+            "ShowTab",
+            BindingFlags.Public | BindingFlags.Instance,
+            null,
+            Type.EmptyTypes,
+            null);
+        MethodInfo focus = editorWindowType.GetMethod(
+            "Focus",
+            BindingFlags.Public | BindingFlags.Instance,
+            null,
+            Type.EmptyTypes,
+            null);
+        MethodInfo repaint = editorWindowType.GetMethod(
+            "Repaint",
+            BindingFlags.Public | BindingFlags.Instance,
+            null,
+            Type.EmptyTypes,
+            null);
+        Assert.That(showTab, Is.Not.Null);
+        Assert.That(focus, Is.Not.Null);
+        Assert.That(repaint, Is.Not.Null);
+        showTab.Invoke(settlementGameView, null);
+        focus.Invoke(settlementGameView, null);
+        repaint.Invoke(settlementGameView, null);
+    }
+
+    internal static void RestoreEditorWindowAfterSettlement()
+    {
+        if (preexistingGameViewInstanceIds == null)
+            return;
+
+        Type editorWindowType = Type.GetType("UnityEditor.EditorWindow, UnityEditor");
+        if (editorWindowType != null && settlementGameView != null &&
+            !preexistingGameViewInstanceIds.Contains(
+                settlementGameView.GetInstanceID()))
+        {
+            MethodInfo close = editorWindowType.GetMethod(
+                "Close",
+                BindingFlags.Public | BindingFlags.Instance,
+                null,
+                Type.EmptyTypes,
+                null);
+            if (close != null)
+                close.Invoke(settlementGameView, null);
+        }
+
+        if (editorWindowType != null && previouslyFocusedEditorWindow != null)
+        {
+            foreach (string methodName in new[] { "ShowTab", "Focus", "Repaint" })
+            {
+                MethodInfo method = editorWindowType.GetMethod(
+                    methodName,
+                    BindingFlags.Public | BindingFlags.Instance,
+                    null,
+                    Type.EmptyTypes,
+                    null);
+                if (method != null)
+                    method.Invoke(previouslyFocusedEditorWindow, null);
+            }
+        }
+
+        settlementGameView = null;
+        previouslyFocusedEditorWindow = null;
+        preexistingGameViewInstanceIds = null;
+    }
+#endif
 
     static string[] PersistentMethods(Button button)
     {

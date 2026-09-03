@@ -292,24 +292,11 @@ public sealed class SoloProductionPolicyTests
         SetInstanceField(manager, "min", low);
         SetInstanceField(manager, "max", high);
         SetInstanceField(manager, "firstAIGuess", firstGuess);
-        SetInstanceField(manager, "playerSecretNumber", 101);
-        SetInstanceField(manager, "currentOpponent", "PolicyBot");
-        SetInstanceField(manager, "matchSetUp", true);
-
-        var rules = (DuelRules)GetInstanceField(manager, "rules");
-        rules.StartMatch(DuelRules.Side.Host);
-        DuelRules.Move pendingWin = rules.Submit(
-            DuelRules.Side.Host, 37, 37, false);
-        Assert.That(pendingWin.Accepted, Is.True);
-        Assert.That(pendingWin.Hint, Is.EqualTo(DuelRules.Hint.Correct));
-        Assert.That(rules.Turn, Is.EqualTo(DuelRules.Side.Guest));
-
         UnityEngine.Random.State savedRandomState = UnityEngine.Random.state;
         try
         {
             UnityEngine.Random.InitState(seed);
-            InvokeInstance(manager, "AIGuess");
-            return (int)GetInstanceField(manager, "aiGuess");
+            return (int)InvokeInstance(manager, "ChooseAiGuess");
         }
         finally
         {
@@ -431,11 +418,11 @@ public sealed class SoloProductionPolicyTests
         return method.Invoke(null, null);
     }
 
-    static void InvokeInstance(object target, string methodName)
+    static object InvokeInstance(object target, string methodName)
     {
         MethodInfo method = target.GetType().GetMethod(methodName, InstancePrivate);
         Assert.That(method, Is.Not.Null, "Missing GameManager policy seam " + methodName + ".");
-        method.Invoke(target, null);
+        return method.Invoke(target, null);
     }
 
     static object GetInstanceField(object target, string fieldName)

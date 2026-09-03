@@ -102,6 +102,8 @@ public sealed class SoloDuelVisuals : MonoBehaviour
     RectTransform visualRoot;
     RectTransform safeRoot;
     GameObject interactionCard;
+    GameObject playerCardRoot;
+    GameObject opponentCardRoot;
     GameObject opponentBubbleRoot;
     GameObject tipRoot;
     NumberManager numberManager;
@@ -112,25 +114,57 @@ public sealed class SoloDuelVisuals : MonoBehaviour
     TMP_InputField input;
     TMP_Text phaseText;
     TMP_Text roundText;
-    TMP_Text rangeText;
-    readonly GameObject[] historyRows = new GameObject[3];
-    readonly Image[] historyRowImages = new Image[3];
-    readonly TMP_Text[] historyNumberTexts = new TMP_Text[3];
-    readonly TMP_Text[] historyOutcomeTexts = new TMP_Text[3];
-    readonly Image[] historyIconImages = new Image[3];
+    TMP_Text currentHeadingText;
+    TMP_Text centralGuessText;
+    TMP_Text centralOutcomeText;
+    TMP_Text playerRangeText;
+    TMP_Text aiRangeText;
+    TMP_Text lockExplanationText;
+    readonly List<GameObject> historyRows = new List<GameObject>();
+    readonly List<Image> historyRowImages = new List<Image>();
+    readonly List<TMP_Text> historyMetaTexts = new List<TMP_Text>();
+    readonly List<TMP_Text> historyNumberTexts = new List<TMP_Text>();
+    readonly List<TMP_Text> historyOutcomeTexts = new List<TMP_Text>();
+    readonly List<TMP_Text> historyNewestTexts = new List<TMP_Text>();
+    readonly List<Image> historyIconImages = new List<Image>();
+    RectTransform historyViewport;
+    RectTransform historyContent;
+    ScrollRect historyScroll;
+    int renderedHistoryCount = -1;
     TMP_Text opponentSpeechText;
+    TMP_Text opponentGuessText;
     TMP_Text opponentPromptText;
     TMP_Text opponentIdentityText;
     TMP_Text playerNameText;
     TMP_Text playerWinsText;
     TMP_Text opponentDifficultyText;
+    TMP_Text playerActiveBadgeText;
+    TMP_Text opponentActiveBadgeText;
+    TMP_Text playerSecretText;
+    TMP_Text playerLatestGuessText;
+    TMP_Text opponentLatestGuessText;
+    CanvasGroup playerCardCanvasGroup;
+    CanvasGroup opponentCardCanvasGroup;
     TMP_Text chipText;
     Image playerAvatarImage;
     GameObject historyRoot;
     GameObject keypadRoot;
+    GameObject resultRoot;
+    TMP_Text resultReasonText;
+    TMP_Text resultSecretsText;
+    TMP_Text resultTurnsText;
+    TMP_Text resultGuessesText;
+    GameObject leaveModalRoot;
+    TMP_Text leaveTitleText;
+    TMP_Text leaveBodyText;
     Button submitControl;
+    Button continueControl;
+    Button homeControl;
+    Button leaveConfirmControl;
+    Button leaveCancelControl;
     Button lockControl;
     Button saveStreakControl;
+    bool leaveConfirmationVisible;
     bool built;
     int lastLayoutWidth = -1;
     int lastLayoutHeight = -1;
@@ -139,6 +173,7 @@ public sealed class SoloDuelVisuals : MonoBehaviour
     public SoloBoardPresentationState CurrentState => presentation.Current;
     public Button SubmitControl => submitControl;
     public GameObject KeypadRoot => keypadRoot;
+    public bool IsLeaveConfirmationVisible => leaveConfirmationVisible;
     public bool IsReady { get; private set; }
     public float CurrentTallBlend { get; private set; }
 
@@ -146,14 +181,21 @@ public sealed class SoloDuelVisuals : MonoBehaviour
     {
         lockControl = control;
         if (built)
+        {
             SeatLockControl();
+            LayoutStateControls(CurrentTallBlend);
+            Render();
+        }
     }
 
     public void RegisterSaveStreakControl(Button control)
     {
         saveStreakControl = control;
         if (built)
+        {
             SeatSaveStreakControl();
+            LayoutStateControls(CurrentTallBlend);
+        }
     }
 
     void OnEnable()
@@ -202,6 +244,7 @@ public sealed class SoloDuelVisuals : MonoBehaviour
     public void BeginNewMatch(string opponentName)
     {
         presentation.BeginNewMatch(opponentName);
+        SetLeaveConfirmationVisible(false);
         Render();
     }
 
@@ -236,6 +279,150 @@ public sealed class SoloDuelVisuals : MonoBehaviour
         Render();
     }
 
+    public bool SetPlayerSecret(int value)
+    {
+        bool changed = presentation.SetPlayerSecret(value);
+        Render();
+        return changed;
+    }
+
+    public bool RevealStarter(
+        SoloBoardActor openingActor,
+        int roundNumber,
+        int playerMin,
+        int playerMax,
+        int opponentMin,
+        int opponentMax)
+    {
+        bool changed = presentation.RevealStarter(
+            openingActor, roundNumber, playerMin, playerMax,
+            opponentMin, opponentMax);
+        Render();
+        return changed;
+    }
+
+    public bool BeginPlayerTurn(
+        int roundNumber,
+        int playerMin,
+        int playerMax,
+        int opponentMin,
+        int opponentMax,
+        bool lastLicks)
+    {
+        bool changed = presentation.BeginPlayerTurn(
+            roundNumber, playerMin, playerMax, opponentMin, opponentMax,
+            lastLicks);
+        Render();
+        return changed;
+    }
+
+    public bool BeginOpponentThinking(
+        int roundNumber,
+        int playerMin,
+        int playerMax,
+        int opponentMin,
+        int opponentMax)
+    {
+        bool changed = presentation.BeginOpponentThinking(
+            roundNumber, playerMin, playerMax, opponentMin, opponentMax);
+        Render();
+        return changed;
+    }
+
+    public bool RecordPlayerMove(
+        int roundNumber,
+        int guess,
+        DuelRules.Hint hint,
+        bool usedLock,
+        int candidatesBefore,
+        int newPlayerMin,
+        int newPlayerMax,
+        int opponentMin,
+        int opponentMax)
+    {
+        bool changed = presentation.RecordPlayerMove(
+            roundNumber, guess, hint, usedLock, candidatesBefore,
+            newPlayerMin, newPlayerMax, opponentMin, opponentMax);
+        Render();
+        return changed;
+    }
+
+    public bool RecordOpponentMove(
+        int roundNumber,
+        int guess,
+        DuelRules.Hint hint,
+        bool usedLock,
+        int candidatesBefore,
+        int playerMin,
+        int playerMax,
+        int newOpponentMin,
+        int newOpponentMax)
+    {
+        bool changed = presentation.RecordOpponentMove(
+            roundNumber, guess, hint, usedLock, candidatesBefore,
+            playerMin, playerMax, newOpponentMin, newOpponentMax);
+        Render();
+        return changed;
+    }
+
+    public bool RevealOpponentOutcome()
+    {
+        bool changed = presentation.RevealOpponentOutcome();
+        Render();
+        return changed;
+    }
+
+    public bool ShowLastLicks(int roundNumber)
+    {
+        bool changed = presentation.ShowLastLicks(roundNumber);
+        Render();
+        return changed;
+    }
+
+    public bool ShowLockForfeit(SoloBoardActor actor, int roundNumber)
+    {
+        bool changed = presentation.ShowLockForfeit(actor, roundNumber);
+        Render();
+        return changed;
+    }
+
+    public bool CompleteMatch(
+        DuelRules.Outcome outcome,
+        int playerSecret,
+        int opponentSecret,
+        int playerGuessCount,
+        int opponentGuessCount)
+    {
+        bool changed = presentation.CompleteMatch(
+            outcome, playerSecret, opponentSecret,
+            playerGuessCount, opponentGuessCount);
+        Render();
+        return changed;
+    }
+
+    public void UpdateLockState(
+        bool revealed,
+        bool available,
+        bool armed,
+        bool spent,
+        int candidates)
+    {
+        presentation.UpdateLockState(
+            revealed, available, armed, spent, candidates);
+        Render();
+    }
+
+    public void SetLeaveConfirmationVisible(bool visible)
+    {
+        leaveConfirmationVisible = visible;
+        if (leaveModalRoot != null)
+        {
+            leaveModalRoot.SetActive(visible);
+            if (visible)
+                leaveModalRoot.transform.SetAsLastSibling();
+        }
+    }
+
     void Build()
     {
         if (built) return;
@@ -258,6 +445,8 @@ public sealed class SoloDuelVisuals : MonoBehaviour
         LayoutExistingGameplay();
         BuildKeypad();
         SeatControllerOwnedControls();
+        BuildSemanticSurfaces();
+        BuildLeaveConfirmation();
         SuppressRetiredLegacyPanels();
         built = true;
         Rect safeArea = Screen.safeArea;
@@ -322,50 +511,73 @@ public sealed class SoloDuelVisuals : MonoBehaviour
             new Vector2(362f, 901f), new Vector2(340f, 1220f), blend);
         LayoutNamed("SoloOpponentBubble",
             new Vector2(-45f, 350f), new Vector2(-40f, 457f),
-            new Vector2(315f, 234f), new Vector2(315f, 244f), blend);
+            new Vector2(315f, 220f), new Vector2(315f, 220f), blend);
         LayoutNamed("HistoryCard",
-            new Vector2(0f, 7f), new Vector2(0f, 12f),
-            new Vector2(374f, 462f), new Vector2(340f, 625f), blend);
+            new Vector2(0f, 20f), new Vector2(0f, 40f),
+            new Vector2(374f, 420f), new Vector2(340f, 590f), blend);
         LayoutNamed("SoloTipCard",
-            new Vector2(0f, -342f), new Vector2(0f, -413f),
-            new Vector2(390f, 249f), new Vector2(342f, 363f), blend);
+            new Vector2(0f, -330f), new Vector2(0f, -425f),
+            new Vector2(390f, 260f), new Vector2(342f, 320f), blend);
 
         LayoutNamed("CurrentNumberHeading",
             new Vector2(-9f, 402f), new Vector2(-9f, 506f),
-            new Vector2(545f, 60f), new Vector2(545f, 60f), blend);
+            new Vector2(600f, 64f), new Vector2(600f, 68f), blend);
         LayoutControl(input != null ? input.transform as RectTransform : null,
-            new Vector2(-13f, 274f), new Vector2(-13f, 377f),
-            new Vector2(500f, 184f), new Vector2(500f, 208f), blend);
+            new Vector2(-13f, 285f), new Vector2(-13f, 385f),
+            new Vector2(520f, 140f), new Vector2(520f, 150f), blend);
         LayoutControl(
             numberManager != null && numberManager.playerNumberText != null
                 ? numberManager.playerNumberText.rectTransform
                 : null,
-            new Vector2(-13f, 274f), new Vector2(-13f, 377f),
-            new Vector2(500f, 184f), new Vector2(500f, 208f), blend);
+            new Vector2(-13f, 285f), new Vector2(-13f, 385f),
+            new Vector2(520f, 140f), new Vector2(520f, 150f), blend);
+        LayoutControl(centralGuessText != null
+                ? centralGuessText.rectTransform
+                : null,
+            new Vector2(-9f, 285f), new Vector2(-9f, 385f),
+            new Vector2(620f, 132f), new Vector2(620f, 146f), blend);
+        LayoutControl(centralOutcomeText != null
+                ? centralOutcomeText.rectTransform
+                : null,
+            new Vector2(-9f, 180f), new Vector2(-9f, 275f),
+            new Vector2(610f, 50f), new Vector2(610f, 58f), blend);
         LayoutControl(
             numberManager != null && numberManager.messageText != null
                 ? numberManager.messageText.rectTransform
                 : null,
-            new Vector2(0f, 225f), new Vector2(0f, 236f),
-            new Vector2(540f, 42f), new Vector2(540f, 50f), blend);
+            new Vector2(0f, 180f), new Vector2(0f, 275f),
+            new Vector2(560f, 46f), new Vector2(560f, 50f), blend);
 
         LayoutControl(keypadRoot != null
                 ? keypadRoot.transform as RectTransform
                 : null,
-            new Vector2(-1f, -74f), new Vector2(-1f, -69f),
-            new Vector2(577f, 477f), new Vector2(577f, 628f), blend);
+            new Vector2(-1f, -80f), new Vector2(-1f, -65f),
+            new Vector2(577f, 440f), new Vector2(577f, 600f), blend);
         LayoutKeypadButtons(blend);
-        LayoutControl(submitControl != null
-                ? submitControl.transform as RectTransform
-                : null,
-            new Vector2(-1f, -383f), new Vector2(-1f, -418f),
-            new Vector2(575f, 94f), new Vector2(575f, 150f), blend);
         TMP_Text submitLabel = submitControl != null
             ? submitControl.GetComponentInChildren<TMP_Text>(true)
             : null;
         LayoutControl(submitLabel != null ? submitLabel.rectTransform : null,
             Vector2.zero, Vector2.zero,
-            new Vector2(430f, 76f), new Vector2(430f, 110f), blend);
+            new Vector2(250f, 72f), new Vector2(250f, 96f), blend);
+
+        LayoutControl(resultRoot != null
+                ? resultRoot.transform as RectTransform
+                : null,
+            new Vector2(-9f, 20f), new Vector2(-9f, 40f),
+            new Vector2(640f, 660f), new Vector2(640f, 820f), blend);
+        LayoutNamed("ResultReason",
+            new Vector2(0f, 190f), new Vector2(0f, 250f),
+            new Vector2(600f, 150f), new Vector2(600f, 190f), blend);
+        LayoutNamed("ResultSecrets",
+            new Vector2(0f, 66f), new Vector2(0f, 90f),
+            new Vector2(600f, 60f), new Vector2(600f, 70f), blend);
+        LayoutNamed("ResultLatestGuesses",
+            new Vector2(0f, -2f), new Vector2(0f, 5f),
+            new Vector2(600f, 92f), new Vector2(600f, 112f), blend);
+        LayoutNamed("ResultTurns",
+            new Vector2(0f, -88f), new Vector2(0f, -98f),
+            new Vector2(600f, 60f), new Vector2(600f, 72f), blend);
 
         LayoutHistory(blend);
         LayoutTip(blend);
@@ -390,75 +602,139 @@ public sealed class SoloDuelVisuals : MonoBehaviour
             int column = i % 3;
             int row = i / 3;
             float x = -203f + column * 203f;
-            float baseY = 176f - row * 120f;
-            float tallY = 243f - row * 162f;
+            float baseY = 165f - row * 110f;
+            float tallY = 225f - row * 150f;
             LayoutControl(key as RectTransform,
                 new Vector2(x, baseY), new Vector2(x, tallY),
-                new Vector2(186f, 120f), new Vector2(186f, 142f), blend);
+                new Vector2(186f, 108f), new Vector2(186f, 132f), blend);
         }
     }
 
     void LayoutHistory(float blend)
     {
         LayoutNamed("HistoryTitle",
-            new Vector2(0f, 196f), new Vector2(0f, 258f),
+            new Vector2(0f, 174f), new Vector2(0f, 255f),
             new Vector2(310f, 50f), new Vector2(310f, 58f), blend);
         LayoutNamed("HistoryTitleSparkleLeft",
-            new Vector2(-150f, 196f), new Vector2(-150f, 258f),
+            new Vector2(-150f, 174f), new Vector2(-150f, 255f),
             new Vector2(34f, 40f), new Vector2(34f, 40f), blend);
         LayoutNamed("HistoryTitleSparkleRight",
-            new Vector2(150f, 196f), new Vector2(150f, 258f),
+            new Vector2(150f, 174f), new Vector2(150f, 255f),
             new Vector2(34f, 40f), new Vector2(34f, 40f), blend);
+        LayoutControl(historyViewport,
+            new Vector2(0f, -28f), new Vector2(0f, -42f),
+            new Vector2(334f, 310f), new Vector2(314f, 450f), blend);
 
-        float[] baseY = { 110f, -5f, -120f };
-        float[] tallY = { 145f, -18f, -181f };
-        for (int i = 0; i < historyRows.Length; i++)
+        if (historyContent == null)
+            return;
+
+        float rowHeight = Mathf.Lerp(102f, 114f, blend);
+        float viewportHeight = Mathf.Lerp(310f, 450f, blend);
+        float contentHeight = Mathf.Max(
+            viewportHeight, historyRows.Count * rowHeight);
+        historyContent.anchorMin = new Vector2(0f, 1f);
+        historyContent.anchorMax = new Vector2(1f, 1f);
+        historyContent.pivot = new Vector2(0.5f, 1f);
+        historyContent.anchoredPosition = Vector2.zero;
+        historyContent.sizeDelta = new Vector2(0f, contentHeight);
+
+        for (int i = 0; i < historyRows.Count; i++)
         {
-            LayoutNamed("HistoryRow" + (i + 1),
-                new Vector2(0f, baseY[i]), new Vector2(0f, tallY[i]),
-                new Vector2(334f, 104f), new Vector2(314f, 170f), blend);
+            RectTransform row = historyRows[i].transform as RectTransform;
+            if (row == null)
+                continue;
+            row.anchorMin = row.anchorMax = new Vector2(0.5f, 1f);
+            row.pivot = new Vector2(0.5f, 1f);
+            row.anchoredPosition = new Vector2(0f, -i * rowHeight);
+            row.sizeDelta = new Vector2(
+                Mathf.Lerp(326f, 306f, blend), rowHeight - 8f);
+            row.localRotation = Quaternion.identity;
+            row.localScale = Vector3.one;
         }
     }
 
     void LayoutTip(float blend)
     {
         LayoutNamed("SoloTipHeading",
-            new Vector2(-90f, 91f), new Vector2(-90f, 112f),
+            new Vector2(-90f, 91f), new Vector2(-90f, 128f),
             new Vector2(150f, 42f), new Vector2(150f, 46f), blend);
         LayoutNamed("SoloTipBulb",
-            new Vector2(-150f, 88f), new Vector2(-150f, 109f),
+            new Vector2(-150f, 88f), new Vector2(-150f, 125f),
             new Vector2(64f, 72f), new Vector2(64f, 72f), blend);
         LayoutNamed("SoloTipMascot",
-            new Vector2(118f, -31f), new Vector2(85f, -66f),
-            new Vector2(164f, 190f), new Vector2(145f, 176f), blend);
-        LayoutControl(rangeText != null ? rangeText.rectTransform : null,
-            new Vector2(-65f, 2f), new Vector2(-62f, -5f),
-            new Vector2(195f, 88f), new Vector2(210f, 126f), blend);
+            new Vector2(135f, -44f), new Vector2(126f, -55f),
+            new Vector2(108f, 126f), new Vector2(112f, 138f), blend);
+        LayoutControl(playerRangeText != null
+                ? playerRangeText.rectTransform
+                : null,
+            new Vector2(-43f, 42f), new Vector2(-38f, 69f),
+            new Vector2(238f, 40f), new Vector2(250f, 44f), blend);
+        LayoutControl(aiRangeText != null ? aiRangeText.rectTransform : null,
+            new Vector2(-43f, 5f), new Vector2(-38f, 23f),
+            new Vector2(238f, 40f), new Vector2(250f, 44f), blend);
+        LayoutControl(lockExplanationText != null
+                ? lockExplanationText.rectTransform
+                : null,
+            new Vector2(-43f, -62f), new Vector2(-38f, -65f),
+            new Vector2(238f, 96f), new Vector2(250f, 104f), blend);
     }
 
     void LayoutStateControls(float blend)
     {
+        bool splitNumeric = presentation.Current.Phase ==
+                            SoloBoardPhase.PlayerGuess;
+        bool splitAcknowledge =
+            presentation.Current.AcknowledgeControlVisible &&
+            LiveLockVisible(presentation.Current);
+        LayoutControl(submitControl != null
+                ? submitControl.transform as RectTransform
+                : null,
+            splitNumeric ? new Vector2(-150f, -385f) :
+                new Vector2(-1f, -385f),
+            splitNumeric ? new Vector2(-150f, -455f) :
+                new Vector2(-1f, -455f),
+            splitNumeric ? new Vector2(276f, 94f) :
+                new Vector2(575f, 94f),
+            splitNumeric ? new Vector2(276f, 120f) :
+                new Vector2(575f, 120f), blend);
+        LayoutControl(continueControl != null
+                ? continueControl.transform as RectTransform
+                : null,
+            splitAcknowledge ? new Vector2(-150f, -385f) :
+                new Vector2(-1f, -385f),
+            splitAcknowledge ? new Vector2(-150f, -455f) :
+                new Vector2(-1f, -455f),
+            splitAcknowledge ? new Vector2(276f, 94f) :
+                new Vector2(575f, 94f),
+            splitAcknowledge ? new Vector2(276f, 120f) :
+                new Vector2(575f, 120f), blend);
+        LayoutControl(lockControl != null
+                ? lockControl.transform as RectTransform
+                : null,
+            new Vector2(150f, -385f), new Vector2(150f, -455f),
+            new Vector2(276f, 94f), new Vector2(276f, 120f), blend);
+
         if (gameManager != null)
         {
             LayoutControl(gameManager.stopGameButton != null
                     ? gameManager.stopGameButton.transform as RectTransform
                     : null,
-                new Vector2(0f, -835f), new Vector2(0f, -1035f),
-                new Vector2(500f, 96f), new Vector2(500f, 118f), blend);
+                new Vector2(-150f, -385f), new Vector2(-150f, -455f),
+                new Vector2(276f, 94f), new Vector2(276f, 120f), blend);
             LayoutAnswerControl(gameManager.higherButton, -190f, blend);
             LayoutAnswerControl(gameManager.correctButton, 0f, blend);
             LayoutAnswerControl(gameManager.lowerButton, 190f, blend);
         }
+        LayoutControl(homeControl != null
+                ? homeControl.transform as RectTransform
+                : null,
+            new Vector2(150f, -385f), new Vector2(150f, -455f),
+            new Vector2(276f, 94f), new Vector2(276f, 120f), blend);
         LayoutControl(saveStreakControl != null
                 ? saveStreakControl.transform as RectTransform
                 : null,
-            new Vector2(0f, -710f), new Vector2(0f, -900f),
-            new Vector2(560f, 90f), new Vector2(560f, 112f), blend);
-        LayoutControl(lockControl != null
-                ? lockControl.transform as RectTransform
-                : null,
-            new Vector2(0f, -63f), new Vector2(0f, -78f),
-            new Vector2(292f, 82f), new Vector2(292f, 96f), blend);
+            new Vector2(0f, -275f), new Vector2(0f, -330f),
+            new Vector2(560f, 82f), new Vector2(560f, 96f), blend);
     }
 
     void LayoutAnswerControl(GameObject control, float x, float blend)
@@ -466,8 +742,8 @@ public sealed class SoloDuelVisuals : MonoBehaviour
         LayoutControl(control != null
                 ? control.transform as RectTransform
                 : null,
-            new Vector2(x, -383f), new Vector2(x, -418f),
-            new Vector2(170f, 94f), new Vector2(170f, 150f), blend);
+            new Vector2(x, -385f), new Vector2(x, -455f),
+            new Vector2(170f, 94f), new Vector2(170f, 120f), blend);
     }
 
     void LayoutNamed(
@@ -647,43 +923,77 @@ public sealed class SoloDuelVisuals : MonoBehaviour
             (RectTransform)back.transform, new Vector2(132f, 129f),
             new Vector2(-453f, 860f));
         HideButtonLabels(back.transform);
-        if (menuManager != null)
-            back.onClick.AddListener(menuManager.RequestSoloMatchExit);
+        back.onClick.AddListener(RequestMatchExit);
 
-        GameObject playerCard = ArtFrame(
+        playerCardRoot = ArtFrame(
             safeRoot, "PlayerCard", new Vector2(-276f, 472f),
             new Vector2(514f, 620f), PlayerCardResource, false);
+        playerCardCanvasGroup = playerCardRoot.GetComponent<CanvasGroup>();
+        if (playerCardCanvasGroup == null)
+            playerCardCanvasGroup = playerCardRoot.AddComponent<CanvasGroup>();
         AddSprite(
-            playerCard.transform, "PlayerCharacter", LoadRequired(PlayerResource),
-            new Vector2(-52f, 46f), new Vector2(370f, 370f));
+            playerCardRoot.transform, "PlayerCharacter", LoadRequired(PlayerResource),
+            new Vector2(-52f, 62f), new Vector2(350f, 350f));
         TMP_Text playerCaption = DisplayLabel(
-            playerCard.transform, "PlayerCaption",
+            playerCardRoot.transform, "PlayerCaption",
             L10n.Get("solo_you_header"), 38,
             new Vector2(0f, 248f), new Vector2(320f, 52f), NearWhite);
         RuntimeUI.Localize(playerCaption, "solo_you_header");
+        GameObject playerBadge = Frame(
+            playerCardRoot.transform, "PlayerActiveBadge",
+            new Vector2(0f, 202f), new Vector2(226f, 46f),
+            SoloBlueFrameResource);
+        playerActiveBadgeText = DisplayLabel(
+            playerBadge.transform, "PlayerActiveBadgeLabel", "", 24,
+            Vector2.zero, new Vector2(202f, 38f), NearWhite);
+        playerActiveBadgeText.enableAutoSizing = true;
+        playerActiveBadgeText.fontSizeMin = 16f;
+        playerActiveBadgeText.fontSizeMax = 24f;
         playerNameText = DisplayLabel(
-            playerCard.transform, "PlayerName",
+            playerCardRoot.transform, "PlayerName",
             PlayerPrefs.GetString("PlayerName", L10n.Get("player_default")),
-            60, new Vector2(0f, -159f), new Vector2(380f, 70f), NearWhite);
+            50, new Vector2(0f, -126f), new Vector2(380f, 60f), NearWhite);
+        playerSecretText = BodyLabel(
+            playerCardRoot.transform, "PlayerSecretValue", "", 25,
+            new Vector2(0f, -178f), new Vector2(390f, 42f), Gold);
+        playerSecretText.alignment = TextAlignmentOptions.Center;
+        playerLatestGuessText = BodyLabel(
+            playerCardRoot.transform, "PlayerLatestGuess", "", 23,
+            new Vector2(0f, -218f), new Vector2(390f, 38f), NearWhite);
+        playerLatestGuessText.alignment = TextAlignmentOptions.Center;
         AddSprite(
-            playerCard.transform, "PlayerCardTrophy", LoadRequired(TrophyResource),
-            new Vector2(-72f, -224f), new Vector2(54f, 54f));
+            playerCardRoot.transform, "PlayerCardTrophy", LoadRequired(TrophyResource),
+            new Vector2(-72f, -270f), new Vector2(48f, 48f));
         playerWinsText = DisplayLabel(
-            playerCard.transform, "PlayerWins", string.Empty, 44,
-            new Vector2(38f, -224f), new Vector2(170f, 54f), Gold);
+            playerCardRoot.transform, "PlayerWins", string.Empty, 38,
+            new Vector2(38f, -270f), new Vector2(170f, 50f), Gold);
 
-        GameObject opponentCard = ArtFrame(
+        opponentCardRoot = ArtFrame(
             safeRoot, "OpponentCard", new Vector2(282f, 470f),
             new Vector2(514f, 620f), OpponentCardResource, false);
+        opponentCardCanvasGroup = opponentCardRoot.GetComponent<CanvasGroup>();
+        if (opponentCardCanvasGroup == null)
+            opponentCardCanvasGroup = opponentCardRoot.AddComponent<CanvasGroup>();
         AddSprite(
-            opponentCard.transform, "OpponentCharacter",
-            LoadRequired(OpponentResource), new Vector2(-20f, 65f),
-            new Vector2(360f, 360f));
+            opponentCardRoot.transform, "OpponentCharacter",
+            LoadRequired(OpponentResource), new Vector2(-20f, 72f),
+            new Vector2(344f, 344f));
         TMP_Text opponentCaption = DisplayLabel(
-            opponentCard.transform, "OpponentCaption",
+            opponentCardRoot.transform, "OpponentCaption",
             L10n.Get("prebattle_opponent"), 37,
             new Vector2(0f, 248f), new Vector2(320f, 52f), NearWhite);
         RuntimeUI.Localize(opponentCaption, "prebattle_opponent");
+        GameObject opponentBadge = Frame(
+            opponentCardRoot.transform, "OpponentActiveBadge",
+            new Vector2(0f, 202f), new Vector2(226f, 46f),
+            SoloMagentaFrameResource);
+        opponentActiveBadgeText = DisplayLabel(
+            opponentBadge.transform, "OpponentActiveBadgeLabel", "", 24,
+            Vector2.zero, new Vector2(208f, 38f), NearWhite);
+        opponentActiveBadgeText.enableAutoSizing = true;
+        opponentActiveBadgeText.fontSizeMin = 16f;
+        opponentActiveBadgeText.fontSizeMax = 24f;
+        opponentActiveBadgeText.margin = new Vector4(3f, 0f, 3f, 0f);
 
         opponentIdentityText = gameManager != null
             ? gameManager.opponentNameText
@@ -691,28 +1001,33 @@ public sealed class SoloDuelVisuals : MonoBehaviour
         if (opponentIdentityText == null)
         {
             opponentIdentityText = DisplayLabel(
-                opponentCard.transform, "OpponentIdentity", "", 60,
-                new Vector2(0f, -159f), new Vector2(380f, 70f), NearWhite);
+                opponentCardRoot.transform, "OpponentIdentity", "", 50,
+                new Vector2(0f, -126f), new Vector2(380f, 60f), NearWhite);
         }
         else
         {
-            Reparent(opponentIdentityText.transform, opponentCard.transform);
+            Reparent(opponentIdentityText.transform, opponentCardRoot.transform);
             Place(
                 opponentIdentityText.rectTransform,
-                new Vector2(0f, -159f), new Vector2(380f, 70f));
-            ConfigureDisplayText(opponentIdentityText, 48f, 61f);
+                new Vector2(0f, -126f), new Vector2(380f, 60f));
+            ConfigureDisplayText(opponentIdentityText, 39f, 51f);
             opponentIdentityText.enableAutoSizing = false;
-            opponentIdentityText.fontSize = 60f;
+            opponentIdentityText.fontSize = 50f;
             opponentIdentityText.color = NearWhite;
             opponentIdentityText.alignment = TextAlignmentOptions.Center;
         }
 
+        opponentLatestGuessText = BodyLabel(
+            opponentCardRoot.transform, "OpponentLatestGuess", "", 23,
+            new Vector2(0f, -198f), new Vector2(390f, 44f), NearWhite);
+        opponentLatestGuessText.alignment = TextAlignmentOptions.Center;
+
         AddSprite(
-            opponentCard.transform, "OpponentCardTrophy", LoadRequired(TrophyResource),
-            new Vector2(-72f, -224f), new Vector2(54f, 54f));
+            opponentCardRoot.transform, "OpponentCardTrophy", LoadRequired(TrophyResource),
+            new Vector2(-72f, -270f), new Vector2(48f, 48f));
         opponentDifficultyText = DisplayLabel(
-            opponentCard.transform, "OpponentDifficulty", string.Empty, 32,
-            new Vector2(48f, -224f), new Vector2(250f, 54f), Gold);
+            opponentCardRoot.transform, "OpponentDifficulty", string.Empty, 30,
+            new Vector2(48f, -270f), new Vector2(250f, 50f), Gold);
         opponentDifficultyText.enableAutoSizing = true;
         opponentDifficultyText.fontSizeMin = 24f;
         opponentDifficultyText.fontSizeMax = 32f;
@@ -737,30 +1052,30 @@ public sealed class SoloDuelVisuals : MonoBehaviour
             new Vector2(636f, 181f), PromptRibbonResource, false);
         roundText = DisplayLabel(
             promptRibbon.transform, "RoundLabel", "", 34,
-            new Vector2(0f, 45f), new Vector2(520f, 42f), NearWhite);
+            new Vector2(0f, 52f), new Vector2(520f, 38f), NearWhite);
 
         phaseText = gameManager != null ? gameManager.turnText : null;
         if (phaseText == null)
         {
             phaseText = DisplayLabel(
                 promptRibbon.transform, "PhasePrompt", "", 56,
-                new Vector2(0f, -15f), new Vector2(584f, 70f), NearWhite);
+                new Vector2(0f, -30f), new Vector2(584f, 105f), NearWhite);
         }
         else
         {
             Reparent(phaseText.transform, promptRibbon.transform);
             Place(
-                phaseText.rectTransform, new Vector2(0f, -15f),
-                new Vector2(584f, 70f));
+                phaseText.rectTransform, new Vector2(0f, -30f),
+                new Vector2(584f, 105f));
             phaseText.color = NearWhite;
             phaseText.alignment = TextAlignmentOptions.Center;
         }
-        ConfigureDisplayText(phaseText, 30f, 45f);
+        ConfigureDisplayText(phaseText, 22f, 42f);
         phaseText.enableAutoSizing = true;
-        phaseText.fontSizeMin = 30f;
-        phaseText.fontSizeMax = 45f;
-        phaseText.enableWordWrapping = false;
-        phaseText.overflowMode = TextOverflowModes.Overflow;
+        phaseText.fontSizeMin = 22f;
+        phaseText.fontSizeMax = 42f;
+        phaseText.enableWordWrapping = true;
+        phaseText.overflowMode = TextOverflowModes.Truncate;
         phaseText.margin = new Vector4(8f, 0f, 8f, 0f);
         roundText.outlineWidth = 0.20f;
         phaseText.outlineWidth = 0.22f;
@@ -768,11 +1083,10 @@ public sealed class SoloDuelVisuals : MonoBehaviour
         interactionCard = ArtFrame(
             safeRoot, "SoloInteractionCard", new Vector2(-189f, -488f),
             new Vector2(760f, 1004f), InteractionBoardResource, false);
-        TMP_Text currentLabel = DisplayLabel(
+        currentHeadingText = DisplayLabel(
             interactionCard.transform, "CurrentNumberHeading",
             L10n.Get("hud_current_number"), 30,
             new Vector2(-9f, 402f), new Vector2(545f, 60f), NearWhite);
-        RuntimeUI.Localize(currentLabel, "hud_current_number");
 
         GameObject rail = RuntimeUI.CreateObject("SoloOpponentRail", safeRoot);
         Place(
@@ -781,7 +1095,7 @@ public sealed class SoloDuelVisuals : MonoBehaviour
 
         opponentBubbleRoot = MirroredArtFrame(
             rail.transform, "SoloOpponentBubble", new Vector2(-45f, 350f),
-            new Vector2(315f, 234f), SpeechBubbleResource, false);
+            new Vector2(315f, 220f), SpeechBubbleResource, false);
         AddSprite(
             opponentBubbleRoot.transform, "OpponentBubbleAvatar",
             LoadRequired(OpponentAvatarResource), new Vector2(160f, -20f),
@@ -795,8 +1109,8 @@ public sealed class SoloDuelVisuals : MonoBehaviour
             new Vector2(106f, 106f));
 
         tipRoot = ArtFrame(
-            rail.transform, "SoloTipCard", new Vector2(0f, -342f),
-            new Vector2(390f, 249f), TipBoardResource);
+            rail.transform, "SoloTipCard", new Vector2(0f, -330f),
+            new Vector2(390f, 260f), TipBoardResource);
         TMP_Text tipHeading = DisplayLabel(
             tipRoot.transform, "SoloTipHeading",
             L10n.Get("solo_tip_heading"), 27,
@@ -817,8 +1131,8 @@ public sealed class SoloDuelVisuals : MonoBehaviour
         {
             Reparent(input.transform, interactionCard.transform);
             Place(
-                input.transform as RectTransform, new Vector2(-13f, 274f),
-                new Vector2(500f, 184f));
+                input.transform as RectTransform, new Vector2(-13f, 285f),
+                new Vector2(520f, 140f));
             input.shouldHideMobileInput = true;
             input.shouldHideSoftKeyboard = true;
             var image = input.GetComponent<Image>();
@@ -841,9 +1155,14 @@ public sealed class SoloDuelVisuals : MonoBehaviour
             {
                 placeholder.text = "?";
                 placeholder.font = displayFont;
-                placeholder.fontSize = 170f;
+                // Keep the large empty-state cue, but let TMP fit the actual
+                // input viewport at every supported portrait size.  The old
+                // fixed 170pt glyph exceeded the 720x1280 text rectangle.
+                placeholder.fontSize = 88f;
                 placeholder.fontStyle = FontStyles.Bold;
-                placeholder.enableAutoSizing = false;
+                placeholder.enableAutoSizing = true;
+                placeholder.fontSizeMin = 64f;
+                placeholder.fontSizeMax = 88f;
                 placeholder.color = NearWhite;
                 placeholder.alignment = TextAlignmentOptions.Center;
             }
@@ -857,7 +1176,7 @@ public sealed class SoloDuelVisuals : MonoBehaviour
                 interactionCard.transform);
             Place(
                 numberManager.playerNumberText.rectTransform,
-                new Vector2(-13f, 274f), new Vector2(500f, 184f));
+                new Vector2(-13f, 285f), new Vector2(520f, 140f));
             numberManager.playerNumberText.font = displayFont;
             numberManager.playerNumberText.alignment =
                 TextAlignmentOptions.Center;
@@ -866,39 +1185,51 @@ public sealed class SoloDuelVisuals : MonoBehaviour
             numberManager.playerNumberText.color = NearWhite;
         }
 
-        rangeText = gameManager != null ? gameManager.rangeText : null;
-        if (rangeText == null)
+        playerRangeText = gameManager != null ? gameManager.rangeText : null;
+        if (playerRangeText == null)
         {
-            rangeText = BodyLabel(
-                tipRoot.transform, "RangeLabel", "", 26,
-                new Vector2(-65f, 2f), new Vector2(195f, 88f), NearWhite);
+            playerRangeText = BodyLabel(
+                tipRoot.transform, "PlayerRangeLabel", "", 23,
+                new Vector2(-43f, 42f), new Vector2(238f, 36f), NearWhite);
         }
         else
         {
-            Reparent(rangeText.transform, tipRoot.transform);
+            Reparent(playerRangeText.transform, tipRoot.transform);
+            playerRangeText.name = "PlayerRangeLabel";
             Place(
-                rangeText.rectTransform, new Vector2(-65f, 2f),
-                new Vector2(195f, 88f));
-            ConfigureBodyText(rangeText, 22f, 28f);
-            rangeText.color = NearWhite;
-            rangeText.alignment = TextAlignmentOptions.Center;
+                playerRangeText.rectTransform, new Vector2(-43f, 42f),
+                new Vector2(238f, 36f));
+            ConfigureBodyText(playerRangeText, 16f, 23f);
+            playerRangeText.color = NearWhite;
+            playerRangeText.alignment = TextAlignmentOptions.Center;
         }
+        aiRangeText = BodyLabel(
+            tipRoot.transform, "OpponentRangeLabel", "", 22,
+            new Vector2(-43f, 5f), new Vector2(238f, 36f), NearWhite);
+        aiRangeText.alignment = TextAlignmentOptions.Center;
+        ConfigureBodyText(aiRangeText, 15f, 22f);
+        lockExplanationText = BodyLabel(
+            tipRoot.transform, "LockExplanation", "", 19,
+            new Vector2(-43f, -58f), new Vector2(238f, 82f), NearWhite);
+        lockExplanationText.alignment = TextAlignmentOptions.Center;
+        ConfigureBodyText(lockExplanationText, 15f, 19f);
 
         if (gameManager != null)
         {
-            gameManager.rangeText = rangeText;
+            gameManager.rangeText = playerRangeText;
 
             if (gameManager.aiNumberText != null)
             {
+                opponentGuessText = gameManager.aiNumberText;
                 Reparent(
-                    gameManager.aiNumberText.transform,
+                    opponentGuessText.transform,
                     opponentBubbleRoot.transform);
                 Place(
-                    gameManager.aiNumberText.rectTransform,
+                    opponentGuessText.rectTransform,
                     new Vector2(-35f, 55f), new Vector2(270f, 48f));
-                ConfigureDisplayText(gameManager.aiNumberText, 23f, 30f);
-                gameManager.aiNumberText.color = Ink;
-                gameManager.aiNumberText.alignment =
+                ConfigureDisplayText(opponentGuessText, 23f, 30f);
+                opponentGuessText.color = Ink;
+                opponentGuessText.alignment =
                     TextAlignmentOptions.Center;
             }
 
@@ -927,48 +1258,97 @@ public sealed class SoloDuelVisuals : MonoBehaviour
     {
         Transform rail = DeepFind(safeRoot, "SoloOpponentRail");
         historyRoot = ArtFrame(
-            rail, "HistoryCard", new Vector2(0f, 7f),
-            new Vector2(374f, 462f), HistoryBoardResource, false);
+            rail, "HistoryCard", new Vector2(0f, 20f),
+            new Vector2(374f, 420f), HistoryBoardResource, false);
         TMP_Text title = DisplayLabel(
             historyRoot.transform, "HistoryTitle", L10n.Get("hud_history"), 30,
-            new Vector2(0f, 196f), new Vector2(310f, 50f), NearWhite);
+            new Vector2(0f, 174f), new Vector2(310f, 50f), NearWhite);
         RuntimeUI.Localize(title, "hud_history");
         AddSprite(
             historyRoot.transform, "HistoryTitleSparkleLeft",
-            LoadRequired(TitleSparkleResource), new Vector2(-150f, 196f),
+            LoadRequired(TitleSparkleResource), new Vector2(-150f, 174f),
             new Vector2(34f, 40f));
         AddSprite(
             historyRoot.transform, "HistoryTitleSparkleRight",
-            LoadRequired(TitleSparkleResource), new Vector2(150f, 196f),
+            LoadRequired(TitleSparkleResource), new Vector2(150f, 174f),
             new Vector2(34f, 40f));
 
-        BuildHistoryRow(0, 110f, HistoryHigherResource, HistoryUpIconResource);
-        BuildHistoryRow(1, -5f, HistoryLowerResource, HistoryDownIconResource);
-        BuildHistoryRow(
-            2, -120f, HistoryCorrectResource, HistoryCorrectIconResource);
+        historyViewport = EnsureRect(historyRoot.transform, "HistoryViewport");
+        Place(historyViewport, new Vector2(0f, -28f), new Vector2(334f, 310f));
+        Image viewportImage = historyViewport.GetComponent<Image>();
+        if (viewportImage == null)
+            viewportImage = historyViewport.gameObject.AddComponent<Image>();
+        viewportImage.color = Color.clear;
+        viewportImage.raycastTarget = true;
+        if (historyViewport.GetComponent<RectMask2D>() == null)
+            historyViewport.gameObject.AddComponent<RectMask2D>();
+
+        historyContent = EnsureRect(historyViewport, "HistoryContent");
+        historyContent.anchorMin = new Vector2(0f, 1f);
+        historyContent.anchorMax = new Vector2(1f, 1f);
+        historyContent.pivot = new Vector2(0.5f, 1f);
+        historyContent.anchoredPosition = Vector2.zero;
+        historyContent.sizeDelta = new Vector2(0f, 310f);
+
+        historyScroll = historyRoot.GetComponent<ScrollRect>();
+        if (historyScroll == null)
+            historyScroll = historyRoot.AddComponent<ScrollRect>();
+        historyScroll.content = historyContent;
+        historyScroll.viewport = historyViewport;
+        historyScroll.horizontal = false;
+        historyScroll.vertical = true;
+        historyScroll.movementType = ScrollRect.MovementType.Clamped;
+        historyScroll.inertia = true;
+        historyScroll.scrollSensitivity = 38f;
+
+        EnsureHistoryRowCount(3);
     }
 
-    void BuildHistoryRow(
-        int index, float y, string resource, string iconResource)
+    void EnsureHistoryRowCount(int required)
+    {
+        while (historyRows.Count < required)
+            BuildHistoryRow(historyRows.Count);
+    }
+
+    void BuildHistoryRow(int index)
     {
         GameObject row = ArtFrame(
-            historyRoot.transform, "HistoryRow" + (index + 1),
-            new Vector2(0f, y), new Vector2(334f, 104f), resource, false);
-        historyRows[index] = row;
-        historyRowImages[index] = row.GetComponent<Image>();
-        historyNumberTexts[index] = DisplayLabel(
-            row.transform, "HistoryNumber", "", 64,
-            new Vector2(-106f, 0f), new Vector2(82f, 68f), NearWhite);
-        historyOutcomeTexts[index] = DisplayLabel(
-            row.transform, "HistoryOutcome", "", 30,
-            new Vector2(14f, 0f), new Vector2(150f, 62f), NearWhite);
-        historyOutcomeTexts[index].enableAutoSizing = true;
-        historyOutcomeTexts[index].fontSizeMin = 23f;
-        historyOutcomeTexts[index].fontSizeMax = 30f;
-        historyOutcomeTexts[index].margin = new Vector4(6f, 0f, 6f, 0f);
-        historyIconImages[index] = AddSprite(
-            row.transform, "HistoryIcon", LoadRequired(iconResource),
-            new Vector2(125f, 0f), new Vector2(64f, 64f));
+            historyContent, "HistoryRow" + (index + 1),
+            Vector2.zero, new Vector2(326f, 100f),
+            HistoryLowerResource, false);
+        historyRows.Add(row);
+        historyRowImages.Add(row.GetComponent<Image>());
+
+        TMP_Text meta = BodyLabel(
+            row.transform, "HistoryMeta", "", 18,
+            new Vector2(-33f, 29f), new Vector2(238f, 28f), NearWhite);
+        meta.alignment = TextAlignmentOptions.Left;
+        ConfigureBodyText(meta, 14f, 18f);
+        historyMetaTexts.Add(meta);
+
+        historyNumberTexts.Add(DisplayLabel(
+            row.transform, "HistoryNumber", "", 43,
+            new Vector2(-116f, -13f), new Vector2(78f, 52f), NearWhite));
+        TMP_Text outcome = DisplayLabel(
+            row.transform, "HistoryOutcome", "", 23,
+            new Vector2(8f, -16f), new Vector2(160f, 60f), NearWhite);
+        outcome.enableAutoSizing = true;
+        outcome.fontSizeMin = 18f;
+        outcome.fontSizeMax = 23f;
+        outcome.margin = new Vector4(4f, 0f, 4f, 0f);
+        historyOutcomeTexts.Add(outcome);
+
+        TMP_Text newest = BodyLabel(
+            row.transform, "HistoryNewest", "", 18,
+            new Vector2(111f, 29f), new Vector2(72f, 28f), Gold);
+        newest.alignment = TextAlignmentOptions.Center;
+        ConfigureBodyText(newest, 14f, 18f);
+        historyNewestTexts.Add(newest);
+
+        historyIconImages.Add(AddSprite(
+            row.transform, "HistoryIcon", LoadRequired(HistoryDownIconResource),
+            new Vector2(127f, -13f), new Vector2(48f, 48f)));
+        row.SetActive(false);
     }
 
     void BuildKeypad()
@@ -976,7 +1356,7 @@ public sealed class SoloDuelVisuals : MonoBehaviour
         keypadRoot = RuntimeUI.CreateObject(
             "NumberKeypad", interactionCard.transform);
         RectTransform rootRect = (RectTransform)keypadRoot.transform;
-        Place(rootRect, new Vector2(-1f, -74f), new Vector2(577f, 477f));
+        Place(rootRect, new Vector2(-1f, -80f), new Vector2(577f, 440f));
 
         string[] keys =
         {
@@ -996,8 +1376,8 @@ public sealed class SoloDuelVisuals : MonoBehaviour
             string label = clearKey || backspaceKey ? string.Empty : keys[i];
             Button button = RuntimeUI.CreateButton(
                 keypadRoot.transform, "Key_" + keys[i], label,
-                new Vector2(-203f + column * 203f, 176f - row * 120f),
-                new Vector2(186f, 120f), KeyBlue, NearWhite);
+                new Vector2(-203f + column * 203f, 165f - row * 110f),
+                new Vector2(186f, 108f), KeyBlue, NearWhite);
             StyleSoloButton(button, SoloBlueFrameResource, NearWhite);
             ConfigureImage(
                 button.GetComponent<Image>(), LoadRequired(KeypadKeyResource),
@@ -1053,7 +1433,7 @@ public sealed class SoloDuelVisuals : MonoBehaviour
 
         Place(
             (RectTransform)submitControl.transform,
-            new Vector2(-1f, -383f), new Vector2(575f, 94f));
+            new Vector2(-1f, -385f), new Vector2(575f, 94f));
         StyleSoloButton(submitControl, SoloGoldFrameResource, Ink);
         ConfigureImage(
             submitControl.GetComponent<Image>(), LoadRequired(PrimaryCtaResource),
@@ -1070,11 +1450,15 @@ public sealed class SoloDuelVisuals : MonoBehaviour
             submitLabel.font = displayFont;
             submitLabel.fontSize = 80f;
             submitLabel.fontStyle = FontStyles.Bold;
-            submitLabel.enableAutoSizing = false;
+            submitLabel.enableAutoSizing = true;
+            submitLabel.fontSizeMin = 46f;
+            submitLabel.fontSizeMax = 80f;
             submitLabel.characterSpacing = 0f;
             submitLabel.wordSpacing = 0f;
             submitLabel.lineSpacing = 0f;
-            submitLabel.overflowMode = TextOverflowModes.Overflow;
+            submitLabel.enableWordWrapping = false;
+            submitLabel.margin = new Vector4(4f, 2f, 4f, 2f);
+            submitLabel.overflowMode = TextOverflowModes.Truncate;
             LocalizedText localized =
                 submitLabel.GetComponent<LocalizedText>();
             if (localized == null)
@@ -1086,7 +1470,179 @@ public sealed class SoloDuelVisuals : MonoBehaviour
                 localized.key = "solo_submit";
             submitLabel.text = L10n.Get("solo_submit");
         }
+        if (input != null)
+            input.onValueChanged.AddListener(OnInputValueChanged);
         ValidateLayout();
+    }
+
+    void BuildSemanticSurfaces()
+    {
+        centralGuessText = DisplayLabel(
+            interactionCard.transform, "CentralGuess", "", 54,
+            new Vector2(-9f, 285f), new Vector2(620f, 132f), NearWhite);
+        centralGuessText.alignment = TextAlignmentOptions.Center;
+        centralGuessText.enableAutoSizing = true;
+        centralGuessText.fontSizeMin = 32f;
+        centralGuessText.fontSizeMax = 54f;
+        centralGuessText.margin = new Vector4(5f, 0f, 5f, 0f);
+
+        centralOutcomeText = DisplayLabel(
+            interactionCard.transform, "CentralOutcome", "", 37,
+            new Vector2(-9f, 180f), new Vector2(610f, 50f), Gold);
+        centralOutcomeText.alignment = TextAlignmentOptions.Center;
+        centralOutcomeText.enableAutoSizing = true;
+        centralOutcomeText.fontSizeMin = 25f;
+        centralOutcomeText.fontSizeMax = 39f;
+
+        continueControl = RuntimeUI.CreateButton(
+            interactionCard.transform, "SoloContinueButton",
+            L10n.Get("solo_continue"), new Vector2(-1f, -385f),
+            new Vector2(575f, 94f), Gold, Ink);
+        StyleSoloButton(continueControl, SoloGoldFrameResource, Ink);
+        ConfigureImage(
+            continueControl.GetComponent<Image>(),
+            LoadRequired(PrimaryCtaResource), false, Image.Type.Simple);
+        continueControl.GetComponent<Image>().raycastTarget = true;
+        continueControl.targetGraphic = continueControl.GetComponent<Image>();
+        ConfigureActionLabel(continueControl, 58f, Ink);
+        TMP_Text continueLabel =
+            continueControl.GetComponentInChildren<TMP_Text>(true);
+        if (continueLabel != null)
+        {
+            continueLabel.enableWordWrapping = false;
+            continueLabel.fontSizeMin = 32f;
+        }
+        continueControl.onClick.AddListener(AcknowledgePresentation);
+
+        resultRoot = RuntimeUI.CreateObject(
+            "SoloResultDetail", interactionCard.transform);
+        Place(resultRoot.transform as RectTransform, new Vector2(-9f, 20f),
+            new Vector2(640f, 660f));
+        resultReasonText = DisplayLabel(
+            resultRoot.transform, "ResultReason", "", 34,
+            new Vector2(0f, 190f), new Vector2(600f, 150f), NearWhite);
+        resultReasonText.alignment = TextAlignmentOptions.Center;
+        resultReasonText.enableAutoSizing = true;
+        resultReasonText.fontSizeMin = 22f;
+        resultReasonText.fontSizeMax = 34f;
+        resultSecretsText = BodyLabel(
+            resultRoot.transform, "ResultSecrets", "", 27,
+            new Vector2(0f, 66f), new Vector2(600f, 60f), Gold);
+        resultSecretsText.alignment = TextAlignmentOptions.Center;
+        resultGuessesText = BodyLabel(
+            resultRoot.transform, "ResultLatestGuesses", "", 25,
+            new Vector2(0f, -2f), new Vector2(600f, 92f), NearWhite);
+        resultGuessesText.alignment = TextAlignmentOptions.Center;
+        resultTurnsText = BodyLabel(
+            resultRoot.transform, "ResultTurns", "", 27,
+            new Vector2(0f, -88f), new Vector2(600f, 60f), NearWhite);
+        resultTurnsText.alignment = TextAlignmentOptions.Center;
+
+        homeControl = RuntimeUI.CreateButton(
+            interactionCard.transform, "SoloHomeButton", L10n.Get("solo_home"),
+            new Vector2(150f, -385f), new Vector2(276f, 94f),
+            CardBlue, NearWhite);
+        StyleSoloButton(homeControl, SoloBlueFrameResource, NearWhite);
+        ConfigureActionLabel(homeControl, 43f, NearWhite);
+        homeControl.onClick.AddListener(RequestMatchExit);
+    }
+
+    void BuildLeaveConfirmation()
+    {
+        leaveModalRoot = RuntimeUI.CreateObject(
+            "SoloLeaveConfirmation", visualRoot);
+        Stretch(leaveModalRoot.transform as RectTransform);
+        Image blocker = leaveModalRoot.AddComponent<Image>();
+        blocker.color = new Color(0.035f, 0.015f, 0.09f, 0.84f);
+        blocker.raycastTarget = true;
+
+        GameObject modal = Frame(
+            leaveModalRoot.transform, "SoloLeaveConfirmationCard",
+            Vector2.zero, new Vector2(850f, 560f),
+            SoloPurpleFrameResource);
+        leaveTitleText = DisplayLabel(
+            modal.transform, "SoloLeaveTitle", L10n.Get("solo_leave_title"),
+            46, new Vector2(0f, 170f), new Vector2(720f, 92f), NearWhite);
+        leaveTitleText.alignment = TextAlignmentOptions.Center;
+        leaveTitleText.enableAutoSizing = true;
+        leaveTitleText.fontSizeMin = 30f;
+        leaveTitleText.fontSizeMax = 46f;
+        leaveBodyText = BodyLabel(
+            modal.transform, "SoloLeaveBody", L10n.Get("solo_leave_body"),
+            31, new Vector2(0f, 55f), new Vector2(690f, 112f), NearWhite);
+        leaveBodyText.alignment = TextAlignmentOptions.Center;
+
+        leaveConfirmControl = RuntimeUI.CreateButton(
+            modal.transform, "SoloLeaveConfirmButton",
+            L10n.Get("solo_leave_confirm"), new Vector2(-200f, -130f),
+            new Vector2(360f, 112f), CardPink, NearWhite);
+        StyleSoloButton(
+            leaveConfirmControl, SoloMagentaFrameResource, NearWhite);
+        ConfigureActionLabel(leaveConfirmControl, 34f, NearWhite);
+
+        leaveCancelControl = RuntimeUI.CreateButton(
+            modal.transform, "SoloLeaveCancelButton", L10n.Get("cancel"),
+            new Vector2(220f, -130f), new Vector2(300f, 112f),
+            CardBlue, NearWhite);
+        StyleSoloButton(leaveCancelControl, SoloBlueFrameResource, NearWhite);
+        ConfigureActionLabel(leaveCancelControl, 38f, NearWhite);
+
+        leaveConfirmControl.onClick.AddListener(ConfirmMatchExit);
+        leaveCancelControl.onClick.AddListener(CancelMatchExit);
+        leaveModalRoot.SetActive(leaveConfirmationVisible);
+    }
+
+    void AcknowledgePresentation()
+    {
+        if (gameManager == null)
+            gameManager = FindObjectOfType<GameManager>(true);
+        if (gameManager != null)
+            gameManager.AcknowledgePresentation();
+    }
+
+    void RequestMatchExit()
+    {
+        if (menuManager == null)
+            menuManager = FindObjectOfType<MenuManager>(true);
+        if (menuManager != null)
+            menuManager.RequestSoloMatchExit();
+    }
+
+    void ConfirmMatchExit()
+    {
+        if (menuManager == null)
+            menuManager = FindObjectOfType<MenuManager>(true);
+        if (menuManager != null)
+            menuManager.ConfirmSoloMatchExit();
+    }
+
+    void CancelMatchExit()
+    {
+        if (menuManager == null)
+            menuManager = FindObjectOfType<MenuManager>(true);
+        if (menuManager != null)
+            menuManager.CancelSoloMatchExit();
+        else
+            SetLeaveConfirmationVisible(false);
+    }
+
+    void ConfigureActionLabel(Button button, float size, Color color)
+    {
+        if (button == null)
+            return;
+        TMP_Text label = button.GetComponentInChildren<TMP_Text>(true);
+        if (label == null)
+            return;
+        label.font = displayFont;
+        label.fontSize = size;
+        label.enableAutoSizing = true;
+        label.fontSizeMin = Mathf.Max(22f, size - 16f);
+        label.fontSizeMax = size;
+        label.color = color;
+        label.alignment = TextAlignmentOptions.Center;
+        label.enableWordWrapping = true;
+        label.overflowMode = TextOverflowModes.Truncate;
+        label.margin = new Vector4(10f, 3f, 10f, 3f);
     }
 
     void SeatControllerOwnedControls()
@@ -1095,8 +1651,8 @@ public sealed class SoloDuelVisuals : MonoBehaviour
         {
             TMP_Text message = numberManager.messageText;
             Reparent(message.transform, interactionCard.transform);
-            Place(message.rectTransform, new Vector2(0f, 225f),
-                new Vector2(540f, 42f));
+            Place(message.rectTransform, new Vector2(0f, 180f),
+                new Vector2(560f, 46f));
             message.font = bodyFont;
             message.enableAutoSizing = true;
             message.fontSizeMin = 20f;
@@ -1110,18 +1666,21 @@ public sealed class SoloDuelVisuals : MonoBehaviour
             return;
 
         SeatButton(
-            gameManager.stopGameButton, safeRoot,
-            new Vector2(0f, -835f), new Vector2(500f, 96f),
+            gameManager.stopGameButton, interactionCard.transform,
+            new Vector2(-150f, -385f), new Vector2(276f, 94f),
             SoloGoldFrameResource, Ink);
+        if (gameManager.stopGameButton != null)
+            ConfigureActionLabel(
+                gameManager.stopGameButton.GetComponent<Button>(), 42f, Ink);
 
         SeatAnswerControl(
-            gameManager.higherButton, new Vector2(-190f, -383f),
+            gameManager.higherButton, new Vector2(-190f, -385f),
             SoloBlueFrameResource, NearWhite);
         SeatAnswerControl(
-            gameManager.correctButton, new Vector2(0f, -383f),
+            gameManager.correctButton, new Vector2(0f, -385f),
             SoloGoldFrameResource, Ink);
         SeatAnswerControl(
-            gameManager.lowerButton, new Vector2(190f, -383f),
+            gameManager.lowerButton, new Vector2(190f, -385f),
             SoloMagentaFrameResource, NearWhite);
 
         if (lockControl == null)
@@ -1145,24 +1704,26 @@ public sealed class SoloDuelVisuals : MonoBehaviour
 
     void SeatLockControl()
     {
-        if (lockControl == null || tipRoot == null)
+        if (lockControl == null || interactionCard == null)
             return;
 
         SeatButton(
-            lockControl.gameObject, tipRoot.transform,
-            new Vector2(0f, -63f), new Vector2(292f, 82f),
+            lockControl.gameObject, interactionCard.transform,
+            new Vector2(150f, -385f), new Vector2(276f, 94f),
             SoloBlueFrameResource, Ink);
+        ConfigureActionLabel(lockControl, 35f, Ink);
     }
 
     void SeatSaveStreakControl()
     {
-        if (saveStreakControl == null || safeRoot == null)
+        if (saveStreakControl == null || interactionCard == null)
             return;
 
         SeatButton(
-            saveStreakControl.gameObject, safeRoot,
-            new Vector2(0f, -710f), new Vector2(560f, 90f),
+            saveStreakControl.gameObject, interactionCard.transform,
+            new Vector2(0f, -275f), new Vector2(560f, 82f),
             SoloPurpleFrameResource, NearWhite);
+        ConfigureActionLabel(saveStreakControl, 31f, NearWhite);
     }
 
     static void SeatButton(
@@ -1242,6 +1803,8 @@ public sealed class SoloDuelVisuals : MonoBehaviour
             playerAvatarImage.sprite = ResolvePlayerAvatar(
                 LoadRequired(AvatarResource));
 
+        RenderActorCards(state);
+
         if (phaseText != null)
             phaseText.text = PromptText(state);
 
@@ -1254,16 +1817,21 @@ public sealed class SoloDuelVisuals : MonoBehaviour
                 : string.Empty;
         }
 
-        if (rangeText != null)
-        {
-            bool showRange =
-                state.Phase != SoloBoardPhase.ChooseSecret &&
-                state.Phase != SoloBoardPhase.MatchResult;
-            rangeText.gameObject.SetActive(showRange);
-            rangeText.text = showRange
-                ? L10n.Get("solo_tip_range", state.RangeMin, state.RangeMax)
-                : string.Empty;
-        }
+        bool showStrategy = state.Phase != SoloBoardPhase.ChooseSecret &&
+                            state.Phase != SoloBoardPhase.MatchResult;
+        if (tipRoot != null)
+            tipRoot.SetActive(showStrategy);
+        if (playerRangeText != null)
+            playerRangeText.text = L10n.Get(
+                "solo_range_player", OpponentName(state),
+                state.PlayerRangeMin,
+                state.PlayerRangeMax);
+        if (aiRangeText != null)
+            aiRangeText.text = L10n.Get(
+                "solo_range_ai", OpponentName(state), state.AiRangeMin,
+                state.AiRangeMax);
+        if (lockExplanationText != null)
+            lockExplanationText.text = LockExplanation(state);
 
         RenderHistoryRows(state);
         if (historyRoot != null)
@@ -1271,41 +1839,35 @@ public sealed class SoloDuelVisuals : MonoBehaviour
 
         if (opponentIdentityText != null)
         {
-            opponentIdentityText.text = state.OpponentName;
+            opponentIdentityText.text = OpponentName(state);
             opponentIdentityText.transform.SetAsLastSibling();
         }
 
         bool numeric = state.NumericControlsAvailable;
         if (numberManager != null && numberManager.playerNumberText != null)
+            numberManager.playerNumberText.gameObject.SetActive(false);
+
+        if (currentHeadingText != null)
+            currentHeadingText.text = CurrentHeading(state);
+        if (centralGuessText != null)
         {
-            numberManager.playerNumberText.gameObject.SetActive(
-                !numeric && state.Phase != SoloBoardPhase.MatchResult);
+            bool showCentral = !numeric &&
+                               state.Phase != SoloBoardPhase.MatchResult;
+            centralGuessText.gameObject.SetActive(showCentral);
+            centralGuessText.text = showCentral ? CentralGuess(state) : "";
+        }
+        if (centralOutcomeText != null)
+        {
+            bool showOutcome = !numeric &&
+                               state.Phase != SoloBoardPhase.MatchResult;
+            centralOutcomeText.gameObject.SetActive(showOutcome);
+            centralOutcomeText.text = showOutcome
+                ? CentralOutcome(state)
+                : "";
+            centralOutcomeText.color = OutcomeColorForState(state);
         }
 
-        if (opponentBubbleRoot != null)
-        {
-            bool showBubble =
-                state.Phase == SoloBoardPhase.PlayerGuess ||
-                state.Phase == SoloBoardPhase.OpponentThinking ||
-                state.Phase == SoloBoardPhase.AnswerOpponent;
-            opponentBubbleRoot.SetActive(showBubble);
-        }
-        if (opponentSpeechText != null &&
-            state.Phase == SoloBoardPhase.PlayerGuess)
-        {
-            opponentSpeechText.gameObject.SetActive(true);
-            opponentSpeechText.text = string.Empty;
-        }
-        if (opponentPromptText != null)
-        {
-            bool showPrompt = state.Phase == SoloBoardPhase.PlayerGuess;
-            opponentPromptText.gameObject.SetActive(showPrompt);
-            if (showPrompt)
-            {
-                opponentPromptText.text = L10n.Get("solo_ai_taunt");
-                opponentPromptText.transform.SetAsLastSibling();
-            }
-        }
+        RenderOpponentBubble(state);
         if (input != null)
         {
             input.shouldHideMobileInput = true;
@@ -1317,15 +1879,469 @@ public sealed class SoloDuelVisuals : MonoBehaviour
         }
         if (keypadRoot != null)
             keypadRoot.SetActive(numeric);
+        if (numberManager != null && numberManager.messageText != null &&
+            !numeric)
+            numberManager.messageText.gameObject.SetActive(false);
         if (submitControl != null)
         {
-            submitControl.interactable = numeric;
+            submitControl.interactable = numeric && numberManager != null &&
+                                         numberManager.CanSubmitCurrentValue;
             submitControl.gameObject.SetActive(state.SubmitControlVisible);
         }
+        if (continueControl != null)
+        {
+            continueControl.gameObject.SetActive(
+                state.AcknowledgeControlVisible);
+            continueControl.interactable = state.AcknowledgeControlVisible;
+            TMP_Text label = continueControl.GetComponentInChildren<TMP_Text>(true);
+            if (label != null)
+                label.text = AcknowledgeLabel(state.NextAction);
+        }
+        if (lockControl != null)
+        {
+            bool showLock = LiveLockVisible(state);
+            lockControl.gameObject.SetActive(showLock);
+            lockControl.interactable = showLock && LockCanBePressed(state);
+        }
+
+        RenderResult(state);
+        LayoutStateControls(CurrentTallBlend);
+        RenderLeaveConfirmation();
 
         EnforcePhaseVisibility(state);
         SuppressRetiredLegacyPanels();
         EnsureVisualRootOnTop();
+    }
+
+    void RenderActorCards(SoloBoardPresentationState state)
+    {
+        SoloBoardActor active = state.ActiveActor;
+        if (state.Phase == SoloBoardPhase.ChooseSecret)
+            active = SoloBoardActor.Player;
+        bool hasActive = active == SoloBoardActor.Player ||
+                         active == SoloBoardActor.Opponent;
+        if (playerCardCanvasGroup != null)
+            playerCardCanvasGroup.alpha = hasActive &&
+                                          active != SoloBoardActor.Player
+                ? 0.56f
+                : 1f;
+        if (opponentCardCanvasGroup != null)
+            opponentCardCanvasGroup.alpha = hasActive &&
+                                            active != SoloBoardActor.Opponent
+                ? 0.56f
+                : 1f;
+
+        if (playerActiveBadgeText != null)
+            playerActiveBadgeText.text = active == SoloBoardActor.Player
+                ? L10n.Get("solo_player_active")
+                : L10n.Get("solo_waiting");
+        if (opponentActiveBadgeText != null)
+            opponentActiveBadgeText.text = active == SoloBoardActor.Opponent
+                ? L10n.Get("solo_opponent_active", OpponentName(state))
+                : L10n.Get("solo_waiting");
+        if (playerSecretText != null)
+            playerSecretText.text = state.PlayerSecretNumber > 0
+                ? L10n.Get("solo_secret_value", state.PlayerSecretNumber)
+                : L10n.Get("solo_secret_unset");
+        if (playerLatestGuessText != null)
+            playerLatestGuessText.text = state.LatestPlayerGuess > 0
+                ? L10n.Get("solo_latest_guess", state.LatestPlayerGuess)
+                : L10n.Get("solo_no_guess");
+        if (opponentLatestGuessText != null)
+            opponentLatestGuessText.text = state.LatestAiGuess > 0
+                ? L10n.Get("solo_latest_guess", state.LatestAiGuess)
+                : L10n.Get("solo_no_guess");
+    }
+
+    void RenderOpponentBubble(SoloBoardPresentationState state)
+    {
+        bool playerTaunt = state.Phase == SoloBoardPhase.PlayerGuess;
+        bool factualAiBeat = state.Phase == SoloBoardPhase.OpponentThinking ||
+                             state.Phase == SoloBoardPhase.OpponentGuess ||
+                             state.Phase == SoloBoardPhase.AnswerOpponent;
+        if (opponentBubbleRoot != null)
+            opponentBubbleRoot.SetActive(playerTaunt || factualAiBeat);
+        if (opponentPromptText != null)
+        {
+            opponentPromptText.gameObject.SetActive(playerTaunt);
+            opponentPromptText.text = playerTaunt
+                ? L10n.Get("solo_ai_taunt")
+                : "";
+        }
+        bool showGuess = state.Phase == SoloBoardPhase.OpponentGuess ||
+                         state.Phase == SoloBoardPhase.AnswerOpponent;
+        if (opponentGuessText != null)
+        {
+            opponentGuessText.gameObject.SetActive(showGuess);
+            opponentGuessText.text = showGuess
+                ? L10n.Get(
+                    "solo_opponent_guessed", OpponentName(state),
+                    state.LatestAiGuess)
+                : "";
+        }
+        if (opponentSpeechText == null)
+            return;
+        bool showSpeech = state.Phase == SoloBoardPhase.OpponentThinking ||
+                          state.Phase == SoloBoardPhase.AnswerOpponent;
+        opponentSpeechText.gameObject.SetActive(showSpeech);
+        if (state.Phase == SoloBoardPhase.OpponentThinking)
+            opponentSpeechText.text = L10n.Get(
+                "opponent_thinking", OpponentName(state));
+        else if (state.Phase == SoloBoardPhase.AnswerOpponent)
+            opponentSpeechText.text = L10n.Get(
+                "solo_answer", HistoryOutcomeLabel(state.LatestAiOutcome));
+        else
+            opponentSpeechText.text = "";
+    }
+
+    static string OpponentName(SoloBoardPresentationState state)
+    {
+        return string.IsNullOrWhiteSpace(state.OpponentName)
+            ? L10n.Get("prebattle_opponent")
+            : state.OpponentName;
+    }
+
+    static string CurrentHeading(SoloBoardPresentationState state)
+    {
+        if (state.Phase == SoloBoardPhase.ChooseSecret)
+            return L10n.Get("solo_current_secret");
+        if (state.Phase == SoloBoardPhase.StarterReveal)
+            return L10n.Get("solo_starter_heading");
+        if (state.Phase == SoloBoardPhase.PlayerGuess ||
+            state.Phase == SoloBoardPhase.PlayerOutcome ||
+            state.Phase == SoloBoardPhase.LastLicks)
+            return L10n.Get("solo_current_guess", OpponentName(state));
+        if (state.Phase == SoloBoardPhase.OpponentThinking ||
+            state.Phase == SoloBoardPhase.OpponentGuess ||
+            state.Phase == SoloBoardPhase.AnswerOpponent)
+            return L10n.Get("solo_current_ai_guess", OpponentName(state));
+        if (state.Phase == SoloBoardPhase.LockForfeit)
+            return L10n.Get("solo_lock_forfeit_heading");
+        if (state.Phase == SoloBoardPhase.RoundResolution)
+            return L10n.Get("solo_round_update_heading");
+        if (state.Phase == SoloBoardPhase.MatchResult)
+            return L10n.Get("result_page_title");
+        return L10n.Get("solo_round_update_heading");
+    }
+
+    static string CentralGuess(SoloBoardPresentationState state)
+    {
+        switch (state.Phase)
+        {
+            case SoloBoardPhase.StarterReveal:
+                return state.Starter == SoloBoardActor.Player
+                    ? L10n.Get("solo_player_objective", OpponentName(state))
+                    : L10n.Get("solo_opponent_objective", OpponentName(state));
+            case SoloBoardPhase.PlayerOutcome:
+                return L10n.Get("solo_you_guessed", state.LatestPlayerGuess);
+            case SoloBoardPhase.OpponentThinking:
+                return L10n.Get("opponent_thinking", OpponentName(state));
+            case SoloBoardPhase.OpponentGuess:
+            case SoloBoardPhase.AnswerOpponent:
+                return L10n.Get(
+                    "solo_opponent_guessed", OpponentName(state),
+                    state.LatestAiGuess);
+            case SoloBoardPhase.LastLicks:
+                return L10n.Get("solo_last_licks", OpponentName(state));
+            case SoloBoardPhase.LockForfeit:
+                return PromptText(state);
+            default:
+                return PromptText(state);
+        }
+    }
+
+    static string CentralOutcome(SoloBoardPresentationState state)
+    {
+        if (state.Phase == SoloBoardPhase.PlayerOutcome)
+            return HistoryOutcomeLabel(state.LatestPlayerOutcome);
+        if (state.Phase == SoloBoardPhase.AnswerOpponent)
+            return L10n.Get(
+                "solo_answer", HistoryOutcomeLabel(state.LatestAiOutcome));
+        if (state.Phase == SoloBoardPhase.OpponentGuess)
+            return L10n.Get("solo_reveal_outcome");
+        if (state.Phase == SoloBoardPhase.StarterReveal)
+            return state.Starter == SoloBoardActor.Player
+                ? L10n.Get("solo_player_starts")
+                : L10n.Get("solo_opponent_starts", OpponentName(state));
+        return "";
+    }
+
+    static Color OutcomeColorForState(SoloBoardPresentationState state)
+    {
+        if (state.Phase == SoloBoardPhase.PlayerOutcome)
+            return HistoryOutcomeColor(state.LatestPlayerOutcome);
+        if (state.Phase == SoloBoardPhase.AnswerOpponent)
+            return HistoryOutcomeColor(state.LatestAiOutcome);
+        return Gold;
+    }
+
+    static string LockExplanation(SoloBoardPresentationState state)
+    {
+        if (state.LockSpent)
+            return L10n.Get("solo_lock_spent_reason");
+        if (state.LockArmed)
+            return L10n.Get("solo_lock_locked");
+        if (LockCanBePressed(state))
+            return L10n.Get("solo_lock_available");
+        return L10n.Get("solo_lock_after_guess");
+    }
+
+    static bool LockCanBePressed(SoloBoardPresentationState state)
+    {
+        // DuelRules exposes one Lock from the opening player turn. The old
+        // first-guess reveal was only a tutorial presentation choice and must
+        // not make the real action unavailable.
+        return state.Phase == SoloBoardPhase.PlayerGuess &&
+               !state.LockSpent &&
+               (state.LockAvailable || !state.LockRevealed || state.LockArmed);
+    }
+
+    static bool LiveLockVisible(SoloBoardPresentationState state)
+    {
+        return state.Phase != SoloBoardPhase.ChooseSecret &&
+               state.Phase != SoloBoardPhase.MatchResult;
+    }
+
+    static string AcknowledgeLabel(SoloBoardNextAction action)
+    {
+        switch (action)
+        {
+            case SoloBoardNextAction.Start:
+                return L10n.Get("solo_start");
+            case SoloBoardNextAction.RevealGuess:
+                return L10n.Get("solo_reveal_guess");
+            case SoloBoardNextAction.RevealOutcome:
+                return L10n.Get("solo_reveal_outcome");
+            default:
+                return L10n.Get("solo_continue");
+        }
+    }
+
+    void RenderResult(SoloBoardPresentationState state)
+    {
+        bool show = state.Phase == SoloBoardPhase.MatchResult;
+        if (resultRoot != null)
+            resultRoot.SetActive(show);
+        if (homeControl != null)
+            homeControl.gameObject.SetActive(show);
+        if (gameManager != null && gameManager.stopGameButton != null)
+        {
+            gameManager.stopGameButton.SetActive(show);
+            TMP_Text rematch = gameManager.stopGameButton
+                .GetComponentInChildren<TMP_Text>(true);
+            if (rematch != null && show)
+                rematch.text = L10n.Get("rematch");
+        }
+        if (!show)
+        {
+            if (saveStreakControl != null)
+                saveStreakControl.gameObject.SetActive(false);
+            return;
+        }
+
+        string opponent = OpponentName(state);
+        if (resultReasonText != null)
+            resultReasonText.text = ResultReason(state, opponent);
+        if (resultSecretsText != null)
+        {
+            bool secretsKnown = state.PlayerSecretNumber > 0 &&
+                                state.OpponentSecretNumber > 0;
+            resultSecretsText.gameObject.SetActive(secretsKnown);
+            resultSecretsText.text = secretsKnown
+                ? L10n.Get(
+                    "solo_result_secrets", state.PlayerSecretNumber,
+                    opponent, state.OpponentSecretNumber)
+                : "";
+        }
+        if (resultGuessesText != null)
+        {
+            string decisive = DecisiveEvents(state);
+            if (!string.IsNullOrEmpty(decisive))
+                resultGuessesText.text = decisive;
+            else
+            {
+                string playerGuess = state.LatestPlayerGuess > 0
+                    ? state.LatestPlayerGuess.ToString(
+                        CultureInfo.InvariantCulture)
+                    : "—";
+                string aiGuess = state.LatestAiGuess > 0
+                    ? state.LatestAiGuess.ToString(
+                        CultureInfo.InvariantCulture)
+                    : "—";
+                resultGuessesText.text = L10n.Get("solo_you_header") + ": " +
+                    L10n.Get("solo_latest_guess", playerGuess) + "\n" +
+                    opponent + ": " + L10n.Get("solo_latest_guess", aiGuess);
+            }
+        }
+        if (resultTurnsText != null)
+            resultTurnsText.text = L10n.Get(
+                "solo_result_turns", state.PlayerTurns,
+                opponent, state.AiTurns);
+        if (homeControl != null)
+        {
+            TMP_Text home = homeControl.GetComponentInChildren<TMP_Text>(true);
+            if (home != null)
+                home.text = L10n.Get("solo_home");
+        }
+    }
+
+    static string ResultReason(
+        SoloBoardPresentationState state,
+        string opponent)
+    {
+        List<SoloHistoryEvent> terminal = TerminalRoundEvents(state);
+        var correct = new List<SoloHistoryEvent>(2);
+        foreach (SoloHistoryEvent item in terminal)
+        {
+            if (item.Outcome == SoloGuessOutcome.Correct)
+                correct.Add(item);
+        }
+
+        if (correct.Count == 1 &&
+            OutcomeMatches(state.MatchOutcome, correct[0].Actor))
+        {
+            SoloHistoryEvent winner = correct[0];
+            SoloBoardActor loser = winner.Actor == SoloBoardActor.Player
+                ? SoloBoardActor.Opponent
+                : SoloBoardActor.Player;
+            if (terminal.Count == 1 && PreviousLockMiss(state, loser))
+            {
+                return L10n.Get(
+                    "solo_result_forfeit_decider", winner.RoundNumber,
+                    ActorLabel(winner.Actor, state), winner.Guess,
+                    ActorLabel(loser, state));
+            }
+            return L10n.Get(
+                "solo_result_only_correct", winner.RoundNumber,
+                ActorLabel(winner.Actor, state), winner.Guess);
+        }
+
+        if (correct.Count == 2)
+        {
+            SoloHistoryEvent first = correct[0];
+            SoloHistoryEvent second = correct[1];
+            if (first.LockStaked != second.LockStaked)
+            {
+                SoloHistoryEvent winner = first.LockStaked ? first : second;
+                if (OutcomeMatches(state.MatchOutcome, winner.Actor))
+                {
+                    return L10n.Get(
+                        "solo_result_lock_tiebreak",
+                        ActorLabel(winner.Actor, state), winner.Guess);
+                }
+            }
+            else if (first.CandidatesBefore != second.CandidatesBefore)
+            {
+                SoloHistoryEvent winner =
+                    first.CandidatesBefore < second.CandidatesBefore
+                        ? first
+                        : second;
+                SoloHistoryEvent loser = ReferenceEquals(winner, first)
+                    ? second
+                    : first;
+                if (OutcomeMatches(state.MatchOutcome, winner.Actor))
+                {
+                    return L10n.Get(
+                        "solo_result_range_tiebreak",
+                        ActorLabel(winner.Actor, state), winner.Guess,
+                        winner.CandidatesBefore, loser.CandidatesBefore);
+                }
+            }
+            else if (state.MatchOutcome == DuelRules.Outcome.Draw)
+            {
+                return L10n.Get(
+                    "solo_result_exact_draw", first.CandidatesBefore);
+            }
+        }
+
+        if (state.MatchOutcome == DuelRules.Outcome.HostWins)
+            return L10n.Get("solo_result_win_reason", opponent);
+        if (state.MatchOutcome == DuelRules.Outcome.GuestWins)
+            return L10n.Get("solo_result_loss_reason", opponent);
+        return L10n.Get("solo_result_draw_reason");
+    }
+
+    static bool OutcomeMatches(
+        DuelRules.Outcome outcome,
+        SoloBoardActor winner)
+    {
+        return outcome == DuelRules.Outcome.HostWins &&
+               winner == SoloBoardActor.Player ||
+               outcome == DuelRules.Outcome.GuestWins &&
+               winner == SoloBoardActor.Opponent;
+    }
+
+    static bool PreviousLockMiss(
+        SoloBoardPresentationState state,
+        SoloBoardActor actor)
+    {
+        for (int index = state.History.Count - 1; index >= 0; index--)
+        {
+            SoloHistoryEvent item = state.History[index];
+            if (item.Actor == actor)
+                return item.LockMissed;
+        }
+        return false;
+    }
+
+    static List<SoloHistoryEvent> TerminalRoundEvents(
+        SoloBoardPresentationState state)
+    {
+        var result = new List<SoloHistoryEvent>(2);
+        foreach (SoloHistoryEvent item in state.History)
+        {
+            if (item.RoundNumber == state.RoundNumber)
+                result.Add(item);
+        }
+        return result;
+    }
+
+    static string DecisiveEvents(SoloBoardPresentationState state)
+    {
+        List<SoloHistoryEvent> terminal = TerminalRoundEvents(state);
+        if (terminal.Count == 0)
+            return string.Empty;
+
+        var lines = new List<string>(2);
+        foreach (SoloHistoryEvent item in terminal)
+        {
+            lines.Add(
+                L10n.Get("solo_history_round", item.RoundNumber) + " • " +
+                ActorLabel(item.Actor, state) + " > " +
+                ActorLabel(item.Target, state) + " • " +
+                item.Guess.ToString(CultureInfo.InvariantCulture) + " • " +
+                HistoryOutcomeLabel(item.Outcome) +
+                (item.LockStaked ? " • " + L10n.Get("lock") : ""));
+        }
+        return string.Join("\n", lines.ToArray());
+    }
+
+    void RenderLeaveConfirmation()
+    {
+        if (leaveTitleText != null)
+            leaveTitleText.text = L10n.Get("solo_leave_title");
+        if (leaveBodyText != null)
+            leaveBodyText.text = L10n.Get("solo_leave_body");
+        if (leaveConfirmControl != null)
+        {
+            TMP_Text confirm = leaveConfirmControl
+                .GetComponentInChildren<TMP_Text>(true);
+            if (confirm != null)
+                confirm.text = L10n.Get("solo_leave_confirm");
+        }
+        if (leaveCancelControl != null)
+        {
+            TMP_Text cancel = leaveCancelControl
+                .GetComponentInChildren<TMP_Text>(true);
+            if (cancel != null)
+                cancel.text = L10n.Get("cancel");
+        }
+        if (leaveModalRoot != null)
+        {
+            leaveModalRoot.SetActive(leaveConfirmationVisible);
+            if (leaveConfirmationVisible)
+                leaveModalRoot.transform.SetAsLastSibling();
+        }
     }
 
     void EnsureVisualRootOnTop()
@@ -1338,24 +2354,34 @@ public sealed class SoloDuelVisuals : MonoBehaviour
 
     void RenderHistoryRows(SoloBoardPresentationState state)
     {
-        int historyCount = state.PlayerGuessHistory.Count;
-        int first = Mathf.Max(0, historyCount - historyRows.Length);
-        int visible = historyCount - first;
-        for (int i = 0; i < historyRows.Length; i++)
+        int historyCount = state.History.Count;
+        EnsureHistoryRowCount(Mathf.Max(3, historyCount));
+        for (int i = 0; i < historyRows.Count; i++)
         {
-            bool active = i < visible;
+            bool active = i < historyCount;
             if (historyRows[i] != null)
                 historyRows[i].SetActive(active);
             if (!active) continue;
 
-            int sourceIndex = first + i;
-            SoloGuessOutcome outcome = sourceIndex <
-                state.PlayerGuessOutcomeHistory.Count
-                ? state.PlayerGuessOutcomeHistory[sourceIndex]
-                : SoloGuessOutcome.Unknown;
+            SoloHistoryEvent item = state.History[i];
+            bool awaitingReveal = i == historyCount - 1 &&
+                                  item.Actor == SoloBoardActor.Opponent &&
+                                  state.Phase == SoloBoardPhase.OpponentGuess;
+            SoloGuessOutcome outcome = awaitingReveal
+                ? SoloGuessOutcome.Unknown
+                : item.Outcome;
+            string actor = ActorLabel(item.Actor, state);
+            string target = ActorLabel(item.Target, state);
+            historyMetaTexts[i].text = L10n.Get(
+                "solo_history_round", item.RoundNumber) + "  •  " +
+                actor + " > " + target;
             historyNumberTexts[i].text =
-                state.PlayerGuessHistory[sourceIndex].ToString();
-            historyOutcomeTexts[i].text = HistoryOutcomeLabel(outcome);
+                item.Guess.ToString(CultureInfo.InvariantCulture);
+            historyOutcomeTexts[i].text = HistoryOutcomeLabel(outcome) +
+                (item.LockStaked ? " • " + L10n.Get("lock") : "");
+            historyNewestTexts[i].text = i == historyCount - 1
+                ? L10n.Get("solo_history_newest")
+                : "";
             Color color = HistoryOutcomeColor(outcome);
             historyNumberTexts[i].color = color;
             historyOutcomeTexts[i].color = NearWhite;
@@ -1363,7 +2389,28 @@ public sealed class SoloDuelVisuals : MonoBehaviour
             ConfigureImage(
                 historyRowImages[i], HistoryOutcomeSprite(outcome),
                 false, Image.Type.Simple);
+            if (outcome == SoloGuessOutcome.Unknown)
+                historyRowImages[i].color = new Color(
+                    0.58f, 0.60f, 0.72f, 1f);
         }
+
+        LayoutHistory(CurrentTallBlend);
+        if (historyCount != renderedHistoryCount && historyScroll != null)
+        {
+            Canvas.ForceUpdateCanvases();
+            historyScroll.verticalNormalizedPosition = 0f;
+            renderedHistoryCount = historyCount;
+        }
+    }
+
+    static string ActorLabel(
+        SoloBoardActor actor, SoloBoardPresentationState state)
+    {
+        if (actor == SoloBoardActor.Player)
+            return L10n.Get("solo_you_header");
+        if (actor == SoloBoardActor.Opponent)
+            return OpponentName(state);
+        return "—";
     }
 
     static string HistoryOutcomeLabel(SoloGuessOutcome outcome)
@@ -1467,47 +2514,72 @@ public sealed class SoloDuelVisuals : MonoBehaviour
 
     static string PromptText(SoloBoardPresentationState state)
     {
+        string opponent = OpponentName(state);
         switch (state.Prompt)
         {
             case SoloBoardPrompt.EnterSecret:
                 return L10n.Get("solo_choose_secret");
             case SoloBoardPrompt.YourGuess:
-                return L10n.Get("solo_guess_number");
+                return L10n.Get("solo_player_turn", opponent);
             case SoloBoardPrompt.OpponentThinking:
-                return L10n.Get("opponent_thinking", state.OpponentName);
+                return L10n.Get("solo_opponent_turn", opponent);
             case SoloBoardPrompt.AnswerOpponent:
-                return L10n.Get("answer_opponent", state.OpponentName);
+                return L10n.Get("solo_opponent_turn", opponent);
             case SoloBoardPrompt.OpponentGuessedHigher:
-                return L10n.Get("your_number_is_higher");
+                return L10n.Get("solo_opponent_turn", opponent) + "\n" +
+                       L10n.Get("your_number_is_higher");
             case SoloBoardPrompt.OpponentGuessedLower:
-                return L10n.Get("your_number_is_lower");
+                return L10n.Get("solo_opponent_turn", opponent) + "\n" +
+                       L10n.Get("your_number_is_lower");
             case SoloBoardPrompt.OpponentGuessedCorrect:
-                return L10n.Get("your_number_is_correct");
+                return L10n.Get("solo_opponent_turn", opponent) + "\n" +
+                       L10n.Get("your_number_is_correct");
             case SoloBoardPrompt.OpponentForfeits:
-                return L10n.Get("opponent_forfeits", state.OpponentName);
+                return L10n.Get("opponent_forfeits", opponent);
             case SoloBoardPrompt.MatchPoint:
-                return L10n.Get("match_point");
+                return L10n.Get("solo_player_turn", opponent) + "\n" +
+                       L10n.Get("match_point");
             case SoloBoardPrompt.MatchPointYours:
-                return L10n.Get("match_point_yours", state.OpponentName);
+                return L10n.Get("match_point_yours", opponent);
             case SoloBoardPrompt.TurnForfeited:
                 return L10n.Get("turn_forfeited");
             case SoloBoardPrompt.ResolvingRound:
                 return string.Empty;
+            case SoloBoardPrompt.PlayerStarts:
+                return L10n.Get("solo_player_starts") + "\n" +
+                       L10n.Get("solo_player_objective", opponent);
+            case SoloBoardPrompt.OpponentStarts:
+                return L10n.Get("solo_opponent_starts", opponent) + "\n" +
+                       L10n.Get("solo_opponent_objective", opponent);
+            case SoloBoardPrompt.PlayerGuessedHigher:
+                return L10n.Get("solo_player_turn", opponent) + "\n" +
+                       L10n.Get("solo_you_guessed", state.LatestPlayerGuess) +
+                       " — " + L10n.Get("solo_history_higher");
+            case SoloBoardPrompt.PlayerGuessedLower:
+                return L10n.Get("solo_player_turn", opponent) + "\n" +
+                       L10n.Get("solo_you_guessed", state.LatestPlayerGuess) +
+                       " — " + L10n.Get("solo_history_lower");
+            case SoloBoardPrompt.PlayerGuessedCorrect:
+                return L10n.Get("solo_player_turn", opponent) + "\n" +
+                       L10n.Get("solo_you_guessed", state.LatestPlayerGuess) +
+                       " — " + L10n.Get("solo_history_correct");
+            case SoloBoardPrompt.OpponentGuess:
+                return L10n.Get("solo_opponent_turn", opponent) + "\n" +
+                       L10n.Get(
+                           "solo_opponent_guessed", opponent,
+                           state.LatestAiGuess);
+            case SoloBoardPrompt.LastLicks:
+                return L10n.Get("solo_last_licks", opponent);
+            case SoloBoardPrompt.PlayerLockForfeit:
+                return L10n.Get("solo_player_lock_forfeit");
+            case SoloBoardPrompt.OpponentLockForfeit:
+                return L10n.Get("solo_ai_lock_forfeit", opponent);
             case SoloBoardPrompt.Win:
-            {
-                string result = L10n.Get("you_win") + "\n" +
-                                L10n.Get("won_in_guesses", state.DetailValue);
-                if (state.DetailValue <= 7)
-                    result += "\n" + L10n.Get("perfect_game");
-                return result;
-            }
+                return L10n.Get("you_win");
             case SoloBoardPrompt.Loss:
-                return L10n.Get("you_lose") + "\n" +
-                       L10n.Get("number_was", state.DetailValue);
+                return L10n.Get("you_lose");
             case SoloBoardPrompt.Draw:
-                return L10n.Get("you_draw") + "\n" +
-                       L10n.Get("draw_in_guesses", state.DetailValue) +
-                       "\n" + L10n.Get("draw_tip");
+                return L10n.Get("you_draw");
             default:
                 return string.Empty;
         }
@@ -1560,6 +2632,19 @@ public sealed class SoloDuelVisuals : MonoBehaviour
                     "HOL layout: touch target below 48px: " + rect.name);
             }
         }
+    }
+
+    void OnInputValueChanged(string unused)
+    {
+        if (!built || submitControl == null)
+            return;
+        bool numeric = presentation.Current.NumericControlsAvailable;
+        submitControl.interactable = numeric && numberManager != null &&
+                                     numberManager.CanSubmitCurrentValue;
+        if (numeric && numberManager != null &&
+            numberManager.HasCompleteValidValue &&
+            numberManager.messageText != null)
+            numberManager.messageText.gameObject.SetActive(false);
     }
 
     void OnKeyPressed(string key)

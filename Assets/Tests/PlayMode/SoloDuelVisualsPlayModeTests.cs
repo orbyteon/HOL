@@ -71,6 +71,10 @@ public sealed class SoloDuelVisualsPlayModeTests
             active.handle != quiescent.handle)
             yield return SceneManager.UnloadSceneAsync(active);
         yield return null;
+#if UNITY_EDITOR
+        FirstLaunchSoloEndToEndPlayModeTests
+            .RestoreEditorWindowAfterSettlement();
+#endif
 
         for (int index = 0; index < dailyIntegerKeys.Length; index++)
         {
@@ -142,13 +146,6 @@ public sealed class SoloDuelVisualsPlayModeTests
             for (int frame = 0; frame < 8; frame++)
                 yield return null;
 
-            MethodInfo begin = layout.GetType().GetMethod(
-                "BeginNewMatch", BindingFlags.Instance | BindingFlags.Public);
-            Assert.That(begin, Is.Not.Null);
-            MethodInfo present = layout.GetType().GetMethod(
-                "PresentPhase", BindingFlags.Instance | BindingFlags.Public);
-            Assert.That(present, Is.Not.Null);
-
             TMP_InputField input = GetField<TMP_InputField>(
                 numberManager, "numberInput");
             Transform visualRoot = Find(
@@ -169,22 +166,6 @@ public sealed class SoloDuelVisualsPlayModeTests
                 PlayerPrefs.SetString(
                     "PlayerName", greek ? "ΜΑΡΙΝΟΣ" : "MARINOS");
                 PlayerPrefs.Save();
-                begin.Invoke(layout, new object[]
-                {
-                    greek ? "ΑΝΔΡΕΑΣ" : "ANDREAS",
-                });
-                present.Invoke(layout, new[]
-                {
-                    Enum.Parse(RuntimeType("SoloBoardPhase"), "PlayerGuess"),
-                    Enum.Parse(RuntimeType("SoloBoardPrompt"), "YourGuess"),
-                    (object)3,
-                    27,
-                    68,
-                    0,
-                });
-                RecordGuessResult(layout, 68, "Higher");
-                RecordGuessResult(layout, 27, "Lower");
-                RecordGuessResult(layout, 42, "Correct");
                 input.SetTextWithoutNotify(string.Empty);
                 yield return null;
                 yield return null;
@@ -198,9 +179,10 @@ public sealed class SoloDuelVisualsPlayModeTests
                     new Vector2Int(1179, 2556),
                 })
                 {
-                    yield return ValidateSoloViewport(
-                        canvas, safeAreaOwner, layout,
-                        viewport.x, viewport.y, locale);
+                    yield return ValidateSoloStateMatrix(
+                        canvas, safeAreaOwner, layout, numberManager,
+                        viewport.x, viewport.y, locale,
+                        greek ? "ΑΝΔΡΕΑΣ" : "ANDREAS");
                 }
             }
         }
@@ -593,10 +575,20 @@ public sealed class SoloDuelVisualsPlayModeTests
                 // interactive content rather than treating transparent pixels
                 // as clipped production UI.
                 "CurrentNumberHeading",
+                "CentralGuess",
+                "CentralOutcome",
+                "SoloContinueButton",
                 "NumberKeypad",
                 "ButtonConfirm",
+                "LockButton",
                 "SoloOpponentRail",
                 "OpponentBubbleAvatar",
+                "HistoryCard",
+                "HistoryViewport",
+                "SoloTipCard",
+                "PlayerRangeLabel",
+                "OpponentRangeLabel",
+                "LockExplanation",
                 "SoloTipMascot",
             };
             Vector2[] viewports =
@@ -607,12 +599,22 @@ public sealed class SoloDuelVisualsPlayModeTests
                 new Vector2(1179f, 2556f),
             };
 
+            string opponent = GetProperty<string>(
+                gameManager, "CurrentOpponentName");
+            MethodInfo begin = layout.GetType().GetMethod(
+                "BeginNewMatch",
+                BindingFlags.Instance | BindingFlags.Public);
+            Assert.That(begin, Is.Not.Null);
+            begin.Invoke(layout, new object[] { opponent });
+            PresentPhase(layout, "PlayerGuess", "YourGuess", 11);
+            RecordPlayerMove(layout, 11, 42, "Higher", 43, 100);
+
             foreach (string language in new[] { "English", "Greek" })
             {
                 SetLanguage(language);
                 PresentPhase(layout, "PlayerGuess", "YourGuess", 11);
-
-                string expectedPrompt = Localized("solo_guess_number");
+                string expectedPrompt = Localized(
+                    "solo_player_turn", opponent);
                 string expectedRound = Localized(
                     "round_label_open", 11);
                 Assert.That(phasePrompt.text, Is.EqualTo(expectedPrompt),
@@ -622,6 +624,27 @@ public sealed class SoloDuelVisualsPlayModeTests
                 Assert.That(roundLabel.text, Does.Contain("11"));
                 Assert.That(roundLabel.text, Does.Not.Contain("/"),
                     "Solo rules do not impose a ten-round cap.");
+                Assert.That(Find(root, "PlayerCard").GetComponent<CanvasGroup>().alpha,
+                    Is.EqualTo(1f).Within(0.001f));
+                Assert.That(Find(root, "OpponentCard").GetComponent<CanvasGroup>().alpha,
+                    Is.LessThan(0.7f),
+                    language + " opponent card must be visibly inactive.");
+                Assert.That(Find(root, "PlayerActiveBadgeLabel")
+                    .GetComponent<TMP_Text>().text,
+                    Is.EqualTo(Localized("solo_player_active")));
+                Assert.That(Find(root, "OpponentActiveBadgeLabel")
+                    .GetComponent<TMP_Text>().text,
+                    Is.EqualTo(Localized("solo_waiting")));
+
+                Transform firstHistory = Find(root, "HistoryRow1");
+                Assert.That(firstHistory, Is.Not.Null);
+                string historyMeta = Find(firstHistory, "HistoryMeta")
+                    .GetComponent<TMP_Text>().text;
+                Assert.That(historyMeta,
+                    Does.Contain(Localized("solo_you_header")));
+                Assert.That(historyMeta, Does.Contain(opponent));
+                Assert.That(historyMeta, Does.Contain(">"),
+                    language + " history must name both actor and target.");
 
                 foreach (Vector2 viewport in viewports)
                 {
@@ -768,7 +791,8 @@ public sealed class SoloDuelVisualsPlayModeTests
         Assert.That(stop.transform.IsChildOf(safeRoot), Is.True);
         Transform lockButton = Find(root, "LockButton");
         Assert.That(lockButton, Is.Not.Null);
-        Assert.That(lockButton.IsChildOf(tip), Is.True);
+        Assert.That(lockButton.IsChildOf(interaction), Is.True,
+            "Lock belongs beside Submit and must not cover strategy text.");
         Assert.That(higher.transform.IsChildOf(interaction), Is.True);
         Assert.That(correct.transform.IsChildOf(interaction), Is.True);
         Assert.That(lower.transform.IsChildOf(interaction), Is.True);
@@ -789,12 +813,14 @@ public sealed class SoloDuelVisualsPlayModeTests
 
         PresentPhase(layout, "AnswerOpponent", "AnswerOpponent");
         Assert.That(input.gameObject.activeSelf, Is.False);
-        Assert.That(value.gameObject.activeSelf, Is.True);
+        Assert.That(value.gameObject.activeSelf, Is.False,
+            "The central factual surface replaces the ambiguous legacy value.");
+        Assert.That(Find(root, "CentralGuess").gameObject.activeSelf, Is.True);
         higher.SetActive(true);
         yield return null;
         Assert.That(new[] { higher, correct, lower }.Any(x => x.activeSelf),
             Is.False,
-            "Solo already knows the secret and must resolve AI feedback automatically.");
+            "Solo already knows the secret and presents factual feedback through acknowledgement.");
 
         PresentPhase(layout, "PlayerGuess", "YourGuess");
         Assert.That(new[] { higher, correct, lower }.Any(x => x.activeSelf),
@@ -974,6 +1000,10 @@ public sealed class SoloDuelVisualsPlayModeTests
     static IEnumerator EnterSoloThroughProductionPath(
         Action<Component> captureReadyLayout)
     {
+#if UNITY_EDITOR
+        FirstLaunchSoloEndToEndPlayModeTests
+            .FocusGameViewForEndOfFrameSettlement();
+#endif
         Component homeOwner = null;
         Button soloEntry = null;
         for (int frame = 0; frame < 600; frame++)
@@ -995,6 +1025,10 @@ public sealed class SoloDuelVisualsPlayModeTests
                     soloEntry.interactable)
                     break;
             }
+#if UNITY_EDITOR
+            FirstLaunchSoloEndToEndPlayModeTests
+                .FocusGameViewForEndOfFrameSettlement();
+#endif
             yield return null;
         }
 
@@ -1097,10 +1131,298 @@ public sealed class SoloDuelVisualsPlayModeTests
         });
     }
 
+    static IEnumerator ValidateSoloStateMatrix(
+        Canvas canvas,
+        Component safeAreaOwner,
+        Component layout,
+        Component numberManager,
+        int width,
+        int height,
+        string locale,
+        string opponent)
+    {
+        object player = RuntimeEnum("SoloBoardActor", "Player");
+        object ai = RuntimeEnum("SoloBoardActor", "Opponent");
+        object higher = RuntimeEnum("DuelRules+Hint", "Higher");
+        object lower = RuntimeEnum("DuelRules+Hint", "Lower");
+        object correct = RuntimeEnum("DuelRules+Hint", "Correct");
+
+        InvokeLayout(layout, "BeginNewMatch", opponent);
+        yield return ValidateSoloViewport(
+            canvas, safeAreaOwner, layout, numberManager,
+            width, height, locale + " ChooseSecret");
+
+        InvokeLayout(layout, "SetPlayerSecret", 73);
+        InvokeLayout(layout, "RevealStarter",
+            player, 1, 1, 100, 1, 100);
+        InvokeLayout(layout, "UpdateLockState",
+            true, false, false, false, 100);
+        Assert.That(
+            Find(canvas.transform, "CurrentNumberHeading")
+                .GetComponent<TMP_Text>().text,
+            Is.EqualTo(Localized("solo_starter_heading")));
+        yield return ValidateSoloViewport(
+            canvas, safeAreaOwner, layout, numberManager,
+            width, height, locale + " PlayerStarts");
+
+        InvokeLayout(layout, "BeginPlayerTurn",
+            1, 1, 100, 1, 100, false);
+        InvokeLayout(layout, "UpdateLockState",
+            true, true, false, false, 100);
+        Assert.That(
+            Find(canvas.transform, "PlayerRangeLabel")
+                .GetComponent<TMP_Text>().text,
+            Is.EqualTo(Localized(
+                "solo_range_player", opponent, 1, 100)));
+        Assert.That(
+            Find(canvas.transform, "OpponentRangeLabel")
+                .GetComponent<TMP_Text>().text,
+            Is.EqualTo(Localized(
+                "solo_range_ai", opponent, 1, 100)));
+        yield return ValidateSoloViewport(
+            canvas, safeAreaOwner, layout, numberManager,
+            width, height, locale + " PlayerGuess");
+        InvokeLayout(layout, "SetLeaveConfirmationVisible", true);
+        yield return ValidateSoloViewport(
+            canvas, safeAreaOwner, layout, numberManager,
+            width, height, locale + " LeaveConfirmation");
+        InvokeLayout(layout, "SetLeaveConfirmationVisible", false);
+
+        InvokeLayout(layout, "RecordPlayerMove",
+            1, 40, higher, false, 100,
+            41, 100, 1, 100);
+        InvokeLayout(layout, "UpdateLockState",
+            true, false, false, false, 60);
+        yield return ValidateSoloViewport(
+            canvas, safeAreaOwner, layout, numberManager,
+            width, height, locale + " PlayerHigher");
+
+        InvokeLayout(layout, "BeginOpponentThinking",
+            1, 41, 100, 1, 100);
+        yield return ValidateSoloViewport(
+            canvas, safeAreaOwner, layout, numberManager,
+            width, height, locale + " OpponentThinking");
+        InvokeLayout(layout, "RecordOpponentMove",
+            1, 60, lower, false, 100,
+            41, 100, 1, 59);
+        yield return ValidateSoloViewport(
+            canvas, safeAreaOwner, layout, numberManager,
+            width, height, locale + " OpponentGuess");
+        InvokeLayout(layout, "RevealOpponentOutcome");
+        yield return ValidateSoloViewport(
+            canvas, safeAreaOwner, layout, numberManager,
+            width, height, locale + " OpponentLower");
+
+        InvokeLayout(layout, "BeginPlayerTurn",
+            2, 41, 100, 1, 59, false);
+        InvokeLayout(layout, "RecordPlayerMove",
+            2, 77, correct, false, 60,
+            41, 100, 1, 59);
+        yield return ValidateSoloViewport(
+            canvas, safeAreaOwner, layout, numberManager,
+            width, height, locale + " PlayerCorrect");
+        InvokeLayout(layout, "BeginOpponentThinking",
+            2, 41, 100, 1, 59);
+        Assert.That(
+            StateProperty(layout, "Prompt"),
+            Is.EqualTo("MatchPointYours"));
+        yield return ValidateSoloViewport(
+            canvas, safeAreaOwner, layout, numberManager,
+            width, height, locale + " AnsweringGuessNotice");
+
+        InvokeLayout(layout, "BeginNewMatch", opponent);
+        InvokeLayout(layout, "SetPlayerSecret", 73);
+        InvokeLayout(layout, "RevealStarter",
+            ai, 1, 1, 100, 1, 100);
+        InvokeLayout(layout, "UpdateLockState",
+            true, false, false, false, 100);
+        yield return ValidateSoloViewport(
+            canvas, safeAreaOwner, layout, numberManager,
+            width, height, locale + " OpponentStarts");
+        InvokeLayout(layout, "BeginOpponentThinking",
+            1, 1, 100, 1, 100);
+        InvokeLayout(layout, "RecordOpponentMove",
+            1, 73, correct, false, 100,
+            1, 100, 1, 100);
+        InvokeLayout(layout, "RevealOpponentOutcome");
+        InvokeLayout(layout, "ShowLastLicks", 1);
+        yield return ValidateSoloViewport(
+            canvas, safeAreaOwner, layout, numberManager,
+            width, height, locale + " LastLicks");
+        InvokeLayout(layout, "BeginPlayerTurn",
+            1, 1, 100, 1, 100, true);
+        InvokeLayout(layout, "UpdateLockState",
+            true, true, false, false, 100);
+        yield return ValidateSoloViewport(
+            canvas, safeAreaOwner, layout, numberManager,
+            width, height, locale + " LastLicksGuess");
+        InvokeLayout(layout, "RecordPlayerMove",
+            1, 40, lower, false, 100,
+            1, 39, 1, 100);
+        InvokeLayout(layout, "CompleteMatch",
+            RuntimeEnum("DuelRules+Outcome", "GuestWins"),
+            73, 77, 1, 1);
+        Assert.That(
+            Find(canvas.transform, "ResultReason").GetComponent<TMP_Text>().text,
+            Is.EqualTo(Localized(
+                "solo_result_only_correct", 1, opponent, 73)));
+        yield return ValidateSoloViewport(
+            canvas, safeAreaOwner, layout, numberManager,
+            width, height, locale + " ResultLoss");
+
+        InvokeLayout(layout, "BeginNewMatch", opponent);
+        InvokeLayout(layout, "SetPlayerSecret", 73);
+        InvokeLayout(layout, "RevealStarter",
+            player, 1, 1, 100, 1, 100);
+        InvokeLayout(layout, "BeginPlayerTurn",
+            1, 1, 100, 1, 100, false);
+        InvokeLayout(layout, "RecordPlayerMove",
+            1, 40, higher, true, 100,
+            41, 100, 1, 100);
+        InvokeLayout(layout, "UpdateLockState",
+            true, false, false, true, 60);
+        InvokeLayout(layout, "ShowLockForfeit", player, 1);
+        Assert.That(StateProperty(layout, "ActiveActor"),
+            Is.EqualTo("Opponent"));
+        Assert.That(
+            Find(canvas.transform, "CurrentNumberHeading")
+                .GetComponent<TMP_Text>().text,
+            Is.EqualTo(Localized("solo_lock_forfeit_heading")));
+        yield return ValidateSoloViewport(
+            canvas, safeAreaOwner, layout, numberManager,
+            width, height, locale + " PlayerLockForfeit");
+
+        InvokeLayout(layout, "BeginNewMatch", opponent);
+        InvokeLayout(layout, "SetPlayerSecret", 73);
+        InvokeLayout(layout, "RevealStarter",
+            ai, 1, 1, 100, 1, 100);
+        InvokeLayout(layout, "BeginOpponentThinking",
+            1, 1, 100, 1, 100);
+        InvokeLayout(layout, "RecordOpponentMove",
+            1, 40, higher, true, 100,
+            1, 100, 41, 100);
+        InvokeLayout(layout, "RevealOpponentOutcome");
+        InvokeLayout(layout, "ShowLockForfeit", ai, 1);
+        Assert.That(StateProperty(layout, "ActiveActor"),
+            Is.EqualTo("Player"));
+        yield return ValidateSoloViewport(
+            canvas, safeAreaOwner, layout, numberManager,
+            width, height, locale + " OpponentLockForfeit");
+
+        InvokeLayout(layout, "BeginNewMatch", opponent);
+        InvokeLayout(layout, "SetPlayerSecret", 73);
+        InvokeLayout(layout, "RevealStarter",
+            player, 1, 1, 100, 1, 100);
+        InvokeLayout(layout, "BeginPlayerTurn",
+            1, 1, 100, 1, 100, false);
+        InvokeLayout(layout, "RecordPlayerMove",
+            1, 77, correct, false, 100,
+            1, 100, 1, 100);
+        InvokeLayout(layout, "BeginOpponentThinking",
+            1, 1, 100, 1, 100);
+        InvokeLayout(layout, "RecordOpponentMove",
+            1, 73, correct, false, 100,
+            1, 100, 1, 100);
+        InvokeLayout(layout, "RevealOpponentOutcome");
+        InvokeLayout(layout, "CompleteMatch",
+            RuntimeEnum("DuelRules+Outcome", "Draw"),
+            73, 77, 1, 1);
+        Assert.That(
+            Find(canvas.transform, "ResultReason").GetComponent<TMP_Text>().text,
+            Is.EqualTo(Localized("solo_result_exact_draw", 100)));
+        yield return ValidateSoloViewport(
+            canvas, safeAreaOwner, layout, numberManager,
+            width, height, locale + " ResultDraw");
+
+        InvokeLayout(layout, "BeginNewMatch", opponent);
+        InvokeLayout(layout, "SetPlayerSecret", 73);
+        InvokeLayout(layout, "RevealStarter",
+            player, 1, 1, 100, 1, 100);
+        InvokeLayout(layout, "BeginPlayerTurn",
+            1, 1, 100, 1, 100, false);
+        InvokeLayout(layout, "RecordPlayerMove",
+            1, 77, correct, true, 100,
+            1, 100, 1, 100);
+        InvokeLayout(layout, "BeginOpponentThinking",
+            1, 1, 100, 1, 100);
+        InvokeLayout(layout, "RecordOpponentMove",
+            1, 73, correct, false, 100,
+            1, 100, 1, 100);
+        InvokeLayout(layout, "RevealOpponentOutcome");
+        InvokeLayout(layout, "CompleteMatch",
+            RuntimeEnum("DuelRules+Outcome", "HostWins"),
+            73, 77, 1, 1);
+        Assert.That(
+            Find(canvas.transform, "ResultReason").GetComponent<TMP_Text>().text,
+            Is.EqualTo(Localized(
+                "solo_result_lock_tiebreak",
+                Localized("solo_you_header"), 77)));
+        yield return ValidateSoloViewport(
+            canvas, safeAreaOwner, layout, numberManager,
+            width, height, locale + " ResultLockWin");
+
+        InvokeLayout(layout, "BeginNewMatch", opponent);
+        InvokeLayout(layout, "SetPlayerSecret", 73);
+        InvokeLayout(layout, "RevealStarter",
+            player, 1, 1, 100, 1, 100);
+        InvokeLayout(layout, "BeginPlayerTurn",
+            1, 1, 100, 1, 100, false);
+        InvokeLayout(layout, "RecordPlayerMove",
+            1, 77, correct, false, 7,
+            1, 100, 1, 100);
+        InvokeLayout(layout, "BeginOpponentThinking",
+            1, 1, 100, 1, 100);
+        InvokeLayout(layout, "RecordOpponentMove",
+            1, 73, correct, false, 12,
+            1, 100, 1, 100);
+        InvokeLayout(layout, "RevealOpponentOutcome");
+        InvokeLayout(layout, "CompleteMatch",
+            RuntimeEnum("DuelRules+Outcome", "HostWins"),
+            73, 77, 1, 1);
+        Assert.That(
+            Find(canvas.transform, "ResultReason").GetComponent<TMP_Text>().text,
+            Is.EqualTo(Localized(
+                "solo_result_range_tiebreak",
+                Localized("solo_you_header"), 77, 7, 12)));
+        yield return ValidateSoloViewport(
+            canvas, safeAreaOwner, layout, numberManager,
+            width, height, locale + " ResultRangeWin");
+    }
+
+    static object InvokeLayout(
+        Component layout,
+        string methodName,
+        params object[] arguments)
+    {
+        MethodInfo method = layout.GetType().GetMethod(
+            methodName, BindingFlags.Instance | BindingFlags.Public);
+        Assert.That(method, Is.Not.Null, methodName);
+        object result = method.Invoke(layout, arguments);
+        if (method.ReturnType == typeof(bool))
+            Assert.That(result, Is.EqualTo(true), methodName);
+        return result;
+    }
+
+    static object RuntimeEnum(string typeName, string value)
+    {
+        return Enum.Parse(RuntimeType(typeName), value);
+    }
+
+    static string StateProperty(Component layout, string name)
+    {
+        object state = GetProperty<object>(layout, "CurrentState");
+        PropertyInfo property = state.GetType().GetProperty(
+            name, BindingFlags.Instance | BindingFlags.Public);
+        Assert.That(property, Is.Not.Null, name);
+        object value = property.GetValue(state);
+        return value != null ? value.ToString() : string.Empty;
+    }
+
     static IEnumerator ValidateSoloViewport(
         Canvas canvas,
         Component safeAreaOwner,
         Component layout,
+        Component numberManager,
         int width,
         int height,
         string locale)
@@ -1156,6 +1478,14 @@ public sealed class SoloDuelVisualsPlayModeTests
                 "SoloPromptRibbon",
                 "NumberKeypad",
                 "ButtonConfirm",
+                "LockButton",
+                "SoloContinueButton",
+                "HistoryCard",
+                "HistoryViewport",
+                "SoloTipCard",
+                "PlayerRangeLabel",
+                "OpponentRangeLabel",
+                "LockExplanation",
             })
             {
                 RectTransform target = Find(visualRoot, targetName)
@@ -1167,6 +1497,56 @@ public sealed class SoloDuelVisualsPlayModeTests
                         safeRoot as RectTransform, target, safeRect),
                     $"{locale} {width}x{height} {targetName}");
             }
+
+            RectTransform keypad = Find(visualRoot, "NumberKeypad")
+                as RectTransform;
+            RectTransform submit = Find(visualRoot, "ButtonConfirm")
+                as RectTransform;
+            RectTransform lockButton = Find(visualRoot, "LockButton")
+                as RectTransform;
+            RectTransform continueButton = Find(
+                visualRoot, "SoloContinueButton") as RectTransform;
+            RectTransform history = Find(visualRoot, "HistoryCard")
+                as RectTransform;
+            RectTransform tip = Find(visualRoot, "SoloTipCard")
+                as RectTransform;
+            TMP_Text validation = GetField<TMP_Text>(
+                numberManager, "messageText");
+            string geometryContext = $"{locale} {width}x{height}";
+            AssertVerticalGap(
+                BoundsInSafeRect(safeRoot as RectTransform,
+                    validation.rectTransform, safeRect),
+                BoundsInSafeRect(
+                    safeRoot as RectTransform, keypad, safeRect),
+                1f, geometryContext + " validation/keypad");
+            if (submit.gameObject.activeInHierarchy &&
+                lockButton.gameObject.activeInHierarchy)
+            {
+                AssertHorizontalGap(
+                    BoundsInSafeRect(
+                        safeRoot as RectTransform, submit, safeRect),
+                    BoundsInSafeRect(
+                        safeRoot as RectTransform, lockButton, safeRect),
+                    1f, geometryContext + " Submit/Lock");
+            }
+            if (continueButton.gameObject.activeInHierarchy &&
+                lockButton.gameObject.activeInHierarchy)
+            {
+                AssertHorizontalGap(
+                    BoundsInSafeRect(
+                        safeRoot as RectTransform,
+                        continueButton, safeRect),
+                    BoundsInSafeRect(
+                        safeRoot as RectTransform,
+                        lockButton, safeRect),
+                    1f, geometryContext + " Continue/Lock");
+            }
+            AssertVerticalGap(
+                BoundsInSafeRect(
+                    safeRoot as RectTransform, history, safeRect),
+                BoundsInSafeRect(
+                    safeRoot as RectTransform, tip, safeRect),
+                1f, geometryContext + " history/strategy");
 
             foreach (TMP_Text text in
                      visualRoot.GetComponentsInChildren<TMP_Text>(true))
@@ -1183,6 +1563,24 @@ public sealed class SoloDuelVisualsPlayModeTests
                         text, 1f,
                         $"{locale} {width}x{height} {text.name}");
                 }
+            }
+
+            string phase = StateProperty(layout, "Phase");
+            Button lockControl = lockButton.GetComponent<Button>();
+            bool live = phase != "ChooseSecret" && phase != "MatchResult";
+            Assert.That(lockButton.gameObject.activeInHierarchy,
+                Is.EqualTo(live), geometryContext + " Lock visibility");
+            Assert.That(lockControl.interactable,
+                Is.EqualTo(phase == "PlayerGuess"),
+                geometryContext + " Lock interaction");
+            if (phase == "StarterReveal" || phase == "LockForfeit" ||
+                phase == "RoundResolution")
+            {
+                TMP_Text heading = Find(visualRoot, "CurrentNumberHeading")
+                    .GetComponent<TMP_Text>();
+                Assert.That(heading.text,
+                    Is.Not.EqualTo(Localized("hud_current_number")),
+                    geometryContext + " contextual heading");
             }
         }
         finally
@@ -1272,6 +1670,20 @@ public sealed class SoloDuelVisualsPlayModeTests
             Is.GreaterThanOrEqualTo(outer.yMin - tolerance), context);
         Assert.That(inner.yMax,
             Is.LessThanOrEqualTo(outer.yMax + tolerance), context);
+    }
+
+    static void AssertVerticalGap(
+        Rect upper, Rect lower, float minimumGap, string context)
+    {
+        Assert.That(upper.yMin - lower.yMax,
+            Is.GreaterThanOrEqualTo(minimumGap), context);
+    }
+
+    static void AssertHorizontalGap(
+        Rect left, Rect right, float minimumGap, string context)
+    {
+        Assert.That(right.xMin - left.xMax,
+            Is.GreaterThanOrEqualTo(minimumGap), context);
     }
 
     static void AssertRenderedTextWithinRect(
@@ -1433,6 +1845,38 @@ public sealed class SoloDuelVisualsPlayModeTests
         });
     }
 
+    static void RecordPlayerMove(
+        Component layout,
+        int roundNumber,
+        int guess,
+        string hintName,
+        int newPlayerMin,
+        int newPlayerMax)
+    {
+        MethodInfo method = layout.GetType().GetMethod(
+            "RecordPlayerMove",
+            BindingFlags.Instance | BindingFlags.Public);
+        Assert.That(method, Is.Not.Null, "RecordPlayerMove");
+        ParameterInfo[] parameters = method.GetParameters();
+        Assert.That(parameters.Length, Is.EqualTo(9));
+        Type hintType = parameters[2].ParameterType;
+        Assert.That(hintType.IsEnum, Is.True,
+            "RecordPlayerMove hint must remain the canonical enum contract.");
+        object accepted = method.Invoke(layout, new object[]
+        {
+            roundNumber,
+            guess,
+            Enum.Parse(hintType, hintName),
+            false,
+            100,
+            newPlayerMin,
+            newPlayerMax,
+            1,
+            100,
+        });
+        Assert.That(accepted, Is.EqualTo(true));
+    }
+
     static string OnboardingAvatarResourcePath(int index)
     {
         MethodInfo get = RuntimeType("OnboardingAvatarCatalog")
@@ -1470,6 +1914,8 @@ public sealed class SoloDuelVisualsPlayModeTests
     static Type RuntimeType(string name)
     {
         Type type = Type.GetType(name + ", Assembly-CSharp");
+        if (type == null)
+            type = Type.GetType(name + ", HOL.Core");
         Assert.That(type, Is.Not.Null, name);
         return type;
     }

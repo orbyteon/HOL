@@ -10,6 +10,14 @@ using UnityEngine.UI;
 
 public sealed class SoloSearchCartoonVisualsPlayModeTests
 {
+    [TearDown]
+    public void TearDown()
+    {
+#if UNITY_EDITOR
+        FirstLaunchSoloEndToEndPlayModeTests.RestoreEditorWindowAfterSettlement();
+#endif
+    }
+
     [UnityTest]
     public IEnumerator SearchScreenUsesApprovedRadarAndSingleCancelableAiLifecycle()
     {
@@ -204,7 +212,16 @@ public sealed class SoloSearchCartoonVisualsPlayModeTests
         if (Application.isBatchMode)
             yield return null;
         else
+        {
+#if UNITY_EDITOR
+            // Exercise the real presentation frame. A floating Test Runner can
+            // leave Unity's Game View inactive, in which case
+            // WaitForEndOfFrame is never scheduled by the Editor player loop.
+            FirstLaunchSoloEndToEndPlayModeTests.FocusGameViewForEndOfFrameSettlement();
+            yield return null;
+#endif
             yield return new WaitForEndOfFrame();
+        }
 
         Assert.That(searchPanel.activeSelf, Is.False);
         Assert.That(gamePanel.activeSelf, Is.True);
