@@ -158,14 +158,18 @@ public sealed class SoloBoardPresentationState
 
     public bool SubmitControlVisible => NumericControlsAvailable;
 
-    public bool AcknowledgeControlVisible =>
-        Phase == SoloBoardPhase.StarterReveal ||
-        Phase == SoloBoardPhase.PlayerOutcome ||
-        Phase == SoloBoardPhase.OpponentThinking ||
-        Phase == SoloBoardPhase.OpponentGuess ||
-        Phase == SoloBoardPhase.AnswerOpponent ||
-        Phase == SoloBoardPhase.LastLicks ||
-        Phase == SoloBoardPhase.LockForfeit;
+    public bool IsTerminal => Phase == SoloBoardPhase.MatchResult;
+
+    public bool RequiresHumanDecision =>
+        Phase == SoloBoardPhase.ChooseSecret ||
+        Phase == SoloBoardPhase.PlayerGuess;
+
+    public bool RequiresAutomaticTransition =>
+        !RequiresHumanDecision && !IsTerminal;
+
+    // Routine presentation facts are paced by GameManager's single bounded
+    // transition owner. They must never look like permission requests.
+    public bool AcknowledgeControlVisible => false;
 
     public SoloBoardPresentationState(
         SoloBoardPhase phase,

@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
@@ -23,6 +24,7 @@ public sealed class SoloDuelVisualsPlayModeTests
     int originalScreenWidth;
     int originalScreenHeight;
     bool originalFullScreen;
+    readonly List<string> activeGlyphViolations = new List<string>();
 
     [SetUp]
     public void CaptureFixtureState()
@@ -100,6 +102,7 @@ public sealed class SoloDuelVisualsPlayModeTests
     [UnityTest]
     public IEnumerator ValidateSoloDuelRequiredViewportMatrix()
     {
+        activeGlyphViolations.Clear();
         bool hadName = PlayerPrefs.HasKey("PlayerName");
         bool hadWins = PlayerPrefs.HasKey("StatWins");
         bool hadDifficulty = PlayerPrefs.HasKey("AIDifficulty");
@@ -182,7 +185,7 @@ public sealed class SoloDuelVisualsPlayModeTests
                     yield return ValidateSoloStateMatrix(
                         canvas, safeAreaOwner, layout, numberManager,
                         viewport.x, viewport.y, locale,
-                        greek ? "ΑΝΔΡΕΑΣ" : "ANDREAS");
+                        greek ? "ΚΩΝΣΤΑΝΤΙΝΟΣ" : "KONSTANTINOS");
                 }
             }
         }
@@ -198,6 +201,19 @@ public sealed class SoloDuelVisualsPlayModeTests
                 oldProfileVersion);
             RestoreInt(avatarKey, hadAvatar, oldAvatar);
             PlayerPrefs.Save();
+        }
+
+        if (activeGlyphViolations.Count > 0)
+        {
+            string report = "Solo active-glyph viewport matrix found " +
+                activeGlyphViolations.Count + " violation(s):\n" +
+                string.Join("\n", activeGlyphViolations.Select(
+                    (violation, index) =>
+                        $"{index + 1}. {violation}"));
+            // A normal log preserves the complete diagnostic in Editor.log
+            // even when the Test Runner details pane truncates long failures.
+            Debug.Log(report);
+            Assert.Fail(report);
         }
     }
 
@@ -498,6 +514,7 @@ public sealed class SoloDuelVisualsPlayModeTests
             RestoreInt(avatarKey, hadAvatar, oldAvatar);
             PlayerPrefs.Save();
         }
+
     }
 
     [UnityTest]
@@ -820,7 +837,7 @@ public sealed class SoloDuelVisualsPlayModeTests
         yield return null;
         Assert.That(new[] { higher, correct, lower }.Any(x => x.activeSelf),
             Is.False,
-            "Solo already knows the secret and presents factual feedback through acknowledgement.");
+            "Solo already knows the secret and presents automatic factual feedback.");
 
         PresentPhase(layout, "PlayerGuess", "YourGuess");
         Assert.That(new[] { higher, correct, lower }.Any(x => x.activeSelf),
@@ -1131,7 +1148,7 @@ public sealed class SoloDuelVisualsPlayModeTests
         });
     }
 
-    static IEnumerator ValidateSoloStateMatrix(
+    IEnumerator ValidateSoloStateMatrix(
         Canvas canvas,
         Component safeAreaOwner,
         Component layout,
@@ -1182,6 +1199,13 @@ public sealed class SoloDuelVisualsPlayModeTests
         yield return ValidateSoloViewport(
             canvas, safeAreaOwner, layout, numberManager,
             width, height, locale + " PlayerGuess");
+        InvokeLayout(layout, "UpdateLockState",
+            true, true, true, false, 3);
+        yield return ValidateSoloViewport(
+            canvas, safeAreaOwner, layout, numberManager,
+            width, height, locale + " LockArmed");
+        InvokeLayout(layout, "UpdateLockState",
+            true, true, false, false, 100);
         InvokeLayout(layout, "SetLeaveConfirmationVisible", true);
         yield return ValidateSoloViewport(
             canvas, safeAreaOwner, layout, numberManager,
@@ -1281,6 +1305,9 @@ public sealed class SoloDuelVisualsPlayModeTests
             41, 100, 1, 100);
         InvokeLayout(layout, "UpdateLockState",
             true, false, false, true, 60);
+        yield return ValidateSoloViewport(
+            canvas, safeAreaOwner, layout, numberManager,
+            width, height, locale + " PlayerLockMiss");
         InvokeLayout(layout, "ShowLockForfeit", player, 1);
         Assert.That(StateProperty(layout, "ActiveActor"),
             Is.EqualTo("Opponent"));
@@ -1343,6 +1370,11 @@ public sealed class SoloDuelVisualsPlayModeTests
         InvokeLayout(layout, "RecordPlayerMove",
             1, 77, correct, true, 100,
             1, 100, 1, 100);
+        InvokeLayout(layout, "UpdateLockState",
+            true, false, false, true, 1);
+        yield return ValidateSoloViewport(
+            canvas, safeAreaOwner, layout, numberManager,
+            width, height, locale + " PlayerLockHit");
         InvokeLayout(layout, "BeginOpponentThinking",
             1, 1, 100, 1, 100);
         InvokeLayout(layout, "RecordOpponentMove",
@@ -1418,7 +1450,7 @@ public sealed class SoloDuelVisualsPlayModeTests
         return value != null ? value.ToString() : string.Empty;
     }
 
-    static IEnumerator ValidateSoloViewport(
+    IEnumerator ValidateSoloViewport(
         Canvas canvas,
         Component safeAreaOwner,
         Component layout,
@@ -1510,9 +1542,13 @@ public sealed class SoloDuelVisualsPlayModeTests
                 as RectTransform;
             RectTransform tip = Find(visualRoot, "SoloTipCard")
                 as RectTransform;
+            RectTransform tipMascot = Find(visualRoot, "SoloTipMascot")
+                as RectTransform;
             TMP_Text validation = GetField<TMP_Text>(
                 numberManager, "messageText");
             string geometryContext = $"{locale} {width}x{height}";
+            Assert.That(continueButton.gameObject.activeInHierarchy, Is.False,
+                geometryContext + " routine phases need no permission button");
             AssertVerticalGap(
                 BoundsInSafeRect(safeRoot as RectTransform,
                     validation.rectTransform, safeRect),
@@ -1548,18 +1584,40 @@ public sealed class SoloDuelVisualsPlayModeTests
                     safeRoot as RectTransform, tip, safeRect),
                 1f, geometryContext + " history/strategy");
 
+            foreach (string textName in new[]
+                     { "PlayerRangeLabel", "OpponentRangeLabel", "LockExplanation" })
+            {
+                TMP_Text tipText = Find(visualRoot, textName)
+                    .GetComponent<TMP_Text>();
+                CollectRenderedTextInsidePanel(
+                    activeGlyphViolations,
+                    tipText,
+                    tip,
+                    new Vector4(16f, 10f, 112f, 12f),
+                    geometryContext + " " + textName + " tip-safe-area");
+                CollectRenderedTextLeftOf(
+                    activeGlyphViolations,
+                    tipText,
+                    tipMascot,
+                    tip,
+                    2f,
+                    geometryContext + " " + textName + " mascot-reserve");
+            }
+
             foreach (TMP_Text text in
                      visualRoot.GetComponentsInChildren<TMP_Text>(true))
             {
                 if (!text.gameObject.activeInHierarchy ||
                     string.IsNullOrWhiteSpace(text.text))
                     continue;
-                AssertRenderedTextWithinRect(
+                CollectRenderedTextWithinRect(
+                    activeGlyphViolations,
                     text, $"{locale} {width}x{height} {text.name}");
                 if (text.name == "OpponentDifficulty" ||
                     text.name == "HistoryOutcome")
                 {
-                    AssertRenderedTextHorizontalSafety(
+                    CollectRenderedTextHorizontalSafety(
+                        activeGlyphViolations,
                         text, 1f,
                         $"{locale} {width}x{height} {text.name}");
                 }
@@ -1723,6 +1781,231 @@ public sealed class SoloDuelVisualsPlayModeTests
             Is.GreaterThanOrEqualTo(available.xMin + safety), metrics);
         Assert.That(rendered.max.x,
             Is.LessThanOrEqualTo(available.xMax - safety), metrics);
+    }
+
+    static void AssertRenderedTextInsidePanel(
+        TMP_Text text,
+        RectTransform panel,
+        Vector4 padding,
+        string context)
+    {
+        // An inactive phase can retain text in a reusable TMP label while its
+        // parent panel is hidden. TMP reports an extreme sentinel textBounds
+        // value because no glyphs are rendered in that state.
+        // The label RectTransform is still covered by the viewport checks.
+        if (!text.gameObject.activeInHierarchy ||
+            !text.enabled ||
+            string.IsNullOrWhiteSpace(text.text))
+            return;
+
+        Rect glyphs = RenderedGlyphRectIn(panel, text);
+        Rect safe = panel.rect;
+        safe.xMin += padding.x;
+        safe.yMin += padding.y;
+        safe.xMax -= padding.z;
+        safe.yMax -= padding.w;
+        AssertContained(safe, glyphs, context);
+    }
+
+    static void AssertRenderedTextLeftOf(
+        TMP_Text text,
+        RectTransform reserved,
+        RectTransform panel,
+        float minimumGap,
+        string context)
+    {
+        if (!text.gameObject.activeInHierarchy ||
+            !text.enabled ||
+            string.IsNullOrWhiteSpace(text.text))
+            return;
+
+        Rect glyphs = RenderedGlyphRectIn(panel, text);
+        Bounds reservedBounds =
+            RectTransformUtility.CalculateRelativeRectTransformBounds(
+                panel, reserved);
+        float gap = reservedBounds.min.x - glyphs.xMax;
+        Assert.That(gap, Is.GreaterThanOrEqualTo(minimumGap),
+            context + $" / gap={gap:0.###}");
+    }
+
+    static Rect RenderedGlyphRectIn(
+        RectTransform owner,
+        TMP_Text text)
+    {
+        text.ForceMeshUpdate();
+        Bounds rendered = text.textBounds;
+        Vector3[] corners =
+        {
+            new Vector3(rendered.min.x, rendered.min.y, 0f),
+            new Vector3(rendered.min.x, rendered.max.y, 0f),
+            new Vector3(rendered.max.x, rendered.min.y, 0f),
+            new Vector3(rendered.max.x, rendered.max.y, 0f),
+        };
+        Vector2 minimum = new Vector2(float.PositiveInfinity, float.PositiveInfinity);
+        Vector2 maximum = new Vector2(float.NegativeInfinity, float.NegativeInfinity);
+        foreach (Vector3 corner in corners)
+        {
+            Vector3 local = owner.InverseTransformPoint(
+                text.rectTransform.TransformPoint(corner));
+            minimum = Vector2.Min(minimum, local);
+            maximum = Vector2.Max(maximum, local);
+        }
+        return new Rect(minimum, maximum - minimum);
+    }
+
+    static void CollectRenderedTextWithinRect(
+        ICollection<string> violations,
+        TMP_Text text,
+        string context)
+    {
+        text.ForceMeshUpdate();
+        Bounds rendered = text.textBounds;
+        Rect available = text.rectTransform.rect;
+        var reasons = new List<string>();
+        if (text.isTextOverflowing)
+            reasons.Add("overflow/truncation expected false but was true");
+
+        const float tolerance = 1f;
+        AddLowerBoundReason(
+            reasons, "glyph min x", rendered.min.x,
+            available.xMin - tolerance);
+        AddUpperBoundReason(
+            reasons, "glyph max x", rendered.max.x,
+            available.xMax + tolerance);
+        AddLowerBoundReason(
+            reasons, "glyph min y", rendered.min.y,
+            available.yMin - tolerance);
+        AddUpperBoundReason(
+            reasons, "glyph max y", rendered.max.y,
+            available.yMax + tolerance);
+        AddGlyphViolation(
+            violations, context, text, reasons,
+            $"font={text.fontSize:0.###}, max={text.fontSizeMax:0.###}, " +
+            $"rect={available}, textBounds={rendered}");
+    }
+
+    static void CollectRenderedTextHorizontalSafety(
+        ICollection<string> violations,
+        TMP_Text text,
+        float safety,
+        string context)
+    {
+        text.ForceMeshUpdate();
+        Bounds rendered = text.textBounds;
+        Rect available = text.rectTransform.rect;
+        var reasons = new List<string>();
+        AddLowerBoundReason(
+            reasons, "glyph min x", rendered.min.x,
+            available.xMin + safety);
+        AddUpperBoundReason(
+            reasons, "glyph max x", rendered.max.x,
+            available.xMax - safety);
+        AddGlyphViolation(
+            violations, context + " horizontal-safety", text, reasons,
+            $"safety={safety:0.###}, rect={available}, " +
+            $"textBounds={rendered}");
+    }
+
+    static void CollectRenderedTextInsidePanel(
+        ICollection<string> violations,
+        TMP_Text text,
+        RectTransform panel,
+        Vector4 padding,
+        string context)
+    {
+        if (!text.gameObject.activeInHierarchy ||
+            !text.enabled ||
+            string.IsNullOrWhiteSpace(text.text))
+            return;
+
+        Rect glyphs = RenderedGlyphRectIn(panel, text);
+        Rect safe = panel.rect;
+        safe.xMin += padding.x;
+        safe.yMin += padding.y;
+        safe.xMax -= padding.z;
+        safe.yMax -= padding.w;
+        var reasons = new List<string>();
+        const float tolerance = 0.5f;
+        AddLowerBoundReason(
+            reasons, "panel glyph min x", glyphs.xMin,
+            safe.xMin - tolerance);
+        AddUpperBoundReason(
+            reasons, "panel glyph max x", glyphs.xMax,
+            safe.xMax + tolerance);
+        AddLowerBoundReason(
+            reasons, "panel glyph min y", glyphs.yMin,
+            safe.yMin - tolerance);
+        AddUpperBoundReason(
+            reasons, "panel glyph max y", glyphs.yMax,
+            safe.yMax + tolerance);
+        AddGlyphViolation(
+            violations, context, text, reasons,
+            $"safe={safe}, glyphs={glyphs}");
+    }
+
+    static void CollectRenderedTextLeftOf(
+        ICollection<string> violations,
+        TMP_Text text,
+        RectTransform reserved,
+        RectTransform panel,
+        float minimumGap,
+        string context)
+    {
+        if (!text.gameObject.activeInHierarchy ||
+            !text.enabled ||
+            string.IsNullOrWhiteSpace(text.text))
+            return;
+
+        Rect glyphs = RenderedGlyphRectIn(panel, text);
+        Bounds reservedBounds =
+            RectTransformUtility.CalculateRelativeRectTransformBounds(
+                panel, reserved);
+        float gap = reservedBounds.min.x - glyphs.xMax;
+        var reasons = new List<string>();
+        AddLowerBoundReason(reasons, "mascot gap", gap, minimumGap);
+        AddGlyphViolation(
+            violations, context, text, reasons,
+            $"minimumGap={minimumGap:0.###}, gap={gap:0.###}, " +
+            $"glyphs={glyphs}, reserved={reservedBounds}");
+    }
+
+    static void AddLowerBoundReason(
+        ICollection<string> reasons,
+        string label,
+        float actual,
+        float minimum)
+    {
+        if (!(actual >= minimum))
+            reasons.Add(
+                $"{label} expected >= {minimum:0.###} but was {actual:0.###}");
+    }
+
+    static void AddUpperBoundReason(
+        ICollection<string> reasons,
+        string label,
+        float actual,
+        float maximum)
+    {
+        if (!(actual <= maximum))
+            reasons.Add(
+                $"{label} expected <= {maximum:0.###} but was {actual:0.###}");
+    }
+
+    static void AddGlyphViolation(
+        ICollection<string> violations,
+        string context,
+        TMP_Text text,
+        ICollection<string> reasons,
+        string metrics)
+    {
+        if (reasons.Count == 0)
+            return;
+        string value = (text.text ?? string.Empty)
+            .Replace("\r", "\\r")
+            .Replace("\n", "\\n");
+        violations.Add(
+            context + " / " + string.Join("; ", reasons) +
+            $" / text=\"{value}\" / {metrics}");
     }
 
     static void AssertSprite(Transform root, string name, string resource)

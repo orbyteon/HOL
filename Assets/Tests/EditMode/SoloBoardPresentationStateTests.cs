@@ -175,7 +175,7 @@ public sealed class SoloBoardPresentationStateTests
 
     [TestCase("Player", "PlayerStarts", "PlayerGuess")]
     [TestCase("Opponent", "OpponentStarts", "OpponentThinking")]
-    public void BothStartersAreBlockingFactsUntilTheirExplicitAcknowledgement(
+    public void BothStartersAreAutomaticFactsWithoutPermissionControls(
         string starter,
         string expectedPrompt,
         string expectedNextPhase)
@@ -188,7 +188,8 @@ public sealed class SoloBoardPresentationStateTests
             EnumValue("SoloBoardActor", starter), 1, 1, 100, 1, 100), Is.True);
         AssertState(model, "StarterReveal", expectedPrompt, starter,
             starter == "Player" ? "Opponent" : "Player", "Start", 1);
-        Assert.That(Property(Current(model), "AcknowledgeControlVisible"), Is.True);
+        Assert.That(Property(Current(model), "AcknowledgeControlVisible"), Is.False);
+        Assert.That(Property(Current(model), "RequiresAutomaticTransition"), Is.True);
         Assert.That(Events(model), Is.Empty);
 
         bool advanced = expectedNextPhase == "PlayerGuess"
@@ -197,6 +198,38 @@ public sealed class SoloBoardPresentationStateTests
         Assert.That(advanced, Is.True);
         Assert.That(Property(Current(model), "Phase").ToString(),
             Is.EqualTo(expectedNextPhase));
+    }
+
+    [Test]
+    public void EveryPresentationPhaseIsTerminalHumanOrBoundedAutomatic()
+    {
+        object model = NewModel();
+        Begin(model, "Konstantinos");
+
+        foreach (string phase in Enum.GetNames(RuntimeType("SoloBoardPhase")))
+        {
+            string prompt = phase == "ChooseSecret" ? "EnterSecret" :
+                phase == "PlayerGuess" ? "YourGuess" :
+                phase == "StarterReveal" ? "PlayerStarts" :
+                phase == "PlayerOutcome" ? "PlayerGuessedHigher" :
+                phase == "OpponentGuess" ? "OpponentGuess" :
+                phase == "AnswerOpponent" ? "AnswerOpponent" :
+                phase == "LastLicks" ? "LastLicks" :
+                phase == "LockForfeit" ? "PlayerLockForfeit" :
+                phase == "RoundResolution" ? "ResolvingRound" :
+                phase == "MatchResult" ? "Win" : "OpponentThinking";
+            Present(model, phase, prompt, phase == "ChooseSecret" ? 0 : 1, 1, 100);
+
+            object state = Current(model);
+            bool terminal = (bool)Property(state, "IsTerminal");
+            bool human = (bool)Property(state, "RequiresHumanDecision");
+            bool automatic = (bool)Property(state, "RequiresAutomaticTransition");
+            Assert.That(
+                (terminal ? 1 : 0) + (human ? 1 : 0) + (automatic ? 1 : 0),
+                Is.EqualTo(1), phase + " must have exactly one liveness owner.");
+            Assert.That(Property(state, "AcknowledgeControlVisible"), Is.False,
+                phase + " must never present a permission-only Continue control.");
+        }
     }
 
     [Test]

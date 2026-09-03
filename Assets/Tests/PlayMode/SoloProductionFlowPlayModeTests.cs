@@ -599,6 +599,100 @@ public sealed class SoloProductionFlowPlayModeTests
         }
     }
 
+    [UnityTest]
+    public IEnumerator AutomaticPipelineReachesAndPresentsOneAuthoritativeResult()
+    {
+        PlayerPrefs.SetInt("AIDifficulty", 2);
+        StartWithoutAcknowledgement("Host", 100, 77);
+
+        AssertPhase("StarterReveal");
+        Assert.That(GetProperty<bool>(game, "HasAutomaticTransitionScheduled"),
+            Is.True);
+        yield return WaitUntilOrFail(
+            () => StateProperty("Phase").ToString() == "PlayerGuess",
+            1.8f,
+            "Starter fact did not route to the player's real decision.");
+        Assert.That(GetProperty<bool>(game, "HasAutomaticTransitionScheduled"),
+            Is.False);
+
+        Assert.That(Invoke(game, "PlayerGuess", 77), Is.EqualTo(true));
+        AssertPhase("PlayerOutcome");
+        Assert.That(GetProperty<bool>(game, "HasAutomaticTransitionScheduled"),
+            Is.True);
+
+        yield return WaitUntilOrFail(
+            () => GetProperty<bool>(game, "IsResultPresentationPending"),
+            4.2f,
+            "DuelRules did not decide the expected equal-turn result.");
+        Invoke(menu, "RequestSoloMatchExit");
+        Assert.That(GetProperty<bool>(menu, "IsSoloLeaveConfirmationVisible"),
+            Is.False,
+            "Back must not replace an already decided result with a forfeit.");
+        Assert.That(GetProperty<bool>(game, "HasAutomaticTransitionScheduled"),
+            Is.True,
+            "The final fact must retain its one route to the result screen.");
+
+        yield return WaitUntilOrFail(
+            () => StateProperty("Phase").ToString() == "MatchResult",
+            6.5f,
+            "A decided DuelRules result never reached its result presentation.");
+
+        AssertTerminal("Win");
+        AssertSingleOutcome(
+            MatchOutcome.Result.Win,
+            expectedGuesses: 1,
+            expectedOpponentGuesses: 1,
+            expectedOpened: true,
+            expectedLockStaked: false);
+        Assert.That(HistoryEvents(), Has.Length.EqualTo(2));
+        Assert.That(History("AiGuessHistory"), Has.Length.EqualTo(1),
+            "One AI turn must publish exactly one guess.");
+        Assert.That(GetProperty<bool>(game, "HasAutomaticTransitionScheduled"),
+            Is.False,
+            "Terminal presentation must cancel every pending transition.");
+        Assert.That(statsChangedCount, Is.EqualTo(1));
+    }
+
+    [UnityTest]
+    public IEnumerator BackModalAndRematchCancelPendingAiWorkWithoutLateMoves()
+    {
+        PlayerPrefs.SetInt("AIDifficulty", 2);
+        StartWithoutAcknowledgement("Guest", 100, 77);
+        yield return WaitUntilOrFail(
+            () => StateProperty("Phase").ToString() == "OpponentThinking",
+            1.8f,
+            "AI opener did not enter its visible thinking phase.");
+        Assert.That(History("AiGuessHistory"), Is.Empty);
+
+        Invoke(menu, "RequestSoloMatchExit");
+        Assert.That(GetProperty<bool>(menu, "IsSoloLeaveConfirmationVisible"),
+            Is.True);
+        Assert.That(GetProperty<bool>(game, "HasAutomaticTransitionScheduled"),
+            Is.False,
+            "The leave decision must suspend pending AI work.");
+        yield return new WaitForSecondsRealtime(1.3f);
+        Assert.That(History("AiGuessHistory"), Is.Empty,
+            "No AI move may land behind the leave confirmation.");
+
+        Invoke(menu, "CancelSoloMatchExit");
+        Assert.That(GetProperty<bool>(game, "HasAutomaticTransitionScheduled"),
+            Is.True);
+        yield return WaitUntilOrFail(
+            () => History("AiGuessHistory").Length == 1,
+            1.6f,
+            "Cancel did not safely resume the one pending AI turn.");
+
+        Invoke(game, "RestartMatch");
+        AssertPhase("ChooseSecret");
+        Assert.That(HistoryEvents(), Is.Empty);
+        Assert.That(GetProperty<bool>(game, "HasAutomaticTransitionScheduled"),
+            Is.False);
+        yield return new WaitForSecondsRealtime(1.8f);
+        AssertPhase("ChooseSecret");
+        Assert.That(HistoryEvents(), Is.Empty,
+            "A stale AI transition fired after rematch reset.");
+    }
+
     IEnumerator PlaySymmetricTwoRoundFinish(bool usePlayerLock)
     {
         // Both solvers miss at 50, narrowing their objective ranges to the
@@ -677,6 +771,21 @@ public sealed class SoloProductionFlowPlayModeTests
         Assert.That(HistoryEvents(), Is.Empty);
         Acknowledge();
         AssertPhase(opener == "Host" ? "PlayerGuess" : "OpponentThinking");
+    }
+
+    void StartWithoutAcknowledgement(
+        string opener,
+        int playerSecret,
+        int aiSecret)
+    {
+        Invoke(game, "SetPlayerNumber", playerSecret);
+        MethodInfo start = game.GetType().GetMethod(
+            "StartGameWithOpener",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.That(start, Is.Not.Null);
+        Type side = start.GetParameters()[0].ParameterType;
+        start.Invoke(game, new[] { Enum.Parse(side, opener) });
+        SetField(game, "aiSecretNumber", aiSecret);
     }
 
     void Acknowledge()

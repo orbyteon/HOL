@@ -68,6 +68,12 @@ public class MenuManager : MonoBehaviour
         if (soloVisuals == null)
             soloVisuals = FindObjectOfType<SoloDuelVisuals>(true);
 
+        // DuelRules may already be final while the truthful last move is held
+        // on screen. Its one scheduled presentation transition owns that
+        // brief state; Back must not bypass the canonical result.
+        if (gameManager != null && gameManager.IsResultPresentationPending)
+            return;
+
         if (gameManager != null && gameManager.HasLiveMatch)
         {
             if (soloVisuals == null)

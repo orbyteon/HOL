@@ -176,6 +176,74 @@ public sealed class SoloProductionPolicyTests
             "Adaptive becomes Precise only above the 0.6 boundary.");
     }
 
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(2)]
+    [TestCase(3)]
+    public void RepresentativeLegalMatchesAlwaysReachOneTerminalOutcome(
+        int difficulty)
+    {
+        PlayerPrefs.SetInt(DifficultyKey, difficulty);
+        int[] secrets = { 1, 2, 50, 99, 100 };
+        foreach (DuelRules.Side opener in new[]
+                 { DuelRules.Side.Host, DuelRules.Side.Guest })
+        {
+            foreach (int hostSecret in secrets)
+            foreach (int guestSecret in secrets)
+            {
+                var rules = new DuelRules();
+                rules.StartMatch(opener);
+                int hostMin = 1;
+                int hostMax = 100;
+                int guestMin = 1;
+                int guestMax = 100;
+
+                for (int step = 0; step < 40 && !rules.Finished; step++)
+                {
+                    DuelRules.Side actor = rules.Turn;
+                    Assert.That(actor == DuelRules.Side.Host ||
+                                actor == DuelRules.Side.Guest, Is.True,
+                        "A live match must always expose exactly one actor.");
+                    bool host = actor == DuelRules.Side.Host;
+                    int low = host ? hostMin : guestMin;
+                    int high = host ? hostMax : guestMax;
+                    Assert.That(low, Is.LessThanOrEqualTo(high),
+                        "A legal range may collapse to one value but never deadlock.");
+                    int guess = (low + high) / 2;
+                    int candidates = high - low + 1;
+                    DuelRules.LockStyle style = host
+                        ? DuelRules.LockStyle.Bold
+                        : ProductionLockStyle();
+                    bool useLock = DuelRules.ShouldLock(
+                        style, candidates, rules.LockAvailable(actor));
+                    DuelRules.Move move = rules.Submit(
+                        actor,
+                        guess,
+                        host ? guestSecret : hostSecret,
+                        useLock);
+                    Assert.That(move.Accepted, Is.True, move.Error);
+
+                    if (move.Hint == DuelRules.Hint.Higher)
+                    {
+                        if (host) hostMin = guess + 1;
+                        else guestMin = guess + 1;
+                    }
+                    else if (move.Hint == DuelRules.Hint.Lower)
+                    {
+                        if (host) hostMax = guess - 1;
+                        else guestMax = guess - 1;
+                    }
+                }
+
+                Assert.That(rules.Finished, Is.True,
+                    $"difficulty={difficulty}, opener={opener}, " +
+                    $"hostSecret={hostSecret}, guestSecret={guestSecret}");
+                Assert.That(rules.Result, Is.Not.EqualTo(DuelRules.Outcome.Undecided));
+                Assert.That(rules.Turn, Is.EqualTo(DuelRules.Side.None));
+            }
+        }
+    }
+
     [Test]
     public void GameStatsPersistsWinLossDrawStreakBestAndRecentMatrixExactly()
     {

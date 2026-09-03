@@ -415,6 +415,10 @@ public sealed class SoloDuelVisuals : MonoBehaviour
     public void SetLeaveConfirmationVisible(bool visible)
     {
         leaveConfirmationVisible = visible;
+        if (gameManager == null)
+            gameManager = FindObjectOfType<GameManager>(true);
+        if (gameManager != null)
+            gameManager.SetPresentationSuspended(visible);
         if (leaveModalRoot != null)
         {
             leaveModalRoot.SetActive(visible);
@@ -521,7 +525,7 @@ public sealed class SoloDuelVisuals : MonoBehaviour
 
         LayoutNamed("CurrentNumberHeading",
             new Vector2(-9f, 402f), new Vector2(-9f, 506f),
-            new Vector2(600f, 64f), new Vector2(600f, 68f), blend);
+            new Vector2(612f, 64f), new Vector2(612f, 68f), blend);
         LayoutControl(input != null ? input.transform as RectTransform : null,
             new Vector2(-13f, 285f), new Vector2(-13f, 385f),
             new Vector2(520f, 140f), new Vector2(520f, 150f), blend);
@@ -568,7 +572,7 @@ public sealed class SoloDuelVisuals : MonoBehaviour
             new Vector2(640f, 660f), new Vector2(640f, 820f), blend);
         LayoutNamed("ResultReason",
             new Vector2(0f, 190f), new Vector2(0f, 250f),
-            new Vector2(600f, 150f), new Vector2(600f, 190f), blend);
+            new Vector2(608f, 150f), new Vector2(608f, 190f), blend);
         LayoutNamed("ResultSecrets",
             new Vector2(0f, 66f), new Vector2(0f, 90f),
             new Vector2(600f, 60f), new Vector2(600f, 70f), blend);
@@ -667,16 +671,16 @@ public sealed class SoloDuelVisuals : MonoBehaviour
         LayoutControl(playerRangeText != null
                 ? playerRangeText.rectTransform
                 : null,
-            new Vector2(-43f, 42f), new Vector2(-38f, 69f),
-            new Vector2(238f, 40f), new Vector2(250f, 44f), blend);
+            new Vector2(-50f, 45f), new Vector2(-48f, 80f),
+            new Vector2(252f, 38f), new Vector2(214f, 40f), blend);
         LayoutControl(aiRangeText != null ? aiRangeText.rectTransform : null,
-            new Vector2(-43f, 5f), new Vector2(-38f, 23f),
-            new Vector2(238f, 40f), new Vector2(250f, 44f), blend);
+            new Vector2(-50f, 4f), new Vector2(-48f, 36f),
+            new Vector2(252f, 38f), new Vector2(214f, 40f), blend);
         LayoutControl(lockExplanationText != null
                 ? lockExplanationText.rectTransform
                 : null,
-            new Vector2(-43f, -62f), new Vector2(-38f, -65f),
-            new Vector2(238f, 96f), new Vector2(250f, 104f), blend);
+            new Vector2(-50f, -68f), new Vector2(-48f, -68f),
+            new Vector2(252f, 104f), new Vector2(214f, 152f), blend);
     }
 
     void LayoutStateControls(float blend)
@@ -989,7 +993,7 @@ public sealed class SoloDuelVisuals : MonoBehaviour
             SoloMagentaFrameResource);
         opponentActiveBadgeText = DisplayLabel(
             opponentBadge.transform, "OpponentActiveBadgeLabel", "", 24,
-            Vector2.zero, new Vector2(208f, 38f), NearWhite);
+            Vector2.zero, new Vector2(216f, 38f), NearWhite);
         opponentActiveBadgeText.enableAutoSizing = true;
         opponentActiveBadgeText.fontSizeMin = 16f;
         opponentActiveBadgeText.fontSizeMax = 24f;
@@ -1002,20 +1006,21 @@ public sealed class SoloDuelVisuals : MonoBehaviour
         {
             opponentIdentityText = DisplayLabel(
                 opponentCardRoot.transform, "OpponentIdentity", "", 50,
-                new Vector2(0f, -126f), new Vector2(380f, 60f), NearWhite);
+                new Vector2(0f, -126f), new Vector2(390f, 60f), NearWhite);
         }
         else
         {
             Reparent(opponentIdentityText.transform, opponentCardRoot.transform);
             Place(
                 opponentIdentityText.rectTransform,
-                new Vector2(0f, -126f), new Vector2(380f, 60f));
+                new Vector2(0f, -126f), new Vector2(390f, 60f));
             ConfigureDisplayText(opponentIdentityText, 39f, 51f);
             opponentIdentityText.enableAutoSizing = false;
             opponentIdentityText.fontSize = 50f;
             opponentIdentityText.color = NearWhite;
             opponentIdentityText.alignment = TextAlignmentOptions.Center;
         }
+        opponentIdentityText.margin = new Vector4(5f, 0f, 5f, 0f);
 
         opponentLatestGuessText = BodyLabel(
             opponentCardRoot.transform, "OpponentLatestGuess", "", 23,
@@ -1086,7 +1091,7 @@ public sealed class SoloDuelVisuals : MonoBehaviour
         currentHeadingText = DisplayLabel(
             interactionCard.transform, "CurrentNumberHeading",
             L10n.Get("hud_current_number"), 30,
-            new Vector2(-9f, 402f), new Vector2(545f, 60f), NearWhite);
+            new Vector2(-9f, 402f), new Vector2(612f, 64f), NearWhite);
 
         GameObject rail = RuntimeUI.CreateObject("SoloOpponentRail", safeRoot);
         Place(
@@ -1199,20 +1204,30 @@ public sealed class SoloDuelVisuals : MonoBehaviour
             Place(
                 playerRangeText.rectTransform, new Vector2(-43f, 42f),
                 new Vector2(238f, 36f));
-            ConfigureBodyText(playerRangeText, 16f, 23f);
-            playerRangeText.color = NearWhite;
-            playerRangeText.alignment = TextAlignmentOptions.Center;
         }
+        // The scene does not serialize GameManager.rangeText today, but keep
+        // both construction paths on one deterministic production policy.
+        // Range rows are a single semantic line: fit them horizontally inside
+        // the mascot-safe corridor instead of wrapping into a clipped row.
+        playerRangeText.font = bodyFont;
+        ConfigureBodyText(playerRangeText, 16f, 23f);
+        playerRangeText.enableWordWrapping = false;
+        playerRangeText.margin = Vector4.zero;
+        playerRangeText.color = NearWhite;
+        playerRangeText.alignment = TextAlignmentOptions.Center;
         aiRangeText = BodyLabel(
             tipRoot.transform, "OpponentRangeLabel", "", 22,
             new Vector2(-43f, 5f), new Vector2(238f, 36f), NearWhite);
         aiRangeText.alignment = TextAlignmentOptions.Center;
         ConfigureBodyText(aiRangeText, 15f, 22f);
+        aiRangeText.enableWordWrapping = false;
+        aiRangeText.margin = Vector4.zero;
         lockExplanationText = BodyLabel(
             tipRoot.transform, "LockExplanation", "", 19,
-            new Vector2(-43f, -58f), new Vector2(238f, 82f), NearWhite);
+            new Vector2(-50f, -67f), new Vector2(230f, 108f), NearWhite);
         lockExplanationText.alignment = TextAlignmentOptions.Center;
-        ConfigureBodyText(lockExplanationText, 15f, 19f);
+        ConfigureBodyText(lockExplanationText, 16f, 20f);
+        lockExplanationText.margin = Vector4.zero;
 
         if (gameManager != null)
         {
@@ -1226,7 +1241,8 @@ public sealed class SoloDuelVisuals : MonoBehaviour
                     opponentBubbleRoot.transform);
                 Place(
                     opponentGuessText.rectTransform,
-                    new Vector2(-35f, 55f), new Vector2(270f, 48f));
+                    new Vector2(-35f, 68f), new Vector2(238f, 72f));
+                opponentGuessText.font = displayFont;
                 ConfigureDisplayText(opponentGuessText, 23f, 30f);
                 opponentGuessText.color = Ink;
                 opponentGuessText.alignment =
@@ -1241,10 +1257,10 @@ public sealed class SoloDuelVisuals : MonoBehaviour
                     opponentBubbleRoot.transform);
                 Place(
                     opponentSpeechText.rectTransform,
-                    new Vector2(-35f, -24f), new Vector2(220f, 108f));
+                    new Vector2(-35f, -27f), new Vector2(238f, 112f));
                 opponentSpeechText.font = displayFont;
-                ConfigureDisplayText(opponentSpeechText, 30f, 37f);
-                opponentSpeechText.enableAutoSizing = false;
+                ConfigureDisplayText(opponentSpeechText, 27f, 34f);
+                opponentSpeechText.enableAutoSizing = true;
                 opponentSpeechText.fontSize = 34f;
                 opponentSpeechText.color = Ink;
                 opponentSpeechText.alignment =
@@ -1493,6 +1509,7 @@ public sealed class SoloDuelVisuals : MonoBehaviour
         centralOutcomeText.enableAutoSizing = true;
         centralOutcomeText.fontSizeMin = 25f;
         centralOutcomeText.fontSizeMax = 39f;
+        centralOutcomeText.margin = new Vector4(4f, 0f, 4f, 0f);
 
         continueControl = RuntimeUI.CreateButton(
             interactionCard.transform, "SoloContinueButton",
@@ -1520,7 +1537,7 @@ public sealed class SoloDuelVisuals : MonoBehaviour
             new Vector2(640f, 660f));
         resultReasonText = DisplayLabel(
             resultRoot.transform, "ResultReason", "", 34,
-            new Vector2(0f, 190f), new Vector2(600f, 150f), NearWhite);
+            new Vector2(0f, 190f), new Vector2(608f, 150f), NearWhite);
         resultReasonText.alignment = TextAlignmentOptions.Center;
         resultReasonText.enableAutoSizing = true;
         resultReasonText.fontSizeMin = 22f;
@@ -1989,7 +2006,8 @@ public sealed class SoloDuelVisuals : MonoBehaviour
                 "opponent_thinking", OpponentName(state));
         else if (state.Phase == SoloBoardPhase.AnswerOpponent)
             opponentSpeechText.text = L10n.Get(
-                "solo_answer", HistoryOutcomeLabel(state.LatestAiOutcome));
+                "solo_answer", OutcomeWithLock(
+                    state, state.LatestAiOutcome, SoloBoardActor.Opponent));
         else
             opponentSpeechText.text = "";
     }
@@ -2053,10 +2071,11 @@ public sealed class SoloDuelVisuals : MonoBehaviour
     static string CentralOutcome(SoloBoardPresentationState state)
     {
         if (state.Phase == SoloBoardPhase.PlayerOutcome)
-            return HistoryOutcomeLabel(state.LatestPlayerOutcome);
+            return OutcomeWithLock(
+                state, state.LatestPlayerOutcome, SoloBoardActor.Player);
         if (state.Phase == SoloBoardPhase.AnswerOpponent)
-            return L10n.Get(
-                "solo_answer", HistoryOutcomeLabel(state.LatestAiOutcome));
+            return L10n.Get("solo_answer", OutcomeWithLock(
+                state, state.LatestAiOutcome, SoloBoardActor.Opponent));
         if (state.Phase == SoloBoardPhase.OpponentGuess)
             return L10n.Get("solo_reveal_outcome");
         if (state.Phase == SoloBoardPhase.StarterReveal)
@@ -2084,6 +2103,24 @@ public sealed class SoloDuelVisuals : MonoBehaviour
         if (LockCanBePressed(state))
             return L10n.Get("solo_lock_available");
         return L10n.Get("solo_lock_after_guess");
+    }
+
+    static string OutcomeWithLock(
+        SoloBoardPresentationState state,
+        SoloGuessOutcome outcome,
+        SoloBoardActor actor)
+    {
+        string label = HistoryOutcomeLabel(outcome);
+        if (state.History.Count == 0)
+            return label;
+
+        SoloHistoryEvent latest = state.History[state.History.Count - 1];
+        if (latest.Actor != actor || !latest.LockStaked)
+            return label;
+        return label + "  •  " + L10n.Get(
+            latest.LockMissed
+                ? "solo_lock_failed_short"
+                : "solo_lock_success_short");
     }
 
     static bool LockCanBePressed(SoloBoardPresentationState state)
@@ -2378,7 +2415,12 @@ public sealed class SoloDuelVisuals : MonoBehaviour
             historyNumberTexts[i].text =
                 item.Guess.ToString(CultureInfo.InvariantCulture);
             historyOutcomeTexts[i].text = HistoryOutcomeLabel(outcome) +
-                (item.LockStaked ? " • " + L10n.Get("lock") : "");
+                (!awaitingReveal && item.LockStaked
+                    ? " • " + L10n.Get(
+                        item.LockMissed
+                            ? "solo_lock_failed_short"
+                            : "solo_lock_success_short")
+                    : "");
             historyNewestTexts[i].text = i == historyCount - 1
                 ? L10n.Get("solo_history_newest")
                 : "";
