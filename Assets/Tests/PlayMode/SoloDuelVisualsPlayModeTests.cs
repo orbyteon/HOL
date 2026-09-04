@@ -15,6 +15,13 @@ public sealed class SoloDuelVisualsPlayModeTests
 {
     const BindingFlags StaticFlags =
         BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static;
+    static readonly Vector2Int[] AvatarPortraitViewports =
+    {
+        new Vector2Int(720, 1280),
+        new Vector2Int(1080, 1920),
+        new Vector2Int(1080, 2400),
+        new Vector2Int(1179, 2556),
+    };
 
     string[] dailyIntegerKeys;
     bool[] dailyIntegerExisted;
@@ -928,6 +935,10 @@ public sealed class SoloDuelVisualsPlayModeTests
             MethodInfo render = layout.GetType().GetMethod(
                 "Render", BindingFlags.Instance | BindingFlags.NonPublic);
             Assert.That(render, Is.Not.Null);
+            MethodInfo applyViewport = layout.GetType().GetMethod(
+                "ApplyResponsiveLayoutForViewport",
+                BindingFlags.Instance | BindingFlags.Public);
+            Assert.That(applyViewport, Is.Not.Null);
 
             Sprite first = null;
             Sprite second = null;
@@ -959,6 +970,10 @@ public sealed class SoloDuelVisualsPlayModeTests
                         "Render", BindingFlags.Instance |
                                   BindingFlags.NonPublic);
                     Assert.That(render, Is.Not.Null);
+                    applyViewport = layout.GetType().GetMethod(
+                        "ApplyResponsiveLayoutForViewport",
+                        BindingFlags.Instance | BindingFlags.Public);
+                    Assert.That(applyViewport, Is.Not.Null);
                     reloadedSelections++;
                 }
                 else
@@ -971,6 +986,11 @@ public sealed class SoloDuelVisualsPlayModeTests
                 Assert.That(expected, Is.Not.Null, resourcePath);
                 Assert.That(avatar.sprite, Is.SameAs(expected),
                     "Solo must resolve every selectable avatar through the canonical catalog.");
+                AssertSoloAvatarFramingAcrossViewports(
+                    layout, root, applyViewport, expected,
+                    "Solo avatar " + index);
+                Assert.That(PlayerPrefs.GetInt(avatarKey), Is.EqualTo(index),
+                    "Solo framing must not overwrite the saved avatar.");
                 if (first == null) first = expected;
                 else if (second == null && expected != first) second = expected;
             }
@@ -989,12 +1009,19 @@ public sealed class SoloDuelVisualsPlayModeTests
             render.Invoke(layout, null);
             Assert.That(avatar.sprite, Is.SameAs(fallback),
                 "Missing profile data must use the approved Solo fallback.");
+            Assert.That(PlayerPrefs.HasKey(avatarKey), Is.False,
+                "Fallback framing must not create an avatar preference.");
+            AssertSoloAvatarFramingAcrossViewports(
+                layout, root, applyViewport, fallback,
+                "Solo missing-value fallback");
 
             PlayerPrefs.SetInt(profileVersionKey, currentProfileVersion);
             PlayerPrefs.SetInt(avatarKey, int.MaxValue);
             render.Invoke(layout, null);
             Assert.That(avatar.sprite, Is.SameAs(fallback),
                 "Invalid profile data must use the approved Solo fallback.");
+            Assert.That(PlayerPrefs.GetInt(avatarKey), Is.EqualTo(int.MaxValue),
+                "Fallback framing must not rewrite invalid legacy data.");
 
             const int lockedAvatar = 11;
             Assert.That(avatarCount, Is.GreaterThan(lockedAvatar));
@@ -1007,45 +1034,8 @@ public sealed class SoloDuelVisualsPlayModeTests
             render.Invoke(layout, null);
             Assert.That(avatar.sprite, Is.SameAs(fallback),
                 "Locked avatar 11 must use the approved Solo fallback.");
-
-            Assert.That(TryCommitOnboardingAvatar(6), Is.True);
-            render.Invoke(layout, null);
-            MethodInfo applyViewport = layout.GetType().GetMethod(
-                "ApplyResponsiveLayoutForViewport",
-                BindingFlags.Instance | BindingFlags.Public);
-            Assert.That(applyViewport, Is.Not.Null);
-            foreach (Vector2Int viewport in new[]
-            {
-                new Vector2Int(720, 1280),
-                new Vector2Int(1080, 1920),
-                new Vector2Int(1080, 2400),
-                new Vector2Int(1179, 2556),
-            })
-            {
-                applyViewport.Invoke(layout, new object[]
-                {
-                    (float)viewport.x,
-                    (float)viewport.y,
-                });
-                Canvas.ForceUpdateCanvases();
-                aperture = Find(
-                    root, "SoloDuelChipAvatarAperture") as RectTransform;
-                avatar = Find(root, "SoloDuelChipAvatar").GetComponent<Image>();
-                RectTransform chip = Find(root, "SoloDuelPlayerChip")
-                    as RectTransform;
-                AssertRectInside(
-                    avatar.rectTransform, aperture, 1f,
-                    viewport + " Solo avatar inside aperture");
-                AssertSquareInsideCircularAperture(
-                    avatar.rectTransform, aperture, 1f,
-                    viewport + " complete Solo portrait inside circle");
-                AssertRectInside(
-                    aperture, chip, 8f,
-                    viewport + " Solo aperture inside chip");
-                Assert.That(avatar.sprite,
-                    Is.SameAs(Resources.Load<Sprite>(
-                        OnboardingAvatarResourcePath(6))));
-            }
+            Assert.That(PlayerPrefs.GetInt(avatarKey), Is.EqualTo(lockedAvatar),
+                "Fallback framing must not rewrite a locked legacy value.");
 
             TMP_Text difficulty = Find(root, "OpponentDifficulty")
                 .GetComponent<TMP_Text>();
@@ -2091,7 +2081,7 @@ public sealed class SoloDuelVisualsPlayModeTests
             context + " chip score/trophy");
         CollectReservedExclusion(
             violations, chipScore,
-            RectNamed(visualRoot, "SoloDuelChipAvatar"), chip, 8f,
+            RectNamed(visualRoot, "SoloDuelChipAvatarAperture"), chip, 8f,
             context + " chip score/avatar");
 
         if (result.gameObject.activeInHierarchy)
@@ -2960,26 +2950,44 @@ public sealed class SoloDuelVisualsPlayModeTests
             context + " top");
     }
 
-    static void AssertSquareInsideCircularAperture(
-        RectTransform portrait,
-        RectTransform aperture,
-        float inset,
+    static void AssertSoloAvatarFramingAcrossViewports(
+        Component layout,
+        Transform root,
+        MethodInfo applyViewport,
+        Sprite expected,
         string context)
     {
-        float apertureRadius =
-            Mathf.Min(aperture.rect.width, aperture.rect.height) * 0.5f - inset;
-        Vector3[] corners = new Vector3[4];
-        portrait.GetWorldCorners(corners);
-        Vector2 center = aperture.rect.center;
-        for (int index = 0; index < corners.Length; index++)
+        foreach (Vector2Int viewport in AvatarPortraitViewports)
         {
-            Vector2 local = aperture.InverseTransformPoint(corners[index]);
-            Assert.That(Vector2.Distance(local, center),
-                Is.LessThanOrEqualTo(apertureRadius),
-                context + " corner " + index + " requires the entire " +
-                "portrait rectangle, including opaque edge pixels, to fit " +
-                "inside the circular aperture.");
+            applyViewport.Invoke(layout, new object[]
+            {
+                (float)viewport.x,
+                (float)viewport.y,
+            });
+            Canvas.ForceUpdateCanvases();
+            Image portrait = Find(root, "SoloDuelChipAvatar")
+                .GetComponent<Image>();
+            RectTransform aperture = Find(
+                root, "SoloDuelChipAvatarAperture") as RectTransform;
+            RectTransform chip = Find(root, "SoloDuelPlayerChip")
+                as RectTransform;
+            string lane = context + " " + viewport.x + "x" + viewport.y;
+            Assert.That(portrait.sprite, Is.SameAs(expected),
+                lane + " changed identity.");
+            AssertNormalizedAvatarFraming(portrait, aperture, lane);
+            AssertRectInside(
+                aperture, chip, 8f,
+                lane + " aperture inside unchanged chip");
         }
+    }
+
+    static void AssertNormalizedAvatarFraming(
+        Image portrait,
+        RectTransform aperture,
+        string context)
+    {
+        PlayerProfileAvatarFramingTestAssertions.AssertLayout(
+            portrait, aperture, context);
     }
 
     static void AssertSlicedSprite(
@@ -3149,5 +3157,155 @@ public sealed class SoloDuelVisualsPlayModeTests
             type = Type.GetType(name + ", HOL.Core");
         Assert.That(type, Is.Not.Null, name);
         return type;
+    }
+}
+
+// Test-owned measurements of the approved PNG alpha footprints. Keeping these
+// independent from PlayerProfileAvatarFraming makes the layout checks capable
+// of catching a bad production table, scale formula, or centering offset.
+internal static class PlayerProfileAvatarFramingTestAssertions
+{
+    const float MinimumDominantFill = 0.80f;
+    const float MaximumDominantFill = 0.85f;
+    const float MaskSupportRadius = 0.4469f;
+    const float SourceEdgeSafety = 0.0015f;
+    const float MinimumLayoutSafety = 0.49f;
+
+    readonly struct AlphaMetrics
+    {
+        public AlphaMetrics(
+            float centerX,
+            float centerY,
+            float radius,
+            float dominantExtent)
+        {
+            Center = new Vector2(centerX, centerY);
+            Radius = radius;
+            DominantExtent = dominantExtent;
+        }
+
+        public Vector2 Center { get; }
+        public float Radius { get; }
+        public float DominantExtent { get; }
+    }
+
+    public static void AssertLayout(
+        Image portrait,
+        RectTransform aperture,
+        string context)
+    {
+        Assert.That(portrait, Is.Not.Null, context + " portrait");
+        Assert.That(aperture, Is.Not.Null, context + " aperture");
+        Assert.That(portrait.sprite, Is.Not.Null, context + " sprite");
+        Assert.That(TryGetAlphaMetrics(
+                portrait.sprite.name, out AlphaMetrics metrics),
+            Is.True,
+            context + " has no independently audited alpha footprint.");
+
+        RectTransform rect = portrait.rectTransform;
+        Vector2 sourceSize = portrait.sprite.rect.size;
+        float sourceMaximum = Mathf.Max(sourceSize.x, sourceSize.y);
+        float scaleX = Mathf.Abs(rect.rect.width) / sourceSize.x;
+        float scaleY = Mathf.Abs(rect.rect.height) / sourceSize.y;
+        Assert.That(scaleX, Is.EqualTo(scaleY).Within(0.0001f),
+            context + " must preserve source aspect ratio.");
+
+        Vector2 sourceCenter = Vector2.Scale(metrics.Center, sourceSize);
+        Vector2 sourceRectCenter = sourceSize * 0.5f;
+        Vector2 visibleCenter = rect.anchoredPosition +
+            (sourceCenter - sourceRectCenter) * scaleX;
+        Vector2 apertureCenter = aperture.rect.center;
+        float centerError = Vector2.Distance(visibleCenter, apertureCenter);
+        Assert.That(centerError, Is.LessThanOrEqualTo(0.03f),
+            context + " visible alpha footprint is not centered.");
+
+        float apertureDiameter = Mathf.Min(
+            Mathf.Abs(aperture.rect.width),
+            Mathf.Abs(aperture.rect.height));
+        float innerApertureDiameter =
+            apertureDiameter * MaskSupportRadius * 2f;
+        float dominantFill = metrics.DominantExtent * sourceMaximum *
+            scaleX / innerApertureDiameter;
+        Assert.That(dominantFill,
+            Is.InRange(MinimumDominantFill, MaximumDominantFill),
+            context + " visible artwork must occupy 80-85% of the " +
+            "mask's usable inner aperture.");
+
+        float alphaReach =
+            (metrics.Radius + SourceEdgeSafety) * sourceMaximum * scaleX;
+        float radialSafety =
+            innerApertureDiameter * 0.5f - centerError - alphaReach;
+        Assert.That(radialSafety,
+            Is.GreaterThanOrEqualTo(MinimumLayoutSafety),
+            context + " visible alpha pixels must remain inside the " +
+            "circular mask with a breathing margin.");
+
+        Assert.That(rect.anchorMin, Is.EqualTo(new Vector2(0.5f, 0.5f)),
+            context + " minimum anchor");
+        Assert.That(rect.anchorMax, Is.EqualTo(new Vector2(0.5f, 0.5f)),
+            context + " maximum anchor");
+        Assert.That(rect.pivot, Is.EqualTo(new Vector2(0.5f, 0.5f)),
+            context + " pivot");
+        Assert.That(portrait.preserveAspect, Is.True, context + " aspect");
+        Assert.That(portrait.useSpriteMesh, Is.False,
+            context + " must not substitute a tight-mesh crop.");
+    }
+
+    static bool TryGetAlphaMetrics(
+        string spriteName,
+        out AlphaMetrics metrics)
+    {
+        switch (spriteName)
+        {
+            case "avatar_01_teal_boy":
+                metrics = M(0.584254f, 0.424383f, 0.532345f, 0.936464f);
+                return true;
+            case "avatar_02_cap_boy":
+                metrics = M(0.574586f, 0.390990f, 0.514243f, 0.900552f);
+                return true;
+            case "avatar_03_glasses_boy":
+                metrics = M(0.526243f, 0.423044f, 0.532967f, 0.928177f);
+                return true;
+            case "avatar_04_blue_hair":
+                metrics = M(0.497238f, 0.425414f, 0.542510f, 0.933702f);
+                return true;
+            case "avatar_05_ponytail_girl":
+                metrics = M(0.588398f, 0.516575f, 0.584243f, 0.969613f);
+                return true;
+            case "avatar_06_cat_ear_girl":
+                metrics = M(0.563036f, 0.518134f, 0.592793f, 0.969613f);
+                return true;
+            case "avatar_07_bubblegum_girl":
+                metrics = M(0.513812f, 0.508883f, 0.595277f, 0.969613f);
+                return true;
+            case "avatar_08_gold_hoodie_girl":
+                metrics = M(0.500000f, 0.509250f, 0.594975f, 0.969613f);
+                return true;
+            case "avatar_09_green_cap":
+                metrics = M(0.551105f, 0.480602f, 0.507531f, 0.883978f);
+                return true;
+            case "avatar_10_silver_hair":
+                metrics = M(0.513812f, 0.521033f, 0.528785f, 0.870166f);
+                return true;
+            case "avatar_11_black_red_hair":
+                metrics = M(0.495856f, 0.494475f, 0.527083f, 0.897790f);
+                return true;
+            case "player_cyan_exact":
+                metrics = M(0.488428f, 0.485567f, 0.524300f, 0.948891f);
+                return true;
+            default:
+                metrics = default;
+                return false;
+        }
+    }
+
+    static AlphaMetrics M(
+        float centerX,
+        float centerY,
+        float radius,
+        float dominantExtent)
+    {
+        return new AlphaMetrics(
+            centerX, centerY, radius, dominantExtent);
     }
 }

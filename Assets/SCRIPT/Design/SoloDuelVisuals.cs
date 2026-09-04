@@ -513,13 +513,9 @@ public sealed class SoloDuelVisuals : MonoBehaviour
             new Vector2(370f, 150f), new Vector2(310f, 132f), blend);
         LayoutControl(playerAvatarAperture,
             new Vector2(116f, 0f), new Vector2(97f, 0f),
-            new Vector2(108f, 108f), new Vector2(96f, 96f), blend);
-        LayoutControl(
-            playerAvatarImage != null
-                ? playerAvatarImage.rectTransform
-                : null,
-            Vector2.zero, Vector2.zero,
-            new Vector2(74f, 74f), new Vector2(66f, 66f), blend);
+            new Vector2(122f, 122f), new Vector2(100f, 100f), blend);
+        PlayerProfileAvatarFraming.Apply(
+            playerAvatarImage, playerAvatarAperture);
 
         LayoutNamed("PlayerCard",
             new Vector2(-276f, 472f), new Vector2(-259f, 586f),
@@ -943,10 +939,12 @@ public sealed class SoloDuelVisuals : MonoBehaviour
         playerAvatarAperture = avatarMaskImage.rectTransform;
         Place(
             playerAvatarAperture, new Vector2(116f, 0f),
-            new Vector2(108f, 108f));
+            new Vector2(122f, 122f));
         playerAvatarImage = AddSprite(
             playerAvatarAperture, "SoloDuelChipAvatar", avatar,
-            Vector2.zero, new Vector2(74f, 74f));
+            Vector2.zero, Vector2.one);
+        PlayerProfileAvatarFraming.Apply(
+            playerAvatarImage, playerAvatarAperture);
         AddSprite(
             chipImage.transform, "SoloDuelChipTrophy", trophy,
             new Vector2(-102f, 0f), new Vector2(52f, 52f));
@@ -1937,7 +1935,11 @@ public sealed class SoloDuelVisuals : MonoBehaviour
         if (opponentDifficultyText != null)
             opponentDifficultyText.text = DifficultyLabel();
         if (playerAvatarImage != null)
+        {
             playerAvatarImage.sprite = PlayerProfileAvatarResolver.Resolve();
+            PlayerProfileAvatarFraming.Apply(
+                playerAvatarImage, playerAvatarAperture);
+        }
 
         RenderActorCards(state);
 

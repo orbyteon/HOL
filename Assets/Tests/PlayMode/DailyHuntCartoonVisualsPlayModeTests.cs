@@ -188,9 +188,11 @@ public sealed class DailyHuntCartoonVisualsPlayModeTests
         AssertRect(root, "DailyPlayerAvatarRing",
             new Vector2(-120f, 5f), new Vector2(122f, 122f));
         AssertRect(root, "DailyPlayerAvatarClip",
-            new Vector2(-120f, 5f), new Vector2(100f, 100f));
-        AssertRect(root, "DailyPlayerAvatar",
-            Vector2.zero, new Vector2(68f, 68f));
+            new Vector2(-120f, 5f), new Vector2(105f, 105f));
+        AssertNormalizedAvatarFraming(
+            Find(root, "DailyPlayerAvatar").GetComponent<Image>(),
+            Find(root, "DailyPlayerAvatarClip") as RectTransform,
+            "Daily initial profile portrait");
         AssertRect(root, "DailyPlayerName",
             new Vector2(45f, 53f), new Vector2(220f, 40f));
         AssertRect(root, "DailyPlayerStar",
@@ -474,12 +476,42 @@ public sealed class DailyHuntCartoonVisualsPlayModeTests
                     "Daily Hunt canonical avatar " + index);
                 Assert.That(PlayerPrefs.GetInt(avatarKey), Is.EqualTo(index),
                     "Refreshing Daily Hunt must never overwrite the saved avatar.");
+                if (selectable)
+                {
+                    foreach (Vector2Int viewport in PortraitViewports)
+                    {
+                        ApplyResponsiveViewport(visuals, viewport);
+                        refresh.Invoke(visuals, null);
+                        Canvas.ForceUpdateCanvases();
+                        string lane = "Daily avatar " + index + " " +
+                            viewport.x + "x" + viewport.y;
+                        Assert.That(portrait.sprite, Is.SameAs(expected),
+                            lane + " changed identity.");
+                        AssertNormalizedAvatarFraming(
+                            portrait, aperture, lane);
+                        Assert.That(PlayerPrefs.GetInt(avatarKey),
+                            Is.EqualTo(index),
+                            lane + " overwrote the saved avatar.");
+                    }
+                }
             }
 
             PlayerPrefs.DeleteKey(avatarKey);
             refresh.Invoke(visuals, null);
             Assert.That(portrait.sprite, Is.SameAs(fallback),
                 "Missing avatar must use the approved cyan fallback.");
+            Assert.That(PlayerPrefs.HasKey(avatarKey), Is.False,
+                "Fallback framing must not create an avatar preference.");
+            foreach (Vector2Int viewport in PortraitViewports)
+            {
+                ApplyResponsiveViewport(visuals, viewport);
+                refresh.Invoke(visuals, null);
+                Canvas.ForceUpdateCanvases();
+                AssertNormalizedAvatarFraming(
+                    portrait, aperture,
+                    "Daily missing-value fallback " +
+                    viewport.x + "x" + viewport.y);
+            }
             foreach (int invalid in new[] { -1, avatarCount, int.MaxValue })
             {
                 PlayerPrefs.SetInt(avatarKey, invalid);
@@ -510,14 +542,10 @@ public sealed class DailyHuntCartoonVisualsPlayModeTests
                         lane + " changed the selected avatar.");
                     Assert.That(PlayerPrefs.GetInt(avatarKey), Is.EqualTo(6),
                         lane + " overwrote the selected avatar.");
+                    AssertNormalizedAvatarFraming(
+                        portrait, aperture, lane + " Daily avatar");
                     AssertRectInside(
-                        portrait.rectTransform, aperture, 1f,
-                        lane + " Daily avatar inside aperture");
-                    AssertSquareInsideCircularAperture(
-                        portrait.rectTransform, aperture, 1f,
-                        lane + " complete Daily portrait inside circle");
-                    AssertRectInside(
-                        aperture, ring, 10f,
+                        aperture, ring, 8f,
                         lane + " Daily aperture inside ring");
                     AssertRectInside(
                         ring, chip, 1f,
@@ -719,25 +747,13 @@ public sealed class DailyHuntCartoonVisualsPlayModeTests
         Assert.That(expanded.Overlaps(other), Is.False, context);
     }
 
-    static void AssertSquareInsideCircularAperture(
-        RectTransform portrait,
+    static void AssertNormalizedAvatarFraming(
+        Image portrait,
         RectTransform aperture,
-        float inset,
         string context)
     {
-        float apertureRadius =
-            Mathf.Min(aperture.rect.width, aperture.rect.height) * 0.5f - inset;
-        Vector3[] corners = new Vector3[4];
-        portrait.GetWorldCorners(corners);
-        Vector2 center = aperture.rect.center;
-        for (int index = 0; index < corners.Length; index++)
-        {
-            Vector2 local = aperture.InverseTransformPoint(corners[index]);
-            Assert.That(Vector2.Distance(local, center),
-                Is.LessThanOrEqualTo(apertureRadius),
-                context + " corner " + index +
-                " requires every source pixel to remain within the mask.");
-        }
+        PlayerProfileAvatarFramingTestAssertions.AssertLayout(
+            portrait, aperture, context);
     }
 
     static void AssertRenderedTextInsideAndRightOfAperture(

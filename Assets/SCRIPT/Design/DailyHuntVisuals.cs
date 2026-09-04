@@ -178,6 +178,7 @@ public sealed class DailyHuntVisuals : MonoBehaviour
     TMP_Text chipName;
     TMP_Text chipWins;
     TMP_Text chipProgress;
+    RectTransform playerAvatarAperture;
     Image playerAvatarImage;
     Image chipProgressFill;
     TMP_Text ribbonTitle;
@@ -895,9 +896,10 @@ public sealed class DailyHuntVisuals : MonoBehaviour
         Image avatarMaskImage = EnsureImage(
             playerChipRoot, "DailyPlayerAvatarClip");
         ConfigureCircularMask(avatarMaskImage);
+        playerAvatarAperture = avatarMaskImage.rectTransform;
         Place(
-            avatarMaskImage.rectTransform, new Vector2(-120f, 5f),
-            new Vector2(100f, 100f));
+            playerAvatarAperture, new Vector2(-120f, 5f),
+            new Vector2(105f, 105f));
 
         playerAvatarImage = EnsureImage(
             avatarMaskImage.transform, "DailyPlayerAvatar");
@@ -906,9 +908,8 @@ public sealed class DailyHuntVisuals : MonoBehaviour
             PlayerProfileAvatarResolver.Resolve(),
             true,
             Image.Type.Simple);
-        Place(
-            playerAvatarImage.rectTransform, Vector2.zero,
-            new Vector2(68f, 68f));
+        PlayerProfileAvatarFraming.Apply(
+            playerAvatarImage, playerAvatarAperture);
 
         chipName = EnsureText(
             playerChipRoot, "DailyPlayerName", 31f, displayFont,
@@ -1220,7 +1221,11 @@ public sealed class DailyHuntVisuals : MonoBehaviour
     void RefreshPlayerChip()
     {
         if (playerAvatarImage != null)
+        {
             playerAvatarImage.sprite = PlayerProfileAvatarResolver.Resolve();
+            PlayerProfileAvatarFraming.Apply(
+                playerAvatarImage, playerAvatarAperture);
+        }
 
         if (chipName == null || chipWins == null || chipProgress == null) return;
 
