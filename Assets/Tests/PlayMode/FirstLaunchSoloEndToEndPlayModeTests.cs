@@ -25,6 +25,7 @@ public sealed class FirstLaunchSoloEndToEndPlayModeTests
     {
         "PlayerName",
         "DailyLastPlayDate",
+        "DailyHuntTrail",
     };
 
     static readonly string[] IntPreferenceKeys =
@@ -56,22 +57,42 @@ public sealed class FirstLaunchSoloEndToEndPlayModeTests
         "LockEverUsed",
         "PendingStreakRestore",
         "PendingRewardEarned",
+        "DailyHuntDay",
+        "DailyHuntUsed",
+        "DailyHuntDone",
+        "DailyHuntFound",
+        "DailyHuntRevived",
+        "DailyHuntMin",
+        "DailyHuntMax",
+        "DailyHuntStreak",
+        "DailyHuntLastFound",
+        "DailyHuntPendingRevive",
     };
 
     readonly List<PreferenceSnapshot> preferences =
         new List<PreferenceSnapshot>();
     UnityEngine.Random.State randomState;
     double fakePresentationTime;
+    int originalScreenWidth;
+    int originalScreenHeight;
+    bool originalFullScreen;
 
     [SetUp]
     public void SetUp()
     {
+        originalScreenWidth = Screen.width;
+        originalScreenHeight = Screen.height;
+        originalFullScreen = Screen.fullScreen;
         randomState = UnityEngine.Random.state;
         preferences.Clear();
         foreach (string key in StringPreferenceKeys)
             preferences.Add(PreferenceSnapshot.CaptureString(key));
         foreach (string key in IntPreferenceKeys)
-            preferences.Add(PreferenceSnapshot.CaptureInt(key));
+        {
+            preferences.Add(key == "HOL.Onboarding.Avatar"
+                ? PreferenceSnapshot.CaptureAuto(key)
+                : PreferenceSnapshot.CaptureInt(key));
+        }
 
         foreach (PreferenceSnapshot preference in preferences)
             PlayerPrefs.DeleteKey(preference.Key);
@@ -101,6 +122,8 @@ public sealed class FirstLaunchSoloEndToEndPlayModeTests
         SceneManager.SetActiveScene(quiescent);
         if (active.IsValid() && active.isLoaded)
             yield return SceneManager.UnloadSceneAsync(active);
+        Screen.SetResolution(
+            originalScreenWidth, originalScreenHeight, originalFullScreen);
         yield return null;
 #if UNITY_EDITOR
         RestoreEditorWindowAfterSettlement();
@@ -171,6 +194,7 @@ public sealed class FirstLaunchSoloEndToEndPlayModeTests
         Assert.That(PlayerPrefs.GetInt("HOL.Onboarding.Gender"), Is.EqualTo(1));
         Assert.That(PlayerPrefs.GetInt("HOL.Onboarding.Avatar"), Is.EqualTo(0));
         Assert.That(PlayerPrefs.GetInt("HOL.Onboarding.AgeCategory"), Is.EqualTo(2));
+        Sprite committedAvatar = CatalogAvatarSprite(0);
         Assert.That(GetStaticProperty<bool>("OnboardingProfile", "IsComplete"),
             Is.True);
         Assert.That(GetStaticProperty<bool>("OnboardingProfile", "ShouldRun"),
@@ -207,6 +231,9 @@ public sealed class FirstLaunchSoloEndToEndPlayModeTests
         Assert.That(homeCanvas, Is.Not.Null);
         Assert.That(Find(homeCanvas.transform, "HomePlayerChipText")
             .GetComponent<TMP_Text>().text, Is.EqualTo(PlayerName));
+        AssertAvatar(
+            homeOwner.transform, "HomePlayerAvatar", committedAvatar,
+            "First-launch Home");
 
         Button soloEntry = Find(homeCanvas.transform, "ButtonPlay")
             .GetComponent<Button>();
@@ -244,6 +271,9 @@ public sealed class FirstLaunchSoloEndToEndPlayModeTests
         Assert.That(CountInScene(
             SceneManager.GetActiveScene(), RuntimeType("SoloDuelVisuals")),
             Is.EqualTo(1), "Solo must have one presentation owner.");
+        AssertAvatar(
+            soloOwner.transform, "SoloDuelChipAvatar", committedAvatar,
+            "First-launch Solo");
 
         Component numberManager = FindInScene(
             SceneManager.GetActiveScene(), RuntimeType("NumberManager"));
@@ -273,6 +303,10 @@ public sealed class FirstLaunchSoloEndToEndPlayModeTests
         // then choose a deterministic opener while every move still runs
         // through GameManager, NumberManager and canonical DuelRules.
         Invoke(game, "RestartMatch");
+        AssertPersistedAvatar(0, "Solo rematch");
+        AssertAvatar(
+            soloOwner.transform, "SoloDuelChipAvatar", committedAvatar,
+            "Solo rematch");
         Invoke(game, "SetPlayerNumber", 100);
         SetField(numberManager, "playerNumber", 100);
         SetField(numberManager, "gameStarted", true);
@@ -421,6 +455,218 @@ public sealed class FirstLaunchSoloEndToEndPlayModeTests
         {
             SceneManager.sceneLoaded -= onSceneLoaded;
         }
+    }
+
+    [UnityTest]
+    public IEnumerator CommittedAvatarSurvivesHomeSoloBackDailyAndReturningLaunch()
+    {
+        const int selectedAvatar = 6;
+        Assert.That(TryCommitProfile(selectedAvatar), Is.True);
+        Sprite expected = CatalogAvatarSprite(selectedAvatar);
+        PlayerPrefs.Save();
+        Screen.SetResolution(1080, 1920, false);
+#if UNITY_EDITOR
+        FocusGameViewForEndOfFrameSettlement();
+#endif
+
+        yield return SceneManager.LoadSceneAsync(
+            "MainMenu", LoadSceneMode.Single);
+        Component homeOwner = null;
+        yield return WaitUntilOrFail(() =>
+        {
+            homeOwner = FindInScene(
+                SceneManager.GetActiveScene(),
+                RuntimeType("MainMenuHomeVisuals"));
+            return homeOwner != null &&
+                   GetProperty<bool>(homeOwner, "IsReady") &&
+                   GetProperty<bool>(homeOwner, "IsSettled");
+        }, 8f, "Main Menu did not settle for the shared-avatar route.");
+        AssertAvatar(homeOwner.transform, "HomePlayerAvatar", expected, "Home");
+        AssertPersistedAvatar(selectedAvatar, "Home");
+
+        Button solo = Find(homeOwner.transform, "ButtonPlay").GetComponent<Button>();
+        Assert.That(PersistentMethods(solo), Does.Contain("OnPlayPressed"));
+        Click(solo);
+
+        Component soloOwner = null;
+        yield return WaitUntilOrFail(() =>
+        {
+            soloOwner = FindInScene(
+                SceneManager.GetActiveScene(), RuntimeType("SoloDuelVisuals"));
+            return soloOwner != null &&
+                   GetProperty<bool>(soloOwner, "IsReady") &&
+                   Find(soloOwner.transform, "SoloDuelChipAvatar") != null;
+        }, 8f, "Solo did not expose its shared player-avatar slot.");
+        AssertAvatar(
+            soloOwner.transform, "SoloDuelChipAvatar", expected, "Solo");
+        AssertPersistedAvatar(selectedAvatar, "Solo");
+        SetLanguage("Greek");
+        yield return null;
+        AssertAvatar(
+            soloOwner.transform, "SoloDuelChipAvatar", expected,
+            "Greek Solo");
+        AssertPersistedAvatar(selectedAvatar, "Greek Solo");
+        SetLanguage("English");
+        yield return null;
+
+        Button back = Find(soloOwner.transform, "DuelBack").GetComponent<Button>();
+        Click(back);
+        Transform confirmation = Find(
+            soloOwner.transform, "SoloLeaveConfirmation");
+        if (confirmation != null && confirmation.gameObject.activeInHierarchy)
+        {
+            yield return null;
+            Button confirm = Find(
+                confirmation, "SoloLeaveConfirmButton").GetComponent<Button>();
+            Click(confirm);
+        }
+        yield return WaitForScene("MainMenu", 8f);
+        AssertPersistedAvatar(selectedAvatar, "Solo Back");
+
+        homeOwner = null;
+        Component hunt = null;
+        Button dailyEntry = null;
+        yield return WaitUntilOrFail(() =>
+        {
+            homeOwner = FindInScene(
+                SceneManager.GetActiveScene(),
+                RuntimeType("MainMenuHomeVisuals"));
+            hunt = FindInScene(
+                SceneManager.GetActiveScene(), RuntimeType("DailyHunt"));
+            Transform entry = homeOwner == null
+                ? null
+                : Find(homeOwner.transform, "DailyHuntButton");
+            dailyEntry = entry == null ? null : entry.GetComponent<Button>();
+            return homeOwner != null &&
+                   GetProperty<bool>(homeOwner, "IsReady") &&
+                   GetProperty<bool>(homeOwner, "IsSettled") &&
+                   hunt != null && dailyEntry != null && dailyEntry.interactable;
+        }, 8f, "Returned Home did not expose the real Daily Hunt entry.");
+        AssertAvatar(homeOwner.transform, "HomePlayerAvatar", expected, "Returned Home");
+        Click(dailyEntry);
+
+        hunt = null;
+        Component dailyVisuals = null;
+        yield return WaitUntilOrFail(() =>
+        {
+            hunt = FindInScene(
+                SceneManager.GetActiveScene(), RuntimeType("DailyHunt"));
+            dailyVisuals = hunt == null
+                ? null
+                : hunt.GetComponent(RuntimeType("DailyHuntVisuals"));
+            return hunt != null && hunt.gameObject.activeInHierarchy &&
+                   dailyVisuals != null &&
+                   GetProperty<bool>(dailyVisuals, "IsReady") &&
+                   Find(hunt.transform, "DailyPlayerAvatar") != null;
+        }, 5f, "Daily Hunt did not expose its shared player-avatar slot.");
+        AssertAvatar(
+            hunt.transform, "DailyPlayerAvatar", expected, "Daily Hunt");
+        AssertPersistedAvatar(selectedAvatar, "Daily Hunt");
+        SetLanguage("Greek");
+        yield return null;
+        AssertAvatar(
+            hunt.transform, "DailyPlayerAvatar", expected,
+            "Greek Daily Hunt");
+        AssertPersistedAvatar(selectedAvatar, "Greek Daily Hunt");
+        SetLanguage("English");
+        yield return null;
+
+        // This returning-player Splash path reconstructs every scene owner
+        // from persisted PlayerPrefs and must not re-enter Onboarding. A true
+        // process-level cold restart remains part of the APK human retest.
+        PlayerPrefs.Save();
+        yield return SceneManager.LoadSceneAsync(
+            "SplashScene", LoadSceneMode.Single);
+        yield return WaitUntilOrFail(
+            () => Find(SceneManager.GetActiveScene(), "SplashVisualRoot") != null,
+            5f,
+            "Returning-player Splash did not build its production presentation.");
+        Scene returningSplash = SceneManager.GetActiveScene();
+        Assert.That(returningSplash.name, Is.EqualTo("SplashScene"));
+        Assert.That(Find(returningSplash, "HOLOnboardingRoot"), Is.Null,
+            "A committed avatar must not be replaced by a new onboarding run.");
+        Component returningLoader = FindInScene(
+            returningSplash, RuntimeType("SplashLoader"));
+        Assert.That(returningLoader, Is.Not.Null);
+        Assert.That(((MonoBehaviour)returningLoader).IsInvoking(), Is.True,
+            "Returning-player Splash must schedule its normal menu transition.");
+        yield return WaitForScene("MainMenu", 8f);
+        homeOwner = null;
+        yield return WaitUntilOrFail(() =>
+        {
+            homeOwner = FindInScene(
+                SceneManager.GetActiveScene(),
+                RuntimeType("MainMenuHomeVisuals"));
+            return homeOwner != null &&
+                   GetProperty<bool>(homeOwner, "IsReady") &&
+                   GetProperty<bool>(homeOwner, "IsSettled");
+        }, 8f, "Returning launch did not settle Home.");
+        AssertAvatar(
+            homeOwner.transform, "HomePlayerAvatar", expected,
+            "Returning launch Home");
+        AssertPersistedAvatar(selectedAvatar, "Returning launch");
+    }
+
+    static void AssertAvatar(
+        Transform root,
+        string objectName,
+        Sprite expected,
+        string context)
+    {
+        Transform avatar = Find(root, objectName);
+        Assert.That(avatar, Is.Not.Null, context + " avatar slot");
+        Image image = avatar.GetComponent<Image>();
+        Assert.That(image, Is.Not.Null, context + " avatar image");
+        Assert.That(image.sprite, Is.SameAs(expected),
+            context + " did not resolve the committed canonical avatar.");
+    }
+
+    static void AssertPersistedAvatar(int expected, string context)
+    {
+        Assert.That(PlayerPrefs.GetInt("HOL.Onboarding.Avatar", -1),
+            Is.EqualTo(expected),
+            context + " overwrote the persisted avatar selection.");
+    }
+
+    static bool TryCommitProfile(int avatarIndex)
+    {
+        Type profile = RuntimeType("OnboardingProfile");
+        Type gender = profile.GetNestedType("GenderChoice", BindingFlags.Public);
+        Type age = profile.GetNestedType("AgeCategory", BindingFlags.Public);
+        MethodInfo commit = profile.GetMethod(
+            "TryCommit", BindingFlags.Public | BindingFlags.Static);
+        return (bool)commit.Invoke(null, new object[]
+        {
+            PlayerName,
+            Enum.ToObject(gender, 0),
+            avatarIndex,
+            Enum.ToObject(age, 2),
+        });
+    }
+
+    static Sprite CatalogAvatarSprite(int index)
+    {
+        Type catalog = RuntimeType("OnboardingAvatarCatalog");
+        object entry = catalog.GetMethod(
+            "Get", BindingFlags.Public | BindingFlags.Static)
+            .Invoke(null, new object[] { index });
+        string resource = (string)entry.GetType()
+            .GetProperty("ResourcePath", BindingFlags.Public | BindingFlags.Instance)
+            .GetValue(entry, null);
+        Sprite sprite = Resources.Load<Sprite>(resource);
+        Assert.That(sprite, Is.Not.Null, resource);
+        return sprite;
+    }
+
+    static void SetLanguage(string name)
+    {
+        Type l10n = RuntimeType("L10n");
+        Type language = l10n.GetNestedType("Language", BindingFlags.Public);
+        MethodInfo set = l10n.GetMethod(
+            "SetLanguage", BindingFlags.Public | BindingFlags.Static);
+        Assert.That(language, Is.Not.Null);
+        Assert.That(set, Is.Not.Null);
+        set.Invoke(null, new[] { Enum.Parse(language, name) });
     }
 
     static void StartWithOpener(Component game, string opener)
@@ -849,6 +1095,22 @@ public sealed class FirstLaunchSoloEndToEndPlayModeTests
                 PlayerPrefs.HasKey(key),
                 0,
                 PlayerPrefs.GetString(key, string.Empty));
+        }
+
+        public static PreferenceSnapshot CaptureAuto(string key)
+        {
+            bool existed = PlayerPrefs.HasKey(key);
+            if (!existed)
+            {
+                return new PreferenceSnapshot(
+                    key, ValueKind.Int, false, 0, null);
+            }
+
+            const string sentinel = "<HOL_PLAYER_PREFS_TYPE_SENTINEL>";
+            string text = PlayerPrefs.GetString(key, sentinel);
+            return text == sentinel
+                ? CaptureInt(key)
+                : CaptureString(key);
         }
 
         public void Restore()

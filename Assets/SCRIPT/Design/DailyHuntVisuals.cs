@@ -52,7 +52,6 @@ public sealed class DailyHuntVisuals : MonoBehaviour
 
     const string BackgroundResource = "phase2a/hol_neon_reference_bg_r3";
     const string LogoResource = "reference/hol_logo_exact";
-    const string AvatarResource = "reference/player_cyan_exact";
     const string MascotSixResource = "reference/mascot_6_exact";
     const string MascotSevenResource = "reference/mascot_7_exact";
     const string CalendarResource = "dailyhunt/production/daily_calendar_target_production";
@@ -118,7 +117,7 @@ public sealed class DailyHuntVisuals : MonoBehaviour
     {
         BackgroundResource,
         LogoResource,
-        AvatarResource,
+        PlayerProfileAvatarResolver.FallbackResourcePath,
         MascotSixResource,
         MascotSevenResource,
         CalendarResource,
@@ -179,6 +178,7 @@ public sealed class DailyHuntVisuals : MonoBehaviour
     TMP_Text chipName;
     TMP_Text chipWins;
     TMP_Text chipProgress;
+    Image playerAvatarImage;
     Image chipProgressFill;
     TMP_Text ribbonTitle;
     TMP_Text challengeTitle;
@@ -301,7 +301,8 @@ public sealed class DailyHuntVisuals : MonoBehaviour
 
         Sprite background = LoadRequired(BackgroundResource);
         Sprite logo = LoadRequired(LogoResource);
-        Sprite avatar = LoadRequired(AvatarResource);
+        Sprite fallbackAvatar = LoadRequired(
+            PlayerProfileAvatarResolver.FallbackResourcePath);
         Sprite six = LoadRequired(MascotSixResource);
         Sprite seven = LoadRequired(MascotSevenResource);
         Sprite rewardChest = LoadRequired(MissionRewardChestResource);
@@ -337,7 +338,7 @@ public sealed class DailyHuntVisuals : MonoBehaviour
         Sprite playerStar = LoadRequired(PlayerStarResource);
 
         IsReady = ArtReady(
-            background, logo, avatar, six, seven, rewardChest, calendar,
+            background, logo, fallbackAvatar, six, seven, rewardChest, calendar,
             stars, confetti, outerBezelBody, backButton, playerChip,
             playerAvatarRing, playerXpTrack,
             titleRibbon, challengeBoard, infoPanel, inputShell,
@@ -412,7 +413,7 @@ public sealed class DailyHuntVisuals : MonoBehaviour
 
         BuildTopBar(
             close, backButton, playerChip,
-            playerAvatarRing, avatar, playerStar,
+            playerAvatarRing, playerStar,
             playerXpTrack, guessAction);
 
         huntRoot = EnsureRect(safeRoot, "DailyNumberHuntRoot");
@@ -862,7 +863,6 @@ public sealed class DailyHuntVisuals : MonoBehaviour
         Sprite backButton,
         Sprite playerChipSprite,
         Sprite playerAvatarRing,
-        Sprite avatar,
         Sprite playerStar,
         Sprite progressTrackSprite,
         Sprite progressFillSprite)
@@ -892,31 +892,34 @@ public sealed class DailyHuntVisuals : MonoBehaviour
             avatarRing.rectTransform, new Vector2(-120f, 5f),
             new Vector2(122f, 122f));
 
-        var avatarClip = EnsureRect(
+        Image avatarMaskImage = EnsureImage(
             playerChipRoot, "DailyPlayerAvatarClip");
+        ConfigureCircularMask(avatarMaskImage);
         Place(
-            avatarClip, new Vector2(-128f, 20f),
-            new Vector2(118f, 118f));
-        if (avatarClip.GetComponent<RectMask2D>() == null)
-            avatarClip.gameObject.AddComponent<RectMask2D>();
+            avatarMaskImage.rectTransform, new Vector2(-120f, 5f),
+            new Vector2(100f, 100f));
 
-        var avatarImage = EnsureImage(
-            avatarClip, "DailyPlayerAvatar");
-        ConfigureImage(avatarImage, avatar, true, Image.Type.Simple);
+        playerAvatarImage = EnsureImage(
+            avatarMaskImage.transform, "DailyPlayerAvatar");
+        ConfigureImage(
+            playerAvatarImage,
+            PlayerProfileAvatarResolver.Resolve(),
+            true,
+            Image.Type.Simple);
         Place(
-            avatarImage.rectTransform, new Vector2(0f, -24f),
-            new Vector2(146f, 146f));
+            playerAvatarImage.rectTransform, Vector2.zero,
+            new Vector2(68f, 68f));
 
         chipName = EnsureText(
             playerChipRoot, "DailyPlayerName", 31f, displayFont,
             NearWhite, TextAlignmentOptions.Center);
         Place(
-            chipName.rectTransform, new Vector2(30f, 53f),
-            new Vector2(170f, 40f));
-        ConfigureDisplayText(chipName, 24f, 32f);
-        chipName.enableAutoSizing = false;
+            chipName.rectTransform, new Vector2(45f, 53f),
+            new Vector2(220f, 40f));
+        ConfigureDisplayText(chipName, 24f, 34f);
+        chipName.enableAutoSizing = true;
         chipName.fontSize = 34f;
-        chipName.overflowMode = TextOverflowModes.Ellipsis;
+        chipName.overflowMode = TextOverflowModes.Overflow;
 
         var star = EnsureImage(
             playerChipRoot, "DailyPlayerStar");
@@ -1216,6 +1219,9 @@ public sealed class DailyHuntVisuals : MonoBehaviour
 
     void RefreshPlayerChip()
     {
+        if (playerAvatarImage != null)
+            playerAvatarImage.sprite = PlayerProfileAvatarResolver.Resolve();
+
         if (chipName == null || chipWins == null || chipProgress == null) return;
 
         string player = PlayerPrefs.GetString("PlayerName", "");
@@ -1596,6 +1602,29 @@ public sealed class DailyHuntVisuals : MonoBehaviour
         image.preserveAspect = preserveAspect;
         image.color = Color.white;
         image.raycastTarget = false;
+    }
+
+    static void ConfigureCircularMask(Image maskImage)
+    {
+        Sprite maskSprite =
+            Resources.Load<Sprite>(
+                PlayerProfileAvatarResolver.CircularApertureResourcePath);
+        if (maskSprite == null)
+        {
+            Debug.LogError(
+                "[DailyHuntVisuals] Shared circular avatar mask is missing.");
+            maskImage.gameObject.SetActive(false);
+            return;
+        }
+        ConfigureImage(
+            maskImage,
+            maskSprite,
+            false,
+            Image.Type.Simple);
+        var mask = maskImage.GetComponent<Mask>();
+        if (mask == null)
+            mask = maskImage.gameObject.AddComponent<Mask>();
+        mask.showMaskGraphic = false;
     }
 
     static void Reparent(Transform child, Transform parent)

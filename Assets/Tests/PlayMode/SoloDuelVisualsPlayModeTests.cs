@@ -349,7 +349,7 @@ public sealed class SoloDuelVisualsPlayModeTests
         AssertSprite(root, "SoloInteractionCard",
             "solo/production/solo_interaction_board_v2");
         AssertSprite(root, "SoloDuelChipAvatar",
-            "solo/production/solo_player_avatar_v1");
+            "reference/player_cyan_exact");
         AssertSprite(root, "OpponentBubbleAvatar",
             "solo/production/solo_opponent_medallion_v1");
         AssertSprite(root, "OpponentReaction",
@@ -905,6 +905,22 @@ public sealed class SoloDuelVisualsPlayModeTests
             Assert.That(root, Is.Not.Null);
             Image avatar = Find(root, "SoloDuelChipAvatar")
                 .GetComponent<Image>();
+            RectTransform aperture = Find(
+                root, "SoloDuelChipAvatarAperture") as RectTransform;
+            Assert.That(aperture, Is.Not.Null);
+            Mask apertureMask = aperture.GetComponent<Mask>();
+            Assert.That(apertureMask, Is.Not.Null,
+                "The selected portrait must be clipped by the chip aperture.");
+            Assert.That(aperture.GetComponent<Image>().sprite,
+                Is.SameAs(Resources.Load<Sprite>(
+                    RuntimeConstant<string>(
+                        "PlayerProfileAvatarResolver",
+                        "CircularApertureResourcePath"))),
+                "The Solo aperture must use the shared circular aperture sprite.");
+            Assert.That(apertureMask.showMaskGraphic, Is.False,
+                "The invisible aperture must not replace approved chip artwork.");
+            Assert.That(avatar.rectTransform.parent, Is.SameAs(aperture));
+            Assert.That(avatar.preserveAspect, Is.True);
             Assert.That(avatar.raycastTarget, Is.False);
             Assert.That(avatar.GetComponentInParent<Button>(), Is.Null,
                 "The Solo profile chip is display-only, not a deceptive control.");
@@ -965,7 +981,7 @@ public sealed class SoloDuelVisualsPlayModeTests
                 "Two distinct committed avatars must survive a real scene reload.");
 
             Sprite fallback = Resources.Load<Sprite>(
-                "solo/production/solo_player_avatar_v1");
+                "reference/player_cyan_exact");
             Assert.That(fallback, Is.Not.Null);
 
             PlayerPrefs.DeleteKey(profileVersionKey);
@@ -991,6 +1007,45 @@ public sealed class SoloDuelVisualsPlayModeTests
             render.Invoke(layout, null);
             Assert.That(avatar.sprite, Is.SameAs(fallback),
                 "Locked avatar 11 must use the approved Solo fallback.");
+
+            Assert.That(TryCommitOnboardingAvatar(6), Is.True);
+            render.Invoke(layout, null);
+            MethodInfo applyViewport = layout.GetType().GetMethod(
+                "ApplyResponsiveLayoutForViewport",
+                BindingFlags.Instance | BindingFlags.Public);
+            Assert.That(applyViewport, Is.Not.Null);
+            foreach (Vector2Int viewport in new[]
+            {
+                new Vector2Int(720, 1280),
+                new Vector2Int(1080, 1920),
+                new Vector2Int(1080, 2400),
+                new Vector2Int(1179, 2556),
+            })
+            {
+                applyViewport.Invoke(layout, new object[]
+                {
+                    (float)viewport.x,
+                    (float)viewport.y,
+                });
+                Canvas.ForceUpdateCanvases();
+                aperture = Find(
+                    root, "SoloDuelChipAvatarAperture") as RectTransform;
+                avatar = Find(root, "SoloDuelChipAvatar").GetComponent<Image>();
+                RectTransform chip = Find(root, "SoloDuelPlayerChip")
+                    as RectTransform;
+                AssertRectInside(
+                    avatar.rectTransform, aperture, 1f,
+                    viewport + " Solo avatar inside aperture");
+                AssertSquareInsideCircularAperture(
+                    avatar.rectTransform, aperture, 1f,
+                    viewport + " complete Solo portrait inside circle");
+                AssertRectInside(
+                    aperture, chip, 8f,
+                    viewport + " Solo aperture inside chip");
+                Assert.That(avatar.sprite,
+                    Is.SameAs(Resources.Load<Sprite>(
+                        OnboardingAvatarResourcePath(6))));
+            }
 
             TMP_Text difficulty = Find(root, "OpponentDifficulty")
                 .GetComponent<TMP_Text>();
@@ -2882,6 +2937,49 @@ public sealed class SoloDuelVisualsPlayModeTests
         Assert.That(image.color.a, Is.EqualTo(1f).Within(0.001f), name);
         Assert.That(image.raycastTarget, Is.True, name);
         Assert.That(button.targetGraphic, Is.SameAs(image), name);
+    }
+
+    static void AssertRectInside(
+        RectTransform inner,
+        RectTransform outer,
+        float inset,
+        string context)
+    {
+        Assert.That(inner, Is.Not.Null, context + " inner");
+        Assert.That(outer, Is.Not.Null, context + " outer");
+        Bounds bounds = RectTransformUtility.CalculateRelativeRectTransformBounds(
+            outer, inner);
+        Rect available = outer.rect;
+        Assert.That(bounds.min.x, Is.GreaterThanOrEqualTo(available.xMin + inset),
+            context + " left");
+        Assert.That(bounds.max.x, Is.LessThanOrEqualTo(available.xMax - inset),
+            context + " right");
+        Assert.That(bounds.min.y, Is.GreaterThanOrEqualTo(available.yMin + inset),
+            context + " bottom");
+        Assert.That(bounds.max.y, Is.LessThanOrEqualTo(available.yMax - inset),
+            context + " top");
+    }
+
+    static void AssertSquareInsideCircularAperture(
+        RectTransform portrait,
+        RectTransform aperture,
+        float inset,
+        string context)
+    {
+        float apertureRadius =
+            Mathf.Min(aperture.rect.width, aperture.rect.height) * 0.5f - inset;
+        Vector3[] corners = new Vector3[4];
+        portrait.GetWorldCorners(corners);
+        Vector2 center = aperture.rect.center;
+        for (int index = 0; index < corners.Length; index++)
+        {
+            Vector2 local = aperture.InverseTransformPoint(corners[index]);
+            Assert.That(Vector2.Distance(local, center),
+                Is.LessThanOrEqualTo(apertureRadius),
+                context + " corner " + index + " requires the entire " +
+                "portrait rectangle, including opaque edge pixels, to fit " +
+                "inside the circular aperture.");
+        }
     }
 
     static void AssertSlicedSprite(

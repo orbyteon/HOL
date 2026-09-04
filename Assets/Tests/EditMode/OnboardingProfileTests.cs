@@ -133,9 +133,13 @@ public sealed class OnboardingProfileTests
     public void CommittedAvatarReadUsesTheCanonicalCatalogAndRejectsFallbackCases()
     {
         AssertCommittedAvatar(false, -1, "missing profile");
+        Sprite fallback = Resources.Load<Sprite>("reference/player_cyan_exact");
+        Assert.That(fallback, Is.Not.Null);
+        AssertResolvedAvatar(fallback, "missing profile fallback");
 
         PlayerPrefs.SetInt(AvatarKey, 1);
         AssertCommittedAvatar(false, -1, "incomplete profile");
+        AssertResolvedAvatar(fallback, "incomplete profile fallback");
         PlayerPrefs.SetInt(VersionKey, 1);
 
         Type catalog = RuntimeType("OnboardingAvatarCatalog");
@@ -156,20 +160,35 @@ public sealed class OnboardingProfileTests
             string resource = (string)entry.GetType()
                 .GetProperty("ResourcePath").GetValue(entry, null);
             if (selectable)
-                Assert.That(Resources.Load<Sprite>(resource), Is.Not.Null,
+            {
+                Sprite expected = Resources.Load<Sprite>(resource);
+                Assert.That(expected, Is.Not.Null,
                     "Missing canonical avatar resource " + resource);
+                AssertResolvedAvatar(
+                    expected, "resolved catalog avatar " + index);
+            }
+            else
+            {
+                AssertResolvedAvatar(
+                    fallback, "locked catalog avatar " + index);
+            }
         }
 
         PlayerPrefs.DeleteKey(AvatarKey);
         AssertCommittedAvatar(false, -1, "missing avatar key");
+        AssertResolvedAvatar(fallback, "missing avatar key fallback");
         PlayerPrefs.SetString(AvatarKey, string.Empty);
         AssertCommittedAvatar(false, -1, "empty legacy avatar");
+        AssertResolvedAvatar(fallback, "empty legacy avatar fallback");
         PlayerPrefs.SetString(AvatarKey, "avatar_02_cap_boy");
         AssertCommittedAvatar(false, -1, "string legacy avatar");
+        AssertResolvedAvatar(fallback, "string legacy avatar fallback");
         PlayerPrefs.SetInt(AvatarKey, -1);
         AssertCommittedAvatar(false, -1, "negative avatar");
+        AssertResolvedAvatar(fallback, "negative avatar fallback");
         PlayerPrefs.SetInt(AvatarKey, count);
         AssertCommittedAvatar(false, -1, "out-of-range avatar");
+        AssertResolvedAvatar(fallback, "out-of-range avatar fallback");
     }
 
     static bool TryCommit(string name, int gender, int avatar, int age)
@@ -198,6 +217,30 @@ public sealed class OnboardingProfileTests
             .Invoke(null, arguments);
         Assert.That(result, Is.EqualTo(expectedResult), label);
         Assert.That((int)arguments[0], Is.EqualTo(expectedAvatar), label);
+    }
+
+    static void AssertResolvedAvatar(
+        Sprite expected,
+        string label)
+    {
+        bool hadAvatar = PlayerPrefs.HasKey(AvatarKey);
+        int avatar = PlayerPrefs.GetInt(AvatarKey, int.MinValue);
+        string avatarString = PlayerPrefs.GetString(
+            AvatarKey, "__not-a-string-value__");
+        int version = PlayerPrefs.GetInt(VersionKey, 0);
+        Sprite resolved = (Sprite)RuntimeType("PlayerProfileAvatarResolver")
+            .GetMethod("Resolve", StaticFlags)
+            .Invoke(null, null);
+        Assert.That(resolved, Is.SameAs(expected), label);
+        Assert.That(PlayerPrefs.HasKey(AvatarKey), Is.EqualTo(hadAvatar),
+            label + " must not create or remove the persisted avatar key.");
+        Assert.That(PlayerPrefs.GetInt(AvatarKey, int.MinValue), Is.EqualTo(avatar),
+            label + " must not rewrite the persisted avatar value.");
+        Assert.That(PlayerPrefs.GetString(
+                AvatarKey, "__not-a-string-value__"), Is.EqualTo(avatarString),
+            label + " must preserve legacy string data byte-for-byte.");
+        Assert.That(PlayerPrefs.GetInt(VersionKey, 0), Is.EqualTo(version),
+            label + " must not rewrite the profile commit marker.");
     }
 
     static bool GetBool(string property)

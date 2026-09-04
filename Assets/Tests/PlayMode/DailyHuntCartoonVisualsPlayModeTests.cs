@@ -10,6 +10,14 @@ using UnityEngine.UI;
 
 public sealed class DailyHuntCartoonVisualsPlayModeTests
 {
+    struct SavedPreference
+    {
+        public bool Exists;
+        public bool IsInteger;
+        public int Integer;
+        public string Text;
+    }
+
     static readonly string[] DailyKeys =
     {
         "DailyHuntDay",
@@ -27,14 +35,22 @@ public sealed class DailyHuntCartoonVisualsPlayModeTests
 
     static readonly Vector2Int[] PortraitViewports =
     {
+        new Vector2Int(720, 1280),
         new Vector2Int(1080, 1920),
         new Vector2Int(1080, 2400),
         new Vector2Int(1179, 2556),
     };
 
+    int originalScreenWidth;
+    int originalScreenHeight;
+    bool originalFullScreen;
+
     [UnitySetUp]
     public IEnumerator SetUp()
     {
+        originalScreenWidth = Screen.width;
+        originalScreenHeight = Screen.height;
+        originalFullScreen = Screen.fullScreen;
         SetLanguage("English");
         foreach (string key in DailyKeys)
             PlayerPrefs.DeleteKey(key);
@@ -45,6 +61,8 @@ public sealed class DailyHuntCartoonVisualsPlayModeTests
     [UnityTearDown]
     public IEnumerator TearDown()
     {
+        Screen.SetResolution(
+            originalScreenWidth, originalScreenHeight, originalFullScreen);
         SetLanguage("English");
         foreach (string key in DailyKeys)
             PlayerPrefs.DeleteKey(key);
@@ -106,6 +124,7 @@ public sealed class DailyHuntCartoonVisualsPlayModeTests
             "DailyPlayerChip",
             "DailyPlayerChipShell",
             "DailyPlayerAvatarRing",
+            "DailyPlayerAvatarClip",
             "DailyPlayerAvatar",
             "DailyPlayerStar",
             "DailyPlayerName",
@@ -169,9 +188,11 @@ public sealed class DailyHuntCartoonVisualsPlayModeTests
         AssertRect(root, "DailyPlayerAvatarRing",
             new Vector2(-120f, 5f), new Vector2(122f, 122f));
         AssertRect(root, "DailyPlayerAvatarClip",
-            new Vector2(-128f, 20f), new Vector2(118f, 118f));
+            new Vector2(-120f, 5f), new Vector2(100f, 100f));
+        AssertRect(root, "DailyPlayerAvatar",
+            Vector2.zero, new Vector2(68f, 68f));
         AssertRect(root, "DailyPlayerName",
-            new Vector2(30f, 53f), new Vector2(170f, 40f));
+            new Vector2(45f, 53f), new Vector2(220f, 40f));
         AssertRect(root, "DailyPlayerStar",
             new Vector2(-9f, -4f), new Vector2(30f, 30f));
         AssertRect(root, "DailyPlayerWins",
@@ -353,6 +374,186 @@ public sealed class DailyHuntCartoonVisualsPlayModeTests
             "The top-left Back control lost the real Close callback.");
     }
 
+    [UnityTest]
+    public IEnumerator DailyHeaderUsesCanonicalAvatarAndContainsEverySelection()
+    {
+        Type profile = RuntimeType("OnboardingProfile");
+        string playerNameKey = Constant<string>(profile, "PlayerNameKey");
+        string versionKey = Constant<string>(profile, "VersionKey");
+        string genderKey = Constant<string>(profile, "GenderKey");
+        string avatarKey = Constant<string>(profile, "AvatarKey");
+        string ageKey = Constant<string>(profile, "AgeKey");
+        string[] keys =
+        {
+            playerNameKey, versionKey, genderKey, avatarKey, ageKey,
+        };
+        SavedPreference[] saved = new SavedPreference[keys.Length];
+        for (int index = 0; index < keys.Length; index++)
+            saved[index] = CapturePreference(keys[index]);
+
+        try
+        {
+            Assert.That(TryCommitProfile(6), Is.True);
+            PlayerPrefs.Save();
+            Screen.SetResolution(1080, 1920, false);
+            yield return SceneManager.LoadSceneAsync(
+                "MainMenu", LoadSceneMode.Single);
+
+            Component hunt = null;
+            Component visuals = null;
+            for (int frame = 0; frame < 180; frame++)
+            {
+                hunt = FindInScene(RuntimeType("DailyHunt"));
+                visuals = FindInScene(RuntimeType("DailyHuntVisuals"));
+                if (hunt != null && visuals != null &&
+                    GetProperty<bool>(visuals, "IsReady"))
+                    break;
+                yield return null;
+            }
+            Assert.That(hunt, Is.Not.Null);
+            Assert.That(visuals, Is.Not.Null);
+            Invoke(hunt, "Open");
+            yield return null;
+            Canvas.ForceUpdateCanvases();
+
+            Transform root = Find(hunt.transform, "DailyHuntVisualRoot");
+            Assert.That(root, Is.Not.Null);
+            Image portrait = Find(root, "DailyPlayerAvatar")
+                .GetComponent<Image>();
+            RectTransform aperture = Find(root, "DailyPlayerAvatarClip")
+                as RectTransform;
+            RectTransform ring = Find(root, "DailyPlayerAvatarRing")
+                as RectTransform;
+            RectTransform chip = Find(root, "DailyPlayerChip")
+                as RectTransform;
+            Assert.That(aperture, Is.Not.Null, "Daily avatar aperture");
+            Assert.That(ring, Is.Not.Null, "Daily avatar ring");
+            Assert.That(chip, Is.Not.Null, "Daily player chip");
+            Mask mask = aperture.GetComponent<Mask>();
+            Assert.That(mask, Is.Not.Null,
+                "Daily Hunt must clip the portrait to its circular aperture.");
+            Assert.That(aperture.GetComponent<Image>().sprite, Is.Not.Null,
+                "Daily Hunt must use the built-in circular mask sprite.");
+            Assert.That(mask.showMaskGraphic, Is.False,
+                "The aperture must not replace the approved ring artwork.");
+            Assert.That(aperture.GetComponent<Image>().sprite,
+                Is.SameAs(Resources.Load<Sprite>(
+                    Constant<string>(
+                        RuntimeType("PlayerProfileAvatarResolver"),
+                        "CircularApertureResourcePath"))),
+                "Daily Hunt must use the shared circular aperture sprite.");
+            Assert.That(aperture.GetComponent<RectMask2D>(), Is.Null,
+                "The old misaligned rectangular crop must not remain active.");
+            Assert.That(portrait.rectTransform.parent, Is.SameAs(aperture));
+            Assert.That(portrait.preserveAspect, Is.True);
+            Assert.That(portrait.raycastTarget, Is.False);
+
+            MethodInfo refresh = visuals.GetType().GetMethod(
+                "RefreshPlayerChip",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(refresh, Is.Not.Null);
+            MethodInfo valid = profile.GetMethod(
+                "IsValidAvatar", BindingFlags.Public | BindingFlags.Static);
+            int avatarCount = (int)RuntimeType("OnboardingAvatarCatalog")
+                .GetProperty("Count", BindingFlags.Public | BindingFlags.Static)
+                .GetValue(null, null);
+            Sprite fallback = Resources.Load<Sprite>(
+                "reference/player_cyan_exact");
+            Assert.That(fallback, Is.Not.Null);
+
+            for (int index = 0; index < avatarCount; index++)
+            {
+                PlayerPrefs.SetInt(avatarKey, index);
+                refresh.Invoke(visuals, null);
+                bool selectable = (bool)valid.Invoke(
+                    null, new object[] { index });
+                Sprite expected = selectable
+                    ? CatalogAvatarSprite(index)
+                    : fallback;
+                Assert.That(portrait.sprite, Is.SameAs(expected),
+                    "Daily Hunt canonical avatar " + index);
+                Assert.That(PlayerPrefs.GetInt(avatarKey), Is.EqualTo(index),
+                    "Refreshing Daily Hunt must never overwrite the saved avatar.");
+            }
+
+            PlayerPrefs.DeleteKey(avatarKey);
+            refresh.Invoke(visuals, null);
+            Assert.That(portrait.sprite, Is.SameAs(fallback),
+                "Missing avatar must use the approved cyan fallback.");
+            foreach (int invalid in new[] { -1, avatarCount, int.MaxValue })
+            {
+                PlayerPrefs.SetInt(avatarKey, invalid);
+                refresh.Invoke(visuals, null);
+                Assert.That(portrait.sprite, Is.SameAs(fallback),
+                    "Invalid avatar fallback " + invalid);
+                Assert.That(PlayerPrefs.GetInt(avatarKey), Is.EqualTo(invalid),
+                    "Fallback resolution must not rewrite legacy data.");
+            }
+
+            foreach (string language in new[] { "English", "Greek" })
+            {
+                SetLanguage(language);
+                string longestName = language == "Greek"
+                    ? "ΚΩΝΣΤΑΝΤΙΝΟΣ"
+                    : "CONSTANTINOS";
+                Assert.That(TryCommitProfile(6, longestName), Is.True);
+                refresh.Invoke(visuals, null);
+                foreach (Vector2Int viewport in PortraitViewports)
+                {
+                    ApplyResponsiveViewport(visuals, viewport);
+                    refresh.Invoke(visuals, null);
+                    Canvas.ForceUpdateCanvases();
+                    string lane = language + " " +
+                        viewport.x + "x" + viewport.y;
+                    Assert.That(portrait.sprite,
+                        Is.SameAs(CatalogAvatarSprite(6)),
+                        lane + " changed the selected avatar.");
+                    Assert.That(PlayerPrefs.GetInt(avatarKey), Is.EqualTo(6),
+                        lane + " overwrote the selected avatar.");
+                    AssertRectInside(
+                        portrait.rectTransform, aperture, 1f,
+                        lane + " Daily avatar inside aperture");
+                    AssertSquareInsideCircularAperture(
+                        portrait.rectTransform, aperture, 1f,
+                        lane + " complete Daily portrait inside circle");
+                    AssertRectInside(
+                        aperture, ring, 10f,
+                        lane + " Daily aperture inside ring");
+                    AssertRectInside(
+                        ring, chip, 1f,
+                        lane + " Daily ring inside profile chip");
+                    foreach (string textName in new[]
+                    {
+                        "DailyPlayerName",
+                        "DailyPlayerWins",
+                        "DailyPlayerProgress",
+                    })
+                    {
+                        TMP_Text text = Find(root, textName)
+                            .GetComponent<TMP_Text>();
+                        text.ForceMeshUpdate();
+                        Assert.That(text.isTextOverflowing, Is.False,
+                            lane + " " + textName + " overflowed.");
+                        Assert.That(text.fontSize, Is.GreaterThanOrEqualTo(20f),
+                            lane + " " + textName + " became unreadable.");
+                        AssertRenderedTextInsideAndRightOfAperture(
+                            text, chip, aperture, 1f,
+                            lane + " " + textName);
+                        AssertRectsDoNotOverlap(
+                            aperture, text.rectTransform, chip, 1f,
+                            lane + " avatar / " + textName);
+                    }
+                }
+            }
+        }
+        finally
+        {
+            for (int index = 0; index < keys.Length; index++)
+                RestorePreference(keys[index], saved[index]);
+            PlayerPrefs.Save();
+        }
+    }
+
     static bool IsAllowedProductionGraphic(Graphic graphic)
     {
         if (graphic is Image || graphic is TMP_Text)
@@ -473,6 +674,211 @@ public sealed class DailyHuntCartoonVisualsPlayModeTests
             Is.LessThan(1f), name + " position drifted.");
         Assert.That(Vector2.Distance(rect.sizeDelta, size),
             Is.LessThan(1f), name + " size drifted.");
+    }
+
+    static void AssertRectInside(
+        RectTransform inner,
+        RectTransform outer,
+        float inset,
+        string context)
+    {
+        Bounds bounds = RectTransformUtility.CalculateRelativeRectTransformBounds(
+            outer, inner);
+        Rect available = outer.rect;
+        Assert.That(bounds.min.x, Is.GreaterThanOrEqualTo(available.xMin + inset),
+            context + " left");
+        Assert.That(bounds.max.x, Is.LessThanOrEqualTo(available.xMax - inset),
+            context + " right");
+        Assert.That(bounds.min.y, Is.GreaterThanOrEqualTo(available.yMin + inset),
+            context + " bottom");
+        Assert.That(bounds.max.y, Is.LessThanOrEqualTo(available.yMax - inset),
+            context + " top");
+    }
+
+    static void AssertRectsDoNotOverlap(
+        RectTransform first,
+        RectTransform second,
+        RectTransform relativeTo,
+        float gap,
+        string context)
+    {
+        Bounds firstBounds = RectTransformUtility
+            .CalculateRelativeRectTransformBounds(relativeTo, first);
+        Bounds secondBounds = RectTransformUtility
+            .CalculateRelativeRectTransformBounds(relativeTo, second);
+        Rect expanded = new Rect(
+            firstBounds.min.x - gap,
+            firstBounds.min.y - gap,
+            firstBounds.size.x + gap * 2f,
+            firstBounds.size.y + gap * 2f);
+        Rect other = new Rect(
+            secondBounds.min.x,
+            secondBounds.min.y,
+            secondBounds.size.x,
+            secondBounds.size.y);
+        Assert.That(expanded.Overlaps(other), Is.False, context);
+    }
+
+    static void AssertSquareInsideCircularAperture(
+        RectTransform portrait,
+        RectTransform aperture,
+        float inset,
+        string context)
+    {
+        float apertureRadius =
+            Mathf.Min(aperture.rect.width, aperture.rect.height) * 0.5f - inset;
+        Vector3[] corners = new Vector3[4];
+        portrait.GetWorldCorners(corners);
+        Vector2 center = aperture.rect.center;
+        for (int index = 0; index < corners.Length; index++)
+        {
+            Vector2 local = aperture.InverseTransformPoint(corners[index]);
+            Assert.That(Vector2.Distance(local, center),
+                Is.LessThanOrEqualTo(apertureRadius),
+                context + " corner " + index +
+                " requires every source pixel to remain within the mask.");
+        }
+    }
+
+    static void AssertRenderedTextInsideAndRightOfAperture(
+        TMP_Text text,
+        RectTransform chip,
+        RectTransform aperture,
+        float gap,
+        string context)
+    {
+        Assert.That(TryRenderedGlyphRectIn(chip, text, out Rect glyphs),
+            Is.True, context + " must render visible glyphs.");
+        Rect safe = chip.rect;
+        Assert.That(glyphs.xMin, Is.GreaterThanOrEqualTo(safe.xMin + gap),
+            context + " glyphs left chip");
+        Assert.That(glyphs.xMax, Is.LessThanOrEqualTo(safe.xMax - gap),
+            context + " glyphs right chip");
+        Assert.That(glyphs.yMin, Is.GreaterThanOrEqualTo(safe.yMin + gap),
+            context + " glyphs below chip");
+        Assert.That(glyphs.yMax, Is.LessThanOrEqualTo(safe.yMax - gap),
+            context + " glyphs above chip");
+        Bounds reserved = RectTransformUtility.CalculateRelativeRectTransformBounds(
+            chip, aperture);
+        Assert.That(glyphs.xMin,
+            Is.GreaterThanOrEqualTo(reserved.max.x + gap),
+            context + " glyphs overlap the avatar aperture");
+    }
+
+    static bool TryRenderedGlyphRectIn(
+        RectTransform owner,
+        TMP_Text text,
+        out Rect glyphs)
+    {
+        glyphs = default;
+        if (owner == null || text == null)
+            return false;
+
+        text.ForceMeshUpdate(true, true);
+        bool found = false;
+        Vector2 minimum = new Vector2(
+            float.PositiveInfinity, float.PositiveInfinity);
+        Vector2 maximum = new Vector2(
+            float.NegativeInfinity, float.NegativeInfinity);
+        TMP_TextInfo info = text.textInfo;
+        for (int index = 0; index < info.characterCount; index++)
+        {
+            TMP_CharacterInfo character = info.characterInfo[index];
+            if (!character.isVisible)
+                continue;
+
+            foreach (Vector3 corner in new[]
+            {
+                character.bottomLeft,
+                character.topLeft,
+                character.topRight,
+                character.bottomRight,
+            })
+            {
+                Vector3 local = owner.InverseTransformPoint(
+                    text.rectTransform.TransformPoint(corner));
+                minimum = Vector2.Min(minimum, local);
+                maximum = Vector2.Max(maximum, local);
+            }
+            found = true;
+        }
+
+        if (found)
+            glyphs = Rect.MinMaxRect(
+                minimum.x, minimum.y, maximum.x, maximum.y);
+        return found;
+    }
+
+    static SavedPreference CapturePreference(string key)
+    {
+        var saved = new SavedPreference
+        {
+            Exists = PlayerPrefs.HasKey(key),
+        };
+        if (!saved.Exists)
+            return saved;
+
+        const string sentinel = "<HOL_PLAYER_PREFS_TYPE_SENTINEL>";
+        string text = PlayerPrefs.GetString(key, sentinel);
+        saved.IsInteger = text == sentinel;
+        if (saved.IsInteger)
+            saved.Integer = PlayerPrefs.GetInt(key, 0);
+        else
+            saved.Text = text;
+        return saved;
+    }
+
+    static void RestorePreference(string key, SavedPreference saved)
+    {
+        PlayerPrefs.DeleteKey(key);
+        if (!saved.Exists)
+            return;
+        if (saved.IsInteger)
+            PlayerPrefs.SetInt(key, saved.Integer);
+        else
+            PlayerPrefs.SetString(key, saved.Text ?? string.Empty);
+    }
+
+    static T Constant<T>(Type type, string name)
+    {
+        FieldInfo field = type.GetField(
+            name, BindingFlags.Public | BindingFlags.Static);
+        Assert.That(field, Is.Not.Null, name);
+        return (T)field.GetRawConstantValue();
+    }
+
+    static bool TryCommitProfile(
+        int avatarIndex,
+        string playerName = "AvatarTester")
+    {
+        Type profile = RuntimeType("OnboardingProfile");
+        Type gender = profile.GetNestedType(
+            "GenderChoice", BindingFlags.Public);
+        Type age = profile.GetNestedType(
+            "AgeCategory", BindingFlags.Public);
+        MethodInfo commit = profile.GetMethod(
+            "TryCommit", BindingFlags.Public | BindingFlags.Static);
+        return (bool)commit.Invoke(null, new object[]
+        {
+            playerName,
+            Enum.ToObject(gender, 0),
+            avatarIndex,
+            Enum.ToObject(age, 2),
+        });
+    }
+
+    static Sprite CatalogAvatarSprite(int index)
+    {
+        Type catalog = RuntimeType("OnboardingAvatarCatalog");
+        object entry = catalog.GetMethod(
+            "Get", BindingFlags.Public | BindingFlags.Static)
+            .Invoke(null, new object[] { index });
+        string resource = (string)entry.GetType()
+            .GetProperty("ResourcePath", BindingFlags.Public | BindingFlags.Instance)
+            .GetValue(entry, null);
+        Sprite sprite = Resources.Load<Sprite>(resource);
+        Assert.That(sprite, Is.Not.Null, resource);
+        return sprite;
     }
 
     static string Localized(string key)

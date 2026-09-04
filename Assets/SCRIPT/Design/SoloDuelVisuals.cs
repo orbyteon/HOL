@@ -22,7 +22,6 @@ public sealed class SoloDuelVisuals : MonoBehaviour
     const string LogoResource = "reference/hol_logo_exact";
     const string PlayerResource = "reference/player_cyan_exact";
     const string OpponentResource = "reference/opponent_purple_exact";
-    const string AvatarResource = "solo/production/solo_player_avatar_v1";
     const string OpponentAvatarResource =
         "solo/production/solo_opponent_medallion_v1";
     const string VsResource = "solo/production/solo_vs_burst_v2";
@@ -149,6 +148,7 @@ public sealed class SoloDuelVisuals : MonoBehaviour
     CanvasGroup playerCardCanvasGroup;
     CanvasGroup opponentCardCanvasGroup;
     TMP_Text chipText;
+    RectTransform playerAvatarAperture;
     Image playerAvatarImage;
     GameObject historyRoot;
     GameObject keypadRoot;
@@ -511,6 +511,15 @@ public sealed class SoloDuelVisuals : MonoBehaviour
         LayoutNamed("SoloDuelPlayerChip",
             new Vector2(339f, 860f), new Vector2(339f, 932f),
             new Vector2(370f, 150f), new Vector2(310f, 132f), blend);
+        LayoutControl(playerAvatarAperture,
+            new Vector2(116f, 0f), new Vector2(97f, 0f),
+            new Vector2(108f, 108f), new Vector2(96f, 96f), blend);
+        LayoutControl(
+            playerAvatarImage != null
+                ? playerAvatarImage.rectTransform
+                : null,
+            Vector2.zero, Vector2.zero,
+            new Vector2(74f, 74f), new Vector2(66f, 66f), blend);
 
         LayoutNamed("PlayerCard",
             new Vector2(-276f, 472f), new Vector2(-259f, 586f),
@@ -826,8 +835,9 @@ public sealed class SoloDuelVisuals : MonoBehaviour
         Sprite logo = LoadRequired(LogoResource);
         Sprite player = LoadRequired(PlayerResource);
         Sprite opponent = LoadRequired(OpponentResource);
-        Sprite fallbackAvatar = LoadRequired(AvatarResource);
-        Sprite avatar = ResolvePlayerAvatar(fallbackAvatar);
+        Sprite fallbackAvatar = LoadRequired(
+            PlayerProfileAvatarResolver.FallbackResourcePath);
+        Sprite avatar = PlayerProfileAvatarResolver.Resolve();
         Sprite opponentAvatar = LoadRequired(OpponentAvatarResource);
         Sprite vs = LoadRequired(VsResource);
         Sprite trophy = LoadRequired(TrophyResource);
@@ -927,9 +937,16 @@ public sealed class SoloDuelVisuals : MonoBehaviour
             chipImage.rectTransform, new Vector2(370f, 150f),
             new Vector2(339f, 860f));
 
+        Image avatarMaskImage = EnsureImage(
+            chipImage.transform, "SoloDuelChipAvatarAperture");
+        ConfigureCircularMask(avatarMaskImage);
+        playerAvatarAperture = avatarMaskImage.rectTransform;
+        Place(
+            playerAvatarAperture, new Vector2(116f, 0f),
+            new Vector2(108f, 108f));
         playerAvatarImage = AddSprite(
-            chipImage.transform, "SoloDuelChipAvatar", avatar,
-            new Vector2(128f, 0f), new Vector2(104f, 104f));
+            playerAvatarAperture, "SoloDuelChipAvatar", avatar,
+            Vector2.zero, new Vector2(74f, 74f));
         AddSprite(
             chipImage.transform, "SoloDuelChipTrophy", trophy,
             new Vector2(-102f, 0f), new Vector2(52f, 52f));
@@ -1920,8 +1937,7 @@ public sealed class SoloDuelVisuals : MonoBehaviour
         if (opponentDifficultyText != null)
             opponentDifficultyText.text = DifficultyLabel();
         if (playerAvatarImage != null)
-            playerAvatarImage.sprite = ResolvePlayerAvatar(
-                LoadRequired(AvatarResource));
+            playerAvatarImage.sprite = PlayerProfileAvatarResolver.Resolve();
 
         RenderActorCards(state);
 
@@ -2809,20 +2825,6 @@ public sealed class SoloDuelVisuals : MonoBehaviour
         }
     }
 
-    static Sprite ResolvePlayerAvatar(Sprite fallback)
-    {
-        if (!OnboardingProfile.TryLoadCommittedAvatar(out int avatarIndex))
-            return fallback;
-
-        OnboardingAvatarCatalog.Entry entry =
-            OnboardingAvatarCatalog.Get(avatarIndex);
-        if (string.IsNullOrWhiteSpace(entry.ResourcePath))
-            return fallback;
-
-        Sprite selected = Resources.Load<Sprite>(entry.ResourcePath);
-        return selected != null ? selected : fallback;
-    }
-
     static string DifficultyLabel()
     {
         string[] keys = { "easy", "normal", "hard", "adaptive" };
@@ -3273,6 +3275,29 @@ public sealed class SoloDuelVisuals : MonoBehaviour
         image.preserveAspect = preserveAspect;
         image.color = Color.white;
         image.raycastTarget = false;
+    }
+
+    static void ConfigureCircularMask(Image maskImage)
+    {
+        Sprite maskSprite =
+            Resources.Load<Sprite>(
+                PlayerProfileAvatarResolver.CircularApertureResourcePath);
+        if (maskSprite == null)
+        {
+            Debug.LogError(
+                "[SoloDuelVisuals] Shared circular avatar mask is missing.");
+            maskImage.gameObject.SetActive(false);
+            return;
+        }
+        ConfigureImage(
+            maskImage,
+            maskSprite,
+            false,
+            Image.Type.Simple);
+        var mask = maskImage.GetComponent<Mask>();
+        if (mask == null)
+            mask = maskImage.gameObject.AddComponent<Mask>();
+        mask.showMaskGraphic = false;
     }
 
     static void Place(
