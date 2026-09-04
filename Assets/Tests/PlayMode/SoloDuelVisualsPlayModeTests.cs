@@ -1165,6 +1165,16 @@ public sealed class SoloDuelVisualsPlayModeTests
         object correct = RuntimeEnum("DuelRules+Hint", "Correct");
 
         InvokeLayout(layout, "BeginNewMatch", opponent);
+        TMP_InputField liveInput = GetField<TMP_InputField>(
+            numberManager, "numberInput");
+        TMP_Text livePlaceholder = liveInput.placeholder as TMP_Text;
+        Assert.That(livePlaceholder, Is.Not.Null);
+        Assert.That(livePlaceholder.text,
+            Is.EqualTo(Localized("solo_secret_domain")));
+        Assert.That(
+            Find(canvas.transform, "CurrentNumberHeading")
+                .GetComponent<TMP_Text>().text,
+            Is.EqualTo(Localized("solo_secret_domain_heading")));
         yield return ValidateSoloViewport(
             canvas, safeAreaOwner, layout, numberManager,
             width, height, locale + " ChooseSecret");
@@ -1196,6 +1206,13 @@ public sealed class SoloDuelVisualsPlayModeTests
                 .GetComponent<TMP_Text>().text,
             Is.EqualTo(Localized(
                 "solo_range_ai", opponent, 1, 100)));
+        Assert.That(
+            Find(canvas.transform, "CurrentNumberHeading")
+                .GetComponent<TMP_Text>().text,
+            Is.EqualTo(Localized(
+                "solo_live_range_heading", opponent, 1, 100)));
+        Assert.That(livePlaceholder.text,
+            Is.EqualTo(Localized("solo_input_range", 1, 100)));
         yield return ValidateSoloViewport(
             canvas, safeAreaOwner, layout, numberManager,
             width, height, locale + " PlayerGuess");
@@ -1217,6 +1234,14 @@ public sealed class SoloDuelVisualsPlayModeTests
             41, 100, 1, 100);
         InvokeLayout(layout, "UpdateLockState",
             true, false, false, false, 60);
+        TMP_Text playerOutcome = Find(canvas.transform, "CentralOutcome")
+            .GetComponent<TMP_Text>();
+        Assert.That(playerOutcome.text,
+            Does.Contain(Localized("solo_target_number_higher", opponent)));
+        Assert.That(playerOutcome.text, Does.Contain("41"));
+        Assert.That(playerOutcome.text, Does.Contain("100"));
+        Assert.That(playerOutcome.text,
+            Does.Contain(Localized("solo_opponent_turn_short", opponent)));
         yield return ValidateSoloViewport(
             canvas, safeAreaOwner, layout, numberManager,
             width, height, locale + " PlayerHigher");
@@ -1229,16 +1254,54 @@ public sealed class SoloDuelVisualsPlayModeTests
         InvokeLayout(layout, "RecordOpponentMove",
             1, 60, lower, false, 100,
             41, 100, 1, 59);
+        Assert.That(
+            Find(canvas.transform, "CentralOutcome")
+                .GetComponent<TMP_Text>().text,
+            Is.EqualTo(Localized("solo_ai_result_pending")),
+            "The AI result must not appear during the guess-reveal beat.");
         yield return ValidateSoloViewport(
             canvas, safeAreaOwner, layout, numberManager,
             width, height, locale + " OpponentGuess");
         InvokeLayout(layout, "RevealOpponentOutcome");
+        TMP_Text aiOutcome = Find(canvas.transform, "CentralOutcome")
+            .GetComponent<TMP_Text>();
+        Assert.That(aiOutcome.text,
+            Does.Contain(Localized("your_number_is_lower")));
+        Assert.That(aiOutcome.text, Does.Contain("1"));
+        Assert.That(aiOutcome.text, Does.Contain("59"));
+        Assert.That(aiOutcome.text,
+            Does.Contain(Localized("solo_your_turn_short")));
         yield return ValidateSoloViewport(
             canvas, safeAreaOwner, layout, numberManager,
             width, height, locale + " OpponentLower");
 
         InvokeLayout(layout, "BeginPlayerTurn",
             2, 41, 100, 1, 59, false);
+        // Mirror GameManager.RefreshLockButton at the real turn handoff: the
+        // rule-owned Lock becomes actionable again only after PlayerGuess is
+        // active, while the factual AI summary remains pinned.
+        InvokeLayout(layout, "UpdateLockState",
+            true, true, false, false, 60);
+        Assert.That(StateProperty(layout, "LatestAiHandoffPinned"),
+            Is.EqualTo("True"));
+        TMP_Text pinnedPrompt = GetField<TMP_Text>(layout, "phaseText");
+        Assert.That(pinnedPrompt.text,
+            Does.Contain(Localized("solo_opponent_guessed", opponent, 60)));
+        Assert.That(pinnedPrompt.text,
+            Does.Contain(Localized("your_number_is_lower")));
+        Assert.That(pinnedPrompt.text,
+            Does.Contain(Localized("solo_your_turn_short")));
+        Assert.That(livePlaceholder.text,
+            Is.EqualTo(Localized("solo_input_range", 41, 100)));
+        Assert.That(
+            Find(canvas.transform, "CurrentNumberHeading")
+                .GetComponent<TMP_Text>().text,
+            Is.EqualTo(Localized(
+                "solo_live_range_heading", opponent, 41, 100)));
+        yield return ValidateSoloViewport(
+            canvas, safeAreaOwner, layout, numberManager,
+            width, height, locale + " StickyAiHandoff");
+        InvokeLayout(layout, "DismissLatestAiHandoff");
         InvokeLayout(layout, "RecordPlayerMove",
             2, 77, correct, false, 60,
             41, 100, 1, 59);
@@ -1275,6 +1338,13 @@ public sealed class SoloDuelVisualsPlayModeTests
             width, height, locale + " LastLicks");
         InvokeLayout(layout, "BeginPlayerTurn",
             1, 1, 100, 1, 100, true);
+        Assert.That(StateProperty(layout, "LatestAiHandoffPinned"),
+            Is.EqualTo("True"));
+        TMP_Text lastLicksHandoff = GetField<TMP_Text>(layout, "phaseText");
+        Assert.That(lastLicksHandoff.text,
+            Does.Contain(Localized("solo_opponent_guessed", opponent, 73)));
+        Assert.That(lastLicksHandoff.text,
+            Does.Contain(Localized("your_number_is_correct")));
         InvokeLayout(layout, "UpdateLockState",
             true, true, false, false, 100);
         yield return ValidateSoloViewport(

@@ -137,6 +137,9 @@ public sealed class SoloBoardPresentationState
     public SoloBoardActor ActiveActor { get; }
     public SoloBoardActor TargetActor { get; }
     public SoloBoardNextAction NextAction { get; }
+    public SoloBoardActor HandoffActor { get; }
+    public bool ResultFollows { get; }
+    public bool LatestAiHandoffPinned { get; }
     public bool IsLastLicks { get; }
     public bool LockRevealed { get; }
     public bool LockAvailable { get; }
@@ -191,7 +194,7 @@ public sealed class SoloBoardPresentationState
             0, 0, 0, 0,
             SoloGuessOutcome.Unknown, SoloGuessOutcome.Unknown,
             SoloBoardActor.None, SoloBoardActor.None, SoloBoardActor.None,
-            DefaultActionFor(phase), false,
+            DefaultActionFor(phase), SoloBoardActor.None, false, false, false,
             false, false, false, false, 100,
             DuelRules.Outcome.Undecided, 0, 0,
             Array.Empty<SoloHistoryEvent>(),
@@ -220,6 +223,9 @@ public sealed class SoloBoardPresentationState
         SoloBoardActor activeActor,
         SoloBoardActor targetActor,
         SoloBoardNextAction nextAction,
+        SoloBoardActor handoffActor,
+        bool resultFollows,
+        bool latestAiHandoffPinned,
         bool isLastLicks,
         bool lockRevealed,
         bool lockAvailable,
@@ -257,6 +263,9 @@ public sealed class SoloBoardPresentationState
         ActiveActor = activeActor;
         TargetActor = targetActor;
         NextAction = nextAction;
+        HandoffActor = handoffActor;
+        ResultFollows = resultFollows;
+        LatestAiHandoffPinned = latestAiHandoffPinned;
         IsLastLicks = isLastLicks;
         LockRevealed = lockRevealed;
         LockAvailable = lockAvailable;
@@ -292,6 +301,59 @@ public sealed class SoloBoardPresentationState
 }
 
 /// <summary>
+/// Deterministic reading-time policy for automatic Solo presentation beats.
+/// Gameplay never depends on these values; GameManager uses them only to hold
+/// already-authoritative facts on screen long enough to be read.
+/// </summary>
+public static class SoloPresentationTiming
+{
+    public static float MinimumFor(SoloBoardPhase phase)
+    {
+        if (phase == SoloBoardPhase.OpponentThinking)
+            return 1.2f;
+        if (phase == SoloBoardPhase.OpponentGuess)
+            return 1.5f;
+        if (phase == SoloBoardPhase.AnswerOpponent ||
+            phase == SoloBoardPhase.LockForfeit)
+            return 2.5f;
+        return 2.2f;
+    }
+
+    public static float MaximumFor(SoloBoardPhase phase)
+    {
+        if (phase == SoloBoardPhase.OpponentThinking)
+            return 1.8f;
+        if (phase == SoloBoardPhase.OpponentGuess)
+            return 2.2f;
+        if (phase == SoloBoardPhase.AnswerOpponent ||
+            phase == SoloBoardPhase.LockForfeit)
+            return 3.5f;
+        return 3.2f;
+    }
+
+    public static float DurationFor(
+        SoloBoardPhase phase,
+        string finalVisibleCopy)
+    {
+        float minimum = MinimumFor(phase);
+        float maximum = MaximumFor(phase);
+        string copy = finalVisibleCopy ?? string.Empty;
+        int lineBreaks = 0;
+        for (int index = 0; index < copy.Length; index++)
+            if (copy[index] == '\n') lineBreaks++;
+
+        // Short beats sit at their required minimum. Longer localized or
+        // wrapped facts earn deterministic reading time, capped so gameplay
+        // never feels stalled.
+        float extraCharacters = Math.Max(0, copy.Length - 28) * 0.0125f;
+        float extraLines = lineBreaks * 0.18f;
+        return Math.Max(
+            minimum,
+            Math.Min(maximum, minimum + extraCharacters + extraLines));
+    }
+}
+
+/// <summary>
 /// Owns solo-board presentation history and republishes immutable snapshots.
 /// A history is cleared only by BeginNewMatch; phase changes never erase it.
 /// </summary>
@@ -311,6 +373,9 @@ public sealed class SoloBoardPresentationModel
     SoloGuessOutcome latestPlayerOutcome;
     SoloGuessOutcome latestAiOutcome;
     SoloBoardActor starter;
+    SoloBoardActor handoffActor;
+    bool resultFollows;
+    bool latestAiHandoffPinned;
     bool lockRevealed;
     bool lockAvailable;
     bool lockArmed;
@@ -341,6 +406,9 @@ public sealed class SoloBoardPresentationModel
         latestPlayerGuess = latestAiGuess = 0;
         latestPlayerOutcome = latestAiOutcome = SoloGuessOutcome.Unknown;
         starter = SoloBoardActor.None;
+        handoffActor = SoloBoardActor.None;
+        resultFollows = false;
+        latestAiHandoffPinned = false;
         lockRevealed = lockAvailable = lockArmed = lockSpent = false;
         lockCandidates = 100;
         matchOutcome = DuelRules.Outcome.Undecided;
@@ -403,7 +471,16 @@ public sealed class SoloBoardPresentationModel
             !ValidRanges(playerMin, playerMax, opponentMin, opponentMax))
             return false;
 
+        bool preserveAiHandoff = latestAiHandoffPinned &&
+                                 (Current.Phase == SoloBoardPhase.AnswerOpponent ||
+                                  Current.Phase == SoloBoardPhase.LockForfeit ||
+                                  Current.Phase == SoloBoardPhase.LastLicks);
         ApplyRanges(playerMin, playerMax, opponentMin, opponentMax);
+        latestAiHandoffPinned = preserveAiHandoff;
+        resultFollows = false;
+        handoffActor = preserveAiHandoff
+            ? SoloBoardActor.Player
+            : SoloBoardActor.None;
         CommitTransition(
             SoloBoardPhase.PlayerGuess,
             lastLicks ? SoloBoardPrompt.MatchPoint : SoloBoardPrompt.YourGuess,
@@ -426,6 +503,9 @@ public sealed class SoloBoardPresentationModel
         bool answeringPlayerCorrect =
             Current.Phase == SoloBoardPhase.PlayerOutcome &&
             latestPlayerOutcome == SoloGuessOutcome.Correct;
+        latestAiHandoffPinned = false;
+        resultFollows = false;
+        handoffActor = SoloBoardActor.None;
         ApplyRanges(playerMin, playerMax, opponentMin, opponentMax);
         CommitTransition(
             SoloBoardPhase.OpponentThinking,
@@ -457,6 +537,9 @@ public sealed class SoloBoardPresentationModel
 
         SoloGuessOutcome outcome = OutcomeFor(hint);
         bool wasLastLicks = Current.IsLastLicks;
+        latestAiHandoffPinned = false;
+        resultFollows = false;
+        handoffActor = SoloBoardActor.Opponent;
         ApplyRanges(newPlayerMin, newPlayerMax, opponentMin, opponentMax);
         AppendEvent(roundNumber, SoloBoardActor.Player,
             SoloBoardActor.Opponent, guess, outcome, usedLock,
@@ -490,6 +573,9 @@ public sealed class SoloBoardPresentationModel
             return false;
 
         SoloGuessOutcome outcome = OutcomeFor(hint);
+        latestAiHandoffPinned = false;
+        resultFollows = false;
+        handoffActor = SoloBoardActor.Player;
         ApplyRanges(playerMin, playerMax, newOpponentMin, newOpponentMax);
         AppendEvent(roundNumber, SoloBoardActor.Opponent,
             SoloBoardActor.Player, guess, outcome, usedLock,
@@ -511,11 +597,45 @@ public sealed class SoloBoardPresentationModel
             !ValidGuess(latestAiGuess) ||
             !ValidGuessOutcome(latestAiOutcome))
             return false;
-        return Transition(
+        latestAiHandoffPinned = true;
+        CommitTransition(
             SoloBoardPhase.AnswerOpponent,
             OpponentPromptFor(latestAiOutcome), Current.RoundNumber,
             SoloBoardActor.Opponent, SoloBoardActor.Player,
             SoloBoardNextAction.Continue, latestAiGuess, false);
+        return true;
+    }
+
+    public bool SetOutcomeDestination(
+        bool terminalResultFollows,
+        SoloBoardActor nextActor)
+    {
+        if (Current.Phase != SoloBoardPhase.PlayerOutcome &&
+            Current.Phase != SoloBoardPhase.OpponentGuess &&
+            Current.Phase != SoloBoardPhase.AnswerOpponent)
+            return false;
+        if (!terminalResultFollows &&
+            nextActor != SoloBoardActor.Player &&
+            nextActor != SoloBoardActor.Opponent)
+            return false;
+
+        resultFollows = terminalResultFollows;
+        handoffActor = terminalResultFollows
+            ? SoloBoardActor.None
+            : nextActor;
+        Republish();
+        return true;
+    }
+
+    public bool DismissLatestAiHandoff()
+    {
+        if (!latestAiHandoffPinned ||
+            Current.Phase != SoloBoardPhase.PlayerGuess)
+            return false;
+        latestAiHandoffPinned = false;
+        handoffActor = SoloBoardActor.None;
+        Republish();
+        return true;
     }
 
     public bool ShowLastLicks(int roundNumber)
@@ -568,6 +688,9 @@ public sealed class SoloBoardPresentationModel
                 ? SoloBoardPrompt.Win
                 : SoloBoardPrompt.Loss;
         matchOutcome = outcome;
+        resultFollows = false;
+        handoffActor = SoloBoardActor.None;
+        latestAiHandoffPinned = false;
         playerSecretNumber = playerSecret;
         opponentSecretNumber = opponentSecret;
         playerTurns = playerGuessCount;
@@ -864,7 +987,8 @@ public sealed class SoloBoardPresentationModel
             playerSecretNumber, opponentSecretNumber,
             latestPlayerGuess, latestAiGuess,
             latestPlayerOutcome, latestAiOutcome,
-            starter, actor, target, action, lastLicks,
+            starter, actor, target, action,
+            handoffActor, resultFollows, latestAiHandoffPinned, lastLicks,
             lockRevealed, lockAvailable, lockArmed, lockSpent,
             lockCandidates, matchOutcome, playerTurns, aiTurns,
             history.ToArray(), playerGuesses.ToArray(),

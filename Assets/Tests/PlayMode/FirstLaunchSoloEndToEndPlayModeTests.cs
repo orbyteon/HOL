@@ -61,6 +61,7 @@ public sealed class FirstLaunchSoloEndToEndPlayModeTests
     readonly List<PreferenceSnapshot> preferences =
         new List<PreferenceSnapshot>();
     UnityEngine.Random.State randomState;
+    double fakePresentationTime;
 
     [SetUp]
     public void SetUp()
@@ -251,6 +252,10 @@ public sealed class FirstLaunchSoloEndToEndPlayModeTests
         Assert.That(numberManager, Is.Not.Null);
         Assert.That(game, Is.Not.Null);
 
+        fakePresentationTime = 3000d;
+        Invoke(game, "SetPresentationClockForTests",
+            new Func<double>(() => fakePresentationTime));
+
         TMP_InputField numberInput = GetField<TMP_InputField>(
             numberManager, "numberInput");
         AssertPhase(soloOwner, "ChooseSecret");
@@ -277,8 +282,13 @@ public sealed class FirstLaunchSoloEndToEndPlayModeTests
         AssertPhase(soloOwner, "StarterReveal");
         Assert.That(Convert.ToInt32(StateProperty(soloOwner, "RoundNumber")),
             Is.EqualTo(1));
+        Transform permissionAction = Find(
+            gamePanel.transform, "SoloContinueButton");
+        Assert.That(permissionAction, Is.Not.Null);
+        Assert.That(permissionAction.gameObject.activeInHierarchy, Is.False,
+            "Automatic Solo pacing must not require a permission tap.");
 
-        Invoke(game, "AcknowledgePresentation");
+        yield return AdvanceScheduledBeat(game);
         AssertPhase(soloOwner, "PlayerGuess");
 
         PressKey(gamePanel.transform, "5");
@@ -290,19 +300,16 @@ public sealed class FirstLaunchSoloEndToEndPlayModeTests
         Assert.That(StateProperty(soloOwner, "Prompt").ToString(),
             Is.EqualTo("PlayerGuessedHigher"));
 
-        yield return null;
-        Invoke(game, "AcknowledgePresentation");
+        yield return AdvanceScheduledBeat(game);
         AssertPhase(soloOwner, "OpponentThinking");
         CollectionAssert.IsEmpty(History(soloOwner, "AiGuessHistory"));
 
-        yield return null;
-        Invoke(game, "AcknowledgePresentation");
+        yield return AdvanceScheduledBeat(game);
         AssertPhase(soloOwner, "OpponentGuess");
         Assert.That(GetField<int>(game, "aiGuess"), Is.EqualTo(50));
         CollectionAssert.AreEqual(new[] { 50 }, History(soloOwner, "AiGuessHistory"));
 
-        yield return null;
-        Invoke(game, "AcknowledgePresentation");
+        yield return AdvanceScheduledBeat(game);
         AssertPhase(soloOwner, "AnswerOpponent");
         Assert.That(StateProperty(soloOwner, "Prompt").ToString(),
             Is.EqualTo("OpponentGuessedHigher"));
@@ -320,9 +327,7 @@ public sealed class FirstLaunchSoloEndToEndPlayModeTests
         Assert.That(AnswerActions(game).Any(action => action.activeSelf), Is.False,
             "Truthful Solo feedback must not expose manual answer controls.");
 
-        yield return null;
-        Invoke(game, "AcknowledgePresentation");
-        yield return null;
+        yield return AdvanceScheduledBeat(game);
         Canvas.ForceUpdateCanvases();
 
         AssertPhase(soloOwner, "PlayerGuess");
@@ -338,27 +343,30 @@ public sealed class FirstLaunchSoloEndToEndPlayModeTests
         CollectionAssert.AreEqual(new[] { 50, 77 },
             History(soloOwner, "PlayerGuessHistory"));
 
-        yield return null;
-        Invoke(game, "AcknowledgePresentation");
+        yield return AdvanceScheduledBeat(game);
         AssertPhase(soloOwner, "OpponentThinking");
 
-        yield return null;
-        Invoke(game, "AcknowledgePresentation");
+        yield return AdvanceScheduledBeat(game);
         AssertPhase(soloOwner, "OpponentGuess");
 
-        yield return null;
-        Invoke(game, "AcknowledgePresentation");
+        yield return AdvanceScheduledBeat(game);
         AssertPhase(soloOwner, "AnswerOpponent");
 
-        yield return null;
-        Invoke(game, "AcknowledgePresentation");
+        yield return AdvanceScheduledBeat(game);
 
         AssertPhase(soloOwner, "MatchResult");
         Assert.That(StateProperty(soloOwner, "Prompt").ToString(), Is.EqualTo("Win"));
         Assert.That(GetProperty<bool>(game, "IsMatchOver"), Is.True);
         CollectionAssert.AreEqual(new[] { 50, 75 },
             History(soloOwner, "AiGuessHistory"));
+        Assert.That(phasePrompt.gameObject.activeInHierarchy, Is.True,
+            "The authoritative terminal headline must remain visible.");
         Assert.That(phasePrompt.text, Does.StartWith(Localized("you_win")));
+        TMP_Text resultReason = Find(gamePanel.transform, "ResultReason")
+            .GetComponent<TMP_Text>();
+        Assert.That(resultReason.gameObject.activeInHierarchy, Is.True);
+        Assert.That(resultReason.text, Is.Not.Empty,
+            "The terminal result must include its authoritative reason.");
         Assert.That(numberInput.gameObject.activeSelf, Is.False);
         Assert.That(GetProperty<Button>(soloOwner, "SubmitControl").gameObject.activeSelf,
             Is.False);
@@ -534,6 +542,17 @@ public sealed class FirstLaunchSoloEndToEndPlayModeTests
         while (!predicate() && Time.realtimeSinceStartup < deadline)
             yield return null;
         Assert.That(predicate(), Is.True, failure);
+    }
+
+    IEnumerator AdvanceScheduledBeat(Component game)
+    {
+        float remaining = GetProperty<float>(
+            game, "CurrentAutomaticRemainingSeconds");
+        Assert.That(remaining, Is.GreaterThan(0f),
+            "A readable automatic phase must expose one pending deadline.");
+        fakePresentationTime += remaining + 0.01d;
+        yield return null;
+        yield return null;
     }
 
 #if UNITY_EDITOR

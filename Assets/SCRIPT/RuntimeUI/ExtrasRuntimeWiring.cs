@@ -90,6 +90,12 @@ public class ExtrasRuntimeWiring : MonoBehaviour
     {
         foreach (var tmp in FindObjectsOfType<TMP_Text>(true))
         {
+            // SoloDuelVisuals owns dynamic actor, outcome and range copy. In
+            // particular, its input placeholder changes from the 1-100 secret
+            // domain to the narrowed live range; generic scene localization
+            // must not install a competing writer beneath that owner.
+            if (tmp.GetComponentInParent<SoloDuelVisuals>(true) != null)
+                continue;
             string key;
             if (!SceneTextKeys.TryGetValue(NormalizeSceneText(tmp.text), out key))
                 continue;

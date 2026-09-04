@@ -298,6 +298,146 @@ public sealed class SoloBoardPresentationStateTests
             "The answering AI move must not exist before REVEAL GUESS.");
     }
 
+    [Test]
+    public void RevealedAiHandoffStaysPinnedUntilOneDeliberatePlayerInteraction()
+    {
+        object model = NewModel();
+        Begin(model, "Luca");
+        Assert.That(Call(model, "SetPlayerSecret", 80), Is.True);
+        Assert.That(Call(model, "RevealStarter",
+            EnumValue("SoloBoardActor", "Opponent"),
+            1, 1, 100, 1, 100), Is.True);
+        Assert.That(Call(model, "BeginOpponentThinking",
+            1, 1, 100, 1, 100), Is.True);
+        Assert.That(Call(model, "RecordOpponentMove", 1, 50,
+            EnumValue("DuelRules+Hint", "Higher"), false, 100,
+            1, 100, 51, 100), Is.True);
+        Assert.That(Call(model, "SetOutcomeDestination", false,
+            EnumValue("SoloBoardActor", "Player")), Is.True);
+        Assert.That(Call(model, "RevealOpponentOutcome"), Is.True);
+
+        Assert.That(Property(Current(model), "LatestAiHandoffPinned"), Is.True);
+        Assert.That(Property(Current(model), "HandoffActor").ToString(),
+            Is.EqualTo("Player"));
+        Assert.That(Call(model, "BeginPlayerTurn",
+            2, 1, 100, 51, 100, false), Is.True);
+        Assert.That(Property(Current(model), "LatestAiHandoffPinned"), Is.True,
+            "Unlocking controls must not erase the last AI result.");
+        Assert.That(Events(model), Has.Length.EqualTo(1));
+
+        Assert.That(Call(model, "DismissLatestAiHandoff"), Is.True);
+        Assert.That(Property(Current(model), "LatestAiHandoffPinned"), Is.False);
+        Assert.That(Call(model, "DismissLatestAiHandoff"), Is.False,
+            "Dismissal must be idempotent.");
+        Assert.That(Events(model), Has.Length.EqualTo(1),
+            "A presentation dismissal must not add or remove gameplay history.");
+
+        Begin(model, "Luca");
+        Assert.That(Property(Current(model), "LatestAiHandoffPinned"), Is.False,
+            "A rematch must never inherit the previous AI handoff.");
+    }
+
+    [Test]
+    public void RevealedAiHandoffSurvivesLastLicksUntilPlayerInteraction()
+    {
+        object model = NewModel();
+        Begin(model, "Luca");
+        Assert.That(Call(model, "SetPlayerSecret", 50), Is.True);
+        Assert.That(Call(model, "RevealStarter",
+            EnumValue("SoloBoardActor", "Opponent"),
+            1, 1, 100, 1, 100), Is.True);
+        Assert.That(Call(model, "BeginOpponentThinking",
+            1, 1, 100, 1, 100), Is.True);
+        Assert.That(Call(model, "RecordOpponentMove", 1, 50,
+            EnumValue("DuelRules+Hint", "Correct"), false, 100,
+            1, 100, 1, 100), Is.True);
+        Assert.That(Call(model, "SetOutcomeDestination", false,
+            EnumValue("SoloBoardActor", "Player")), Is.True);
+        Assert.That(Call(model, "RevealOpponentOutcome"), Is.True);
+        Assert.That(Call(model, "ShowLastLicks", 1), Is.True);
+        Assert.That(Call(model, "BeginPlayerTurn",
+            1, 1, 100, 1, 100, true), Is.True);
+
+        Assert.That(Property(Current(model), "LatestAiHandoffPinned"), Is.True,
+            "The equal-turn notice must not erase the AI fact before input unlocks.");
+        Assert.That(Call(model, "DismissLatestAiHandoff"), Is.True);
+        Assert.That(Property(Current(model), "LatestAiHandoffPinned"), Is.False);
+    }
+
+    [Test]
+    public void ReadingDurationsAreDeterministicBoundedAndExtendForLongCopy()
+    {
+        Type timing = RuntimeType("SoloPresentationTiming");
+        MethodInfo duration = timing.GetMethod(
+            "DurationFor", BindingFlags.Static | BindingFlags.Public);
+        MethodInfo minimum = timing.GetMethod(
+            "MinimumFor", BindingFlags.Static | BindingFlags.Public);
+        MethodInfo maximum = timing.GetMethod(
+            "MaximumFor", BindingFlags.Static | BindingFlags.Public);
+        Assert.That(duration, Is.Not.Null);
+        Assert.That(minimum, Is.Not.Null);
+        Assert.That(maximum, Is.Not.Null);
+
+        foreach (string phaseName in new[]
+                 {
+                     "PlayerOutcome", "OpponentThinking", "OpponentGuess",
+                     "AnswerOpponent", "LockForfeit",
+                 })
+        {
+            object phase = EnumValue("SoloBoardPhase", phaseName);
+            float min = (float)minimum.Invoke(null, new[] { phase });
+            float max = (float)maximum.Invoke(null, new[] { phase });
+            float shortCopy = (float)duration.Invoke(
+                null, new[] { phase, (object)"LUCA GUESSED 50" });
+            string localizedWrapped =
+                "Ο ΚΩΝΣΤΑΝΤΙΝΟΣ ΜΑΝΤΕΨΕ 50\n" +
+                "Ο ΑΡΙΘΜΟΣ ΣΟΥ ΕΙΝΑΙ ΜΕΓΑΛΥΤΕΡΟΣ\n" +
+                "ΕΥΡΟΣ 51–100 • Η ΣΕΙΡΑ ΣΟΥ";
+            float longCopy = (float)duration.Invoke(
+                null, new[] { phase, (object)localizedWrapped });
+
+            Assert.That(shortCopy, Is.InRange(min, max), phaseName);
+            Assert.That(longCopy, Is.InRange(min, max), phaseName);
+            Assert.That(longCopy, Is.GreaterThan(shortCopy),
+                phaseName + " localized/wrapped copy must receive more time.");
+            Assert.That(duration.Invoke(null, new[] { phase, (object)localizedWrapped }),
+                Is.EqualTo(longCopy), phaseName + " timing must be deterministic.");
+        }
+
+        Assert.That((float)minimum.Invoke(null, new[]
+        {
+            EnumValue("SoloBoardPhase", "PlayerOutcome"),
+        }), Is.EqualTo(2.2f));
+        Assert.That((float)minimum.Invoke(null, new[]
+        {
+            EnumValue("SoloBoardPhase", "OpponentThinking"),
+        }), Is.EqualTo(1.2f));
+        Assert.That((float)minimum.Invoke(null, new[]
+        {
+            EnumValue("SoloBoardPhase", "OpponentGuess"),
+        }), Is.EqualTo(1.5f));
+        Assert.That((float)minimum.Invoke(null, new[]
+        {
+            EnumValue("SoloBoardPhase", "AnswerOpponent"),
+        }), Is.EqualTo(2.5f));
+        Assert.That((float)maximum.Invoke(null, new[]
+        {
+            EnumValue("SoloBoardPhase", "PlayerOutcome"),
+        }), Is.EqualTo(3.2f));
+        Assert.That((float)maximum.Invoke(null, new[]
+        {
+            EnumValue("SoloBoardPhase", "OpponentThinking"),
+        }), Is.EqualTo(1.8f));
+        Assert.That((float)maximum.Invoke(null, new[]
+        {
+            EnumValue("SoloBoardPhase", "OpponentGuess"),
+        }), Is.EqualTo(2.2f));
+        Assert.That((float)maximum.Invoke(null, new[]
+        {
+            EnumValue("SoloBoardPhase", "AnswerOpponent"),
+        }), Is.EqualTo(3.5f));
+    }
+
     [TestCase("Player", "Opponent")]
     [TestCase("Opponent", "Player")]
     public void LockForfeitHighlightsTheActorWhoActuallyPlaysNext(

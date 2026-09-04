@@ -73,6 +73,7 @@ public sealed class SoloProductionFlowPlayModeTests
     bool legacyWon;
     int legacyGuesses;
     int statsChangedCount;
+    double fakePresentationTime;
 
     [UnitySetUp]
     public IEnumerator SetUp()
@@ -603,15 +604,14 @@ public sealed class SoloProductionFlowPlayModeTests
     public IEnumerator AutomaticPipelineReachesAndPresentsOneAuthoritativeResult()
     {
         PlayerPrefs.SetInt("AIDifficulty", 2);
+        UseFakePresentationClock();
         StartWithoutAcknowledgement("Host", 100, 77);
 
         AssertPhase("StarterReveal");
         Assert.That(GetProperty<bool>(game, "HasAutomaticTransitionScheduled"),
             Is.True);
-        yield return WaitUntilOrFail(
-            () => StateProperty("Phase").ToString() == "PlayerGuess",
-            1.8f,
-            "Starter fact did not route to the player's real decision.");
+        yield return AdvanceScheduledBeat();
+        AssertPhase("PlayerGuess");
         Assert.That(GetProperty<bool>(game, "HasAutomaticTransitionScheduled"),
             Is.False);
 
@@ -620,9 +620,12 @@ public sealed class SoloProductionFlowPlayModeTests
         Assert.That(GetProperty<bool>(game, "HasAutomaticTransitionScheduled"),
             Is.True);
 
-        yield return WaitUntilOrFail(
-            () => GetProperty<bool>(game, "IsResultPresentationPending"),
-            4.2f,
+        yield return AdvanceScheduledBeat();
+        AssertPhase("OpponentThinking");
+        yield return AdvanceScheduledBeat();
+        AssertPhase("OpponentGuess");
+        Assert.That(GetProperty<bool>(game, "IsResultPresentationPending"),
+            Is.True,
             "DuelRules did not decide the expected equal-turn result.");
         Invoke(menu, "RequestSoloMatchExit");
         Assert.That(GetProperty<bool>(menu, "IsSoloLeaveConfirmationVisible"),
@@ -632,10 +635,10 @@ public sealed class SoloProductionFlowPlayModeTests
             Is.True,
             "The final fact must retain its one route to the result screen.");
 
-        yield return WaitUntilOrFail(
-            () => StateProperty("Phase").ToString() == "MatchResult",
-            6.5f,
-            "A decided DuelRules result never reached its result presentation.");
+        yield return AdvanceScheduledBeat();
+        AssertPhase("AnswerOpponent");
+        yield return AdvanceScheduledBeat();
+        AssertPhase("MatchResult");
 
         AssertTerminal("Win");
         AssertSingleOutcome(
@@ -657,12 +660,13 @@ public sealed class SoloProductionFlowPlayModeTests
     public IEnumerator BackModalAndRematchCancelPendingAiWorkWithoutLateMoves()
     {
         PlayerPrefs.SetInt("AIDifficulty", 2);
+        UseFakePresentationClock();
         StartWithoutAcknowledgement("Guest", 100, 77);
-        yield return WaitUntilOrFail(
-            () => StateProperty("Phase").ToString() == "OpponentThinking",
-            1.8f,
-            "AI opener did not enter its visible thinking phase.");
+        yield return AdvanceScheduledBeat();
+        AssertPhase("OpponentThinking");
         Assert.That(History("AiGuessHistory"), Is.Empty);
+        yield return AdvancePresentationClock(0.4f);
+        float remaining = CurrentRemaining();
 
         Invoke(menu, "RequestSoloMatchExit");
         Assert.That(GetProperty<bool>(menu, "IsSoloLeaveConfirmationVisible"),
@@ -670,16 +674,16 @@ public sealed class SoloProductionFlowPlayModeTests
         Assert.That(GetProperty<bool>(game, "HasAutomaticTransitionScheduled"),
             Is.False,
             "The leave decision must suspend pending AI work.");
-        yield return new WaitForSecondsRealtime(1.3f);
+        yield return AdvancePresentationClock(20f);
         Assert.That(History("AiGuessHistory"), Is.Empty,
             "No AI move may land behind the leave confirmation.");
+        Assert.That(CurrentRemaining(), Is.EqualTo(remaining).Within(0.001f));
 
         Invoke(menu, "CancelSoloMatchExit");
         Assert.That(GetProperty<bool>(game, "HasAutomaticTransitionScheduled"),
             Is.True);
-        yield return WaitUntilOrFail(
-            () => History("AiGuessHistory").Length == 1,
-            1.6f,
+        yield return AdvanceScheduledBeat();
+        Assert.That(History("AiGuessHistory"), Has.Length.EqualTo(1),
             "Cancel did not safely resume the one pending AI turn.");
 
         Invoke(game, "RestartMatch");
@@ -687,7 +691,7 @@ public sealed class SoloProductionFlowPlayModeTests
         Assert.That(HistoryEvents(), Is.Empty);
         Assert.That(GetProperty<bool>(game, "HasAutomaticTransitionScheduled"),
             Is.False);
-        yield return new WaitForSecondsRealtime(1.8f);
+        yield return AdvancePresentationClock(20f);
         AssertPhase("ChooseSecret");
         Assert.That(HistoryEvents(), Is.Empty,
             "A stale AI transition fired after rematch reset.");
@@ -791,6 +795,34 @@ public sealed class SoloProductionFlowPlayModeTests
     void Acknowledge()
     {
         Invoke(game, "AcknowledgePresentation");
+    }
+
+    void UseFakePresentationClock()
+    {
+        fakePresentationTime = 2000d;
+        Invoke(game, "SetPresentationClockForTests",
+            new Func<double>(() => fakePresentationTime));
+    }
+
+    IEnumerator AdvancePresentationClock(float seconds)
+    {
+        Assert.That(seconds, Is.GreaterThanOrEqualTo(0f));
+        fakePresentationTime += seconds;
+        yield return null;
+        yield return null;
+    }
+
+    IEnumerator AdvanceScheduledBeat()
+    {
+        float remaining = CurrentRemaining();
+        Assert.That(remaining, Is.GreaterThan(0f),
+            "A bounded automatic phase must expose one pending deadline.");
+        yield return AdvancePresentationClock(remaining + 0.01f);
+    }
+
+    float CurrentRemaining()
+    {
+        return GetProperty<float>(game, "CurrentAutomaticRemainingSeconds");
     }
 
     void AssertTerminal(string prompt)

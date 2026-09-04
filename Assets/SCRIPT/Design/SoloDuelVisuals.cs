@@ -316,6 +316,27 @@ public sealed class SoloDuelVisuals : MonoBehaviour
         return changed;
     }
 
+    public bool SetOutcomeDestination(
+        bool terminalResultFollows,
+        SoloBoardActor nextActor)
+    {
+        bool changed = presentation.SetOutcomeDestination(
+            terminalResultFollows, nextActor);
+        Render();
+        return changed;
+    }
+
+    public bool DismissLatestAiHandoff()
+    {
+        bool changed = presentation.DismissLatestAiHandoff();
+        if (changed)
+            Render();
+        return changed;
+    }
+
+    public string CurrentPresentationTimingText =>
+        PresentationTimingText(presentation.Current);
+
     public bool BeginOpponentThinking(
         int roundNumber,
         int playerMin,
@@ -543,8 +564,8 @@ public sealed class SoloDuelVisuals : MonoBehaviour
         LayoutControl(centralOutcomeText != null
                 ? centralOutcomeText.rectTransform
                 : null,
-            new Vector2(-9f, 180f), new Vector2(-9f, 275f),
-            new Vector2(610f, 50f), new Vector2(610f, 58f), blend);
+            new Vector2(-9f, 166f), new Vector2(-9f, 260f),
+            new Vector2(610f, 94f), new Vector2(610f, 102f), blend);
         LayoutControl(
             numberManager != null && numberManager.messageText != null
                 ? numberManager.messageText.rectTransform
@@ -1064,14 +1085,14 @@ public sealed class SoloDuelVisuals : MonoBehaviour
         {
             phaseText = DisplayLabel(
                 promptRibbon.transform, "PhasePrompt", "", 56,
-                new Vector2(0f, -30f), new Vector2(584f, 105f), NearWhite);
+                new Vector2(0f, -22f), new Vector2(584f, 136f), NearWhite);
         }
         else
         {
             Reparent(phaseText.transform, promptRibbon.transform);
             Place(
-                phaseText.rectTransform, new Vector2(0f, -30f),
-                new Vector2(584f, 105f));
+                phaseText.rectTransform, new Vector2(0f, -22f),
+                new Vector2(584f, 136f));
             phaseText.color = NearWhite;
             phaseText.alignment = TextAlignmentOptions.Center;
         }
@@ -1092,6 +1113,12 @@ public sealed class SoloDuelVisuals : MonoBehaviour
             interactionCard.transform, "CurrentNumberHeading",
             L10n.Get("hud_current_number"), 30,
             new Vector2(-9f, 402f), new Vector2(612f, 64f), NearWhite);
+        currentHeadingText.enableAutoSizing = true;
+        currentHeadingText.fontSizeMin = 20f;
+        currentHeadingText.fontSizeMax = 30f;
+        currentHeadingText.enableWordWrapping = false;
+        currentHeadingText.overflowMode = TextOverflowModes.Truncate;
+        currentHeadingText.margin = new Vector4(4f, 0f, 4f, 0f);
 
         GameObject rail = RuntimeUI.CreateObject("SoloOpponentRail", safeRoot);
         Place(
@@ -1158,16 +1185,24 @@ public sealed class SoloDuelVisuals : MonoBehaviour
             TMP_Text placeholder = input.placeholder as TMP_Text;
             if (placeholder != null)
             {
-                placeholder.text = "?";
+                // This runtime board is the sole owner of its dynamic input
+                // cue. A scene-local LocalizedText would restore the legacy
+                // generic 1-100 placeholder after this owner has painted the
+                // live strategic range.
+                LocalizedText legacyOwner =
+                    placeholder.GetComponent<LocalizedText>();
+                if (legacyOwner != null)
+                {
+                    legacyOwner.enabled = false;
+                    Destroy(legacyOwner);
+                }
+                placeholder.text = L10n.Get("solo_secret_domain");
                 placeholder.font = displayFont;
-                // Keep the large empty-state cue, but let TMP fit the actual
-                // input viewport at every supported portrait size.  The old
-                // fixed 170pt glyph exceeded the 720x1280 text rectangle.
-                placeholder.fontSize = 88f;
+                placeholder.fontSize = 68f;
                 placeholder.fontStyle = FontStyles.Bold;
                 placeholder.enableAutoSizing = true;
-                placeholder.fontSizeMin = 64f;
-                placeholder.fontSizeMax = 88f;
+                placeholder.fontSizeMin = 40f;
+                placeholder.fontSizeMax = 68f;
                 placeholder.color = NearWhite;
                 placeholder.alignment = TextAlignmentOptions.Center;
             }
@@ -1259,9 +1294,13 @@ public sealed class SoloDuelVisuals : MonoBehaviour
                     opponentSpeechText.rectTransform,
                     new Vector2(-35f, -27f), new Vector2(238f, 112f));
                 opponentSpeechText.font = displayFont;
-                ConfigureDisplayText(opponentSpeechText, 27f, 34f);
+                ConfigureDisplayText(opponentSpeechText, 20f, 30f);
                 opponentSpeechText.enableAutoSizing = true;
-                opponentSpeechText.fontSize = 34f;
+                opponentSpeechText.fontSize = 30f;
+                opponentSpeechText.fontSizeMin = 20f;
+                opponentSpeechText.fontSizeMax = 30f;
+                opponentSpeechText.enableWordWrapping = true;
+                opponentSpeechText.overflowMode = TextOverflowModes.Truncate;
                 opponentSpeechText.color = Ink;
                 opponentSpeechText.alignment =
                     TextAlignmentOptions.Center;
@@ -1504,11 +1543,13 @@ public sealed class SoloDuelVisuals : MonoBehaviour
 
         centralOutcomeText = DisplayLabel(
             interactionCard.transform, "CentralOutcome", "", 37,
-            new Vector2(-9f, 180f), new Vector2(610f, 50f), Gold);
+            new Vector2(-9f, 166f), new Vector2(610f, 94f), Gold);
         centralOutcomeText.alignment = TextAlignmentOptions.Center;
         centralOutcomeText.enableAutoSizing = true;
-        centralOutcomeText.fontSizeMin = 25f;
-        centralOutcomeText.fontSizeMax = 39f;
+        centralOutcomeText.fontSizeMin = 22f;
+        centralOutcomeText.fontSizeMax = 37f;
+        centralOutcomeText.enableWordWrapping = true;
+        centralOutcomeText.overflowMode = TextOverflowModes.Truncate;
         centralOutcomeText.margin = new Vector4(4f, 0f, 4f, 0f);
 
         continueControl = RuntimeUI.CreateButton(
@@ -1777,8 +1818,18 @@ public sealed class SoloDuelVisuals : MonoBehaviour
         if (numberManager == null)
             return;
 
-        SetInactive(numberManager.playerGuessesPanel);
-        SetInactive(numberManager.aiGuessesPanel);
+        // The legacy scene serialized each "panel" reference on the same
+        // GameObject as the TMP label.  Once this sole visual owner reparents
+        // those labels into the factual opponent bubble, they are live
+        // presentation surfaces rather than retired panels and must follow
+        // RenderOpponentBubble's phase visibility.
+        if (opponentSpeechText == null ||
+            numberManager.playerGuessesPanel !=
+            opponentSpeechText.gameObject)
+            SetInactive(numberManager.playerGuessesPanel);
+        if (opponentGuessText == null ||
+            numberManager.aiGuessesPanel != opponentGuessText.gameObject)
+            SetInactive(numberManager.aiGuessesPanel);
     }
 
     void EnforcePhaseVisibility(SoloBoardPresentationState state)
@@ -1823,7 +1874,13 @@ public sealed class SoloDuelVisuals : MonoBehaviour
         RenderActorCards(state);
 
         if (phaseText != null)
+        {
+            // The phase surface is also the persistent result headline.  Keep
+            // it live for MatchResult so the authoritative WIN / LOSS / DRAW
+            // state remains visible until Back or Rematch.
+            phaseText.gameObject.SetActive(true);
             phaseText.text = PromptText(state);
+        }
 
         if (roundText != null)
         {
@@ -1866,6 +1923,7 @@ public sealed class SoloDuelVisuals : MonoBehaviour
 
         if (currentHeadingText != null)
             currentHeadingText.text = CurrentHeading(state);
+        RenderInputCue(state);
         if (centralGuessText != null)
         {
             bool showCentral = !numeric &&
@@ -1972,10 +2030,14 @@ public sealed class SoloDuelVisuals : MonoBehaviour
 
     void RenderOpponentBubble(SoloBoardPresentationState state)
     {
-        bool playerTaunt = state.Phase == SoloBoardPhase.PlayerGuess;
+        bool pinnedAiHandoff = state.Phase == SoloBoardPhase.PlayerGuess &&
+                               state.LatestAiHandoffPinned;
+        bool playerTaunt = state.Phase == SoloBoardPhase.PlayerGuess &&
+                           !pinnedAiHandoff;
         bool factualAiBeat = state.Phase == SoloBoardPhase.OpponentThinking ||
                              state.Phase == SoloBoardPhase.OpponentGuess ||
-                             state.Phase == SoloBoardPhase.AnswerOpponent;
+                             state.Phase == SoloBoardPhase.AnswerOpponent ||
+                             pinnedAiHandoff;
         if (opponentBubbleRoot != null)
             opponentBubbleRoot.SetActive(playerTaunt || factualAiBeat);
         if (opponentPromptText != null)
@@ -1986,7 +2048,8 @@ public sealed class SoloDuelVisuals : MonoBehaviour
                 : "";
         }
         bool showGuess = state.Phase == SoloBoardPhase.OpponentGuess ||
-                         state.Phase == SoloBoardPhase.AnswerOpponent;
+                         state.Phase == SoloBoardPhase.AnswerOpponent ||
+                         pinnedAiHandoff;
         if (opponentGuessText != null)
         {
             opponentGuessText.gameObject.SetActive(showGuess);
@@ -1999,17 +2062,36 @@ public sealed class SoloDuelVisuals : MonoBehaviour
         if (opponentSpeechText == null)
             return;
         bool showSpeech = state.Phase == SoloBoardPhase.OpponentThinking ||
-                          state.Phase == SoloBoardPhase.AnswerOpponent;
+                          state.Phase == SoloBoardPhase.AnswerOpponent ||
+                          pinnedAiHandoff;
         opponentSpeechText.gameObject.SetActive(showSpeech);
         if (state.Phase == SoloBoardPhase.OpponentThinking)
             opponentSpeechText.text = L10n.Get(
                 "opponent_thinking", OpponentName(state));
-        else if (state.Phase == SoloBoardPhase.AnswerOpponent)
-            opponentSpeechText.text = L10n.Get(
-                "solo_answer", OutcomeWithLock(
-                    state, state.LatestAiOutcome, SoloBoardActor.Opponent));
+        else if (state.Phase == SoloBoardPhase.AnswerOpponent ||
+                 pinnedAiHandoff)
+            opponentSpeechText.text = AiHandoffBody(state);
         else
             opponentSpeechText.text = "";
+    }
+
+    void RenderInputCue(SoloBoardPresentationState state)
+    {
+        if (input == null)
+            return;
+        TMP_Text placeholder = input.placeholder as TMP_Text;
+        if (placeholder == null)
+            return;
+
+        LocalizedText legacyOwner = placeholder.GetComponent<LocalizedText>();
+        if (legacyOwner != null && legacyOwner.enabled)
+            legacyOwner.enabled = false;
+        placeholder.text = state.Phase == SoloBoardPhase.ChooseSecret
+            ? L10n.Get("solo_secret_domain")
+            : L10n.Get(
+                "solo_input_range",
+                state.PlayerRangeMin,
+                state.PlayerRangeMax);
     }
 
     static string OpponentName(SoloBoardPresentationState state)
@@ -2022,11 +2104,14 @@ public sealed class SoloDuelVisuals : MonoBehaviour
     static string CurrentHeading(SoloBoardPresentationState state)
     {
         if (state.Phase == SoloBoardPhase.ChooseSecret)
-            return L10n.Get("solo_current_secret");
+            return L10n.Get("solo_secret_domain_heading");
         if (state.Phase == SoloBoardPhase.StarterReveal)
             return L10n.Get("solo_starter_heading");
-        if (state.Phase == SoloBoardPhase.PlayerGuess ||
-            state.Phase == SoloBoardPhase.PlayerOutcome ||
+        if (state.Phase == SoloBoardPhase.PlayerGuess)
+            return L10n.Get(
+                "solo_live_range_heading", OpponentName(state),
+                state.PlayerRangeMin, state.PlayerRangeMax);
+        if (state.Phase == SoloBoardPhase.PlayerOutcome ||
             state.Phase == SoloBoardPhase.LastLicks)
             return L10n.Get("solo_current_guess", OpponentName(state));
         if (state.Phase == SoloBoardPhase.OpponentThinking ||
@@ -2071,13 +2156,11 @@ public sealed class SoloDuelVisuals : MonoBehaviour
     static string CentralOutcome(SoloBoardPresentationState state)
     {
         if (state.Phase == SoloBoardPhase.PlayerOutcome)
-            return OutcomeWithLock(
-                state, state.LatestPlayerOutcome, SoloBoardActor.Player);
+            return PlayerHandoffBody(state);
         if (state.Phase == SoloBoardPhase.AnswerOpponent)
-            return L10n.Get("solo_answer", OutcomeWithLock(
-                state, state.LatestAiOutcome, SoloBoardActor.Opponent));
+            return AiHandoffBody(state);
         if (state.Phase == SoloBoardPhase.OpponentGuess)
-            return L10n.Get("solo_reveal_outcome");
+            return L10n.Get("solo_ai_result_pending");
         if (state.Phase == SoloBoardPhase.StarterReveal)
             return state.Starter == SoloBoardActor.Player
                 ? L10n.Get("solo_player_starts")
@@ -2105,12 +2188,11 @@ public sealed class SoloDuelVisuals : MonoBehaviour
         return L10n.Get("solo_lock_after_guess");
     }
 
-    static string OutcomeWithLock(
+    static string WithLatestLockFact(
         SoloBoardPresentationState state,
-        SoloGuessOutcome outcome,
-        SoloBoardActor actor)
+        SoloBoardActor actor,
+        string label)
     {
-        string label = HistoryOutcomeLabel(outcome);
         if (state.History.Count == 0)
             return label;
 
@@ -2121,6 +2203,90 @@ public sealed class SoloDuelVisuals : MonoBehaviour
             latest.LockMissed
                 ? "solo_lock_failed_short"
                 : "solo_lock_success_short");
+    }
+
+    static string PlayerTargetRelation(SoloBoardPresentationState state)
+    {
+        string key = state.LatestPlayerOutcome == SoloGuessOutcome.Higher
+            ? "solo_target_number_higher"
+            : state.LatestPlayerOutcome == SoloGuessOutcome.Lower
+                ? "solo_target_number_lower"
+                : "solo_target_number_correct";
+        return WithLatestLockFact(
+            state, SoloBoardActor.Player,
+            L10n.Get(key, OpponentName(state)));
+    }
+
+    static string AiTargetRelation(SoloBoardPresentationState state)
+    {
+        string key = state.LatestAiOutcome == SoloGuessOutcome.Higher
+            ? "your_number_is_higher"
+            : state.LatestAiOutcome == SoloGuessOutcome.Lower
+                ? "your_number_is_lower"
+                : "your_number_is_correct";
+        return WithLatestLockFact(
+            state, SoloBoardActor.Opponent, L10n.Get(key));
+    }
+
+    static string HandoffDestination(
+        SoloBoardPresentationState state,
+        SoloBoardActor normalActor)
+    {
+        if (state.ResultFollows)
+            return L10n.Get("solo_result_next");
+        SoloBoardActor actor = state.HandoffActor == SoloBoardActor.None
+            ? normalActor
+            : state.HandoffActor;
+        return actor == SoloBoardActor.Player
+            ? L10n.Get("solo_your_turn_short")
+            : L10n.Get("solo_opponent_turn_short", OpponentName(state));
+    }
+
+    static string PlayerHandoffBody(SoloBoardPresentationState state)
+    {
+        return L10n.Get(
+            "solo_handoff_summary",
+            PlayerTargetRelation(state),
+            state.PlayerRangeMin,
+            state.PlayerRangeMax,
+            HandoffDestination(state, SoloBoardActor.Opponent));
+    }
+
+    static string AiHandoffBody(SoloBoardPresentationState state)
+    {
+        return L10n.Get(
+            "solo_handoff_summary",
+            AiTargetRelation(state),
+            state.AiRangeMin,
+            state.AiRangeMax,
+            HandoffDestination(state, SoloBoardActor.Player));
+    }
+
+    static string PlayerOutcomeSummary(SoloBoardPresentationState state)
+    {
+        return L10n.Get("solo_you_guessed", state.LatestPlayerGuess) +
+               "\n" + PlayerHandoffBody(state);
+    }
+
+    static string AiOutcomeSummary(SoloBoardPresentationState state)
+    {
+        return L10n.Get(
+                   "solo_opponent_guessed", OpponentName(state),
+                   state.LatestAiGuess) +
+               "\n" + AiHandoffBody(state);
+    }
+
+    static string PresentationTimingText(SoloBoardPresentationState state)
+    {
+        if (state.Phase == SoloBoardPhase.PlayerOutcome)
+            return PlayerOutcomeSummary(state);
+        if (state.Phase == SoloBoardPhase.AnswerOpponent)
+            return AiOutcomeSummary(state);
+        if (state.Phase == SoloBoardPhase.OpponentGuess)
+            return CentralGuess(state) + "\n" + CentralOutcome(state);
+        if (state.Phase == SoloBoardPhase.OpponentThinking)
+            return L10n.Get("opponent_thinking", OpponentName(state));
+        return PromptText(state);
     }
 
     static bool LockCanBePressed(SoloBoardPresentationState state)
@@ -2557,6 +2723,10 @@ public sealed class SoloDuelVisuals : MonoBehaviour
     static string PromptText(SoloBoardPresentationState state)
     {
         string opponent = OpponentName(state);
+        if (state.Phase == SoloBoardPhase.PlayerGuess &&
+            state.LatestAiHandoffPinned)
+            return AiOutcomeSummary(state);
+
         switch (state.Prompt)
         {
             case SoloBoardPrompt.EnterSecret:
@@ -2594,17 +2764,9 @@ public sealed class SoloDuelVisuals : MonoBehaviour
                 return L10n.Get("solo_opponent_starts", opponent) + "\n" +
                        L10n.Get("solo_opponent_objective", opponent);
             case SoloBoardPrompt.PlayerGuessedHigher:
-                return L10n.Get("solo_player_turn", opponent) + "\n" +
-                       L10n.Get("solo_you_guessed", state.LatestPlayerGuess) +
-                       " — " + L10n.Get("solo_history_higher");
             case SoloBoardPrompt.PlayerGuessedLower:
-                return L10n.Get("solo_player_turn", opponent) + "\n" +
-                       L10n.Get("solo_you_guessed", state.LatestPlayerGuess) +
-                       " — " + L10n.Get("solo_history_lower");
             case SoloBoardPrompt.PlayerGuessedCorrect:
-                return L10n.Get("solo_player_turn", opponent) + "\n" +
-                       L10n.Get("solo_you_guessed", state.LatestPlayerGuess) +
-                       " — " + L10n.Get("solo_history_correct");
+                return PlayerOutcomeSummary(state);
             case SoloBoardPrompt.OpponentGuess:
                 return L10n.Get("solo_opponent_turn", opponent) + "\n" +
                        L10n.Get(
@@ -2681,6 +2843,8 @@ public sealed class SoloDuelVisuals : MonoBehaviour
         if (!built || submitControl == null)
             return;
         bool numeric = presentation.Current.NumericControlsAvailable;
+        if (numeric && !string.IsNullOrEmpty(input != null ? input.text : null))
+            DismissLatestAiHandoff();
         submitControl.interactable = numeric && numberManager != null &&
                                      numberManager.CanSubmitCurrentValue;
         if (numeric && numberManager != null &&
@@ -2692,6 +2856,7 @@ public sealed class SoloDuelVisuals : MonoBehaviour
     void OnKeyPressed(string key)
     {
         if (input == null || !input.interactable) return;
+        DismissLatestAiHandoff();
         if (key == "×")
         {
             input.text = string.Empty;

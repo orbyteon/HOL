@@ -1,6 +1,8 @@
+using System;
 using System.Collections;
 using UnityEngine;
 using TMPro;
+using Random = UnityEngine.Random;
 
 // Solo duel against the on-device AI. Turn order, rounds and the Lock all live
 // in DuelRules, which the PvP backends mirror — so a player learns one set of
@@ -71,7 +73,21 @@ public class GameManager : MonoBehaviour
     public int CurrentPlayerRangeMin => playerMin;
     public int CurrentPlayerRangeMax => playerMax;
     public bool HasAutomaticTransitionScheduled =>
-        automaticTransition != null;
+        automaticTransition != null && !PresentationIsSuspended;
+    public float CurrentAutomaticHoldSeconds => automaticTransitionHoldSeconds;
+    public float CurrentAutomaticRemainingSeconds
+    {
+        get
+        {
+            if (hasSuspendedTransition)
+                return suspendedTransitionRemaining;
+            if (!hasAutomaticTransitionDeadline)
+                return 0f;
+            return Mathf.Max(
+                0f,
+                (float)(automaticTransitionDeadline - PresentationNow()));
+        }
+    }
     public bool HasHumanDecision =>
         presentationPhase == SoloBoardPhase.ChooseSecret ||
         presentationPhase == SoloBoardPhase.PlayerGuess ||
@@ -95,17 +111,23 @@ public class GameManager : MonoBehaviour
     // gameplay timers: DuelRules has already accepted the move before an
     // outcome hold begins, and no rule or difficulty decision depends on the
     // elapsed time.
-    const float StarterRevealSeconds = 1.2f;
-    const float AiThinkingSeconds = 1.1f;
-    const float AiGuessRevealSeconds = 0.35f;
-    const float OutcomeHoldSeconds = 1.6f;
-    const float NoticeHoldSeconds = 1.6f;
-
     Coroutine automaticTransition;
     int automaticTransitionGeneration;
+    Func<double> presentationNow = DefaultPresentationNow;
+    double automaticTransitionDeadline;
+    float automaticTransitionHoldSeconds;
+    bool hasAutomaticTransitionDeadline;
+    bool hasSuspendedTransition;
+    SoloBoardPhase suspendedTransitionPhase;
+    float suspendedTransitionRemaining;
+    float suspendedTransitionOriginalHold;
     bool automaticTransitionsSuspended;
     bool applicationPaused;
     bool applicationFocused = true;
+
+    bool PresentationIsSuspended =>
+        automaticTransitionsSuspended || applicationPaused ||
+        !applicationFocused;
 
     // True from StartGame until RestartMatch clears the board. It stays true
     // across the result screen — the match is over, but it is still the match
@@ -317,62 +339,85 @@ public class GameManager : MonoBehaviour
                phase == SoloBoardPhase.LockForfeit;
     }
 
-    static float AutomaticDelayFor(SoloBoardPhase phase)
+    float AutomaticDelayFor(SoloBoardPhase phase)
     {
-        if (phase == SoloBoardPhase.StarterReveal)
-            return StarterRevealSeconds;
-        if (phase == SoloBoardPhase.OpponentThinking)
-            return AiThinkingSeconds;
-        if (phase == SoloBoardPhase.OpponentGuess)
-            return AiGuessRevealSeconds;
-        if (phase == SoloBoardPhase.PlayerOutcome ||
-            phase == SoloBoardPhase.AnswerOpponent)
-            return OutcomeHoldSeconds;
-        return NoticeHoldSeconds;
+        SoloDuelVisuals presenter = Presenter();
+        string finalVisibleCopy = presenter != null
+            ? presenter.CurrentPresentationTimingText
+            : string.Empty;
+        return SoloPresentationTiming.DurationFor(
+            phase, finalVisibleCopy);
     }
 
     void ScheduleAutomaticTransition()
     {
         CancelAutomaticTransition();
         if (!isActiveAndEnabled || !matchSetUp || terminalRecorded ||
-            automaticTransitionsSuspended ||
-            applicationPaused || !applicationFocused ||
+            PresentationIsSuspended ||
             !IsAutomaticPhase(presentationPhase))
             return;
 
-        int generation = automaticTransitionGeneration;
-        SoloBoardPhase expectedPhase = presentationPhase;
-        automaticTransition = StartCoroutine(
-            AdvanceAfterDelay(
-                expectedPhase,
-                generation,
-                AutomaticDelayFor(expectedPhase)));
+        float hold = AutomaticDelayFor(presentationPhase);
+        StartAutomaticTransition(presentationPhase, hold, hold);
     }
 
-    IEnumerator AdvanceAfterDelay(
+    void StartAutomaticTransition(
         SoloBoardPhase expectedPhase,
-        int generation,
-        float delaySeconds)
+        float remainingSeconds,
+        float originalHoldSeconds)
     {
-        yield return new WaitForSecondsRealtime(delaySeconds);
+        hasSuspendedTransition = false;
+        suspendedTransitionRemaining = 0f;
+        suspendedTransitionOriginalHold = 0f;
+        automaticTransitionHoldSeconds = originalHoldSeconds;
+        automaticTransitionDeadline =
+            PresentationNow() + Math.Max(0f, remainingSeconds);
+        hasAutomaticTransitionDeadline = true;
+        int generation = automaticTransitionGeneration;
+        automaticTransition = StartCoroutine(
+            AdvanceAfterDeadline(expectedPhase, generation));
+    }
+
+    IEnumerator AdvanceAfterDeadline(
+        SoloBoardPhase expectedPhase,
+        int generation)
+    {
+        // StartCoroutine executes synchronously until the first yield.  Always
+        // yield once so StartAutomaticTransition can retain the handle before
+        // an already-expired resumed deadline advances and schedules its
+        // successor phase.
+        yield return null;
+
+        while (generation == automaticTransitionGeneration &&
+               expectedPhase == presentationPhase &&
+               !PresentationIsSuspended && isActiveAndEnabled &&
+               PresentationNow() < automaticTransitionDeadline)
+            yield return null;
 
         if (generation != automaticTransitionGeneration ||
             expectedPhase != presentationPhase ||
-            automaticTransitionsSuspended || applicationPaused ||
-            !applicationFocused || !isActiveAndEnabled)
+            PresentationIsSuspended || !isActiveAndEnabled)
             yield break;
 
         automaticTransition = null;
+        hasAutomaticTransitionDeadline = false;
+        automaticTransitionHoldSeconds = 0f;
         AdvanceAutomaticPhase(expectedPhase);
     }
 
-    void CancelAutomaticTransition()
+    void CancelAutomaticTransition(bool clearSuspended = true)
     {
         automaticTransitionGeneration++;
-        if (automaticTransition == null)
-            return;
-        StopCoroutine(automaticTransition);
+        if (automaticTransition != null)
+            StopCoroutine(automaticTransition);
         automaticTransition = null;
+        hasAutomaticTransitionDeadline = false;
+        automaticTransitionHoldSeconds = 0f;
+        if (!clearSuspended)
+            return;
+        hasSuspendedTransition = false;
+        suspendedTransitionRemaining = 0f;
+        suspendedTransitionOriginalHold = 0f;
     }
 
     void CancelPendingPresentation()
@@ -385,11 +430,77 @@ public class GameManager : MonoBehaviour
     {
         if (automaticTransitionsSuspended == suspended)
             return;
+        bool wasSuspended = PresentationIsSuspended;
         automaticTransitionsSuspended = suspended;
-        if (suspended)
-            CancelAutomaticTransition();
-        else
-            ScheduleAutomaticTransition();
+        HandlePresentationSuspensionChange(wasSuspended);
+    }
+
+    void HandlePresentationSuspensionChange(bool wasSuspended)
+    {
+        bool isSuspended = PresentationIsSuspended;
+        if (!wasSuspended && isSuspended)
+            SuspendAutomaticTransition();
+        else if (wasSuspended && !isSuspended)
+            ResumeAutomaticTransition();
+    }
+
+    void SuspendAutomaticTransition()
+    {
+        if (automaticTransition != null &&
+            hasAutomaticTransitionDeadline)
+        {
+            hasSuspendedTransition = true;
+            suspendedTransitionPhase = presentationPhase;
+            suspendedTransitionRemaining = Mathf.Max(
+                0f,
+                (float)(automaticTransitionDeadline - PresentationNow()));
+            suspendedTransitionOriginalHold =
+                automaticTransitionHoldSeconds;
+        }
+        CancelAutomaticTransition(false);
+    }
+
+    void ResumeAutomaticTransition()
+    {
+        if (hasSuspendedTransition &&
+            suspendedTransitionPhase == presentationPhase &&
+            IsAutomaticPhase(presentationPhase) &&
+            isActiveAndEnabled && matchSetUp && !terminalRecorded)
+        {
+            float remaining = suspendedTransitionRemaining;
+            float originalHold = suspendedTransitionOriginalHold;
+            StartAutomaticTransition(
+                presentationPhase, remaining, originalHold);
+            return;
+        }
+
+        hasSuspendedTransition = false;
+        ScheduleAutomaticTransition();
+    }
+
+    static double DefaultPresentationNow()
+    {
+        return Time.realtimeSinceStartupAsDouble;
+    }
+
+    double PresentationNow()
+    {
+        return presentationNow != null
+            ? presentationNow()
+            : DefaultPresentationNow();
+    }
+
+    // Deterministic PlayMode seam: tests inject a monotonic clock before a
+    // match starts, then advance phase deadlines without real multi-second
+    // waits. Production never calls this method.
+    void SetPresentationClockForTests(Func<double> clock)
+    {
+        if (clock == null)
+            throw new ArgumentNullException(nameof(clock));
+        if (automaticTransition != null || hasSuspendedTransition)
+            throw new InvalidOperationException(
+                "Set the Solo presentation clock before scheduling a beat.");
+        presentationNow = clock;
     }
 
     void AIGuess()
@@ -423,9 +534,13 @@ public class GameManager : MonoBehaviour
             pendingForfeitRound = submittedRound;
         }
 
-        bool presented = Presenter()?.RecordOpponentMove(
+        SoloDuelVisuals presenter = Presenter();
+        bool presented = presenter?.RecordOpponentMove(
             submittedRound, aiGuess, move.Hint, aiLocks,
             candidatesBefore, playerMin, playerMax, min, max) == true;
+        if (presented)
+            presented = presenter.SetOutcomeDestination(
+                rules.Finished, PresentationActorForCurrentTurn());
         presentationPhase = SoloBoardPhase.OpponentGuess;
         RequirePresentation(presented, "opponent guess");
 
@@ -612,9 +727,13 @@ public class GameManager : MonoBehaviour
         }
 
         lastLicksAcknowledged = false;
-        bool presented = Presenter()?.RecordPlayerMove(
+        SoloDuelVisuals presenter = Presenter();
+        bool presented = presenter?.RecordPlayerMove(
             submittedRound, guess, move.Hint, staked,
             candidatesBefore, playerMin, playerMax, min, max) == true;
+        if (presented)
+            presented = presenter.SetOutcomeDestination(
+                rules.Finished, PresentationActorForCurrentTurn());
         presentationPhase = SoloBoardPhase.PlayerOutcome;
         RequirePresentation(presented, "player guess");
         RefreshLockButton();
@@ -784,6 +903,7 @@ public class GameManager : MonoBehaviour
         if (lastLockToggleFrame == Time.frameCount) return;
 
         lastLockToggleFrame = Time.frameCount;
+        Presenter()?.DismissLatestAiHandoff();
         lockArmed = !lockArmed;
         Haptics.Light();
         RefreshLockButton();
@@ -993,25 +1113,21 @@ public class GameManager : MonoBehaviour
         return true;
     }
 
-    // There is no Solo gameplay timeout. Pause/focus only suspend the one
-    // presentation transition and restart its full visual hold on resume;
-    // DuelRules state is never advanced in the background.
+    // There is no Solo gameplay timeout. Pause/focus suspend the one readable
+    // presentation hold and resume its exact remaining time; DuelRules state
+    // is never advanced in the background.
     void OnApplicationPause(bool paused)
     {
+        bool wasSuspended = PresentationIsSuspended;
         applicationPaused = paused;
-        if (paused)
-            CancelAutomaticTransition();
-        else
-            ScheduleAutomaticTransition();
+        HandlePresentationSuspensionChange(wasSuspended);
     }
 
     void OnApplicationFocus(bool focused)
     {
+        bool wasSuspended = PresentationIsSuspended;
         applicationFocused = focused;
-        if (!focused)
-            CancelAutomaticTransition();
-        else
-            ScheduleAutomaticTransition();
+        HandlePresentationSuspensionChange(wasSuspended);
     }
 
     void OnDisable()
@@ -1033,6 +1149,15 @@ public class GameManager : MonoBehaviour
     {
         int randomIndex = Random.Range(0, fakeNames.Length);
         currentOpponent = fakeNames[randomIndex];
+    }
+
+    SoloBoardActor PresentationActorForCurrentTurn()
+    {
+        if (rules.Finished || rules.Turn == DuelRules.Side.None)
+            return SoloBoardActor.None;
+        return rules.Turn == PlayerSide
+            ? SoloBoardActor.Player
+            : SoloBoardActor.Opponent;
     }
 
     SoloDuelVisuals Presenter()

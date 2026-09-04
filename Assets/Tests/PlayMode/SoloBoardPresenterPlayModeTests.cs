@@ -18,6 +18,7 @@ public sealed class SoloBoardPresenterPlayModeTests
     Component menuManager;
     GameObject panel;
     TMP_InputField input;
+    double fakePresentationTime;
 
     [UnitySetUp]
     public IEnumerator SetUp()
@@ -365,8 +366,11 @@ public sealed class SoloBoardPresenterPlayModeTests
         try
         {
             PlayerPrefs.SetInt("AIDifficulty", 2);
+            UseFakePresentationClock();
             StartWithOpener("Guest", 80);
-            Acknowledge();
+            AssertPhase("StarterReveal");
+            Assert.That(CurrentHold(), Is.InRange(2.2f, 3.2f));
+            yield return AdvanceScheduledBeat();
             AssertPhase("OpponentThinking");
             Assert.That(Property(game, "HasAutomaticTransitionScheduled"),
                 Is.EqualTo(true));
@@ -375,20 +379,40 @@ public sealed class SoloBoardPresenterPlayModeTests
             Assert.That(continueButton.gameObject.activeInHierarchy, Is.False,
                 "AI thinking must not ask the player for permission.");
 
-            yield return new WaitForSecondsRealtime(0.65f);
+            float thinkingHold = CurrentHold();
+            Assert.That(thinkingHold, Is.InRange(1.2f, 1.8f));
+            yield return AdvancePresentationClock(thinkingHold - 0.01f);
             AssertPhase("OpponentThinking");
             Assert.That(History("AiGuessHistory"), Is.Empty,
                 "The AI must remain visibly thinking for its natural delay.");
 
-            float thinkingStarted = Time.realtimeSinceStartup - 0.65f;
-            yield return WaitForPhase("OpponentGuess", 1f);
-            Assert.That(Time.realtimeSinceStartup - thinkingStarted,
-                Is.InRange(0.8f, 1.45f));
+            yield return AdvancePresentationClock(0.02f);
+            AssertPhase("OpponentGuess");
             Assert.That(History("AiGuessHistory"), Has.Length.EqualTo(1));
             Assert.That(continueButton.gameObject.activeInHierarchy, Is.False);
+            Assert.That(CurrentHold(), Is.InRange(1.5f, 2.2f));
+            TMP_Text guessReveal = Find(panel.transform, "CentralGuess")
+                .GetComponent<TMP_Text>();
+            TMP_Text resultPending = Find(panel.transform, "CentralOutcome")
+                .GetComponent<TMP_Text>();
+            Assert.That(guessReveal.text, Does.Contain("50"));
+            Assert.That(resultPending.text,
+                Is.EqualTo(Localized("solo_ai_result_pending")),
+                "The AI guess must be visible before its result.");
+            TMP_Text pendingHistoryOutcome =
+                Find(panel.transform, "HistoryOutcome")
+                    .GetComponent<TMP_Text>();
+            Assert.That(pendingHistoryOutcome.text, Is.Empty,
+                "History must not leak the AI result during its guess reveal.");
+            Assert.That(((TMP_Text)Field(game, "aiAnswerText"))
+                    .gameObject.activeInHierarchy,
+                Is.False,
+                "No alternate feedback surface may reveal the result early.");
 
-            yield return WaitForPhase("AnswerOpponent", 0.8f);
+            yield return AdvanceScheduledBeat();
             AssertPhase("AnswerOpponent");
+            Assert.That(pendingHistoryOutcome.text,
+                Is.EqualTo(Localized("solo_history_higher")));
             Assert.That(AnswerActions().Any(action => action.activeSelf), Is.False);
             Assert.That(input.gameObject.activeSelf, Is.False);
             object stateAtZero = State();
@@ -400,7 +424,13 @@ public sealed class SoloBoardPresenterPlayModeTests
                 guessAtZero.ToString()),
                 "The automatic AI fact must remain visibly rendered.");
 
-            yield return new WaitForSecondsRealtime(1.45f);
+            float outcomeHold = CurrentHold();
+            Assert.That(outcomeHold, Is.InRange(2.5f, 3.5f));
+            Assert.That(renderedAtZero,
+                Does.Contain(Localized("your_number_is_higher")));
+            Assert.That(renderedAtZero, Does.Contain("51"));
+            Assert.That(renderedAtZero, Does.Contain("100"));
+            yield return AdvancePresentationClock(outcomeHold - 0.01f);
             AssertPhase("AnswerOpponent");
             Assert.That(State(), Is.SameAs(stateAtZero));
             Assert.That(HistoryEvents(), Has.Length.EqualTo(historyAtZero.Length));
@@ -409,13 +439,62 @@ public sealed class SoloBoardPresenterPlayModeTests
                 Is.EqualTo(outcomeAtZero));
             Assert.That(RenderedAiFactSnapshot(), Is.EqualTo(renderedAtZero));
 
-            yield return WaitForPhase("PlayerGuess", 0.6f);
+            yield return AdvancePresentationClock(0.02f);
             AssertPhase("PlayerGuess");
             Assert.That(input.gameObject.activeSelf, Is.True);
+            Assert.That(Property(State(), "LatestAiHandoffPinned"), Is.True);
+            string sticky = RenderedPinnedAiHandoff();
+            Assert.That(sticky, Does.Contain("50"));
+            Assert.That(sticky,
+                Does.Contain(Localized("your_number_is_higher")));
+            Assert.That(sticky, Does.Contain("51"));
+            Assert.That(sticky, Does.Contain("100"));
+            Assert.That(sticky,
+                Does.Contain(Localized("solo_your_turn_short")));
             Assert.That(HistoryEvents(), Has.Length.EqualTo(historyAtZero.Length),
                 "Automatic resolution must not duplicate the AI move.");
             Assert.That(Property(game, "HasAutomaticTransitionScheduled"),
                 Is.EqualTo(false));
+
+            Find(panel.transform, "Key_1").GetComponent<Button>()
+                .onClick.Invoke();
+            yield return null;
+            Assert.That(Property(State(), "LatestAiHandoffPinned"), Is.False,
+                "The first deliberate keypad action dismisses the retained fact.");
+        }
+        finally
+        {
+            difficulty.Restore();
+        }
+    }
+
+    [UnityTest]
+    public IEnumerator PlayerOutcomeUsesItsBoundedReadableHoldBeforeAiThinking()
+    {
+        var difficulty = new PrefValue("AIDifficulty");
+        try
+        {
+            PlayerPrefs.SetInt("AIDifficulty", 2);
+            UseFakePresentationClock();
+            StartWithOpener("Host", 100);
+            SetField(game, "aiSecretNumber", 90);
+            yield return AdvanceScheduledBeat();
+            AssertPhase("PlayerGuess");
+
+            Assert.That(Invoke(game, "PlayerGuess", 50), Is.EqualTo(true));
+            AssertPhase("PlayerOutcome");
+            float hold = CurrentHold();
+            Assert.That(hold, Is.InRange(2.2f, 3.2f));
+            int historyCount = HistoryEvents().Length;
+
+            yield return AdvancePresentationClock(hold - 0.01f);
+            AssertPhase("PlayerOutcome");
+            Assert.That(HistoryEvents(), Has.Length.EqualTo(historyCount));
+            Assert.That(History("AiGuessHistory"), Is.Empty);
+
+            yield return AdvancePresentationClock(0.02f);
+            AssertPhase("OpponentThinking");
+            Assert.That(History("AiGuessHistory"), Is.Empty);
         }
         finally
         {
@@ -473,23 +552,66 @@ public sealed class SoloBoardPresenterPlayModeTests
     }
 
     [UnityTest]
+    public IEnumerator ValidLockInteractionDismissesPinnedAiHandoffWithoutAnotherAiMove()
+    {
+        var difficulty = new PrefValue("AIDifficulty");
+        try
+        {
+            PlayerPrefs.SetInt("AIDifficulty", 2);
+            UseFakePresentationClock();
+            StartWithOpener("Guest", 80);
+            yield return AdvanceScheduledBeat();
+            yield return AdvanceScheduledBeat();
+            yield return AdvanceScheduledBeat();
+            yield return AdvanceScheduledBeat();
+            AssertPhase("PlayerGuess");
+            Assert.That(Property(State(), "LatestAiHandoffPinned"), Is.True);
+            int historyBefore = HistoryEvents().Length;
+
+            Button lockButton = Find(panel.transform, "LockButton")
+                .GetComponent<Button>();
+            Assert.That(lockButton.interactable, Is.True);
+            lockButton.onClick.Invoke();
+            yield return null;
+
+            Assert.That(Property(State(), "LatestAiHandoffPinned"), Is.False);
+            Assert.That(Field(game, "lockArmed"), Is.EqualTo(true));
+            Assert.That(HistoryEvents(), Has.Length.EqualTo(historyBefore));
+            Assert.That(History("AiGuessHistory"), Has.Length.EqualTo(1));
+        }
+        finally
+        {
+            difficulty.Restore();
+        }
+    }
+
+    [UnityTest]
     public IEnumerator PauseAndResumePreserveThinkingAndOutcomeSnapshotsExactly()
     {
         var difficulty = new PrefValue("AIDifficulty");
         try
         {
             PlayerPrefs.SetInt("AIDifficulty", 2);
+            UseFakePresentationClock();
             StartWithOpener("Guest", 80);
-            Acknowledge();
+            yield return AdvanceScheduledBeat();
             AssertPhase("OpponentThinking");
 
             object thinking = State();
             int round = Convert.ToInt32(Property(thinking, "RoundNumber"));
             int min = Convert.ToInt32(Field(game, "min"));
             int max = Convert.ToInt32(Field(game, "max"));
+            float hold = CurrentHold();
+            yield return AdvancePresentationClock(0.45f);
+            float remaining = CurrentRemaining();
             Invoke(game, "OnApplicationPause", true);
             Invoke(game, "OnApplicationFocus", false);
-            yield return new WaitForSecondsRealtime(0.1f);
+            Assert.That(Property(game, "HasAutomaticTransitionScheduled"),
+                Is.EqualTo(false));
+            yield return AdvancePresentationClock(20f);
+            AssertPhase("OpponentThinking");
+            Assert.That(CurrentRemaining(),
+                Is.EqualTo(remaining).Within(0.001f));
             Invoke(game, "OnApplicationFocus", true);
             Invoke(game, "OnApplicationPause", false);
 
@@ -500,25 +622,79 @@ public sealed class SoloBoardPresenterPlayModeTests
             Assert.That(HistoryEvents(), Is.Empty,
                 "Pause must not synthesize or skip an AI move.");
 
-            Acknowledge();
+            Assert.That(CurrentHold(), Is.EqualTo(hold).Within(0.001f));
+            yield return AdvancePresentationClock(remaining - 0.01f);
+            AssertPhase("OpponentThinking");
+            yield return AdvancePresentationClock(0.02f);
             AssertPhase("OpponentGuess");
-            yield return null;
-            Acknowledge();
+            yield return AdvanceScheduledBeat();
             AssertPhase("AnswerOpponent");
             object outcome = State();
             int historyCount = HistoryEvents().Length;
             int detail = Convert.ToInt32(Property(outcome, "DetailValue"));
 
+            float outcomeRemaining = CurrentRemaining();
             Invoke(game, "OnApplicationPause", true);
-            yield return new WaitForSecondsRealtime(0.1f);
+            yield return AdvancePresentationClock(15f);
+            AssertPhase("AnswerOpponent");
             Invoke(game, "OnApplicationPause", false);
             Assert.That(State(), Is.SameAs(outcome));
             Assert.That(HistoryEvents(), Has.Length.EqualTo(historyCount));
             Assert.That(Property(State(), "DetailValue"), Is.EqualTo(detail));
 
-            yield return null;
-            Acknowledge();
+            Assert.That(CurrentRemaining(),
+                Is.EqualTo(outcomeRemaining).Within(0.001f));
+            yield return AdvancePresentationClock(outcomeRemaining + 0.01f);
             AssertPhase("PlayerGuess");
+        }
+        finally
+        {
+            difficulty.Restore();
+        }
+    }
+
+    [UnityTest]
+    public IEnumerator ResumeAtExpiredDeadlineKeepsSuccessorTrackedAcrossRepause()
+    {
+        var difficulty = new PrefValue("AIDifficulty");
+        try
+        {
+            PlayerPrefs.SetInt("AIDifficulty", 2);
+            UseFakePresentationClock();
+            StartWithOpener("Guest", 80);
+            yield return AdvanceScheduledBeat();
+            AssertPhase("OpponentThinking");
+
+            float remaining = CurrentRemaining();
+            Assert.That(remaining, Is.GreaterThan(0f));
+            fakePresentationTime += remaining + 0.01d;
+
+            Invoke(game, "OnApplicationPause", true);
+            Assert.That(Property(game, "HasAutomaticTransitionScheduled"),
+                Is.EqualTo(false));
+            Invoke(game, "OnApplicationPause", false);
+
+            AssertPhase("OpponentThinking");
+            Assert.That(Property(game, "HasAutomaticTransitionScheduled"),
+                Is.EqualTo(true),
+                "An expired resumed beat must remain tracked until its next-frame advance.");
+
+            Invoke(game, "OnApplicationPause", true);
+            AssertPhase("OpponentThinking");
+            Assert.That(Property(game, "HasAutomaticTransitionScheduled"),
+                Is.EqualTo(false));
+            Assert.That(CurrentRemaining(), Is.EqualTo(0f).Within(0.001f));
+            Invoke(game, "OnApplicationPause", false);
+            Assert.That(Property(game, "HasAutomaticTransitionScheduled"),
+                Is.EqualTo(true));
+
+            yield return null;
+            yield return null;
+            AssertPhase("OpponentGuess");
+            Assert.That(History("AiGuessHistory"), Has.Length.EqualTo(1));
+            Assert.That(Property(game, "HasAutomaticTransitionScheduled"),
+                Is.EqualTo(true),
+                "The successor reveal must own the single tracked automatic transition.");
         }
         finally
         {
@@ -659,6 +835,40 @@ public sealed class SoloBoardPresenterPlayModeTests
         Invoke(game, "AcknowledgePresentation");
     }
 
+    void UseFakePresentationClock()
+    {
+        fakePresentationTime = 1000d;
+        Invoke(game, "SetPresentationClockForTests",
+            new Func<double>(() => fakePresentationTime));
+    }
+
+    IEnumerator AdvancePresentationClock(float seconds)
+    {
+        Assert.That(seconds, Is.GreaterThanOrEqualTo(0f));
+        fakePresentationTime += seconds;
+        yield return null;
+        yield return null;
+    }
+
+    IEnumerator AdvanceScheduledBeat()
+    {
+        float remaining = CurrentRemaining();
+        Assert.That(remaining, Is.GreaterThan(0f),
+            "A bounded automatic phase must expose one pending deadline.");
+        yield return AdvancePresentationClock(remaining + 0.01f);
+    }
+
+    float CurrentHold()
+    {
+        return Convert.ToSingle(Property(game, "CurrentAutomaticHoldSeconds"));
+    }
+
+    float CurrentRemaining()
+    {
+        return Convert.ToSingle(Property(
+            game, "CurrentAutomaticRemainingSeconds"));
+    }
+
     void AssertPhase(string expected)
     {
         Assert.That(Property(State(), "Phase").ToString(), Is.EqualTo(expected));
@@ -737,6 +947,38 @@ public sealed class SoloBoardPresenterPlayModeTests
             parts.Add(name + "=" + text.text);
         }
         return string.Join("|", parts.ToArray());
+    }
+
+    string RenderedPinnedAiHandoff()
+    {
+        TMP_Text prompt = (TMP_Text)Field(game, "turnText");
+        TMP_Text guess = (TMP_Text)Field(game, "aiNumberText");
+        TMP_Text answer = (TMP_Text)Field(game, "aiAnswerText");
+        if (!prompt.gameObject.activeInHierarchy)
+            Assert.Fail(
+                "The central handoff summary must remain visible after input unlock. " +
+                "activeSelf=" + prompt.gameObject.activeSelf +
+                ", parentActive=" +
+                (prompt.transform.parent != null &&
+                 prompt.transform.parent.gameObject.activeInHierarchy));
+        if (!guess.gameObject.activeInHierarchy)
+            Assert.Fail(
+                "The opponent's latest guess must remain visible after input unlock. " +
+                "activeSelf=" + guess.gameObject.activeSelf +
+                ", parentActive=" +
+                (guess.transform.parent != null &&
+                 guess.transform.parent.gameObject.activeInHierarchy));
+        if (!answer.gameObject.activeInHierarchy)
+            Assert.Fail(
+                "The opponent's latest result must remain visible after input unlock. " +
+                "activeSelf=" + answer.gameObject.activeSelf +
+                ", parentActive=" +
+                (answer.transform.parent != null &&
+                 answer.transform.parent.gameObject.activeInHierarchy));
+        Assert.That(prompt.text, Is.Not.Empty);
+        Assert.That(guess.text, Is.Not.Empty);
+        Assert.That(answer.text, Is.Not.Empty);
+        return prompt.text + "|" + guess.text + "|" + answer.text;
     }
 
     GameObject[] AnswerActions()
