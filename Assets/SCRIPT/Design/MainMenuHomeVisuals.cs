@@ -9,8 +9,8 @@ using UnityEngine.UI;
 //
 // The approved cartoon composition is built from modular production sprites and
 // live TMP. Existing gameplay/navigation buttons stay callback-authoritative;
-// the additional Play With A Friend entry is a real Button routed into the same
-// PvpGameController room hub rather than a disconnected visual clone.
+// Home exposes one PLAY gateway and one Daily Hunt event card. Mode selection
+// is owned separately by MainMenuPlayVisuals on the existing PanelPlay.
 [DefaultExecutionOrder(1600)]
 public sealed class MainMenuHomeVisuals : MonoBehaviour
 {
@@ -27,16 +27,12 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
     public const string ChipName = "HomePlayerChip";
     public const string ChipTextName = "HomePlayerChipText";
     public const string ChipScoreName = "HomePlayerChipScore";
-    public const string SoloIconName = "HomeSoloIcon";
-    public const string PvpIconName = "HomePvpIcon";
-    public const string FriendIconName = "HomeFriendIcon";
     public const string DailyIconName = "HomeDailyIcon";
     public const string DailyGiftName = "HomeDailyGift";
     public const string PromoName = "HomeDailyPromo";
     public const string PortalName = "HomePortal";
     public const string MascotSixName = "HomeMascotSix";
     public const string MascotSevenName = "HomeMascotSeven";
-    public const string FriendButtonName = "ButtonPrivateRoom";
     public const string CtaFrameName = "HomeCtaFrame";
 
     const string BackgroundResource = "settings/hol_settings_bg_r1";
@@ -49,8 +45,6 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
     const string MascotSevenResource = "reference/mascot_7_exact";
     const string TrophyResource =
         "dailyhunt/production/daily_mission_icon_trophy";
-    const string VsResource = "cartoon/cartoon_vs_burst_base_raster";
-    const string FriendResource = "cartoon/cartoon_friend_base_raster";
     const string DailyResource = "cartoon/cartoon_radar_base_raster";
     const string DailyGiftResource =
         "mainmenu/mainmenu_daily_gift_reference_v1";
@@ -63,9 +57,7 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
     const string ConfettiResource = "mainmenu/mainmenu_deco_confetti";
 
     const string GoldCtaResource = "phase2a/hol_cta_gold_r2_9s";
-    const string MagentaCtaResource = "phase2a/hol_cta_magenta_r2_9s";
-    const string BlueCtaResource = "phase2a/hol_cta_blue_r2_9s";
-    const string DailyCtaResource = "dailyhunt/v1/daily_action_revive_v1";
+    const string DailyCtaResource = "phase2a/hol_cta_magenta_r2_9s";
     const string PromoFrameResource = "dailyhunt/v1/daily_input_shell_v1";
     const string ChipFrameResource =
         "dailyhunt/production/daily_player_chip_shell_v3";
@@ -95,8 +87,6 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         MascotSixResource,
         MascotSevenResource,
         TrophyResource,
-        VsResource,
-        FriendResource,
         DailyResource,
         DailyGiftResource,
         SpeechBubbleResource,
@@ -106,8 +96,6 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         StarsResource,
         ConfettiResource,
         GoldCtaResource,
-        MagentaCtaResource,
-        BlueCtaResource,
         DailyCtaResource,
         PromoFrameResource,
         ChipFrameResource,
@@ -122,6 +110,7 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
     };
 
     RectTransform visualRoot;
+    RectTransform outerFrameRect;
     RectTransform safeRoot;
     RectTransform logoRect;
     RectTransform heroBoyRect;
@@ -129,9 +118,7 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
     RectTransform speechBubbleRect;
     RectTransform gearRect;
     RectTransform chipRect;
-    RectTransform soloButtonRect;
-    RectTransform pvpButtonRect;
-    RectTransform friendButtonRect;
+    RectTransform playButtonRect;
     RectTransform dailyButtonRect;
     RectTransform promoRect;
     RectTransform portalRect;
@@ -146,7 +133,6 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
     TMP_Text speechText;
     TMP_Text promoTitleText;
     TMP_Text promoBodyText;
-    Button friendButton;
     PvpGameController pvpController;
     bool laidOut;
     int lastLayoutWidth = -1;
@@ -268,8 +254,6 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         Sprite six = LoadRequired(MascotSixResource);
         Sprite seven = LoadRequired(MascotSevenResource);
         Sprite trophy = LoadRequired(TrophyResource);
-        Sprite vs = LoadRequired(VsResource);
-        Sprite friend = LoadRequired(FriendResource);
         Sprite daily = LoadRequired(DailyResource);
         Sprite dailyGift = LoadRequired(DailyGiftResource);
         Sprite speech = LoadRequired(SpeechBubbleResource);
@@ -279,8 +263,6 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         Sprite stars = LoadRequired(StarsResource);
         Sprite confetti = LoadRequired(ConfettiResource);
         Sprite goldFrame = LoadRequired(GoldCtaResource);
-        Sprite magentaFrame = LoadRequired(MagentaCtaResource);
-        Sprite blueFrame = LoadRequired(BlueCtaResource);
         Sprite dailyFrame = LoadRequired(DailyCtaResource);
         Sprite promoFrame = LoadRequired(PromoFrameResource);
         Sprite chipFrame = LoadRequired(ChipFrameResource);
@@ -290,11 +272,10 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         bodyFont = Resources.Load<TMP_FontAsset>(BodyFontResource);
 
         IsReady = ArtReady(
-            background, logo, avatar, heroBoy, heroGirl, six, seven, trophy, vs,
-            friend, daily, dailyGift, speech, outerFrame, portal, promoStar,
-            stars, confetti, goldFrame,
-            magentaFrame, blueFrame, dailyFrame, promoFrame, chipFrame,
-            avatarRing, gear) &&
+            background, logo, avatar, heroBoy, heroGirl, six, seven, trophy,
+            daily, dailyGift, speech, outerFrame, portal, promoStar, stars,
+            confetti, goldFrame, dailyFrame, promoFrame, chipFrame, avatarRing,
+            gear) &&
             displayFont != null &&
             bodyFont != null &&
             pvpController != null;
@@ -336,7 +317,8 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
 
         var outer = EnsureImage(visualRoot, OuterFrameName);
         ConfigureImage(outer, outerFrame, false, Image.Type.Simple);
-        Place(outer.rectTransform, Vector2.zero,
+        outerFrameRect = outer.rectTransform;
+        Place(outerFrameRect, Vector2.zero,
             new Vector2(ReferenceWidth, ReferenceHeight));
 
         safeRoot = EnsureRect(visualRoot, SafeRootName);
@@ -374,22 +356,20 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         ConfigureBodyText(speechText, 25f, 34f);
         SetLocalized(speechText, "home_hero_speech");
 
-        soloButtonRect = RestyleCta(
-            safeRoot, FindButton("ButtonPlay"), goldFrame, trophy,
-            SoloIconName, "HomeSoloTitle", "home_solo_title",
-            "HomeSoloSubtitle", "home_solo_subtitle", true, NearWhite);
+        playButtonRect = RestyleCta(
+            safeRoot, FindButton("ButtonPlay"), goldFrame, null,
+            null, "HomePlayTitle", "play",
+            "HomePlaySubtitle", "home_play_subtitle", true, Ink);
 
-        pvpButtonRect = RestyleCta(
-            safeRoot, FindButton("ButtonPvP"), magentaFrame, vs,
-            PvpIconName, "HomePvpTitle", "home_pvp_title",
-            "HomePvpSubtitle", "home_pvp_subtitle", false, NearWhite);
-
-        friendButton = EnsureFriendButton(safeRoot);
-        friendButtonRect = RestyleCta(
-            safeRoot, friendButton, blueFrame, friend,
-            FriendIconName, "HomeFriendTitle", "home_private_title",
-            "HomeFriendSubtitle", "home_private_subtitle", false,
-            NearWhite);
+        // PanelPlay owns the one real private-room entry. Suppress the injected
+        // button here until that owner reparents it into the selector.
+        Button selectorPvp = FindButton("ButtonPvP");
+        Transform playVisualRoot = DeepFind(canvas.transform, "PlayVisualRoot");
+        if (selectorPvp != null &&
+            (playVisualRoot == null ||
+             !selectorPvp.transform.IsChildOf(playVisualRoot)))
+            selectorPvp.gameObject.SetActive(false);
+        HideNamed("ButtonPrivateRoom");
 
         dailyButtonRect = RestyleCta(
             safeRoot, FindButton("DailyHuntButton"), dailyFrame, daily,
@@ -399,8 +379,8 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
 
         var dailyGiftImage = EnsureImage(dailyButtonRect, DailyGiftName);
         ConfigureImage(dailyGiftImage, dailyGift, true, Image.Type.Simple);
-        Place(dailyGiftImage.rectTransform, new Vector2(390f, 1f),
-            new Vector2(158f, 150f));
+        Place(dailyGiftImage.rectTransform, new Vector2(410f, 1f),
+            new Vector2(145f, 138f));
 
         BuildBottomPromo(
             safeRoot, promoFrame, trophy, promoStar, six, seven, portal);
@@ -486,32 +466,6 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         chipScoreText.outlineWidth = 0.11f;
     }
 
-    Button EnsureFriendButton(Transform parent)
-    {
-        // Home owns this button. Never steal a same-named control from one of
-        // the PvP/private-room panels, because that creates a second layout
-        // writer and moves the Home CTA after our measured layout pass.
-        Transform existing = DirectChild(parent, FriendButtonName);
-        Button button = existing == null ? null : existing.GetComponent<Button>();
-        if (button == null)
-        {
-            // Do not use RuntimeUI.CreateButton here. That helper registers a
-            // generic ResponsivePageLayout writer, while this screen's one
-            // measured presentation owner is MainMenuHomeVisuals.
-            RectTransform rect = EnsureRect(parent, FriendButtonName);
-            var image = rect.GetComponent<Image>();
-            if (image == null)
-                image = rect.gameObject.AddComponent<Image>();
-            button = rect.GetComponent<Button>();
-            if (button == null)
-                button = rect.gameObject.AddComponent<Button>();
-            button.targetGraphic = image;
-            button.onClick.AddListener(pvpController.OpenPvpMenu);
-        }
-
-        return button;
-    }
-
     RectTransform RestyleCta(
         Transform safe,
         Button button,
@@ -551,11 +505,12 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         button.transition = Selectable.Transition.None;
 
         var visualFrame = EnsureImage(button.transform, CtaFrameName);
-        ConfigureImage(visualFrame, frame, false, Image.Type.Simple);
+        ConfigureImage(visualFrame, frame, false, Image.Type.Sliced);
+        visualFrame.pixelsPerUnitMultiplier = 2f;
         Vector2 visualSize = button.name == "ButtonPlay"
-            ? new Vector2(990f, 255f)
+            ? new Vector2(990f, 280f)
             : button.name == "DailyHuntButton"
-                ? new Vector2(990f, 235f)
+                ? new Vector2(990f, 245f)
                 : new Vector2(990f, 250f);
         Place(visualFrame.rectTransform, Vector2.zero, visualSize);
         visualFrame.transform.SetAsFirstSibling();
@@ -568,45 +523,39 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         {
             var iconImage = EnsureImage(button.transform, iconName);
             ConfigureImage(iconImage, icon, true, Image.Type.Simple);
-            float iconSize = primary ? 188f :
-                iconName == PvpIconName ? 220f :
-                iconName == FriendIconName ? 200f : 185f;
+            bool daily = button.name == "DailyHuntButton";
+            float iconSize = daily ? 160f : primary ? 188f : 185f;
             Place(
-                iconImage.rectTransform, new Vector2(-350f, 0f),
+                iconImage.rectTransform,
+                new Vector2(daily ? -410f : -350f, 0f),
                 new Vector2(iconSize, iconSize));
-
-            if (iconName == PvpIconName)
-            {
-                var vsText = EnsureText(
-                    iconImage.transform, "HomePvpIconText", 53f,
-                    displayFont, Ink, TextAlignmentOptions.Center);
-                StretchText(vsText.rectTransform, 10f, 10f);
-                ConfigureDisplayText(vsText, 42f, 56f);
-                vsText.text = "VS";
-                AddTextShadow(vsText, 0.30f);
-            }
         }
 
         var title = EnsureText(
             button.transform, titleName, primary ? 64f : 60f,
             displayFont, labelColor, TextAlignmentOptions.Center);
+        bool centered = button.name == "ButtonPlay" ||
+                        button.name == "DailyHuntButton";
         Place(
-            title.rectTransform, new Vector2(60f, 24f),
-            new Vector2(700f, 78f));
+            title.rectTransform, new Vector2(centered ? 0f : 60f, 24f),
+            new Vector2(button.name == "DailyHuntButton" ? 620f :
+                centered ? 720f : 700f, 78f));
         ConfigureDisplayText(
             title, primary ? 48f : 40f, primary ? 66f : 62f);
         SetLocalized(title, titleKey);
 
         Color subtitleColor = button.name == "DailyHuntButton"
             ? DailyMuted
-            : Ink;
+            : NearWhite;
         var subtitle = EnsureText(
             button.transform, subtitleName, primary ? 31f : 29f,
             displayFont, subtitleColor,
             TextAlignmentOptions.Center);
         Place(
-            subtitle.rectTransform, new Vector2(60f, -39f),
-            new Vector2(700f, 54f));
+            subtitle.rectTransform,
+            new Vector2(centered ? 0f : 60f, -39f),
+            new Vector2(button.name == "DailyHuntButton" ? 650f :
+                centered ? 720f : 700f, 54f));
         ConfigureDisplayText(
             subtitle, primary ? 24f : 22f, primary ? 32f : 30f);
         SetLocalized(subtitle, subtitleKey);
@@ -707,9 +656,9 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         int height,
         bool force = false)
     {
-        if (logoRect == null || heroBoyRect == null || heroGirlRect == null ||
-            speechBubbleRect == null || soloButtonRect == null ||
-            pvpButtonRect == null || friendButtonRect == null ||
+        if (outerFrameRect == null || logoRect == null ||
+            heroBoyRect == null || heroGirlRect == null ||
+            speechBubbleRect == null || playButtonRect == null ||
             dailyButtonRect == null || promoRect == null || portalRect == null ||
             mascotSixRect == null || mascotSevenRect == null)
             return;
@@ -730,6 +679,13 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
             : ReferenceHeight / ReferenceWidth;
         float tall = Mathf.InverseLerp(1.78f, 2.22f, aspect);
 
+        // The approved bezel sprite contains opaque horizontal chrome in its
+        // first and last 42 source rows. Keep the side treatment but overscan
+        // vertically so those baked strips sit entirely outside every viewport.
+        float visibleReferenceHeight = ReferenceWidth * aspect;
+        Place(outerFrameRect, Vector2.zero,
+            new Vector2(ReferenceWidth, visibleReferenceHeight + 240f));
+
         Place(
             gearRect, new Vector2(-432f, 838f + 45f * tall),
             new Vector2(124f, 124f));
@@ -749,38 +705,30 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
             speechBubbleRect, new Vector2(350f, 390f + 62f * tall),
             new Vector2(300f, 200f));
 
-        float buttonShift = 30f * tall;
+        float buttonShift = 24f * tall;
         Place(
-            soloButtonRect, new Vector2(0f, 105f + buttonShift),
-            new Vector2(990f, 190f));
+            playButtonRect, new Vector2(0f, 70f + buttonShift),
+            new Vector2(990f, 230f));
         Place(
-            pvpButtonRect, new Vector2(0f, -92f + buttonShift),
-            new Vector2(990f, 180f));
+            dailyButtonRect, new Vector2(0f, -205f + buttonShift),
+            new Vector2(990f, 205f));
         Place(
-            friendButtonRect, new Vector2(0f, -288f + buttonShift),
-            new Vector2(990f, 180f));
-        Place(
-            dailyButtonRect, new Vector2(0f, -478f + buttonShift),
-            new Vector2(990f, 175f));
-        Place(
-            promoRect, new Vector2(0f, -710f - 34f * tall),
+            promoRect, new Vector2(0f, -515f - 28f * tall),
             new Vector2(500f, 220f));
         Place(
             portalRect, new Vector2(0f, -876f - 42f * tall),
             new Vector2(650f, 180f));
         Place(
-            mascotSixRect, new Vector2(-380f, -735f - 44f * tall),
+            mascotSixRect, new Vector2(-380f, -700f - 42f * tall),
             new Vector2(300f, 350f));
         Place(
-            mascotSevenRect, new Vector2(335f, -735f - 44f * tall),
+            mascotSevenRect, new Vector2(335f, -700f - 42f * tall),
             new Vector2(300f, 350f));
 
         // Greek needs the full title bounds, never a tiny-font fallback.
         foreach (string textName in new[]
         {
-            "HomeSoloTitle",
-            "HomePvpTitle",
-            "HomeFriendTitle",
+            "HomePlayTitle",
             "HomeDailyTitle",
         })
         {
@@ -788,7 +736,7 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
             TMP_Text text = found == null ? null : found.GetComponent<TMP_Text>();
             if (text == null) continue;
             text.fontSizeMin = language == L10n.Language.Greek ? 38f : 40f;
-            text.fontSizeMax = textName == "HomeSoloTitle" ? 66f : 62f;
+            text.fontSizeMax = textName == "HomePlayTitle" ? 92f : 72f;
         }
 
         ApplyTypographyLayout();
@@ -869,11 +817,7 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         }
 
         ConfigureCtaTypography(
-            "HomeSoloTitle", "HomeSoloSubtitle", true);
-        ConfigureCtaTypography(
-            "HomePvpTitle", "HomePvpSubtitle", false);
-        ConfigureCtaTypography(
-            "HomeFriendTitle", "HomeFriendSubtitle", false);
+            "HomePlayTitle", "HomePlaySubtitle", true);
         ConfigureCtaTypography(
             "HomeDailyTitle", "HomeDailySubtitle", false);
     }
@@ -889,24 +833,28 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         if (title != null)
         {
             bool daily = titleName == "HomeDailyTitle";
-            bool friend = titleName == "HomeFriendTitle";
-            float fixedSize = primary ? 88f : daily ? 76f : friend ? 70f : 86f;
             title.alignment = TextAlignmentOptions.Center;
-            title.enableAutoSizing = false;
-            title.fontSize = fixedSize;
+            title.fontStyle = FontStyles.Bold |
+                (primary ? FontStyles.UpperCase : FontStyles.Normal);
+            title.enableAutoSizing = daily;
+            title.fontSize = primary ? 92f : 72f;
+            title.fontSizeMin = daily ? 38f : 92f;
+            title.fontSizeMax = primary ? 92f : 72f;
             title.outlineColor = Ink;
             title.outlineWidth = 0.16f;
             title.enableWordWrapping = false;
             title.overflowMode = TextOverflowModes.Overflow;
-            Place(title.rectTransform, new Vector2(daily ? 0f : 58f, 25f),
-                new Vector2(daily ? 680f : 730f, 108f));
+            Place(title.rectTransform, new Vector2(0f, 40f),
+                new Vector2(daily ? 620f : 760f, primary ? 132f : 108f));
         }
 
         if (subtitle != null)
         {
             subtitle.color = titleName == "HomeDailyTitle"
                 ? new Color(0.88f, 0.50f, 1f, 1f)
-                : Ink;
+                : NearWhite;
+            subtitle.outlineColor = Ink;
+            subtitle.outlineWidth = 0.12f;
             subtitle.alignment = TextAlignmentOptions.Center;
             subtitle.enableAutoSizing = true;
             subtitle.fontSizeMin = primary ? 25f : 23f;
@@ -915,8 +863,8 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
             subtitle.overflowMode = TextOverflowModes.Overflow;
             bool daily = titleName == "HomeDailyTitle";
             Place(subtitle.rectTransform,
-                new Vector2(daily ? 0f : 58f, -28f),
-                new Vector2(daily ? 650f : 700f, 52f));
+                new Vector2(0f, primary ? -23f : -38f),
+                new Vector2(daily ? 650f : 720f, 52f));
         }
     }
 

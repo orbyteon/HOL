@@ -32,10 +32,11 @@ public sealed class MainMenuHomeVisualsPlayModeTests
     }
 
     [UnityTest]
-    public IEnumerator HomeMatchesApprovedFourModeCartoonCompositionAndRemainsPlayable()
+    public IEnumerator HomeMatchesApprovedPlayHubHierarchyAndRemainsPlayable()
     {
         Screen.SetResolution(1080, 1920, false);
         InvokeInstaller("MainMenuHomeVisuals");
+        InvokeInstaller("MainMenuPlayVisuals");
         yield return SceneManager.LoadSceneAsync("MainMenu", LoadSceneMode.Single);
 
         Component owner = null;
@@ -77,10 +78,11 @@ public sealed class MainMenuHomeVisualsPlayModeTests
             "HomeTrophyIcon",
             "HomePlayerChipText",
             "HomePlayerChipScore",
-            "HomeSoloIcon",
-            "HomePvpIcon",
-            "HomeFriendIcon",
+            "HomePlayTitle",
+            "HomePlaySubtitle",
             "HomeDailyIcon",
+            "HomeDailyTitle",
+            "HomeDailySubtitle",
             "HomeDailyGift",
             "HomeDailyPromo",
             "HomePromoTrophy",
@@ -127,48 +129,52 @@ public sealed class MainMenuHomeVisualsPlayModeTests
         AssertSprite(root, "HomeDailyGift",
             "mainmenu/mainmenu_daily_gift_reference_v1", Image.Type.Simple);
 
-        Button solo = Find(canvas.transform, "ButtonPlay").GetComponent<Button>();
-        Button pvp = Find(canvas.transform, "ButtonPvP").GetComponent<Button>();
-        Button friend = Find(canvas.transform, "ButtonPrivateRoom").GetComponent<Button>();
+        RectTransform outerFrame = Find(root, "HomeOuterFrame") as RectTransform;
+        Assert.That(outerFrame, Is.Not.Null);
+        owner.GetType().GetMethod(
+            "ApplyResponsiveLayoutForViewport", InstanceFlags)
+            .Invoke(owner, new object[] { 1080, 1920, true });
+        Assert.That(outerFrame.rect.height, Is.GreaterThan(1920f),
+            "The reference frame must be vertically overscanned so its embedded chrome bands remain offscreen.");
+
+        Button play = Find(root, "ButtonPlay").GetComponent<Button>();
         Button daily = Find(canvas.transform, "DailyHuntButton").GetComponent<Button>();
         Button settings = Find(canvas.transform, "Buttonsettings").GetComponent<Button>();
-        Assert.That(solo, Is.Not.Null);
-        Assert.That(pvp, Is.Not.Null);
-        Assert.That(friend, Is.Not.Null);
+        Assert.That(play, Is.Not.Null);
         Assert.That(daily, Is.Not.Null);
         Assert.That(settings, Is.Not.Null);
-        Assert.That(CountNamedButtons(canvas.transform, "ButtonPrivateRoom"),
-            Is.EqualTo(1));
+        Assert.That(CountNamedButtons(canvas.transform, "ButtonPrivateRoom"), Is.Zero,
+            "Home must not manufacture a duplicate private-room entry.");
+        Assert.That(CountNamedButtons(canvas.transform, "ButtonPvP"), Is.EqualTo(1),
+            "The one real PvP button is owned by the mode selector.");
+        Assert.That(Find(root, "ButtonPvP"), Is.Null,
+            "Private Room must not remain an equal Home CTA.");
 
-        AssertProductionButton(solo, "phase2a/hol_cta_gold_r2_9s");
-        AssertProductionButton(pvp, "phase2a/hol_cta_magenta_r2_9s");
-        AssertProductionButton(friend, "phase2a/hol_cta_blue_r2_9s");
-        AssertProductionButton(daily, "dailyhunt/v1/daily_action_revive_v1");
+        AssertProductionButton(play, "phase2a/hol_cta_gold_r2_9s");
+        AssertProductionButton(daily, "phase2a/hol_cta_magenta_r2_9s");
 
-        Assert.That(PersistentMethods(solo), Does.Contain("OnPlayPressed"));
+        Assert.That(PersistentMethods(play), Does.Contain("OnPlayPressed"));
         Assert.That(PersistentMethods(settings), Does.Contain("OpenSettings"));
 
-        owner.GetType().GetMethod(
-            "ApplyResponsiveLayoutForWidth", InstanceFlags)
-            .Invoke(owner, new object[] { 1080, true });
-
-        AssertReferenceComposition(root, solo, pvp, friend, daily);
+        AssertReferenceComposition(root, play, daily);
 
         foreach (string titleName in new[]
         {
-            "HomeSoloTitle",
-            "HomePvpTitle",
-            "HomeFriendTitle",
+            "HomePlayTitle",
             "HomeDailyTitle",
         })
         {
             TMP_Text title = Find(root, titleName).GetComponent<TMP_Text>();
             Assert.That(title.font, Is.SameAs(Resources.Load<TMP_FontAsset>(
                 "phase2a/fonts/HOL Menu Display SDF")));
-            Assert.That(title.enableAutoSizing, Is.False,
-                titleName + " must not shrink to make rejected geometry fit.");
-            Assert.That(title.fontSize, Is.GreaterThanOrEqualTo(70f), titleName);
+            Assert.That(title.enableAutoSizing,
+                Is.EqualTo(titleName == "HomeDailyTitle"),
+                titleName + " must use only its deliberate localization policy.");
+            Assert.That(title.fontSize, Is.GreaterThanOrEqualTo(38f), titleName);
             Assert.That(title.overflowMode, Is.EqualTo(TextOverflowModes.Overflow));
+            if (titleName == "HomePlayTitle")
+                Assert.That((title.fontStyle & FontStyles.UpperCase) != 0,
+                    "The dominant Home CTA must visibly read PLAY / ΠΑΙΞΕ.");
         }
 
         foreach (Graphic graphic in root.GetComponentsInChildren<Graphic>(true))
@@ -193,30 +199,42 @@ public sealed class MainMenuHomeVisualsPlayModeTests
         Assert.That(chipScore, Is.EqualTo("12"));
 
         AssertLocalizedHomeCopy(root, 0,
-            "PLAY SOLO", "PVP DUEL", "PLAY WITH A FRIEND", "DAILY HUNT");
+            "Play", "Choose your game mode", "DAILY HUNT",
+            "A new challenge every day, big rewards!");
         AssertLocalizedHomeCopy(root, 1,
-            "ΠΑΙΞΕ SOLO", "PVP DUEL", "ΠΑΙΞΕ ΜΕ ΦΙΛΟ", "DAILY HUNT");
+            "Παίξε", "Διάλεξε τρόπο παιχνιδιού", "ΗΜΕΡΗΣΙΑ ΔΟΚΙΜΑΣΙΑ",
+            "Πρόκληση κάθε μέρα, μεγάλα έπαθλα!");
         SetLanguage(0);
 
-        // Both online entries must route into the controller-owned room hub.
-        Component controller = FindInScene(RuntimeType("PvpGameController"));
-        Assert.That(controller, Is.Not.Null);
-        GameObject pvpMenu = GetField<GameObject>(controller, "pvpMenuPanel");
-        Assert.That(pvpMenu, Is.Not.Null);
-
-        pvp.onClick.Invoke();
+        Component hunt = FindInScene(RuntimeType("DailyHunt"));
+        Assert.That(hunt, Is.Not.Null);
+        Assert.That(hunt.gameObject.activeSelf, Is.False);
+        daily.onClick.Invoke();
         yield return null;
-        Assert.That(pvpMenu.activeSelf, Is.True,
-            "PvP Duel entry lost its real controller callback.");
+        Assert.That(hunt.gameObject.activeSelf, Is.True,
+            "Daily Hunt lost its real production callback.");
+        hunt.SendMessage("Close", SendMessageOptions.RequireReceiver);
+        yield return null;
 
-        pvpMenu.SetActive(false);
         var menuManager = FindInScene(RuntimeType("MenuManager"));
         GameObject mainMenu = GetField<GameObject>(menuManager, "mainMenuPanel");
-        mainMenu.SetActive(true);
-        friend.onClick.Invoke();
+        GameObject panelPlay = GetField<GameObject>(menuManager, "panelPlay");
+        GameObject searching = GetField<GameObject>(menuManager, "panelSearching");
+        Component matchmaking = FindInScene(RuntimeType("FakeMatchmaking"));
+        GameObject panelGame = GetField<GameObject>(matchmaking, "panelGame");
+        Component controller = FindInScene(RuntimeType("PvpGameController"));
+        GameObject pvpMenu = GetField<GameObject>(controller, "pvpMenuPanel");
+
+        play.onClick.Invoke();
         yield return null;
-        Assert.That(pvpMenu.activeSelf, Is.True,
-            "Play With A Friend entry is not wired to the real room hub.");
+        Assert.That(mainMenu.activeSelf, Is.False);
+        Assert.That(panelPlay.activeSelf, Is.True,
+            "PLAY must open the truthful two-choice mode selector.");
+        Assert.That(searching.activeSelf, Is.False);
+        Assert.That(panelGame.activeSelf, Is.False,
+            "Opening the selector must not begin Solo.");
+        Assert.That(pvpMenu.activeSelf, Is.False,
+            "Opening the selector must not begin Private Room.");
     }
 
     [UnityTest]
@@ -336,8 +354,7 @@ public sealed class MainMenuHomeVisualsPlayModeTests
             {
                 "Buttonsettings", "HomePlayerChip", "HomePlayerAvatarRing",
                 "HomePlayerAvatar", "HomeLogo", "HomeHeroBoy", "HomeHeroGirl",
-                "HomeSpeechBubble", "ButtonPlay", "ButtonPvP",
-                "ButtonPrivateRoom", "DailyHuntButton", "HomeDailyPromo",
+                "HomeSpeechBubble", "ButtonPlay", "DailyHuntButton", "HomeDailyPromo",
                 "HomePortal", "HomeMascotSix", "HomeMascotSeven",
             };
             foreach (Vector2Int viewport in viewports)
@@ -383,30 +400,23 @@ public sealed class MainMenuHomeVisualsPlayModeTests
                 AssertRectTransform(tracked[7],
                     new Vector2(350f, 390f + 62f * tall),
                     new Vector2(300f, 200f), lane + " speech bubble");
-                float buttonShift = 30f * tall;
                 AssertRectTransform(tracked[8],
-                    new Vector2(0f, 105f + buttonShift),
-                    new Vector2(990f, 190f), lane + " solo");
+                    new Vector2(0f, 70f + 24f * tall),
+                    new Vector2(990f, 230f), lane + " play");
                 AssertRectTransform(tracked[9],
-                    new Vector2(0f, -92f + buttonShift),
-                    new Vector2(990f, 180f), lane + " pvp");
+                    new Vector2(0f, -205f + 24f * tall),
+                    new Vector2(990f, 205f), lane + " daily");
                 AssertRectTransform(tracked[10],
-                    new Vector2(0f, -288f + buttonShift),
-                    new Vector2(990f, 180f), lane + " friend");
-                AssertRectTransform(tracked[11],
-                    new Vector2(0f, -478f + buttonShift),
-                    new Vector2(990f, 175f), lane + " daily");
-                AssertRectTransform(tracked[12],
-                    new Vector2(0f, -710f - 34f * tall),
+                    new Vector2(0f, -515f - 28f * tall),
                     new Vector2(500f, 220f), lane + " promo");
-                AssertRectTransform(tracked[13],
+                AssertRectTransform(tracked[11],
                     new Vector2(0f, -876f - 42f * tall),
                     new Vector2(650f, 180f), lane + " portal");
-                AssertRectTransform(tracked[14],
-                    new Vector2(-380f, -735f - 44f * tall),
+                AssertRectTransform(tracked[12],
+                    new Vector2(-380f, -700f - 42f * tall),
                     new Vector2(300f, 350f), lane + " mascot six");
-                AssertRectTransform(tracked[15],
-                    new Vector2(335f, -735f - 44f * tall),
+                AssertRectTransform(tracked[13],
+                    new Vector2(335f, -700f - 42f * tall),
                     new Vector2(300f, 350f), lane + " mascot seven");
             }
         }
@@ -445,9 +455,15 @@ public sealed class MainMenuHomeVisualsPlayModeTests
         RectTransform bubble = Find(root, "HomeSpeechBubble") as RectTransform;
         RectTransform promo = Find(root, "HomeDailyPromo") as RectTransform;
         RectTransform trophy = Find(root, "HomePromoTrophy") as RectTransform;
+        RectTransform playButton = Find(root, "ButtonPlay") as RectTransform;
+        RectTransform dailyButton = Find(root, "DailyHuntButton") as RectTransform;
         RectTransform mascotSix = Find(root, "HomeMascotSix") as RectTransform;
         RectTransform mascotSeven = Find(root, "HomeMascotSeven") as RectTransform;
         TMP_Text speech = Find(root, "HomeSpeechText").GetComponent<TMP_Text>();
+        TMP_Text playTitle = Find(root, "HomePlayTitle").GetComponent<TMP_Text>();
+        TMP_Text playSubtitle = Find(root, "HomePlaySubtitle").GetComponent<TMP_Text>();
+        TMP_Text dailyTitle = Find(root, "HomeDailyTitle").GetComponent<TMP_Text>();
+        TMP_Text dailySubtitle = Find(root, "HomeDailySubtitle").GetComponent<TMP_Text>();
         TMP_Text promoTitle = Find(root, "HomePromoTitle").GetComponent<TMP_Text>();
         TMP_Text promoBody = Find(root, "HomePromoBody").GetComponent<TMP_Text>();
 
@@ -475,9 +491,21 @@ public sealed class MainMenuHomeVisualsPlayModeTests
                     owner, new object[] { viewport.x, viewport.y, true });
                 Canvas.ForceUpdateCanvases();
                 speech.ForceMeshUpdate(true, true);
+                playTitle.ForceMeshUpdate(true, true);
+                playSubtitle.ForceMeshUpdate(true, true);
+                dailyTitle.ForceMeshUpdate(true, true);
+                dailySubtitle.ForceMeshUpdate(true, true);
                 promoTitle.ForceMeshUpdate(true, true);
                 promoBody.ForceMeshUpdate(true, true);
 
+                foreach (TMP_Text text in new[]
+                {
+                    playTitle, playSubtitle, dailyTitle, dailySubtitle,
+                })
+                {
+                    Assert.That(text.isTextOverflowing, Is.False,
+                        lane + " " + text.name);
+                }
                 Assert.That(speech.textInfo.lineCount, Is.EqualTo(3), lane);
                 Assert.That(promoTitle.textInfo.lineCount, Is.EqualTo(1), lane);
                 Assert.That(promoBody.textInfo.lineCount, Is.EqualTo(2), lane);
@@ -485,8 +513,25 @@ public sealed class MainMenuHomeVisualsPlayModeTests
                 Assert.That(promoTitle.isTextOverflowing, Is.False, lane);
                 Assert.That(promoBody.isTextOverflowing, Is.False, lane);
                 Assert.That(speech.fontSize, Is.GreaterThanOrEqualTo(23f), lane);
+                Assert.That(playTitle.fontSize, Is.GreaterThanOrEqualTo(62f), lane);
+                Assert.That(playSubtitle.fontSize, Is.GreaterThanOrEqualTo(25f), lane);
+                Assert.That(dailyTitle.fontSize, Is.GreaterThanOrEqualTo(38f), lane);
+                Assert.That(dailySubtitle.fontSize, Is.GreaterThanOrEqualTo(23f), lane);
                 Assert.That(promoTitle.fontSize, Is.GreaterThanOrEqualTo(24f), lane);
                 Assert.That(promoBody.fontSize, Is.GreaterThanOrEqualTo(23f), lane);
+
+                AssertContained(playButton.rect,
+                    GlyphBoundsAll(playTitle, playButton), 22f,
+                    lane + " PLAY title");
+                AssertContained(playButton.rect,
+                    GlyphBoundsAll(playSubtitle, playButton), 18f,
+                    lane + " PLAY subtitle");
+                AssertContained(dailyButton.rect,
+                    GlyphBoundsAll(dailyTitle, dailyButton), 20f,
+                    lane + " Daily title");
+                AssertContained(dailyButton.rect,
+                    GlyphBoundsAll(dailySubtitle, dailyButton), 16f,
+                    lane + " Daily subtitle");
 
                 Rect speechLine0 = GlyphBounds(speech, bubble, 0);
                 Rect speechLine1 = GlyphBounds(speech, bubble, 1);
@@ -536,10 +581,10 @@ public sealed class MainMenuHomeVisualsPlayModeTests
                 float aspect = viewport.y / (float)viewport.x;
                 float tall = Mathf.InverseLerp(1.78f, 2.22f, aspect);
                 AssertRectTransform(
-                    mascotSix, new Vector2(-380f, -735f - 44f * tall),
+                    mascotSix, new Vector2(-380f, -700f - 42f * tall),
                     new Vector2(300f, 350f), lane + " mascot 6");
                 AssertRectTransform(
-                    mascotSeven, new Vector2(335f, -735f - 44f * tall),
+                    mascotSeven, new Vector2(335f, -700f - 42f * tall),
                     new Vector2(300f, 350f), lane + " mascot 7");
             }
         }
@@ -573,6 +618,15 @@ public sealed class MainMenuHomeVisualsPlayModeTests
 
         Assert.That(found, Is.True, text.name + " has no visible glyphs.");
         return Rect.MinMaxRect(minimum.x, minimum.y, maximum.x, maximum.y);
+    }
+
+    static Rect GlyphBoundsAll(TMP_Text text, RectTransform container)
+    {
+        int count = Mathf.Max(1, text.textInfo.lineCount);
+        var lines = new int[count];
+        for (int index = 0; index < count; index++)
+            lines[index] = index;
+        return GlyphBounds(text, container, lines);
     }
 
     static Rect Union(Rect first, Rect second)
@@ -764,7 +818,8 @@ public sealed class MainMenuHomeVisualsPlayModeTests
         Assert.That(frame, Is.Not.Null, button.name + " visual frame");
         Assert.That(sprite, Is.Not.Null, resource);
         Assert.That(frame.sprite, Is.SameAs(sprite), button.name);
-        Assert.That(frame.type, Is.EqualTo(Image.Type.Simple), button.name);
+        Assert.That(frame.type, Is.EqualTo(Image.Type.Sliced),
+            button.name + " must preserve the approved 9-sliced frame.");
         Assert.That(frame.color.a, Is.EqualTo(1f).Within(0.001f), button.name);
         Assert.That(frame.raycastTarget, Is.False, button.name);
         Assert.That(hitImage.sprite, Is.Null, button.name);
@@ -776,7 +831,8 @@ public sealed class MainMenuHomeVisualsPlayModeTests
 
     static void AssertReferenceComposition(
         Transform root,
-        params Button[] buttons)
+        Button play,
+        Button daily)
     {
         RectTransform logo = Find(root, "HomeLogo") as RectTransform;
         RectTransform boy = Find(root, "HomeHeroBoy") as RectTransform;
@@ -794,46 +850,46 @@ public sealed class MainMenuHomeVisualsPlayModeTests
         Assert.That(six.anchoredPosition.x, Is.LessThan(-250f));
         Assert.That(seven.anchoredPosition.x, Is.GreaterThan(250f));
 
-        for (int i = 0; i < buttons.Length; i++)
-        {
-            RectTransform hit = buttons[i].transform as RectTransform;
-            RectTransform visual = Find(buttons[i].transform, "HomeCtaFrame")
-                as RectTransform;
-            Assert.That(hit.sizeDelta.x, Is.GreaterThanOrEqualTo(960f),
-                buttons[i].name + " hit width");
-            Assert.That(visual.sizeDelta.x, Is.GreaterThanOrEqualTo(980f),
-                buttons[i].name + " visual width");
-            Assert.That(visual.sizeDelta.y, Is.GreaterThan(hit.sizeDelta.y),
-                buttons[i].name + " keeps visual glow outside its hit rect");
-            if (i == 0) continue;
+        RectTransform playHit = play.transform as RectTransform;
+        RectTransform dailyHit = daily.transform as RectTransform;
+        RectTransform playVisual = Find(play.transform, "HomeCtaFrame")
+            as RectTransform;
+        RectTransform dailyVisual = Find(daily.transform, "HomeCtaFrame")
+            as RectTransform;
+        Assert.That(playHit.sizeDelta.x, Is.GreaterThanOrEqualTo(960f));
+        Assert.That(playHit.sizeDelta.y, Is.GreaterThanOrEqualTo(220f));
+        Assert.That(dailyHit.sizeDelta.x, Is.GreaterThanOrEqualTo(960f));
+        Assert.That(dailyHit.sizeDelta.y, Is.GreaterThanOrEqualTo(190f));
+        Assert.That(playVisual.sizeDelta.x, Is.GreaterThanOrEqualTo(980f));
+        Assert.That(dailyVisual.sizeDelta.x, Is.GreaterThanOrEqualTo(980f));
+        Assert.That(playVisual.sizeDelta.y, Is.GreaterThan(playHit.sizeDelta.y));
+        Assert.That(dailyVisual.sizeDelta.y, Is.GreaterThan(dailyHit.sizeDelta.y));
+        Assert.That(playVisual.sizeDelta.y, Is.GreaterThan(dailyVisual.sizeDelta.y),
+            "PLAY must remain visually dominant over the Daily event card.");
 
-            RectTransform previous = buttons[i - 1].transform as RectTransform;
-            float previousBottom = previous.anchoredPosition.y -
-                                   previous.sizeDelta.y * 0.5f;
-            float currentTop = hit.anchoredPosition.y + hit.sizeDelta.y * 0.5f;
-            Assert.That(previousBottom, Is.GreaterThan(currentTop),
-                buttons[i - 1].name + " and " + buttons[i].name +
-                " must not have overlapping touch ownership.");
-        }
+        float playBottom = playHit.anchoredPosition.y - playHit.sizeDelta.y * 0.5f;
+        float dailyTop = dailyHit.anchoredPosition.y + dailyHit.sizeDelta.y * 0.5f;
+        Assert.That(playBottom, Is.GreaterThan(dailyTop),
+            "PLAY and Daily Hunt must not have overlapping touch ownership.");
     }
 
     static void AssertLocalizedHomeCopy(
         Transform root,
         int language,
-        string solo,
-        string pvp,
-        string friend,
-        string daily)
+        string play,
+        string playSubtitle,
+        string daily,
+        string dailySubtitle)
     {
         SetLanguage(language);
-        Assert.That(Find(root, "HomeSoloTitle").GetComponent<TMP_Text>().text,
-            Is.EqualTo(solo));
-        Assert.That(Find(root, "HomePvpTitle").GetComponent<TMP_Text>().text,
-            Is.EqualTo(pvp));
-        Assert.That(Find(root, "HomeFriendTitle").GetComponent<TMP_Text>().text,
-            Is.EqualTo(friend));
+        Assert.That(Find(root, "HomePlayTitle").GetComponent<TMP_Text>().text,
+            Is.EqualTo(play));
+        Assert.That(Find(root, "HomePlaySubtitle").GetComponent<TMP_Text>().text,
+            Is.EqualTo(playSubtitle));
         Assert.That(Find(root, "HomeDailyTitle").GetComponent<TMP_Text>().text,
             Is.EqualTo(daily));
+        Assert.That(Find(root, "HomeDailySubtitle").GetComponent<TMP_Text>().text,
+            Is.EqualTo(dailySubtitle));
     }
 
     static int CountNamedButtons(Transform root, string name)

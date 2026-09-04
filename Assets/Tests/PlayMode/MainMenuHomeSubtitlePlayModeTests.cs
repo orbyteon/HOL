@@ -13,7 +13,7 @@ public sealed class MainMenuHomeSubtitlePlayModeTests
         BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
 
     [UnityTest]
-    public IEnumerator SoloSubtitleIsSingleLocalizedReadableLabel()
+    public IEnumerator PlaySubtitleIsSingleLocalizedReadableLabel()
     {
         bool hadLanguage = PlayerPrefs.HasKey("Language");
         int savedLanguage = PlayerPrefs.GetInt("Language", 0);
@@ -40,23 +40,24 @@ public sealed class MainMenuHomeSubtitlePlayModeTests
             Assert.That(Property<bool>(owner, "IsReady"), Is.True);
             Assert.That(Property<bool>(owner, "IsSettled"), Is.True);
 
-            Transform solo = Find(owner.transform, "ButtonPlay");
-            Assert.That(solo, Is.Not.Null);
+            Transform play = Find(owner.transform, "ButtonPlay");
+            Assert.That(play, Is.Not.Null);
 
             TMP_Text[] visibleLabels =
-                solo.GetComponentsInChildren<TMP_Text>(false);
+                play.GetComponentsInChildren<TMP_Text>(false);
             Assert.That(visibleLabels, Has.Length.EqualTo(2),
-                "Solo CTA must expose exactly its title and subtitle; no legacy label may remain visible.");
+                "PLAY must expose exactly its title and subtitle; no retired mode label may remain visible.");
 
-            TMP_Text title = Find(solo, "HomeSoloTitle")
+            TMP_Text title = Find(play, "HomePlayTitle")
                 ?.GetComponent<TMP_Text>();
-            TMP_Text subtitle = Find(solo, "HomeSoloSubtitle")
+            TMP_Text subtitle = Find(play, "HomePlaySubtitle")
                 ?.GetComponent<TMP_Text>();
             Assert.That(title, Is.Not.Null);
             Assert.That(subtitle, Is.Not.Null);
             Assert.That(title.gameObject.activeInHierarchy, Is.True);
             Assert.That(subtitle.gameObject.activeInHierarchy, Is.True);
-            Assert.That(subtitle.text, Is.EqualTo(Localized("home_solo_subtitle")));
+            Assert.That(title.text, Is.EqualTo(Localized("play")));
+            Assert.That(subtitle.text, Is.EqualTo(Localized("home_play_subtitle")));
             Assert.That(subtitle.raycastTarget, Is.False);
             Assert.That(subtitle.color.r, Is.LessThan(0.25f));
             Assert.That(subtitle.color.g, Is.LessThan(0.25f));
@@ -64,11 +65,12 @@ public sealed class MainMenuHomeSubtitlePlayModeTests
                 "Solo subtitle must retain the approved dark-ink treatment on gold.");
 
             SetLanguage(1);
+            Assert.That(title.text, Is.EqualTo("Παίξε"));
             Assert.That(subtitle.text,
-                Is.EqualTo(Localized("home_solo_subtitle")));
+                Is.EqualTo(Localized("home_play_subtitle")));
             Assert.That(subtitle.text,
-                Is.EqualTo("Παίξε και σπάσε το ρεκόρ σου!"));
-            Assert.That(solo.GetComponentsInChildren<TMP_Text>(false),
+                Is.EqualTo("Διάλεξε τρόπο παιχνιδιού"));
+            Assert.That(play.GetComponentsInChildren<TMP_Text>(false),
                 Has.Length.EqualTo(2));
         }
         finally

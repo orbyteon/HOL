@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Reflection;
 using NUnit.Framework;
@@ -11,10 +12,21 @@ public sealed class MainMenuPlayVisualsPlayModeTests
 {
     const BindingFlags StaticFlags =
         BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
+    const BindingFlags InstanceFlags =
+        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+
+    static readonly Vector2Int[] RequiredViewports =
+    {
+        new Vector2Int(720, 1280),
+        new Vector2Int(1080, 1920),
+        new Vector2Int(1080, 2400),
+        new Vector2Int(1179, 2556),
+    };
 
     [UnityTearDown]
     public IEnumerator RestoreFixtureState()
     {
+        SetLanguage(0);
         Scene active = SceneManager.GetActiveScene();
         Scene quiescent = SceneManager.CreateScene(
             "MainMenuPlayVisualsQuiescent");
@@ -30,127 +42,142 @@ public sealed class MainMenuPlayVisualsPlayModeTests
     }
 
     [UnityTest]
-    public IEnumerator SoloAiEntryIsImmediateWhilePrivateRoomRemainsSeparate()
+    public IEnumerator PlayHubExposesOnlyAuthoritativeSoloAndPrivateRoomRoutes()
     {
-#if UNITY_EDITOR
-        FirstLaunchSoloEndToEndPlayModeTests
-            .FocusGameViewForEndOfFrameSettlement();
-#endif
-        InvokeInstaller("MainMenuHomeVisuals");
-        InvokeInstaller("MainMenuPlayVisuals");
-        yield return SceneManager.LoadSceneAsync("MainMenu", LoadSceneMode.Single);
-        for (int i = 0; i < 16; i++)
-            yield return null;
-        yield return new WaitForSecondsRealtime(0.35f);
+        yield return LoadReadyMainMenu();
 
-        var menu = Object.FindObjectOfType(RuntimeType("MenuManager")) as Component;
-        Assert.That(menu, Is.Not.Null);
-        var panelPlay = menu.GetType().GetField("panelPlay").GetValue(menu) as GameObject;
-        var mainMenuPanel = menu.GetType().GetField("mainMenuPanel").GetValue(menu) as GameObject;
-        var searching = menu.GetType().GetField("panelSearching").GetValue(menu) as GameObject;
-        Assert.That(panelPlay, Is.Not.Null);
-        Assert.That(mainMenuPanel, Is.Not.Null);
-        Assert.That(searching, Is.Not.Null);
-        Assert.That(CountInScene(RuntimeType("SoloSearchVisuals")), Is.Zero,
-            "The retired Solo Search owner must be absent from normal MainMenu startup.");
-        Assert.That(Find(searching.transform, "SoloSearchVisualRoot"), Is.Null);
-        Assert.That(CountNamedButtons(searching.transform, "CancelButton"), Is.Zero);
-        Assert.That(CountNamedButtons(searching.transform, "SearchBackButton"), Is.Zero);
-
-        // PanelPlay remains available only as an isolated compatibility/capture
-        // seam. Production PLAY SOLO bypasses it completely.
-        mainMenuPanel.SetActive(false);
-        panelPlay.SetActive(true);
-        for (int i = 0; i < 8; i++)
-            yield return null;
-        yield return new WaitForSecondsRealtime(0.35f);
-
-        var ownerType = RuntimeType("MainMenuPlayVisuals");
-        var owner = Object.FindObjectOfType(ownerType) as Component;
-        Assert.That(owner, Is.Not.Null);
-        Assert.That((bool)ownerType.GetProperty("IsReady").GetValue(owner, null), Is.True);
-        Assert.That((bool)ownerType.GetProperty("IsSettled").GetValue(owner, null), Is.True);
-
-        var canvas = owner.GetComponent<Canvas>();
+        Component menu = FindInScene(RuntimeType("MenuManager"));
+        GameObject panelPlay = GetField<GameObject>(menu, "panelPlay");
+        GameObject mainMenu = GetField<GameObject>(menu, "mainMenuPanel");
+        GameObject searching = GetField<GameObject>(menu, "panelSearching");
+        Component matchmaking = FindInScene(RuntimeType("FakeMatchmaking"));
+        GameObject panelGame = GetField<GameObject>(matchmaking, "panelGame");
+        Component pvp = FindInScene(RuntimeType("PvpGameController"));
+        GameObject pvpMenu = GetField<GameObject>(pvp, "pvpMenuPanel");
+        Component playVisuals = FindInScene(RuntimeType("MainMenuPlayVisuals"));
+        Canvas canvas = playVisuals.GetComponent<Canvas>();
         Assert.That(canvas, Is.Not.Null);
-        Assert.That(Find(canvas.transform, "PlayVisualRoot"), Is.Not.Null);
-        Assert.That(Find(canvas.transform, "PlayLogo"), Is.Not.Null);
-        Assert.That(Find(canvas.transform, "PlayHeroBoy"), Is.Null);
-        Assert.That(Find(canvas.transform, "PlayMascotSix"), Is.Null);
-        Assert.That(Find(canvas.transform, "HomeVisualRoot").gameObject.activeSelf, Is.False);
 
-        var playRoot = Find(canvas.transform, "PlayVisualRoot");
-        Assert.That(playRoot.gameObject.activeSelf, Is.True);
+        Assert.That(mainMenu.activeSelf, Is.True);
+        Assert.That(panelPlay.activeSelf, Is.False);
+        Assert.That(searching.activeSelf, Is.False);
+        Assert.That(panelGame.activeSelf, Is.False);
+        Assert.That(pvpMenu.activeSelf, Is.False);
+        Assert.That(CountInScene(RuntimeType("SoloSearchVisuals")), Is.Zero,
+            "The retired Solo search owner must stay absent.");
 
-        var logo = Find(canvas.transform, "PlayLogo").GetComponent<Image>();
-        Assert.That(logo.preserveAspect, Is.True);
-        Assert.That(logo.raycastTarget, Is.False);
+        Button homePlay = Find(canvas.transform, "ButtonPlay").GetComponent<Button>();
+        Assert.That(PersistentMethods(homePlay), Does.Contain("OnPlayPressed"));
+        homePlay.onClick.Invoke();
+        yield return null;
 
-        foreach (var button in canvas.GetComponentsInChildren<Button>(true))
-            Assert.That(button.name.StartsWith("Play"), Is.False,
-                "Play owner must not invent a Button: " + button.name);
-
-        var back = Find(canvas.transform, "ButtonBack").GetComponent<Button>();
-        var find = Find(canvas.transform, "ButtonChallenger").GetComponent<Button>();
-        Assert.That(find.GetComponent<Image>().sprite.name, Does.Contain("gold"));
-        Assert.That(back.GetComponent<Image>().sprite.name, Does.Contain("blue"));
-
+        Component owner = FindInScene(RuntimeType("MainMenuPlayVisuals"));
+        Assert.That(owner, Is.Not.Null);
+        Assert.That(GetProperty<bool>(owner, "IsReady"), Is.True);
+        Assert.That(GetProperty<bool>(owner, "IsSettled"), Is.True);
+        Assert.That(CountInScene(RuntimeType("MainMenuPlayVisuals")), Is.EqualTo(1),
+            "PanelPlay must have exactly one presentation owner.");
+        Assert.That(mainMenu.activeSelf, Is.False);
         Assert.That(panelPlay.activeSelf, Is.True);
         Assert.That(searching.activeSelf, Is.False);
+        Assert.That(panelGame.activeSelf, Is.False,
+            "Opening the hub cannot begin Solo.");
+        Assert.That(pvpMenu.activeSelf, Is.False,
+            "Opening the hub cannot open Private Room.");
 
-        var exactLogo = Find(canvas.transform, "ExactPlayLogo");
-        if (exactLogo != null)
-            Assert.That(exactLogo.gameObject.activeSelf, Is.False);
-
-        var tmpTextType = System.Type.GetType("TMPro.TMP_Text, Unity.TextMeshPro");
-        Assert.That(tmpTextType, Is.Not.Null);
-        var disclosure = Find(panelPlay.transform, "DisclosureLabel");
-        Assert.That(disclosure, Is.Not.Null);
-        Component disclosureText = null;
-        foreach (var component in disclosure.GetComponentsInChildren(tmpTextType, true))
+        Transform root = Find(panelPlay.transform, "PlayVisualRoot");
+        Transform safe = Find(root, "PlaySafeAreaRoot");
+        Assert.That(root, Is.Not.Null);
+        Assert.That(root.gameObject.activeInHierarchy, Is.True);
+        Assert.That(safe, Is.Not.Null);
+        foreach (string required in new[]
         {
-            disclosureText = component;
-            break;
+            "PlayBackground", "PlayLogo", "PlayHubTitle", "PlayHubSubtitle",
+            "ButtonChallenger", "PlaySoloIcon", "PlaySoloTitle",
+            "PlaySoloSubtitle", "ButtonPvP", "PlayFriendIcon",
+            "PlayFriendTitle", "PlayFriendSubtitle", "ButtonBack",
+            "PlayBackTitle",
+        })
+        {
+            Assert.That(Find(root, required), Is.Not.Null,
+                "Missing Play Hub object: " + required);
         }
-        Assert.That(disclosureText, Is.Not.Null);
-        string copy = (string)tmpTextType.GetProperty("text").GetValue(disclosureText, null);
-        string expected = LocalizedCopy("simulated_opponents");
-        Assert.That(copy, Does.Contain(expected));
-        Assert.That(find.GetComponentInChildren<TMP_Text>(true).text,
-            Is.EqualTo(LocalizedCopy("find_challenger")));
-        Assert.That(find.GetComponentInChildren<TMP_Text>(true).text,
-            Does.Contain("AI").IgnoreCase);
 
-        var card = Find(canvas.transform, "PlayDisclosure");
-        Assert.That(card, Is.Not.Null);
-        Assert.That(card.GetComponent<Image>().raycastTarget, Is.False);
-        Assert.That(card.GetComponent<Outline>(), Is.Null);
+        foreach (string retired in new[]
+        {
+            "PlayDisclosure", "DisclosureLabel", "PlayFindIcon",
+            "ExactPlayLogo",
+        })
+        {
+            Transform found = Find(panelPlay.transform, retired);
+            Assert.That(found == null || !found.gameObject.activeInHierarchy, Is.True,
+                "Retired selector presentation remains visible: " + retired);
+        }
 
-        var paths = (string[])ownerType.GetField("LoadedResources", StaticFlags)
-            .GetValue(null);
-        foreach (var path in paths)
-            Assert.That(path.StartsWith("splash/"), Is.False, path);
+        Button solo = Find(safe, "ButtonChallenger").GetComponent<Button>();
+        Button friend = Find(safe, "ButtonPvP").GetComponent<Button>();
+        Button back = Find(safe, "ButtonBack").GetComponent<Button>();
+        AssertProductionButton(solo, "phase2a/hol_cta_gold_r2_9s");
+        AssertProductionButton(friend, "phase2a/hol_cta_blue_r2_9s");
+        AssertProductionButton(back, "phase2a/hol_cta_blue_r2_9s");
+        Assert.That(safe.GetComponentsInChildren<Button>(false), Has.Length.EqualTo(3),
+            "Selector must expose exactly VS AI, one Private Room route, and Back.");
+        Assert.That(root.GetComponentsInChildren<TMP_Text>(false), Has.Length.EqualTo(7),
+            "Selector must expose one heading/helper, two labels per real mode, and Back only.");
+        Assert.That(CountNamedButtons(canvas.transform, "ButtonPvP"), Is.EqualTo(1),
+            "There must be exactly one active Private Room/PvP entry.");
+        Assert.That(CountNamedButtons(canvas.transform, "ButtonPrivateRoom"), Is.Zero,
+            "The duplicate friend entry must not be recreated.");
+        Assert.That(PersistentMethods(solo), Does.Contain("StartSearch"),
+            "VS AI must preserve the scene-authored authoritative Solo callback.");
+        foreach (Button candidate in safe.GetComponentsInChildren<Button>(true))
+        {
+            if (candidate == solo) continue;
+            Assert.That(PersistentMethods(candidate), Does.Not.Contain("StartSearch"),
+                candidate.name + " must not duplicate the Solo route.");
+        }
 
-        // Back before entering the local duel must return home cleanly. Re-entry
-        // must not leave a deferred callback capable of reopening the board.
+        AssertLocalizedHubCopy(root, 0,
+            "CHOOSE A MODE", "What do you want to play?",
+            "VS AI", "A number duel against the computer",
+            "PLAY WITH A FRIEND", "Create or join a private room", "Back");
+        AssertLocalizedHubCopy(root, 1,
+            "ΔΙΑΛΕΞΕ ΤΡΟΠΟ", "Τι θέλεις να παίξεις;",
+            "ΕΝΑΝΤΙΟΝ AI", "Μονομαχία αριθμών με τον υπολογιστή",
+            "ΠΑΙΞΕ ΜΕ ΦΙΛΟ", "Δημιούργησε ή μπες σε ιδιωτικό δωμάτιο", "Πίσω");
+        SetLanguage(0);
+
+        string visibleCopy = VisibleCopy(root).ToUpperInvariant();
+        foreach (string unavailable in new[]
+        {
+            "QUICK MATCH", "PUBLIC DUEL", "RANKED", "MATCHMAKING",
+        })
+        {
+            Assert.That(visibleCopy, Does.Not.Contain(unavailable),
+                "Play Hub must not promise an unavailable mode.");
+        }
+
+        // Back closes only the selector and restores the unchanged Home.
         back.onClick.Invoke();
         yield return null;
         Assert.That(panelPlay.activeSelf, Is.False);
+        Assert.That(mainMenu.activeSelf, Is.True);
         Assert.That(searching.activeSelf, Is.False);
-        Assert.That(Find(canvas.transform, "HomeVisualRoot").gameObject.activeSelf, Is.True);
+        Assert.That(panelGame.activeSelf, Is.False);
+        Assert.That(pvpMenu.activeSelf, Is.False);
+        Assert.That(Find(canvas.transform, "HomeVisualRoot").gameObject.activeSelf,
+            Is.True);
 
-        // The PvP Duel Home entry remains routed to the real room-based online
-        // flow and still exposes the existing Create and Join actions.
-        var pvpEntry = Find(canvas.transform, "ButtonPvP").GetComponent<Button>();
-        Assert.That(pvpEntry.GetComponentInChildren<TMP_Text>(true).text,
-            Is.EqualTo(LocalizedCopy("pvp_duel")));
-        pvpEntry.onClick.Invoke();
+        // The one friend entry invokes the existing room controller and leaves
+        // Home active behind its modal, so the controller's real Close returns Home.
+        homePlay.onClick.Invoke();
         yield return null;
-        var pvp = Object.FindObjectOfType(RuntimeType("PvpGameController")) as Component;
-        Assert.That(pvp, Is.Not.Null);
-        var pvpMenu = pvp.GetType().GetField("pvpMenuPanel").GetValue(pvp) as GameObject;
-        Assert.That(pvpMenu, Is.Not.Null);
-        Assert.That(pvpMenu.activeSelf, Is.True);
+        friend.onClick.Invoke();
+        yield return null;
+        Assert.That(panelPlay.activeSelf, Is.False);
+        Assert.That(mainMenu.activeSelf, Is.True);
+        Assert.That(pvpMenu.activeSelf, Is.True,
+            "Friend must route through PvpGameController.OpenPvpMenu().");
         Assert.That(Find(pvpMenu.transform, "CreateButton").GetComponent<Button>().interactable,
             Is.True);
         Assert.That(Find(pvpMenu.transform, "JoinButton").GetComponent<Button>().interactable,
@@ -158,79 +185,309 @@ public sealed class MainMenuPlayVisualsPlayModeTests
         pvp.SendMessage("ClosePvpMenu", SendMessageOptions.RequireReceiver);
         yield return null;
         Assert.That(pvpMenu.activeSelf, Is.False);
+        Assert.That(mainMenu.activeSelf, Is.True);
 
-        Transform soloEntryTransform = Find(canvas.transform, "ButtonPlay");
-        Assert.That(soloEntryTransform, Is.Not.Null,
-            "The direct-entry proof must find the real Home Solo button.");
-        Button soloEntry = soloEntryTransform.GetComponent<Button>();
-        Assert.That(soloEntry, Is.Not.Null);
-        soloEntry.onClick.Invoke();
+        // Reopen the hub and verify VS AI reaches the existing real Solo board
+        // without ever showing the retired search presentation.
+        homePlay.onClick.Invoke();
         yield return null;
-        Assert.That(panelPlay.activeSelf, Is.False,
-            "Production Solo entry must not expose the retired PanelPlay screen.");
-
-        var matchmaking = Object.FindObjectOfType(RuntimeType("FakeMatchmaking")) as Component;
-        Assert.That(matchmaking, Is.Not.Null);
-        var panelGame = matchmaking.GetType().GetField("panelGame").GetValue(matchmaking) as GameObject;
-        Assert.That(panelGame, Is.Not.Null);
-        Assert.That(mainMenuPanel.activeSelf, Is.False);
+        solo.onClick.Invoke();
+        yield return null;
+        Assert.That(panelPlay.activeSelf, Is.False);
+        Assert.That(mainMenu.activeSelf, Is.False);
+        Assert.That(searching.activeSelf, Is.False);
         Assert.That(panelGame.activeSelf, Is.True,
-            "The real Solo board must activate in the same Home CTA call.");
-        Assert.That(searching.activeSelf, Is.False,
-            "Production direct entry cannot expose the retired search screen.");
-        Assert.That(CountInScene(RuntimeType("SoloSearchVisuals")), Is.Zero);
-        Assert.That(Find(searching.transform, "SoloSearchVisualRoot"), Is.Null);
-        Assert.That(CountNamedButtons(searching.transform, "CancelButton"), Is.Zero);
-        Assert.That(CountNamedButtons(searching.transform, "SearchBackButton"), Is.Zero);
+            "VS AI must route through the authoritative Solo entry.");
+        Assert.That(pvpMenu.activeSelf, Is.False);
         Assert.That(IsPreparing(matchmaking), Is.True);
         for (int frame = 0; frame < 120 && IsPreparing(matchmaking); frame++)
             yield return null;
         Assert.That(IsPreparing(matchmaking), Is.False,
-            "Solo preparation did not finish after the real board became ready.");
-        Assert.That(searching.activeSelf, Is.False);
+            "Solo preparation did not complete after selector entry.");
         Assert.That(panelGame.activeSelf, Is.True);
+    }
+
+    [UnityTest]
+    public IEnumerator PlayHubLocalizedGlyphsRemainContainedAtAllRequiredViewports()
+    {
+        yield return LoadReadyMainMenu();
+
+        Component menu = FindInScene(RuntimeType("MenuManager"));
+        Component playVisuals = FindInScene(RuntimeType("MainMenuPlayVisuals"));
+        Assert.That(playVisuals, Is.Not.Null, "Missing MainMenuPlayVisuals owner.");
+        Canvas canvas = playVisuals.GetComponent<Canvas>();
+        Assert.That(canvas, Is.Not.Null, "Play Hub owner must share the UI canvas.");
+        Transform homePlayTransform = Find(canvas.transform, "ButtonPlay");
+        Assert.That(homePlayTransform, Is.Not.Null, "Missing Home PLAY gateway.");
+        Button homePlay = homePlayTransform.GetComponent<Button>();
+        Assert.That(homePlay, Is.Not.Null, "Home PLAY gateway lost its Button.");
+        homePlay.onClick.Invoke();
+        yield return null;
+
+        Component owner = FindInScene(RuntimeType("MainMenuPlayVisuals"));
+        Assert.That(owner, Is.Not.Null,
+            "MainMenuPlayVisuals owner disappeared after opening the selector.");
+        Transform root = Find(owner.transform, "PlayVisualRoot");
+        Assert.That(root, Is.Not.Null, "Missing PlayVisualRoot.");
+        RectTransform safe = Find(root, "PlaySafeAreaRoot") as RectTransform;
+        Assert.That(safe, Is.Not.Null, "Missing PlaySafeAreaRoot.");
+        RectTransform solo = Find(safe, "ButtonChallenger") as RectTransform;
+        RectTransform friend = Find(safe, "ButtonPvP") as RectTransform;
+        RectTransform back = Find(safe, "ButtonBack") as RectTransform;
+        Assert.That(solo, Is.Not.Null, "Missing authoritative VS AI button.");
+        Assert.That(friend, Is.Not.Null, "Missing authoritative Private Room button.");
+        Assert.That(back, Is.Not.Null, "Missing selector Back button.");
+        TMP_Text hubTitle = RequireText(root, "PlayHubTitle");
+        TMP_Text hubSubtitle = RequireText(root, "PlayHubSubtitle");
+        TMP_Text soloTitle = RequireText(root, "PlaySoloTitle");
+        TMP_Text soloSubtitle = RequireText(root, "PlaySoloSubtitle");
+        TMP_Text friendTitle = RequireText(root, "PlayFriendTitle");
+        TMP_Text friendSubtitle = RequireText(root, "PlayFriendSubtitle");
+        TMP_Text backTitle = RequireText(root, "PlayBackTitle");
+        TMP_Text[] texts =
+        {
+            hubTitle, hubSubtitle, soloTitle, soloSubtitle,
+            friendTitle, friendSubtitle, backTitle,
+        };
+        MethodInfo applyViewport = owner.GetType().GetMethod(
+            "ApplyResponsiveLayoutForViewport", InstanceFlags);
+        Assert.That(applyViewport, Is.Not.Null,
+            "Play Hub must expose its deterministic responsive-layout seam.");
+
+        for (int language = 0; language <= 1; language++)
+        {
+            SetLanguage(language);
+            yield return null;
+            foreach (Vector2Int viewport in RequiredViewports)
+            {
+                string lane = (language == 0 ? "EN " : "EL ") +
+                              viewport.x + "x" + viewport.y;
+                applyViewport.Invoke(owner, new object[]
+                {
+                    viewport.x, viewport.y, true,
+                });
+                Canvas.ForceUpdateCanvases();
+                foreach (TMP_Text text in texts)
+                {
+                    text.ForceMeshUpdate(true, true);
+                    Assert.That(text.isTextOverflowing, Is.False,
+                        lane + " " + text.name);
+                    Assert.That(text.textInfo.characterCount, Is.GreaterThan(0),
+                        lane + " " + text.name);
+                }
+
+                AssertContained(safe.rect, GlyphBounds(hubTitle, safe), 28f,
+                    lane + " hub title");
+                AssertContained(safe.rect, GlyphBounds(hubSubtitle, safe), 28f,
+                    lane + " hub subtitle");
+                AssertContained(solo.rect, GlyphBounds(soloTitle, solo), 20f,
+                    lane + " VS AI title");
+                AssertContained(solo.rect, GlyphBounds(soloSubtitle, solo), 16f,
+                    lane + " VS AI subtitle");
+                AssertContained(friend.rect, GlyphBounds(friendTitle, friend), 20f,
+                    lane + " friend title");
+                AssertContained(friend.rect, GlyphBounds(friendSubtitle, friend), 16f,
+                    lane + " friend subtitle");
+                AssertContained(back.rect, GlyphBounds(backTitle, back), 18f,
+                    lane + " Back title");
+
+                Assert.That(hubTitle.fontSize, Is.GreaterThanOrEqualTo(42f), lane);
+                Assert.That(hubSubtitle.fontSize, Is.GreaterThanOrEqualTo(24f), lane);
+                Assert.That(soloTitle.fontSize, Is.GreaterThanOrEqualTo(40f), lane);
+                Assert.That(friendTitle.fontSize, Is.GreaterThanOrEqualTo(32f), lane);
+                Assert.That(soloSubtitle.fontSize, Is.GreaterThanOrEqualTo(22f), lane);
+                Assert.That(friendSubtitle.fontSize, Is.GreaterThanOrEqualTo(21f), lane);
+                Assert.That(backTitle.fontSize, Is.GreaterThanOrEqualTo(32f), lane);
+
+                AssertRectSize(solo, new Vector2(920f, 210f), lane + " VS AI");
+                AssertRectSize(friend, new Vector2(920f, 210f), lane + " friend");
+                AssertRectSize(back, new Vector2(700f, 120f), lane + " Back");
+                AssertVerticalSeparation(solo, friend, lane + " mode buttons");
+                AssertVerticalSeparation(friend, back, lane + " friend/Back");
+                Assert.That(solo.sizeDelta.y, Is.GreaterThanOrEqualTo(48f));
+                Assert.That(friend.sizeDelta.y, Is.GreaterThanOrEqualTo(48f));
+                Assert.That(back.sizeDelta.y, Is.GreaterThanOrEqualTo(48f));
+            }
+        }
+    }
+
+    static IEnumerator LoadReadyMainMenu()
+    {
+#if UNITY_EDITOR
+        FirstLaunchSoloEndToEndPlayModeTests
+            .FocusGameViewForEndOfFrameSettlement();
+#endif
+        SetLanguage(0);
+        InvokeInstaller("MainMenuHomeVisuals");
+        InvokeInstaller("MainMenuPlayVisuals");
+        yield return SceneManager.LoadSceneAsync("MainMenu", LoadSceneMode.Single);
+        Component homeOwner = null;
+        Component playOwner = null;
+        for (int frame = 0; frame < 180; frame++)
+        {
+            homeOwner = FindInScene(RuntimeType("MainMenuHomeVisuals"));
+            playOwner = FindInScene(RuntimeType("MainMenuPlayVisuals"));
+            if (homeOwner != null && playOwner != null &&
+                GetProperty<bool>(homeOwner, "IsReady") &&
+                GetProperty<bool>(homeOwner, "IsSettled") &&
+                GetProperty<bool>(playOwner, "IsReady") &&
+                GetProperty<bool>(playOwner, "IsSettled"))
+                break;
+            yield return null;
+        }
+
+        Assert.That(homeOwner, Is.Not.Null);
+        Assert.That(playOwner, Is.Not.Null);
+        Assert.That(GetProperty<bool>(homeOwner, "IsReady"), Is.True);
+        Assert.That(GetProperty<bool>(homeOwner, "IsSettled"), Is.True);
+        Assert.That(GetProperty<bool>(playOwner, "IsReady"), Is.True);
+        Assert.That(GetProperty<bool>(playOwner, "IsSettled"), Is.True);
+    }
+
+    static Rect GlyphBounds(TMP_Text text, RectTransform container)
+    {
+        Vector2 minimum = new Vector2(float.PositiveInfinity, float.PositiveInfinity);
+        Vector2 maximum = new Vector2(float.NegativeInfinity, float.NegativeInfinity);
+        bool found = false;
+        TMP_TextInfo info = text.textInfo;
+        for (int index = 0; index < info.characterCount; index++)
+        {
+            TMP_CharacterInfo character = info.characterInfo[index];
+            if (!character.isVisible) continue;
+            Vector3 bottomLeft = container.InverseTransformPoint(
+                text.rectTransform.TransformPoint(character.bottomLeft));
+            Vector3 topRight = container.InverseTransformPoint(
+                text.rectTransform.TransformPoint(character.topRight));
+            minimum = Vector2.Min(minimum, bottomLeft);
+            maximum = Vector2.Max(maximum, topRight);
+            found = true;
+        }
+
+        Assert.That(found, Is.True, text.name + " has no visible glyphs.");
+        return Rect.MinMaxRect(minimum.x, minimum.y, maximum.x, maximum.y);
+    }
+
+    static TMP_Text RequireText(Transform root, string name)
+    {
+        Transform found = Find(root, name);
+        Assert.That(found, Is.Not.Null, "Missing selector text: " + name);
+        TMP_Text text = found.GetComponent<TMP_Text>();
+        Assert.That(text, Is.Not.Null, "Missing TMP component: " + name);
+        return text;
+    }
+
+    static void AssertContained(Rect outer, Rect inner, float padding, string label)
+    {
+        Assert.That(inner.xMin, Is.GreaterThanOrEqualTo(outer.xMin + padding),
+            label + " left");
+        Assert.That(inner.xMax, Is.LessThanOrEqualTo(outer.xMax - padding),
+            label + " right");
+        Assert.That(inner.yMin, Is.GreaterThanOrEqualTo(outer.yMin + padding),
+            label + " bottom");
+        Assert.That(inner.yMax, Is.LessThanOrEqualTo(outer.yMax - padding),
+            label + " top");
+    }
+
+    static void AssertVerticalSeparation(
+        RectTransform upper, RectTransform lower, string label)
+    {
+        float upperBottom = upper.anchoredPosition.y - upper.sizeDelta.y * 0.5f;
+        float lowerTop = lower.anchoredPosition.y + lower.sizeDelta.y * 0.5f;
+        Assert.That(upperBottom, Is.GreaterThan(lowerTop), label);
+    }
+
+    static void AssertRectSize(RectTransform rect, Vector2 size, string label)
+    {
+        Assert.That(rect.sizeDelta.x, Is.EqualTo(size.x).Within(0.01f),
+            label + " width");
+        Assert.That(rect.sizeDelta.y, Is.EqualTo(size.y).Within(0.01f),
+            label + " height");
+    }
+
+    static void AssertProductionButton(Button button, string resource)
+    {
+        Image image = button.GetComponent<Image>();
+        Sprite sprite = Resources.Load<Sprite>(resource);
+        Assert.That(image, Is.Not.Null, button.name);
+        Assert.That(sprite, Is.Not.Null, resource);
+        Assert.That(image.sprite, Is.SameAs(sprite), button.name);
+        Assert.That(image.type, Is.EqualTo(Image.Type.Sliced), button.name);
+        Assert.That(image.color.a, Is.EqualTo(1f).Within(0.001f), button.name);
+        Assert.That(image.raycastTarget, Is.True, button.name);
+        Assert.That(button.targetGraphic, Is.SameAs(image), button.name);
+        Assert.That(button.interactable, Is.True, button.name);
+    }
+
+    static void AssertLocalizedHubCopy(
+        Transform root,
+        int language,
+        string heading,
+        string helper,
+        string solo,
+        string soloSubtitle,
+        string friend,
+        string friendSubtitle,
+        string back)
+    {
+        SetLanguage(language);
+        Assert.That(Text(root, "PlayHubTitle"), Is.EqualTo(heading));
+        Assert.That(Text(root, "PlayHubSubtitle"), Is.EqualTo(helper));
+        Assert.That(Text(root, "PlaySoloTitle"), Is.EqualTo(solo));
+        Assert.That(Text(root, "PlaySoloSubtitle"), Is.EqualTo(soloSubtitle));
+        Assert.That(Text(root, "PlayFriendTitle"), Is.EqualTo(friend));
+        Assert.That(Text(root, "PlayFriendSubtitle"), Is.EqualTo(friendSubtitle));
+        Assert.That(Text(root, "PlayBackTitle"), Is.EqualTo(back));
+    }
+
+    static string Text(Transform root, string name)
+    {
+        Transform found = Find(root, name);
+        Assert.That(found, Is.Not.Null, name);
+        return found.GetComponent<TMP_Text>().text;
+    }
+
+    static string VisibleCopy(Transform root)
+    {
+        string copy = string.Empty;
+        foreach (TMP_Text text in root.GetComponentsInChildren<TMP_Text>(false))
+            copy += "\n" + text.text;
+        return copy;
     }
 
     static bool IsPreparing(Component matchmaking)
     {
-        var property = matchmaking.GetType().GetProperty("IsPreparing");
+        PropertyInfo property = matchmaking.GetType().GetProperty("IsPreparing");
         Assert.That(property, Is.Not.Null);
         return (bool)property.GetValue(matchmaking, null);
     }
 
-    static string LocalizedCopy(string key)
+    static string[] PersistentMethods(Button button)
     {
-        var l10n = RuntimeType("L10n");
-        foreach (var method in l10n.GetMethods(StaticFlags))
-        {
-            if (method.Name != "Get" || method.ReturnType != typeof(string)) continue;
-            var parameters = method.GetParameters();
-            if (parameters.Length == 0 || parameters[0].ParameterType != typeof(string))
-                continue;
-            var arguments = new object[parameters.Length];
-            arguments[0] = key;
-            for (int i = 1; i < parameters.Length; i++)
-            {
-                if (parameters[i].ParameterType == typeof(object[]))
-                    arguments[i] = new object[0];
-                else if (parameters[i].HasDefaultValue)
-                    arguments[i] = parameters[i].DefaultValue;
-            }
-            return (string)method.Invoke(null, arguments);
-        }
-        Assert.Fail("Missing L10n.Get");
-        return null;
+        int count = button.onClick.GetPersistentEventCount();
+        var methods = new string[count];
+        for (int index = 0; index < count; index++)
+            methods[index] = button.onClick.GetPersistentMethodName(index);
+        return methods;
+    }
+
+    static void SetLanguage(int value)
+    {
+        Type l10n = RuntimeType("L10n");
+        Type language = l10n.GetNestedType("Language");
+        object enumValue = Enum.ToObject(language, value);
+        l10n.GetMethod("SetLanguage", BindingFlags.Static | BindingFlags.Public)
+            .Invoke(null, new[] { enumValue });
     }
 
     static void InvokeInstaller(string typeName)
     {
-        var type = RuntimeType(typeName);
-        var install = type.GetMethod("Install", StaticFlags);
+        Type type = RuntimeType(typeName);
+        MethodInfo install = type.GetMethod("Install", StaticFlags);
         Assert.That(install, Is.Not.Null);
         install.Invoke(null, null);
     }
 
-    static int CountInScene(System.Type type)
+    static int CountInScene(Type type)
     {
         int count = 0;
         foreach (GameObject root in SceneManager.GetActiveScene().GetRootGameObjects())
@@ -249,21 +506,49 @@ public sealed class MainMenuPlayVisualsPlayModeTests
         return count;
     }
 
-    static Transform Find(Transform root, string name)
+    static T GetField<T>(Component component, string name) where T : class
     {
-        if (root == null) return null;
-        if (root.name == name) return root;
-        for (int i = 0; i < root.childCount; i++)
+        FieldInfo field = component.GetType().GetField(
+            name, BindingFlags.Instance | BindingFlags.Public |
+                  BindingFlags.NonPublic);
+        Assert.That(field, Is.Not.Null, "Missing field " + name);
+        return field.GetValue(component) as T;
+    }
+
+    static T GetProperty<T>(Component component, string name)
+    {
+        PropertyInfo property = component.GetType().GetProperty(
+            name, BindingFlags.Instance | BindingFlags.Public |
+                  BindingFlags.NonPublic);
+        Assert.That(property, Is.Not.Null, "Missing property " + name);
+        return (T)property.GetValue(component);
+    }
+
+    static Component FindInScene(Type type)
+    {
+        foreach (GameObject root in SceneManager.GetActiveScene().GetRootGameObjects())
         {
-            var found = Find(root.GetChild(i), name);
+            Component found = root.GetComponentInChildren(type, true) as Component;
             if (found != null) return found;
         }
         return null;
     }
 
-    static System.Type RuntimeType(string name)
+    static Transform Find(Transform root, string name)
     {
-        var type = System.Type.GetType(name + ", Assembly-CSharp");
+        if (root == null) return null;
+        if (root.name == name) return root;
+        for (int index = 0; index < root.childCount; index++)
+        {
+            Transform found = Find(root.GetChild(index), name);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
+    static Type RuntimeType(string name)
+    {
+        Type type = Type.GetType(name + ", Assembly-CSharp");
         Assert.That(type, Is.Not.Null, "Missing runtime component: " + name);
         return type;
     }

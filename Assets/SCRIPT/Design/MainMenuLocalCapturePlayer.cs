@@ -15,12 +15,16 @@ public sealed class MainMenuLocalCapturePlayer : MonoBehaviour
     const string HeightArgument = "-holMainMenuCaptureHeight";
     const string ScaleArgument = "-holMainMenuCaptureScale";
     const string AvatarArgument = "-holMainMenuCaptureAvatar";
+    const string ScreenArgument = "-holMainMenuCaptureScreen";
+    const string HomeScreen = "home";
+    const string PanelPlayScreen = "panelplay";
 
     static string capturePath;
     static string language;
     static int width;
     static int height;
     static int captureScale;
+    static string captureScreen;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     static void Install()
@@ -35,6 +39,13 @@ public sealed class MainMenuLocalCapturePlayer : MonoBehaviour
         width = ReadPositiveInt(WidthArgument, 1080);
         height = ReadPositiveInt(HeightArgument, 1920);
         captureScale = ReadPositiveInt(ScaleArgument, 1);
+        captureScreen = ReadArgument(ScreenArgument);
+        if (string.IsNullOrWhiteSpace(captureScreen))
+            captureScreen = HomeScreen;
+        captureScreen = captureScreen.ToLowerInvariant();
+        if (captureScreen != HomeScreen && captureScreen != PanelPlayScreen)
+            throw new InvalidOperationException(
+                "Capture screen must be 'home' or 'panelplay'.");
         if (width % captureScale != 0 || height % captureScale != 0)
             throw new InvalidOperationException(
                 "Capture dimensions must be divisible by capture scale.");
@@ -89,7 +100,8 @@ public sealed class MainMenuLocalCapturePlayer : MonoBehaviour
 
         if (visuals == null || !visuals.IsReady || !visuals.IsSettled)
         {
-            Debug.LogError("HOL_MAINMENU_LOCAL_CAPTURE_NOT_READY");
+            Debug.LogError(
+                "HOL_MAINMENU_LOCAL_CAPTURE_NOT_READY " + captureScreen);
             Application.Quit(2);
             yield break;
         }
@@ -98,18 +110,68 @@ public sealed class MainMenuLocalCapturePlayer : MonoBehaviour
             ? L10n.Language.Greek
             : L10n.Language.English);
         HideCaptureOverlays();
+
+        Transform captureRoot = visuals.transform;
+        if (captureScreen == PanelPlayScreen)
+        {
+            MenuManager menu = FindObjectOfType<MenuManager>(true);
+            if (menu == null)
+            {
+                Debug.LogError(
+                    "HOL_MAINMENU_LOCAL_CAPTURE_NOT_READY panelplay menu");
+                Application.Quit(2);
+                yield break;
+            }
+
+            // Exercise the real production Home callback; never force the
+            // selector hierarchy active from this evidence-only seam.
+            menu.OnPlayPressed();
+            MainMenuPlayVisuals play = null;
+            for (int frame = 0; frame < 600; frame++)
+            {
+                HideCaptureOverlays();
+                play = FindObjectOfType<MainMenuPlayVisuals>(true);
+                bool homeHidden = menu.mainMenuPanel == null ||
+                                  !menu.mainMenuPanel.activeInHierarchy;
+                bool selectorVisible = menu.panelPlay != null &&
+                                       menu.panelPlay.activeInHierarchy;
+                if (play != null && play.IsReady && play.IsSettled &&
+                    homeHidden && selectorVisible)
+                    break;
+                yield return null;
+            }
+
+            if (play == null || !play.IsReady || !play.IsSettled ||
+                menu.panelPlay == null || !menu.panelPlay.activeInHierarchy ||
+                (menu.mainMenuPanel != null &&
+                 menu.mainMenuPanel.activeInHierarchy))
+            {
+                Debug.LogError(
+                    "HOL_MAINMENU_LOCAL_CAPTURE_NOT_READY panelplay owner");
+                Application.Quit(2);
+                yield break;
+            }
+            captureRoot = play.transform;
+        }
+
         yield return new WaitForSecondsRealtime(2.0f);
         yield return new WaitForEndOfFrame();
         yield return new WaitForEndOfFrame();
 
-        if (!visuals.gameObject.activeInHierarchy)
+        Transform expectedRoot = FindRect(
+            captureRoot,
+            captureScreen == HomeScreen
+                ? MainMenuHomeVisuals.VisualRootName
+                : MainMenuPlayVisuals.VisualRootName);
+        if (expectedRoot == null || !expectedRoot.gameObject.activeInHierarchy)
         {
-            Debug.LogError("HOL_MAINMENU_LOCAL_CAPTURE_INVALID_UI");
+            Debug.LogError(
+                "HOL_MAINMENU_LOCAL_CAPTURE_INVALID_UI " + captureScreen);
             Application.Quit(3);
             yield break;
         }
 
-        DumpLayout(visuals.transform);
+        DumpLayout(captureRoot);
         ScreenCapture.CaptureScreenshot(capturePath, captureScale);
         for (int frame = 0; frame < 600; frame++)
         {
@@ -117,7 +179,8 @@ public sealed class MainMenuLocalCapturePlayer : MonoBehaviour
                 new FileInfo(capturePath).Length > 1024)
             {
                 Debug.Log(
-                    "HOL_MAINMENU_LOCAL_CAPTURE_READY " + language + " " +
+                    "HOL_MAINMENU_LOCAL_CAPTURE_READY " + captureScreen + " " +
+                    language + " " +
                     Screen.width + "x" + Screen.height + " x" +
                     captureScale + " " + capturePath);
                 Application.Quit(0);
@@ -126,7 +189,8 @@ public sealed class MainMenuLocalCapturePlayer : MonoBehaviour
             yield return null;
         }
 
-        Debug.LogError("HOL_MAINMENU_LOCAL_CAPTURE_TIMEOUT");
+        Debug.LogError(
+            "HOL_MAINMENU_LOCAL_CAPTURE_TIMEOUT " + captureScreen);
         Application.Quit(4);
     }
 
@@ -157,11 +221,20 @@ public sealed class MainMenuLocalCapturePlayer : MonoBehaviour
             "HomePlayerChip",
             "ButtonPlay",
             "ButtonPvP",
-            "ButtonPrivateRoom",
             "DailyHuntButton",
             "HomeDailyPromo",
             "HomeMascotSix",
             "HomeMascotSeven",
+            "PlaySafeAreaRoot",
+            "PlayLogo",
+            "PlayHubTitle",
+            "PlayHubSubtitle",
+            "ButtonChallenger",
+            "PlaySoloTitle",
+            "PlaySoloSubtitle",
+            "PlayFriendTitle",
+            "PlayFriendSubtitle",
+            "ButtonBack",
         })
         {
             RectTransform rect = FindRect(root, objectName);

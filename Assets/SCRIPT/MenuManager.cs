@@ -140,25 +140,64 @@ public class MenuManager : MonoBehaviour
 
     public void OnPlayPressed()
     {
-        // Ads moved to match end (GameManager.EndGame): gating every Play
-        // press with an interstitial hurt retention and monetized the fake
-        // "opponent not found" retry loop.
-        if (matchmaking == null)
-            matchmaking = FindObjectOfType<FakeMatchmaking>();
-        if (matchmaking == null || matchmaking.panelGame == null)
+        // PLAY is the single truthful gateway to the two modes that currently
+        // exist: local VS AI and a private room with a friend. It does not
+        // imply public matchmaking and it does not begin either mode itself.
+        if (panelPlay == null)
         {
             Debug.LogError(
-                "[MenuManager] Solo match cannot start: " +
-                "FakeMatchmaking/panelGame is missing.");
+                "[MenuManager] PLAY hub cannot open: PanelPlay is missing.");
             return;
         }
 
-        // Solo is a local AI match. Enter the real board in the same call and
-        // never expose the retired find-challenger/search presentation.
+        if (settingsPanel != null) settingsPanel.SetActive(false);
+        if (panelSearching != null) panelSearching.SetActive(false);
+        if (mainMenuPanel != null) mainMenuPanel.SetActive(false);
+        panelPlay.SetActive(true);
+    }
+
+    // ButtonChallenger retains its scene-authored FakeMatchmaking.StartSearch
+    // callback. This second, presentation-only callback runs afterwards and
+    // removes the selector from behind the authoritative Solo board.
+    public void ClosePlayHubForSoloSelection()
+    {
+        if (matchmaking == null)
+            matchmaking = FindObjectOfType<FakeMatchmaking>();
+        if (matchmaking == null || matchmaking.panelGame == null ||
+            !matchmaking.panelGame.activeSelf)
+        {
+            Debug.LogError(
+                "[MenuManager] VS AI did not activate the authoritative Solo board.");
+            if (panelPlay != null) panelPlay.SetActive(true);
+            if (mainMenuPanel != null) mainMenuPanel.SetActive(false);
+            return;
+        }
+
         if (settingsPanel != null) settingsPanel.SetActive(false);
         if (panelPlay != null) panelPlay.SetActive(false);
         if (panelSearching != null) panelSearching.SetActive(false);
         if (mainMenuPanel != null) mainMenuPanel.SetActive(false);
-        matchmaking.StartSearch();
+    }
+
+    // ButtonPvP retains PvpGameController.OpenPvpMenu as its authoritative
+    // callback. Keep Home active behind that modal so its existing Close action
+    // naturally returns to Home, while the selector itself is fully closed.
+    public void ClosePlayHubForPrivateRoomSelection()
+    {
+        PvpGameController pvp = FindObjectOfType<PvpGameController>(true);
+        if (pvp == null || pvp.pvpMenuPanel == null ||
+            !pvp.pvpMenuPanel.activeSelf)
+        {
+            Debug.LogError(
+                "[MenuManager] Private Room did not open its authoritative hub.");
+            if (panelPlay != null) panelPlay.SetActive(true);
+            if (mainMenuPanel != null) mainMenuPanel.SetActive(false);
+            return;
+        }
+
+        if (settingsPanel != null) settingsPanel.SetActive(false);
+        if (panelPlay != null) panelPlay.SetActive(false);
+        if (panelSearching != null) panelSearching.SetActive(false);
+        if (mainMenuPanel != null) mainMenuPanel.SetActive(true);
     }
 }

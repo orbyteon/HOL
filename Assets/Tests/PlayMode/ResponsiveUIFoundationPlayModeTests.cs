@@ -106,7 +106,7 @@ public sealed class ResponsiveUIFoundationPlayModeTests
             new Vector2(720f, 1280f),
             new Vector2(1080f, 1920f),
             new Vector2(1080f, 2400f),
-            new Vector2(1440f, 3200f)
+            new Vector2(1179f, 2556f)
         };
         MethodInfo apply = layoutType.GetMethod("ApplyViewport", InstanceFlags);
         foreach (Vector2 viewport in viewports)
@@ -132,11 +132,11 @@ public sealed class ResponsiveUIFoundationPlayModeTests
                             viewport + " / " + target.name);
                 }
                 AssertSafeRoot(homeSafe, viewport, safe, canvasSize,
-                    "Buttonsettings", "ButtonPlay", "ButtonPvP",
-                    "ButtonPrivateRoom", "DailyHuntButton",
+                    "Buttonsettings", "ButtonPlay", "DailyHuntButton",
                     "HomeSpeechBubble", "HomeDailyPromo");
                 AssertSafeRoot(playSafe, viewport, safe, canvasSize,
-                    "ButtonChallenger", "ButtonBack", "PlayDisclosure");
+                    "ButtonChallenger", "ButtonPvP", "ButtonBack",
+                    "PlayHubTitle", "PlayHubSubtitle");
             }
         }
 
@@ -171,34 +171,35 @@ public sealed class ResponsiveUIFoundationPlayModeTests
 
             var menu = FindInScene(RuntimeType("MenuManager"));
             GameObject panelPlay = (GameObject)Field(menu, "panelPlay");
-            panelPlay.SetActive(true);
+            menu.GetType().GetMethod("OnPlayPressed", InstanceFlags)
+                .Invoke(menu, null);
             yield return null;
 
             Transform safe = Find(panelPlay.transform, "PlaySafeAreaRoot");
             Transform button = Find(safe, "ButtonChallenger");
             Assert.That(safe, Is.Not.Null);
             Assert.That(button, Is.Not.Null);
-            var label = button.GetComponentInChildren<TMP_Text>(true);
+            var label = Find(button, "PlaySoloTitle").GetComponent<TMP_Text>();
             Type ownerType = RuntimeType("ResponsiveSafeAreaRoot");
             Component owner = safe.GetComponent(ownerType);
             Assert.That(owner, Is.Not.Null);
 
             SetLanguage("English");
-            string english = Localized("find_challenger");
+            string english = Localized("play_hub_solo_title");
             Assert.That(label.text, Is.EqualTo(english));
             Vector2 position = ((RectTransform)button).anchoredPosition;
             int childCount = safe.childCount;
             int enabledCount = Property<int>(owner, "RecalculationCount");
 
             SetLanguage("Greek");
-            Assert.That(label.text, Is.EqualTo(Localized("find_challenger")));
+            Assert.That(label.text, Is.EqualTo(Localized("play_hub_solo_title")));
             Assert.That(((RectTransform)button).anchoredPosition, Is.EqualTo(position));
             Assert.That(safe.childCount, Is.EqualTo(childCount));
             Assert.That(Property<int>(owner, "RecalculationCount"),
                 Is.GreaterThan(enabledCount));
             Assert.That(label.enableAutoSizing, Is.True);
             Assert.That(label.fontSizeMin, Is.GreaterThanOrEqualTo(18f));
-            Assert.That(label.overflowMode, Is.EqualTo(TextOverflowModes.Ellipsis));
+            Assert.That(label.overflowMode, Is.EqualTo(TextOverflowModes.Overflow));
 
             safe.gameObject.SetActive(false);
             int disabledCount = Property<int>(owner, "RecalculationCount");

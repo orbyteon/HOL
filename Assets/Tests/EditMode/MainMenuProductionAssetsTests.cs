@@ -93,24 +93,24 @@ public sealed class MainMenuProductionAssetsTests
     }
 
     [Test]
-    public void HomeCopyMatchesTheTruthfulPhase2AContractInBothLanguages()
+    public void HomeAndPlayHubCopyDescribeOnlyRealModesInBothLanguages()
     {
         var l10n = RuntimeType("L10n");
         var original = l10n.GetProperty("Current").GetValue(null, null);
         try
         {
             AssertCopy(0,
-                "PLAY SOLO", "Play and beat your high score!",
-                "PLAY WITH A FRIEND", "Create a room & play together!",
+                "Play", "Choose your game mode",
                 "DAILY HUNT", "A new challenge every day, big rewards!",
-                "TIP:", "Every guess narrows the range!",
-                "LOADING...");
+                "CHOOSE A MODE", "What do you want to play?",
+                "VS AI", "A number duel against the computer",
+                "PLAY WITH A FRIEND", "Create or join a private room");
             AssertCopy(1,
-                "ΠΑΙΞΕ SOLO", "Παίξε και σπάσε το ρεκόρ σου!",
-                "ΠΑΙΞΕ ΜΕ ΦΙΛΟ", "Δημιούργησε δωμάτιο & παίξε μαζί!",
-                "DAILY HUNT", "Πρόκληση κάθε μέρα, μεγάλα έπαθλα!",
-                "ΣΥΜΒΟΥΛΗ:", "Κάθε μαντεψιά μικραίνει το εύρος!",
-                "ΦΟΡΤΩΣΗ...");
+                "Παίξε", "Διάλεξε τρόπο παιχνιδιού",
+                "ΗΜΕΡΗΣΙΑ ΔΟΚΙΜΑΣΙΑ", "Πρόκληση κάθε μέρα, μεγάλα έπαθλα!",
+                "ΔΙΑΛΕΞΕ ΤΡΟΠΟ", "Τι θέλεις να παίξεις;",
+                "ΕΝΑΝΤΙΟΝ AI", "Μονομαχία αριθμών με τον υπολογιστή",
+                "ΠΑΙΞΕ ΜΕ ΦΙΛΟ", "Δημιούργησε ή μπες σε ιδιωτικό δωμάτιο");
         }
         finally
         {
@@ -122,10 +122,11 @@ public sealed class MainMenuProductionAssetsTests
     {
         string[] keys =
         {
-            "home_solo_title", "home_solo_subtitle",
-            "home_private_title", "home_private_subtitle",
+            "play", "home_play_subtitle",
             "home_daily_title", "home_daily_subtitle",
-            "home_tip_title", "home_tip_body", "splash_loading"
+            "play_hub_title", "play_hub_subtitle",
+            "play_hub_solo_title", "play_hub_solo_subtitle",
+            "play_hub_friend_title", "play_hub_friend_subtitle"
         };
         Assert.That(expected.Length, Is.EqualTo(keys.Length));
         SetLanguage(Enum.ToObject(RuntimeType("L10n").GetNestedType("Language"), language));
