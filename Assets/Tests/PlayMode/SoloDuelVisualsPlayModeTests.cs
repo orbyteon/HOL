@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
@@ -120,9 +121,9 @@ public sealed class SoloDuelVisualsPlayModeTests
 
         try
         {
-            PlayerPrefs.SetString("PlayerName", "MARINOS");
+            PlayerPrefs.SetString("PlayerName", "ALEXANDERMAX");
             PlayerPrefs.SetInt("StatWins", 2450);
-            PlayerPrefs.SetInt("AIDifficulty", 0);
+            PlayerPrefs.SetInt("AIDifficulty", 3);
             PlayerPrefs.SetInt("Language", 0);
             PlayerPrefs.DeleteKey(profileVersionKey);
             PlayerPrefs.DeleteKey(avatarKey);
@@ -167,7 +168,7 @@ public sealed class SoloDuelVisualsPlayModeTests
                 bool greek = language == "Greek";
                 SetLanguage(language);
                 PlayerPrefs.SetString(
-                    "PlayerName", greek ? "ΜΑΡΙΝΟΣ" : "MARINOS");
+                    "PlayerName", greek ? "ΚΩΝΣΤΑΝΤΙΝΟΣ" : "ALEXANDERMAX");
                 PlayerPrefs.Save();
                 input.SetTextWithoutNotify(string.Empty);
                 yield return null;
@@ -424,12 +425,21 @@ public sealed class SoloDuelVisualsPlayModeTests
         Assert.That(range.transform.IsChildOf(
             Find(root, "SoloTipCard")), Is.True,
             "The real range text must be seated in the contextual tip card.");
-        RectTransform rangeRect = range.rectTransform;
         RectTransform tipMascot = (RectTransform)Find(root, "SoloTipMascot");
-        float rangeRight = rangeRect.anchoredPosition.x + rangeRect.sizeDelta.x * 0.5f;
-        float mascotLeft = tipMascot.anchoredPosition.x - tipMascot.sizeDelta.x * 0.5f;
-        Assert.That(rangeRight, Is.LessThanOrEqualTo(mascotLeft),
-            "Live range text must not be covered by the Tip mascot.");
+        RectTransform tipPanel = range.rectTransform.parent as RectTransform;
+        range.ForceMeshUpdate(true, true);
+        Assert.That(
+            TryRenderedGlyphRectIn(
+                tipPanel, range, out Rect rangeGlyphs, out int glyphCount),
+            Is.True,
+            "Live range text must render before mascot exclusion is measured.");
+        Assert.That(glyphCount, Is.GreaterThan(0));
+        Bounds mascotBounds =
+            RectTransformUtility.CalculateRelativeRectTransformBounds(
+                tipPanel, tipMascot);
+        Assert.That(mascotBounds.min.x - rangeGlyphs.xMax,
+            Is.GreaterThanOrEqualTo(8f),
+            "Live range glyphs must keep the required gap from the Tip mascot.");
 
         string[] answerNames =
         {
@@ -592,6 +602,7 @@ public sealed class SoloDuelVisualsPlayModeTests
                 // interactive content rather than treating transparent pixels
                 // as clipped production UI.
                 "CurrentNumberHeading",
+                "CurrentRangeLabel",
                 "CentralGuess",
                 "CentralOutcome",
                 "SoloContinueButton",
@@ -1164,6 +1175,15 @@ public sealed class SoloDuelVisualsPlayModeTests
         object lower = RuntimeEnum("DuelRules+Hint", "Lower");
         object correct = RuntimeEnum("DuelRules+Hint", "Correct");
 
+        for (int difficulty = 0; difficulty < 4; difficulty++)
+        {
+            PlayerPrefs.SetInt("AIDifficulty", difficulty);
+            InvokeLayout(layout, "BeginNewMatch", opponent);
+            yield return ValidateSoloViewport(
+                canvas, safeAreaOwner, layout, numberManager,
+                width, height, locale + " Difficulty" + difficulty);
+        }
+        PlayerPrefs.SetInt("AIDifficulty", 3);
         InvokeLayout(layout, "BeginNewMatch", opponent);
         TMP_InputField liveInput = GetField<TMP_InputField>(
             numberManager, "numberInput");
@@ -1174,7 +1194,11 @@ public sealed class SoloDuelVisualsPlayModeTests
         Assert.That(
             Find(canvas.transform, "CurrentNumberHeading")
                 .GetComponent<TMP_Text>().text,
-            Is.EqualTo(Localized("solo_secret_domain_heading")));
+            Is.EqualTo(Localized("solo_secret_action_heading")));
+        Assert.That(
+            Find(canvas.transform, "CurrentRangeLabel")
+                .GetComponent<TMP_Text>().text,
+            Is.EqualTo(Localized("solo_legal_domain")));
         yield return ValidateSoloViewport(
             canvas, safeAreaOwner, layout, numberManager,
             width, height, locale + " ChooseSecret");
@@ -1186,8 +1210,9 @@ public sealed class SoloDuelVisualsPlayModeTests
             true, false, false, false, 100);
         Assert.That(
             Find(canvas.transform, "CurrentNumberHeading")
-                .GetComponent<TMP_Text>().text,
-            Is.EqualTo(Localized("solo_starter_heading")));
+                .gameObject.activeInHierarchy,
+            Is.False,
+            "The central ribbon, not the keypad card, owns starter feedback.");
         yield return ValidateSoloViewport(
             canvas, safeAreaOwner, layout, numberManager,
             width, height, locale + " PlayerStarts");
@@ -1200,17 +1225,22 @@ public sealed class SoloDuelVisualsPlayModeTests
             Find(canvas.transform, "PlayerRangeLabel")
                 .GetComponent<TMP_Text>().text,
             Is.EqualTo(Localized(
-                "solo_range_player", opponent, 1, 100)));
+                "solo_range_player", 1, 100)));
         Assert.That(
             Find(canvas.transform, "OpponentRangeLabel")
                 .GetComponent<TMP_Text>().text,
             Is.EqualTo(Localized(
-                "solo_range_ai", opponent, 1, 100)));
+                "solo_range_ai", 1, 100)));
         Assert.That(
             Find(canvas.transform, "CurrentNumberHeading")
                 .GetComponent<TMP_Text>().text,
             Is.EqualTo(Localized(
-                "solo_live_range_heading", opponent, 1, 100)));
+                "solo_guess_target_heading", opponent)));
+        Assert.That(
+            Find(canvas.transform, "CurrentRangeLabel")
+                .GetComponent<TMP_Text>().text,
+            Is.EqualTo(Localized(
+                "solo_strategic_legal_range", 1, 100)));
         Assert.That(livePlaceholder.text,
             Is.EqualTo(Localized("solo_input_range", 1, 100)));
         yield return ValidateSoloViewport(
@@ -1229,6 +1259,35 @@ public sealed class SoloDuelVisualsPlayModeTests
             width, height, locale + " LeaveConfirmation");
         InvokeLayout(layout, "SetLeaveConfirmationVisible", false);
 
+        // Boundary and mirrored-direction coverage proves the dynamic labels
+        // hold the widest values without relying on the later happy-path data.
+        InvokeLayout(layout, "RecordPlayerMove",
+            1, 100, lower, false, 100,
+            1, 99, 1, 100);
+        InvokeLayout(layout, "UpdateLockState",
+            true, false, false, false, 99);
+        yield return ValidateSoloViewport(
+            canvas, safeAreaOwner, layout, numberManager,
+            width, height, locale + " PlayerLowerBoundary100");
+        InvokeLayout(layout, "BeginOpponentThinking",
+            1, 1, 99, 1, 100);
+        InvokeLayout(layout, "RecordOpponentMove",
+            1, 1, higher, false, 100,
+            1, 99, 2, 100);
+        InvokeLayout(layout, "RevealOpponentOutcome");
+        yield return ValidateSoloViewport(
+            canvas, safeAreaOwner, layout, numberManager,
+            width, height, locale + " OpponentHigherBoundary1");
+
+        InvokeLayout(layout, "BeginNewMatch", opponent);
+        InvokeLayout(layout, "SetPlayerSecret", 73);
+        InvokeLayout(layout, "RevealStarter",
+            player, 1, 1, 100, 1, 100);
+        InvokeLayout(layout, "BeginPlayerTurn",
+            1, 1, 100, 1, 100, false);
+        InvokeLayout(layout, "UpdateLockState",
+            true, true, false, false, 100);
+
         InvokeLayout(layout, "RecordPlayerMove",
             1, 40, higher, false, 100,
             41, 100, 1, 100);
@@ -1238,9 +1297,10 @@ public sealed class SoloDuelVisualsPlayModeTests
             .GetComponent<TMP_Text>();
         Assert.That(playerOutcome.text,
             Does.Contain(Localized("solo_target_number_higher", opponent)));
-        Assert.That(playerOutcome.text, Does.Contain("41"));
-        Assert.That(playerOutcome.text, Does.Contain("100"));
-        Assert.That(playerOutcome.text,
+        TMP_Text playerHandoff = GetField<TMP_Text>(layout, "phaseText");
+        Assert.That(playerHandoff.text, Does.Contain("41"));
+        Assert.That(playerHandoff.text, Does.Contain("100"));
+        Assert.That(playerHandoff.text,
             Does.Contain(Localized("solo_opponent_turn_short", opponent)));
         yield return ValidateSoloViewport(
             canvas, safeAreaOwner, layout, numberManager,
@@ -1248,28 +1308,44 @@ public sealed class SoloDuelVisualsPlayModeTests
 
         InvokeLayout(layout, "BeginOpponentThinking",
             1, 41, 100, 1, 100);
+        TMP_Text thinkingRibbon = Find(canvas.transform, "CentralGuess")
+            .GetComponent<TMP_Text>();
+        TMP_Text thinkingBubble = GetField<TMP_Text>(layout, "opponentSpeechText");
+        Assert.That(thinkingRibbon.text,
+            Is.EqualTo(Localized("opponent_thinking", opponent)));
+        Assert.That(thinkingBubble.text,
+            Is.EqualTo(Localized("solo_ai_thinking_flavor")),
+            "The speech bubble may carry flavour, not the authoritative live state.");
         yield return ValidateSoloViewport(
             canvas, safeAreaOwner, layout, numberManager,
             width, height, locale + " OpponentThinking");
         InvokeLayout(layout, "RecordOpponentMove",
             1, 60, lower, false, 100,
             41, 100, 1, 59);
+        TMP_Text revealBubble = GetField<TMP_Text>(layout, "opponentGuessText");
+        Assert.That(revealBubble.text,
+            Is.EqualTo(Localized("solo_ai_bubble_guess", 60)));
         Assert.That(
-            Find(canvas.transform, "CentralOutcome")
-                .GetComponent<TMP_Text>().text,
+            GetField<TMP_Text>(layout, "phaseText").text,
             Is.EqualTo(Localized("solo_ai_result_pending")),
             "The AI result must not appear during the guess-reveal beat.");
         yield return ValidateSoloViewport(
             canvas, safeAreaOwner, layout, numberManager,
             width, height, locale + " OpponentGuess");
         InvokeLayout(layout, "RevealOpponentOutcome");
+        Assert.That(
+            Find(canvas.transform, "SoloOpponentBubble")
+                .gameObject.activeInHierarchy,
+            Is.False,
+            "Essential AI outcome and handoff copy belongs only to the ribbon.");
         TMP_Text aiOutcome = Find(canvas.transform, "CentralOutcome")
             .GetComponent<TMP_Text>();
         Assert.That(aiOutcome.text,
             Does.Contain(Localized("your_number_is_lower")));
-        Assert.That(aiOutcome.text, Does.Contain("1"));
-        Assert.That(aiOutcome.text, Does.Contain("59"));
-        Assert.That(aiOutcome.text,
+        TMP_Text aiHandoff = GetField<TMP_Text>(layout, "phaseText");
+        Assert.That(aiHandoff.text, Does.Contain("1"));
+        Assert.That(aiHandoff.text, Does.Contain("59"));
+        Assert.That(aiHandoff.text,
             Does.Contain(Localized("solo_your_turn_short")));
         yield return ValidateSoloViewport(
             canvas, safeAreaOwner, layout, numberManager,
@@ -1285,19 +1361,33 @@ public sealed class SoloDuelVisualsPlayModeTests
         Assert.That(StateProperty(layout, "LatestAiHandoffPinned"),
             Is.EqualTo("True"));
         TMP_Text pinnedPrompt = GetField<TMP_Text>(layout, "phaseText");
-        Assert.That(pinnedPrompt.text,
+        TMP_Text pinnedGuess = Find(canvas.transform, "CentralGuess")
+            .GetComponent<TMP_Text>();
+        TMP_Text pinnedOutcome = Find(canvas.transform, "CentralOutcome")
+            .GetComponent<TMP_Text>();
+        Assert.That(pinnedGuess.text,
             Does.Contain(Localized("solo_opponent_guessed", opponent, 60)));
-        Assert.That(pinnedPrompt.text,
+        Assert.That(pinnedOutcome.text,
             Does.Contain(Localized("your_number_is_lower")));
         Assert.That(pinnedPrompt.text,
             Does.Contain(Localized("solo_your_turn_short")));
+        Assert.That(
+            Find(canvas.transform, "SoloOpponentBubble")
+                .gameObject.activeInHierarchy,
+            Is.False,
+            "The retained AI result must not compete with the speech bubble.");
         Assert.That(livePlaceholder.text,
             Is.EqualTo(Localized("solo_input_range", 41, 100)));
         Assert.That(
             Find(canvas.transform, "CurrentNumberHeading")
                 .GetComponent<TMP_Text>().text,
             Is.EqualTo(Localized(
-                "solo_live_range_heading", opponent, 41, 100)));
+                "solo_guess_target_heading", opponent)));
+        Assert.That(
+            Find(canvas.transform, "CurrentRangeLabel")
+                .GetComponent<TMP_Text>().text,
+            Is.EqualTo(Localized(
+                "solo_strategic_legal_range", 41, 100)));
         yield return ValidateSoloViewport(
             canvas, safeAreaOwner, layout, numberManager,
             width, height, locale + " StickyAiHandoff");
@@ -1332,6 +1422,9 @@ public sealed class SoloDuelVisualsPlayModeTests
             1, 73, correct, false, 100,
             1, 100, 1, 100);
         InvokeLayout(layout, "RevealOpponentOutcome");
+        yield return ValidateSoloViewport(
+            canvas, safeAreaOwner, layout, numberManager,
+            width, height, locale + " OpponentCorrect");
         InvokeLayout(layout, "ShowLastLicks", 1);
         yield return ValidateSoloViewport(
             canvas, safeAreaOwner, layout, numberManager,
@@ -1340,10 +1433,13 @@ public sealed class SoloDuelVisualsPlayModeTests
             1, 1, 100, 1, 100, true);
         Assert.That(StateProperty(layout, "LatestAiHandoffPinned"),
             Is.EqualTo("True"));
-        TMP_Text lastLicksHandoff = GetField<TMP_Text>(layout, "phaseText");
-        Assert.That(lastLicksHandoff.text,
+        TMP_Text lastLicksGuess = Find(canvas.transform, "CentralGuess")
+            .GetComponent<TMP_Text>();
+        TMP_Text lastLicksOutcome = Find(canvas.transform, "CentralOutcome")
+            .GetComponent<TMP_Text>();
+        Assert.That(lastLicksGuess.text,
             Does.Contain(Localized("solo_opponent_guessed", opponent, 73)));
-        Assert.That(lastLicksHandoff.text,
+        Assert.That(lastLicksOutcome.text,
             Does.Contain(Localized("your_number_is_correct")));
         InvokeLayout(layout, "UpdateLockState",
             true, true, false, false, 100);
@@ -1383,8 +1479,9 @@ public sealed class SoloDuelVisualsPlayModeTests
             Is.EqualTo("Opponent"));
         Assert.That(
             Find(canvas.transform, "CurrentNumberHeading")
-                .GetComponent<TMP_Text>().text,
-            Is.EqualTo(Localized("solo_lock_forfeit_heading")));
+                .gameObject.activeInHierarchy,
+            Is.False,
+            "The central ribbon, not the keypad card, owns Lock penalties.");
         yield return ValidateSoloViewport(
             canvas, safeAreaOwner, layout, numberManager,
             width, height, locale + " PlayerLockForfeit");
@@ -1399,6 +1496,9 @@ public sealed class SoloDuelVisualsPlayModeTests
             1, 40, higher, true, 100,
             1, 100, 41, 100);
         InvokeLayout(layout, "RevealOpponentOutcome");
+        yield return ValidateSoloViewport(
+            canvas, safeAreaOwner, layout, numberManager,
+            width, height, locale + " OpponentLockMiss");
         InvokeLayout(layout, "ShowLockForfeit", ai, 1);
         Assert.That(StateProperty(layout, "ActiveActor"),
             Is.EqualTo("Player"));
@@ -1585,6 +1685,7 @@ public sealed class SoloDuelVisualsPlayModeTests
                 "HistoryCard",
                 "HistoryViewport",
                 "SoloTipCard",
+                "CurrentRangeLabel",
                 "PlayerRangeLabel",
                 "OpponentRangeLabel",
                 "LockExplanation",
@@ -1612,11 +1713,10 @@ public sealed class SoloDuelVisualsPlayModeTests
                 as RectTransform;
             RectTransform tip = Find(visualRoot, "SoloTipCard")
                 as RectTransform;
-            RectTransform tipMascot = Find(visualRoot, "SoloTipMascot")
-                as RectTransform;
             TMP_Text validation = GetField<TMP_Text>(
                 numberManager, "messageText");
             string geometryContext = $"{locale} {width}x{height}";
+            ForceFinalTextLayout(visualRoot);
             Assert.That(continueButton.gameObject.activeInHierarchy, Is.False,
                 geometryContext + " routine phases need no permission button");
             AssertVerticalGap(
@@ -1654,33 +1754,18 @@ public sealed class SoloDuelVisualsPlayModeTests
                     safeRoot as RectTransform, tip, safeRect),
                 1f, geometryContext + " history/strategy");
 
-            foreach (string textName in new[]
-                     { "PlayerRangeLabel", "OpponentRangeLabel", "LockExplanation" })
-            {
-                TMP_Text tipText = Find(visualRoot, textName)
-                    .GetComponent<TMP_Text>();
-                CollectRenderedTextInsidePanel(
-                    activeGlyphViolations,
-                    tipText,
-                    tip,
-                    new Vector4(16f, 10f, 112f, 12f),
-                    geometryContext + " " + textName + " tip-safe-area");
-                CollectRenderedTextLeftOf(
-                    activeGlyphViolations,
-                    tipText,
-                    tipMascot,
-                    tip,
-                    2f,
-                    geometryContext + " " + textName + " mascot-reserve");
-            }
-
             foreach (TMP_Text text in
                      visualRoot.GetComponentsInChildren<TMP_Text>(true))
             {
-                if (!text.gameObject.activeInHierarchy ||
-                    string.IsNullOrWhiteSpace(text.text))
+                if (!IsRenderedText(text))
                     continue;
                 CollectRenderedTextWithinRect(
+                    activeGlyphViolations,
+                    text, $"{locale} {width}x{height} {text.name}");
+                CollectMissingGlyphs(
+                    activeGlyphViolations,
+                    text, $"{locale} {width}x{height} {text.name}");
+                CollectMinimumReadableFont(
                     activeGlyphViolations,
                     text, $"{locale} {width}x{height} {text.name}");
                 if (text.name == "OpponentDifficulty" ||
@@ -1693,6 +1778,18 @@ public sealed class SoloDuelVisualsPlayModeTests
                 }
             }
 
+            CollectOwnerAwareTypography(
+                activeGlyphViolations,
+                visualRoot,
+                layout,
+                numberManager,
+                geometryContext);
+            CollectConcurrentTextOverlaps(
+                activeGlyphViolations,
+                visualRoot,
+                safeRoot as RectTransform,
+                geometryContext);
+
             string phase = StateProperty(layout, "Phase");
             Button lockControl = lockButton.GetComponent<Button>();
             bool live = phase != "ChooseSecret" && phase != "MatchResult";
@@ -1701,20 +1798,573 @@ public sealed class SoloDuelVisualsPlayModeTests
             Assert.That(lockControl.interactable,
                 Is.EqualTo(phase == "PlayerGuess"),
                 geometryContext + " Lock interaction");
-            if (phase == "StarterReveal" || phase == "LockForfeit" ||
-                phase == "RoundResolution")
-            {
-                TMP_Text heading = Find(visualRoot, "CurrentNumberHeading")
-                    .GetComponent<TMP_Text>();
-                Assert.That(heading.text,
-                    Is.Not.EqualTo(Localized("hud_current_number")),
-                    geometryContext + " contextual heading");
-            }
+            bool inputGuidance = phase == "ChooseSecret" ||
+                                 phase == "PlayerGuess";
+            Assert.That(
+                Find(visualRoot, "CurrentNumberHeading")
+                    .gameObject.activeInHierarchy,
+                Is.EqualTo(inputGuidance),
+                geometryContext + " keypad guidance ownership");
         }
         finally
         {
             if (responsiveBehaviour != null)
                 responsiveBehaviour.enabled = responsiveWasEnabled;
+        }
+    }
+
+    static void ForceFinalTextLayout(Transform visualRoot)
+    {
+        Canvas.ForceUpdateCanvases();
+        foreach (TMP_Text text in
+                 visualRoot.GetComponentsInChildren<TMP_Text>(true))
+        {
+            if (text.gameObject.activeInHierarchy)
+                text.ForceMeshUpdate(true, true);
+        }
+        Canvas.ForceUpdateCanvases();
+    }
+
+    static void CollectOwnerAwareTypography(
+        ICollection<string> violations,
+        Transform visualRoot,
+        Component layout,
+        Component numberManager,
+        string context)
+    {
+        RectTransform ribbon = RectNamed(visualRoot, "SoloPromptRibbon");
+        RectTransform interaction = RectNamed(visualRoot, "SoloInteractionCard");
+        RectTransform playerCard = RectNamed(visualRoot, "PlayerCard");
+        RectTransform opponentCard = RectNamed(visualRoot, "OpponentCard");
+        RectTransform bubble = RectNamed(visualRoot, "SoloOpponentBubble");
+        RectTransform bubbleTextSafe = RectNamed(
+            visualRoot, "OpponentBubbleTextSafeArea");
+        RectTransform historyCard = RectNamed(visualRoot, "HistoryCard");
+        RectTransform tip = RectNamed(visualRoot, "SoloTipCard");
+        RectTransform chip = RectNamed(visualRoot, "SoloDuelPlayerChip");
+        RectTransform result = RectNamed(visualRoot, "SoloResultDetail");
+
+        TMP_Text round = TextNamed(visualRoot, "RoundLabel");
+        TMP_Text action = TextNamed(visualRoot, "CentralGuess");
+        TMP_Text outcome = TextNamed(visualRoot, "CentralOutcome");
+        TMP_Text handoff = GetField<TMP_Text>(layout, "phaseText");
+        CollectInsideMany(
+            violations, ribbon, 8f, context + " ribbon",
+            round, action, outcome, handoff);
+        CollectVerticalSequence(
+            violations, ribbon, 6f, context + " ribbon lanes",
+            round, action, outcome, handoff);
+        CollectMinimumReadableFont(
+            violations, handoff, 18f, context + " ribbon handoff");
+
+        TMP_Text heading = TextNamed(visualRoot, "CurrentNumberHeading");
+        TMP_Text range = TextNamed(visualRoot, "CurrentRangeLabel");
+        TMP_InputField input = GetField<TMP_InputField>(
+            numberManager, "numberInput");
+        TMP_Text inputValue = input != null ? input.textComponent : null;
+        TMP_Text inputPlaceholder = input != null
+            ? input.placeholder as TMP_Text
+            : null;
+        TMP_Text validation = GetField<TMP_Text>(numberManager, "messageText");
+        CollectInsideMany(
+            violations, interaction, 8f, context + " interaction",
+            heading, range, validation);
+        if (input != null)
+        {
+            RectTransform inputOwner = input.transform as RectTransform;
+            CollectInsideMany(
+                violations, inputOwner, 8f, context + " input",
+                inputValue, inputPlaceholder);
+        }
+        CollectVerticalSequence(
+            violations, interaction, 6f, context + " input guidance",
+            heading, range, ActiveInputText(inputValue, inputPlaceholder));
+
+        TMP_Text playerCaption = TextNamed(visualRoot, "PlayerCaption");
+        TMP_Text playerBadge = TextNamed(visualRoot, "PlayerActiveBadgeLabel");
+        TMP_Text playerName = TextNamed(visualRoot, "PlayerName");
+        TMP_Text playerSecret = TextNamed(visualRoot, "PlayerSecretValue");
+        TMP_Text playerLatest = TextNamed(visualRoot, "PlayerLatestGuess");
+        TMP_Text playerWins = TextNamed(visualRoot, "PlayerWins");
+        CollectInsideMany(
+            violations, playerCard, 8f, context + " player-card",
+            playerCaption, playerName, playerSecret, playerLatest, playerWins);
+        CollectInsideMany(
+            violations,
+            RectNamed(visualRoot, "PlayerActiveBadge"),
+            6f,
+            context + " player-badge",
+            playerBadge);
+        CollectVerticalSequence(
+            violations, playerCard, 6f, context + " player-card lanes",
+            playerCaption, playerBadge, playerName,
+            playerSecret, playerLatest, playerWins);
+        CollectReservedExclusion(
+            violations, playerWins,
+            RectNamed(visualRoot, "PlayerCardTrophy"), playerCard, 8f,
+            context + " player score/trophy");
+
+        TMP_Text opponentCaption = TextNamed(visualRoot, "OpponentCaption");
+        TMP_Text opponentBadge = TextNamed(
+            visualRoot, "OpponentActiveBadgeLabel");
+        TMP_Text opponentName = GetField<TMP_Text>(layout, "opponentIdentityText");
+        TMP_Text opponentLatest = TextNamed(
+            visualRoot, "OpponentLatestGuess");
+        TMP_Text difficulty = TextNamed(visualRoot, "OpponentDifficulty");
+        CollectInsideMany(
+            violations, opponentCard, 8f, context + " opponent-card",
+            opponentCaption, opponentName, opponentLatest, difficulty);
+        CollectInsideMany(
+            violations,
+            RectNamed(visualRoot, "OpponentActiveBadge"),
+            6f,
+            context + " opponent-badge",
+            opponentBadge);
+        CollectVerticalSequence(
+            violations, opponentCard, 6f, context + " opponent-card lanes",
+            opponentCaption, opponentBadge, opponentName,
+            opponentLatest, difficulty);
+        CollectReservedExclusion(
+            violations, difficulty,
+            RectNamed(visualRoot, "OpponentCardTrophy"), opponentCard, 8f,
+            context + " difficulty/trophy");
+        CollectMinimumReadableFont(
+            violations, opponentName, 35f, context + " opponent name");
+
+        TMP_Text bubblePrompt = TextNamed(
+            visualRoot, "OpponentBubblePrompt");
+        TMP_Text bubbleGuess = GetField<TMP_Text>(layout, "opponentGuessText");
+        TMP_Text bubbleSpeech = GetField<TMP_Text>(layout, "opponentSpeechText");
+        TMP_Text[] bubbleLabels = { bubblePrompt, bubbleGuess, bubbleSpeech };
+        CollectInsideMany(
+            violations, bubbleTextSafe, 8f,
+            context + " speech-bubble cream-content",
+            bubbleLabels);
+        int visibleBubbleLabels = bubbleLabels.Count(IsRenderedText);
+        if (visibleBubbleLabels > 1)
+        {
+            violations.Add(
+                context + " speech-bubble has " + visibleBubbleLabels +
+                " competing text owners; expected at most one");
+        }
+        foreach (TMP_Text label in bubbleLabels)
+        {
+            CollectReservedExclusion(
+                violations, label,
+                RectNamed(visualRoot, "OpponentBubbleAvatar"), bubble, 8f,
+                context + " speech/avatar reserve");
+            CollectReservedExclusion(
+                violations, label,
+                RectNamed(visualRoot, "OpponentReaction"), bubble, 8f,
+                context + " speech/emoji reserve");
+        }
+
+        TMP_Text historyTitle = TextNamed(visualRoot, "HistoryTitle");
+        CollectInsideMany(
+            violations, historyCard, 8f, context + " history-card",
+            historyTitle);
+        CollectReservedExclusion(
+            violations, historyTitle,
+            RectNamed(visualRoot, "HistoryTitleSparkleLeft"), historyCard, 8f,
+            context + " history-title/left-sparkle");
+        CollectReservedExclusion(
+            violations, historyTitle,
+            RectNamed(visualRoot, "HistoryTitleSparkleRight"), historyCard, 8f,
+            context + " history-title/right-sparkle");
+        foreach (Transform child in
+                 RectNamed(visualRoot, "HistoryContent"))
+        {
+            if (!child.gameObject.activeInHierarchy ||
+                !child.name.StartsWith("HistoryRow", StringComparison.Ordinal))
+                continue;
+            RectTransform row = child as RectTransform;
+            TMP_Text meta = TextNamed(child, "HistoryMeta");
+            TMP_Text number = TextNamed(child, "HistoryNumber");
+            TMP_Text rowOutcome = TextNamed(child, "HistoryOutcome");
+            TMP_Text newest = TextNamed(child, "HistoryNewest");
+            CollectInsideMany(
+                violations, row, 8f,
+                context + " " + child.name,
+                meta, number, rowOutcome, newest);
+            CollectHorizontalTextGap(
+                violations, meta, newest, row, 6f,
+                context + " " + child.name + " meta/new");
+            CollectVerticalTextGap(
+                violations, meta, number, row, 6f,
+                context + " " + child.name + " meta/number");
+            CollectVerticalTextGap(
+                violations, newest, rowOutcome, row, 6f,
+                context + " " + child.name + " new/outcome");
+            CollectHorizontalTextGap(
+                violations, number, rowOutcome, row, 6f,
+                context + " " + child.name + " number/outcome");
+            CollectReservedExclusion(
+                violations, rowOutcome,
+                RectNamed(child, "HistoryIcon"), row, 8f,
+                context + " " + child.name + " outcome/icon");
+        }
+
+        TMP_Text tipHeading = TextNamed(visualRoot, "SoloTipHeading");
+        TMP_Text playerRange = TextNamed(visualRoot, "PlayerRangeLabel");
+        TMP_Text aiRange = TextNamed(visualRoot, "OpponentRangeLabel");
+        TMP_Text lockCopy = TextNamed(visualRoot, "LockExplanation");
+        CollectInsideMany(
+            violations, tip, 8f, context + " tip-card",
+            tipHeading, playerRange, aiRange, lockCopy);
+        CollectVerticalSequence(
+            violations, tip, 6f, context + " tip lanes",
+            tipHeading, playerRange, aiRange, lockCopy);
+        foreach (TMP_Text label in new[]
+                 { tipHeading, playerRange, aiRange, lockCopy })
+        {
+            CollectReservedExclusion(
+                violations, label,
+                RectNamed(visualRoot, "SoloTipMascot"), tip, 8f,
+                context + " tip/mascot reserve");
+            CollectReservedExclusion(
+                violations, label,
+                RectNamed(visualRoot, "SoloTipBulb"), tip, 8f,
+                context + " tip/bulb reserve");
+        }
+
+        TMP_Text chipScore = TextNamed(visualRoot, "SoloDuelChipText");
+        CollectInsideMany(
+            violations, chip, 8f, context + " profile-chip", chipScore);
+        CollectReservedExclusion(
+            violations, chipScore,
+            RectNamed(visualRoot, "SoloDuelChipTrophy"), chip, 8f,
+            context + " chip score/trophy");
+        CollectReservedExclusion(
+            violations, chipScore,
+            RectNamed(visualRoot, "SoloDuelChipAvatar"), chip, 8f,
+            context + " chip score/avatar");
+
+        if (result.gameObject.activeInHierarchy)
+        {
+            TMP_Text reason = TextNamed(visualRoot, "ResultReason");
+            TMP_Text secrets = TextNamed(visualRoot, "ResultSecrets");
+            TMP_Text guesses = TextNamed(visualRoot, "ResultLatestGuesses");
+            TMP_Text turns = TextNamed(visualRoot, "ResultTurns");
+            CollectInsideMany(
+                violations, result, 8f, context + " result",
+                reason, secrets, guesses, turns);
+            CollectVerticalSequence(
+                violations, result, 6f, context + " result lanes",
+                reason, secrets, guesses, turns);
+        }
+
+        foreach (Button button in
+                 visualRoot.GetComponentsInChildren<Button>(true))
+        {
+            if (!button.gameObject.activeInHierarchy)
+                continue;
+            TMP_Text label = button.GetComponentInChildren<TMP_Text>(true);
+            if (label == null || !label.gameObject.activeInHierarchy ||
+                string.IsNullOrWhiteSpace(label.text))
+                continue;
+            CollectRenderedTextInsidePanel(
+                violations, label, button.transform as RectTransform,
+                new Vector4(8f, 8f, 8f, 8f),
+                context + " " + button.name + " label");
+        }
+    }
+
+    static RectTransform RectNamed(Transform root, string name)
+    {
+        Transform found = Find(root, name);
+        Assert.That(found, Is.Not.Null, "Missing layout owner " + name);
+        RectTransform rect = found as RectTransform;
+        Assert.That(rect, Is.Not.Null, name + " must be a RectTransform");
+        return rect;
+    }
+
+    static TMP_Text TextNamed(Transform root, string name)
+    {
+        Transform found = Find(root, name);
+        Assert.That(found, Is.Not.Null, "Missing text owner " + name);
+        TMP_Text text = found.GetComponent<TMP_Text>();
+        Assert.That(text, Is.Not.Null, name + " must own TMP text");
+        return text;
+    }
+
+    static TMP_Text ActiveInputText(TMP_Text value, TMP_Text placeholder)
+    {
+        return IsRenderedText(value) ? value : placeholder;
+    }
+
+    static bool IsRenderedText(TMP_Text text)
+    {
+        return text != null && text.enabled &&
+               text.gameObject.activeInHierarchy &&
+               !text.canvasRenderer.cull &&
+               text.canvasRenderer.GetAlpha() > 0.001f &&
+               HasRenderableText(text.text);
+    }
+
+    static bool HasRenderableText(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+            return false;
+        return value.Any(character =>
+            !char.IsWhiteSpace(character) &&
+            char.GetUnicodeCategory(character) != UnicodeCategory.Format &&
+            char.GetUnicodeCategory(character) != UnicodeCategory.Control);
+    }
+
+    static void CollectConcurrentTextOverlaps(
+        ICollection<string> violations,
+        Transform visualRoot,
+        RectTransform referenceSpace,
+        string context)
+    {
+        TMP_Text[] labels = visualRoot
+            .GetComponentsInChildren<TMP_Text>(true)
+            .Where(IsRenderedText)
+            .ToArray();
+        Transform modal = Find(visualRoot, "SoloLeaveConfirmation");
+        bool modalVisible = modal != null && modal.gameObject.activeInHierarchy;
+        for (int leftIndex = 0; leftIndex < labels.Length; leftIndex++)
+        {
+            TMP_Text left = labels[leftIndex];
+            if (!TryRenderedGlyphRectsIn(
+                    referenceSpace, left, out List<Rect> leftGlyphs))
+                continue;
+            Rect leftBounds = Union(leftGlyphs);
+            for (int rightIndex = leftIndex + 1;
+                 rightIndex < labels.Length;
+                 rightIndex++)
+            {
+                TMP_Text right = labels[rightIndex];
+                if (IsApprovedDecorativeTextLayer(left, right) ||
+                    IsIntentionalModalLayerPair(
+                        left, right, modal, modalVisible) ||
+                    !TryRenderedGlyphRectsIn(
+                        referenceSpace, right, out List<Rect> rightGlyphs))
+                    continue;
+                Rect rightBounds = Union(rightGlyphs);
+                if (!leftBounds.Overlaps(rightBounds))
+                    continue;
+                if (!leftGlyphs.Any(leftGlyph =>
+                        rightGlyphs.Any(rightGlyph =>
+                            leftGlyph.Overlaps(rightGlyph))))
+                    continue;
+                violations.Add(
+                    context + " active text overlap: " + left.name +
+                    "/" + right.name + $"; left={leftBounds}, right={rightBounds}");
+            }
+        }
+    }
+
+    static bool IsApprovedDecorativeTextLayer(TMP_Text left, TMP_Text right)
+    {
+        return left.transform.parent == right.transform.parent &&
+               ((left.name == "SoloVsOutline" && right.name == "SoloVsLabel") ||
+                (left.name == "SoloVsLabel" && right.name == "SoloVsOutline"));
+    }
+
+    static bool IsIntentionalModalLayerPair(
+        TMP_Text left,
+        TMP_Text right,
+        Transform modal,
+        bool modalVisible)
+    {
+        if (!modalVisible)
+            return false;
+        bool leftIsModal = left.transform == modal ||
+                           left.transform.IsChildOf(modal);
+        bool rightIsModal = right.transform == modal ||
+                            right.transform.IsChildOf(modal);
+        return leftIsModal != rightIsModal;
+    }
+
+    static void CollectMissingGlyphs(
+        ICollection<string> violations,
+        TMP_Text text,
+        string context)
+    {
+        if (text.font == null)
+        {
+            violations.Add(context + " has no TMP font asset");
+            return;
+        }
+
+        var missing = new HashSet<int>();
+        foreach (char character in text.text)
+        {
+            if (char.IsWhiteSpace(character) || char.IsControl(character) ||
+                character == '\u200B' || char.IsSurrogate(character))
+                continue;
+            if (!text.font.HasCharacter(character, true, false))
+                missing.Add(character);
+        }
+        if (missing.Count == 0)
+            return;
+        violations.Add(
+            context + " missing TMP glyph(s): " +
+            string.Join(", ", missing.OrderBy(value => value)
+                .Select(value => $"U+{value:X4}")));
+    }
+
+    static void CollectMinimumReadableFont(
+        ICollection<string> violations,
+        TMP_Text text,
+        string context)
+    {
+        float minimum;
+        switch (text.name)
+        {
+            case "RoundLabel": minimum = 20f; break;
+            case "CentralGuess": minimum = 23f; break;
+            case "CentralOutcome": minimum = 21f; break;
+            case "PhasePrompt": minimum = 18f; break;
+            case "CurrentNumberHeading": minimum = 22f; break;
+            case "CurrentRangeLabel": minimum = 19f; break;
+            case "PlayerName":
+            case "OpponentIdentity": minimum = 35f; break;
+            case "PlayerLatestGuess":
+            case "OpponentLatestGuess": minimum = 18f; break;
+            case "OpponentDifficulty": minimum = 23f; break;
+            case "HistoryMeta":
+            case "HistoryNewest": minimum = 16f; break;
+            case "HistoryOutcome": minimum = 19f; break;
+            case "PlayerRangeLabel":
+            case "OpponentRangeLabel": minimum = 17f; break;
+            case "LockExplanation": minimum = 16f; break;
+            case "ResultReason": minimum = 21f; break;
+            default: return;
+        }
+        if (text.fontSize + 0.01f < minimum)
+        {
+            violations.Add(
+                context + $" font expected >= {minimum:0.###} " +
+                $"but was {text.fontSize:0.###}");
+        }
+    }
+
+    static void CollectMinimumReadableFont(
+        ICollection<string> violations,
+        TMP_Text text,
+        float minimum,
+        string context)
+    {
+        if (!IsRenderedText(text))
+            return;
+        if (text.fontSize + 0.01f < minimum)
+        {
+            violations.Add(
+                context + $" font expected >= {minimum:0.###} " +
+                $"but was {text.fontSize:0.###}");
+        }
+    }
+
+    static void CollectInsideMany(
+        ICollection<string> violations,
+        RectTransform owner,
+        float padding,
+        string context,
+        params TMP_Text[] labels)
+    {
+        foreach (TMP_Text label in labels)
+        {
+            CollectRenderedTextInsidePanel(
+                violations, label, owner,
+                new Vector4(padding, padding, padding, padding),
+                context + " " + (label != null ? label.name : "<missing>"));
+        }
+    }
+
+    static void CollectVerticalSequence(
+        ICollection<string> violations,
+        RectTransform owner,
+        float minimumGap,
+        string context,
+        params TMP_Text[] labels)
+    {
+        TMP_Text previous = null;
+        foreach (TMP_Text label in labels)
+        {
+            if (!IsRenderedText(label))
+                continue;
+            if (previous != null)
+            {
+                CollectVerticalTextGap(
+                    violations, previous, label, owner, minimumGap,
+                    context + " " + previous.name + "/" + label.name);
+            }
+            previous = label;
+        }
+    }
+
+    static void CollectVerticalTextGap(
+        ICollection<string> violations,
+        TMP_Text upper,
+        TMP_Text lower,
+        RectTransform owner,
+        float minimumGap,
+        string context)
+    {
+        if (!IsRenderedText(upper) || !IsRenderedText(lower))
+            return;
+        if (!TryRenderedGlyphRectIn(owner, upper, out Rect upperGlyphs, out _) ||
+            !TryRenderedGlyphRectIn(owner, lower, out Rect lowerGlyphs, out _))
+            return;
+        float gap = upperGlyphs.yMin - lowerGlyphs.yMax;
+        if (gap < minimumGap)
+        {
+            violations.Add(
+                context + $" vertical gap expected >= {minimumGap:0.###} " +
+                $"but was {gap:0.###}; upper={upperGlyphs}, lower={lowerGlyphs}");
+        }
+    }
+
+    static void CollectHorizontalTextGap(
+        ICollection<string> violations,
+        TMP_Text left,
+        TMP_Text right,
+        RectTransform owner,
+        float minimumGap,
+        string context)
+    {
+        if (!IsRenderedText(left) || !IsRenderedText(right))
+            return;
+        if (!TryRenderedGlyphRectIn(owner, left, out Rect leftGlyphs, out _) ||
+            !TryRenderedGlyphRectIn(owner, right, out Rect rightGlyphs, out _))
+            return;
+        float gap = rightGlyphs.xMin - leftGlyphs.xMax;
+        if (gap < minimumGap)
+        {
+            violations.Add(
+                context + $" horizontal gap expected >= {minimumGap:0.###} " +
+                $"but was {gap:0.###}; left={leftGlyphs}, right={rightGlyphs}");
+        }
+    }
+
+    static void CollectReservedExclusion(
+        ICollection<string> violations,
+        TMP_Text text,
+        RectTransform reserved,
+        RectTransform owner,
+        float clearance,
+        string context)
+    {
+        if (!IsRenderedText(text) || reserved == null ||
+            !reserved.gameObject.activeInHierarchy)
+            return;
+        if (!TryRenderedGlyphRectsIn(owner, text, out List<Rect> glyphRects))
+            return;
+        Rect glyphs = Union(glyphRects);
+        Bounds bounds = RectTransformUtility.CalculateRelativeRectTransformBounds(
+            owner, reserved);
+        Rect exclusion = new Rect(
+            bounds.min.x - clearance,
+            bounds.min.y - clearance,
+            bounds.size.x + clearance * 2f,
+            bounds.size.y + clearance * 2f);
+        if (glyphRects.Any(glyph => glyph.Overlaps(exclusion)))
+        {
+            violations.Add(
+                context + $" glyphs intersect {clearance:0.###}-unit " +
+                $"reserved zone; glyphs={glyphs}, reserved={exclusion}");
         }
     }
 
@@ -1868,7 +2518,11 @@ public sealed class SoloDuelVisualsPlayModeTests
             string.IsNullOrWhiteSpace(text.text))
             return;
 
-        Rect glyphs = RenderedGlyphRectIn(panel, text);
+        Assert.That(
+            TryRenderedGlyphRectIn(panel, text, out Rect glyphs, out int count),
+            Is.True,
+            context + " must render at least one visible glyph");
+        Assert.That(count, Is.GreaterThan(0), context);
         Rect safe = panel.rect;
         safe.xMin += padding.x;
         safe.yMin += padding.y;
@@ -1889,7 +2543,11 @@ public sealed class SoloDuelVisualsPlayModeTests
             string.IsNullOrWhiteSpace(text.text))
             return;
 
-        Rect glyphs = RenderedGlyphRectIn(panel, text);
+        Assert.That(
+            TryRenderedGlyphRectIn(panel, text, out Rect glyphs, out int count),
+            Is.True,
+            context + " must render at least one visible glyph");
+        Assert.That(count, Is.GreaterThan(0), context);
         Bounds reservedBounds =
             RectTransformUtility.CalculateRelativeRectTransformBounds(
                 panel, reserved);
@@ -1898,29 +2556,125 @@ public sealed class SoloDuelVisualsPlayModeTests
             context + $" / gap={gap:0.###}");
     }
 
-    static Rect RenderedGlyphRectIn(
+    static bool TryRenderedGlyphRectIn(
         RectTransform owner,
-        TMP_Text text)
+        TMP_Text text,
+        out Rect glyphs,
+        out int visibleGlyphCount)
     {
-        text.ForceMeshUpdate();
-        Bounds rendered = text.textBounds;
-        Vector3[] corners =
+        glyphs = default;
+        visibleGlyphCount = 0;
+        if (!TryRenderedGlyphRectsIn(owner, text, out List<Rect> rectangles))
+            return false;
+
+        visibleGlyphCount = rectangles.Count;
+        glyphs = Union(rectangles);
+        return true;
+    }
+
+    static bool TryRenderedGlyphRectsIn(
+        RectTransform owner,
+        TMP_Text text,
+        out List<Rect> rectangles)
+    {
+        rectangles = new List<Rect>();
+        if (owner == null || text == null)
+            return false;
+
+        text.ForceMeshUpdate(true, true);
+        CalculateEffectExpansion(
+            owner, text, out float left, out float bottom,
+            out float right, out float top);
+        TMP_TextInfo info = text.textInfo;
+        for (int index = 0; index < info.characterCount; index++)
         {
-            new Vector3(rendered.min.x, rendered.min.y, 0f),
-            new Vector3(rendered.min.x, rendered.max.y, 0f),
-            new Vector3(rendered.max.x, rendered.min.y, 0f),
-            new Vector3(rendered.max.x, rendered.max.y, 0f),
-        };
-        Vector2 minimum = new Vector2(float.PositiveInfinity, float.PositiveInfinity);
-        Vector2 maximum = new Vector2(float.NegativeInfinity, float.NegativeInfinity);
-        foreach (Vector3 corner in corners)
-        {
-            Vector3 local = owner.InverseTransformPoint(
-                text.rectTransform.TransformPoint(corner));
-            minimum = Vector2.Min(minimum, local);
-            maximum = Vector2.Max(maximum, local);
+            TMP_CharacterInfo character = info.characterInfo[index];
+            if (!character.isVisible)
+                continue;
+            Vector2 minimum = new Vector2(
+                float.PositiveInfinity, float.PositiveInfinity);
+            Vector2 maximum = new Vector2(
+                float.NegativeInfinity, float.NegativeInfinity);
+            Vector3[] corners =
+            {
+                character.bottomLeft,
+                character.topLeft,
+                character.topRight,
+                character.bottomRight,
+            };
+            foreach (Vector3 corner in corners)
+            {
+                Vector3 local = owner.InverseTransformPoint(
+                    text.rectTransform.TransformPoint(corner));
+                minimum = Vector2.Min(minimum, local);
+                maximum = Vector2.Max(maximum, local);
+            }
+            rectangles.Add(Rect.MinMaxRect(
+                minimum.x + left,
+                minimum.y + bottom,
+                maximum.x + right,
+                maximum.y + top));
         }
-        return new Rect(minimum, maximum - minimum);
+        return rectangles.Count > 0;
+    }
+
+    static void CalculateEffectExpansion(
+        RectTransform owner,
+        TMP_Text text,
+        out float left,
+        out float bottom,
+        out float right,
+        out float top)
+    {
+        // TMP character quads already include the SDF material padding and
+        // configured material outline. Expand only for live uGUI
+        // Shadow/Outline components, whose duplicated geometry is outside the
+        // TMP character quad.
+        left = 0f;
+        bottom = 0f;
+        right = 0f;
+        top = 0f;
+
+        foreach (Shadow effect in text.GetComponents<Shadow>())
+        {
+            if (effect == null || !effect.enabled)
+                continue;
+            Vector2 distance = effect.effectDistance;
+            Vector3 offset = owner.InverseTransformVector(
+                text.rectTransform.TransformVector(
+                    new Vector3(distance.x, distance.y, 0f)));
+            if (effect is Outline)
+            {
+                float x = Mathf.Abs(offset.x);
+                float y = Mathf.Abs(offset.y);
+                left = Mathf.Min(left, -x);
+                bottom = Mathf.Min(bottom, -y);
+                right = Mathf.Max(right, x);
+                top = Mathf.Max(top, y);
+            }
+            else
+            {
+                left = Mathf.Min(left, offset.x);
+                bottom = Mathf.Min(bottom, offset.y);
+                right = Mathf.Max(right, offset.x);
+                top = Mathf.Max(top, offset.y);
+            }
+        }
+    }
+
+    static Rect Union(IReadOnlyList<Rect> rectangles)
+    {
+        Rect result = rectangles[0];
+        for (int index = 1; index < rectangles.Count; index++)
+        {
+            Rect item = rectangles[index];
+            result = Rect.MinMaxRect(
+                Mathf.Min(result.xMin, item.xMin),
+                Mathf.Min(result.yMin, item.yMin),
+                Mathf.Max(result.xMax, item.xMax),
+                Mathf.Max(result.yMax, item.yMax));
+        }
+        return result;
     }
 
     static void CollectRenderedTextWithinRect(
@@ -1928,30 +2682,45 @@ public sealed class SoloDuelVisualsPlayModeTests
         TMP_Text text,
         string context)
     {
-        text.ForceMeshUpdate();
-        Bounds rendered = text.textBounds;
+        text.ForceMeshUpdate(true, true);
         Rect available = text.rectTransform.rect;
         var reasons = new List<string>();
         if (text.isTextOverflowing)
             reasons.Add("overflow/truncation expected false but was true");
-
+        bool hasGlyphs = TryRenderedGlyphRectIn(
+            text.rectTransform, text, out Rect rendered, out int glyphCount);
+        if (!hasGlyphs)
+        {
+            reasons.Add("non-empty active label rendered zero visible glyphs");
+            AddGlyphViolation(
+                violations, context, text, reasons,
+                $"font={text.fontSize:0.###}, max={text.fontSizeMax:0.###}, " +
+                $"rect={available}, visible={glyphCount}");
+            return;
+        }
+        if (text.maxVisibleCharacters < text.textInfo.characterCount)
+            reasons.Add("maxVisibleCharacters hides copy");
+        if (text.maxVisibleWords < text.textInfo.wordCount)
+            reasons.Add("maxVisibleWords hides copy");
+        if (text.maxVisibleLines < text.textInfo.lineCount)
+            reasons.Add("maxVisibleLines hides copy");
         const float tolerance = 1f;
         AddLowerBoundReason(
-            reasons, "glyph min x", rendered.min.x,
+            reasons, "glyph min x", rendered.xMin,
             available.xMin - tolerance);
         AddUpperBoundReason(
-            reasons, "glyph max x", rendered.max.x,
+            reasons, "glyph max x", rendered.xMax,
             available.xMax + tolerance);
         AddLowerBoundReason(
-            reasons, "glyph min y", rendered.min.y,
+            reasons, "glyph min y", rendered.yMin,
             available.yMin - tolerance);
         AddUpperBoundReason(
-            reasons, "glyph max y", rendered.max.y,
+            reasons, "glyph max y", rendered.yMax,
             available.yMax + tolerance);
         AddGlyphViolation(
             violations, context, text, reasons,
             $"font={text.fontSize:0.###}, max={text.fontSizeMax:0.###}, " +
-            $"rect={available}, textBounds={rendered}");
+            $"rect={available}, glyphs={rendered}, visible={glyphCount}");
     }
 
     static void CollectRenderedTextHorizontalSafety(
@@ -1960,20 +2729,25 @@ public sealed class SoloDuelVisualsPlayModeTests
         float safety,
         string context)
     {
-        text.ForceMeshUpdate();
-        Bounds rendered = text.textBounds;
+        text.ForceMeshUpdate(true, true);
+        if (!TryRenderedGlyphRectIn(
+                text.rectTransform, text, out Rect rendered, out int glyphCount))
+        {
+            violations.Add(context + " rendered zero visible glyphs");
+            return;
+        }
         Rect available = text.rectTransform.rect;
         var reasons = new List<string>();
         AddLowerBoundReason(
-            reasons, "glyph min x", rendered.min.x,
+            reasons, "glyph min x", rendered.xMin,
             available.xMin + safety);
         AddUpperBoundReason(
-            reasons, "glyph max x", rendered.max.x,
+            reasons, "glyph max x", rendered.xMax,
             available.xMax - safety);
         AddGlyphViolation(
             violations, context + " horizontal-safety", text, reasons,
             $"safety={safety:0.###}, rect={available}, " +
-            $"textBounds={rendered}");
+            $"glyphs={rendered}, visible={glyphCount}");
     }
 
     static void CollectRenderedTextInsidePanel(
@@ -1983,12 +2757,15 @@ public sealed class SoloDuelVisualsPlayModeTests
         Vector4 padding,
         string context)
     {
-        if (!text.gameObject.activeInHierarchy ||
-            !text.enabled ||
-            string.IsNullOrWhiteSpace(text.text))
+        if (panel == null || !IsRenderedText(text))
             return;
 
-        Rect glyphs = RenderedGlyphRectIn(panel, text);
+        if (!TryRenderedGlyphRectIn(
+                panel, text, out Rect glyphs, out int glyphCount))
+        {
+            violations.Add(context + " rendered zero visible glyphs");
+            return;
+        }
         Rect safe = panel.rect;
         safe.xMin += padding.x;
         safe.yMin += padding.y;
@@ -2010,7 +2787,7 @@ public sealed class SoloDuelVisualsPlayModeTests
             safe.yMax + tolerance);
         AddGlyphViolation(
             violations, context, text, reasons,
-            $"safe={safe}, glyphs={glyphs}");
+            $"safe={safe}, glyphs={glyphs}, visible={glyphCount}");
     }
 
     static void CollectRenderedTextLeftOf(
@@ -2021,12 +2798,15 @@ public sealed class SoloDuelVisualsPlayModeTests
         float minimumGap,
         string context)
     {
-        if (!text.gameObject.activeInHierarchy ||
-            !text.enabled ||
-            string.IsNullOrWhiteSpace(text.text))
+        if (!IsRenderedText(text))
             return;
 
-        Rect glyphs = RenderedGlyphRectIn(panel, text);
+        if (!TryRenderedGlyphRectIn(
+                panel, text, out Rect glyphs, out int glyphCount))
+        {
+            violations.Add(context + " rendered zero visible glyphs");
+            return;
+        }
         Bounds reservedBounds =
             RectTransformUtility.CalculateRelativeRectTransformBounds(
                 panel, reserved);
@@ -2036,7 +2816,7 @@ public sealed class SoloDuelVisualsPlayModeTests
         AddGlyphViolation(
             violations, context, text, reasons,
             $"minimumGap={minimumGap:0.###}, gap={gap:0.###}, " +
-            $"glyphs={glyphs}, reserved={reservedBounds}");
+            $"glyphs={glyphs}, reserved={reservedBounds}, visible={glyphCount}");
     }
 
     static void AddLowerBoundReason(

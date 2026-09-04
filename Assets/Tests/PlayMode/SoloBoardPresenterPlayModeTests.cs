@@ -393,8 +393,7 @@ public sealed class SoloBoardPresenterPlayModeTests
             Assert.That(CurrentHold(), Is.InRange(1.5f, 2.2f));
             TMP_Text guessReveal = Find(panel.transform, "CentralGuess")
                 .GetComponent<TMP_Text>();
-            TMP_Text resultPending = Find(panel.transform, "CentralOutcome")
-                .GetComponent<TMP_Text>();
+            TMP_Text resultPending = (TMP_Text)Field(game, "turnText");
             Assert.That(guessReveal.text, Does.Contain("50"));
             Assert.That(resultPending.text,
                 Is.EqualTo(Localized("solo_ai_result_pending")),
@@ -760,7 +759,8 @@ public sealed class SoloBoardPresenterPlayModeTests
             Acknowledge();
 
             AssertPhase("MatchResult");
-            Assert.That(((TMP_Text)Field(game, "turnText")).text,
+            Assert.That(Find(panel.transform, "CentralGuess")
+                    .GetComponent<TMP_Text>().text,
                 Does.StartWith(Localized("you_win")));
             Assert.That(input.gameObject.activeSelf, Is.False);
             Assert.That(Submit().gameObject.activeSelf, Is.False);
@@ -926,6 +926,12 @@ public sealed class SoloBoardPresenterPlayModeTests
 
     string RenderedAiFactSnapshot()
     {
+        TMP_Text handoff = (TMP_Text)Field(game, "turnText");
+        Assert.That(handoff.gameObject.activeInHierarchy, Is.True,
+            "The central ribbon handoff/range lane must remain visible.");
+        Assert.That(handoff.text, Is.Not.Empty,
+            "The central ribbon handoff/range lane must carry the live fact.");
+
         string[] names =
         {
             "CentralGuess",
@@ -935,7 +941,10 @@ public sealed class SoloBoardPresenterPlayModeTests
             "HistoryNumber",
             "HistoryOutcome",
         };
-        var parts = new List<string>();
+        var parts = new List<string>
+        {
+            "RibbonHandoff=" + handoff.text,
+        };
         foreach (string name in names)
         {
             Transform found = Find(panel.transform, name);
@@ -952,8 +961,10 @@ public sealed class SoloBoardPresenterPlayModeTests
     string RenderedPinnedAiHandoff()
     {
         TMP_Text prompt = (TMP_Text)Field(game, "turnText");
-        TMP_Text guess = (TMP_Text)Field(game, "aiNumberText");
-        TMP_Text answer = (TMP_Text)Field(game, "aiAnswerText");
+        TMP_Text guess = Find(panel.transform, "CentralGuess")
+            .GetComponent<TMP_Text>();
+        TMP_Text answer = Find(panel.transform, "CentralOutcome")
+            .GetComponent<TMP_Text>();
         if (!prompt.gameObject.activeInHierarchy)
             Assert.Fail(
                 "The central handoff summary must remain visible after input unlock. " +
@@ -963,14 +974,14 @@ public sealed class SoloBoardPresenterPlayModeTests
                  prompt.transform.parent.gameObject.activeInHierarchy));
         if (!guess.gameObject.activeInHierarchy)
             Assert.Fail(
-                "The opponent's latest guess must remain visible after input unlock. " +
+                "The ribbon's opponent guess must remain visible after input unlock. " +
                 "activeSelf=" + guess.gameObject.activeSelf +
                 ", parentActive=" +
                 (guess.transform.parent != null &&
                  guess.transform.parent.gameObject.activeInHierarchy));
         if (!answer.gameObject.activeInHierarchy)
             Assert.Fail(
-                "The opponent's latest result must remain visible after input unlock. " +
+                "The ribbon's opponent result must remain visible after input unlock. " +
                 "activeSelf=" + answer.gameObject.activeSelf +
                 ", parentActive=" +
                 (answer.transform.parent != null &&

@@ -359,9 +359,11 @@ public sealed class FirstLaunchSoloEndToEndPlayModeTests
         Assert.That(GetProperty<bool>(game, "IsMatchOver"), Is.True);
         CollectionAssert.AreEqual(new[] { 50, 75 },
             History(soloOwner, "AiGuessHistory"));
-        Assert.That(phasePrompt.gameObject.activeInHierarchy, Is.True,
+        TMP_Text terminalHeadline = Find(gamePanel.transform, "CentralGuess")
+            .GetComponent<TMP_Text>();
+        Assert.That(terminalHeadline.gameObject.activeInHierarchy, Is.True,
             "The authoritative terminal headline must remain visible.");
-        Assert.That(phasePrompt.text, Does.StartWith(Localized("you_win")));
+        Assert.That(terminalHeadline.text, Does.StartWith(Localized("you_win")));
         TMP_Text resultReason = Find(gamePanel.transform, "ResultReason")
             .GetComponent<TMP_Text>();
         Assert.That(resultReason.gameObject.activeInHierarchy, Is.True);
