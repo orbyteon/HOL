@@ -106,7 +106,7 @@ public sealed class ResponsiveUIFoundationPlayModeTests
             new Vector2(720f, 1280f),
             new Vector2(1080f, 1920f),
             new Vector2(1080f, 2400f),
-            new Vector2(1440f, 3200f)
+            new Vector2(1179f, 2556f)
         };
         MethodInfo apply = layoutType.GetMethod("ApplyViewport", InstanceFlags);
         foreach (Vector2 viewport in viewports)
@@ -132,11 +132,11 @@ public sealed class ResponsiveUIFoundationPlayModeTests
                             viewport + " / " + target.name);
                 }
                 AssertSafeRoot(homeSafe, viewport, safe, canvasSize,
-                    "Buttonsettings", "ButtonPlay", "ButtonPvP",
-                    "ButtonPrivateRoom", "DailyHuntButton",
+                    "Buttonsettings", "ButtonPlay", "DailyHuntButton",
                     "HomeSpeechBubble", "HomeDailyPromo");
                 AssertSafeRoot(playSafe, viewport, safe, canvasSize,
-                    "ButtonChallenger", "ButtonBack", "PlayDisclosure");
+                    "ButtonChallenger", "ButtonPvP", "ButtonBack",
+                    "PlayHubTitle", "PlayHubSubtitle");
             }
         }
 
@@ -171,34 +171,40 @@ public sealed class ResponsiveUIFoundationPlayModeTests
 
             var menu = FindInScene(RuntimeType("MenuManager"));
             GameObject panelPlay = (GameObject)Field(menu, "panelPlay");
-            panelPlay.SetActive(true);
+            menu.GetType().GetMethod("OnPlayPressed", InstanceFlags)
+                .Invoke(menu, null);
             yield return null;
 
             Transform safe = Find(panelPlay.transform, "PlaySafeAreaRoot");
             Transform button = Find(safe, "ButtonChallenger");
             Assert.That(safe, Is.Not.Null);
             Assert.That(button, Is.Not.Null);
-            var label = button.GetComponentInChildren<TMP_Text>(true);
+            var label = Find(button, "PlaySoloTitle").GetComponent<TMP_Text>();
             Type ownerType = RuntimeType("ResponsiveSafeAreaRoot");
             Component owner = safe.GetComponent(ownerType);
             Assert.That(owner, Is.Not.Null);
 
             SetLanguage("English");
-            string english = Localized("find_challenger");
+            string english = Localized("play_hub_solo_title");
             Assert.That(label.text, Is.EqualTo(english));
+            AssertCompleteVisibleCopy(label, english);
             Vector2 position = ((RectTransform)button).anchoredPosition;
             int childCount = safe.childCount;
             int enabledCount = Property<int>(owner, "RecalculationCount");
 
             SetLanguage("Greek");
-            Assert.That(label.text, Is.EqualTo(Localized("find_challenger")));
+            Assert.That(label.text, Is.EqualTo(Localized("play_hub_solo_title")));
             Assert.That(((RectTransform)button).anchoredPosition, Is.EqualTo(position));
             Assert.That(safe.childCount, Is.EqualTo(childCount));
             Assert.That(Property<int>(owner, "RecalculationCount"),
                 Is.GreaterThan(enabledCount));
             Assert.That(label.enableAutoSizing, Is.True);
             Assert.That(label.fontSizeMin, Is.GreaterThanOrEqualTo(18f));
+            // MainMenuPlayVisuals authors Truncate; the language event's final
+            // ResponsiveTextPolicy pass selects Ellipsis. This is a safety mode,
+            // not permission to omit any of the approved EN/EL title glyphs.
             Assert.That(label.overflowMode, Is.EqualTo(TextOverflowModes.Ellipsis));
+            AssertCompleteVisibleCopy(label, Localized("play_hub_solo_title"));
 
             safe.gameObject.SetActive(false);
             int disabledCount = Property<int>(owner, "RecalculationCount");
@@ -210,6 +216,7 @@ public sealed class ResponsiveUIFoundationPlayModeTests
             safe.gameObject.SetActive(true);
             yield return null;
             Assert.That(label.text, Is.EqualTo(english));
+            AssertCompleteVisibleCopy(label, english);
             Assert.That(((RectTransform)button).anchoredPosition, Is.EqualTo(position));
             Assert.That(safe.childCount, Is.EqualTo(childCount));
             Assert.That(Property<int>(owner, "RecalculationCount"),
@@ -244,6 +251,24 @@ public sealed class ResponsiveUIFoundationPlayModeTests
             AssertSafeRoot(safe, viewport, safePixels, CanvasSize(viewport),
                 "SplashLogo", "SplashHeroBoy", "SplashHeroGirl",
                 "SplashProgressTrack");
+        }
+    }
+
+    static void AssertCompleteVisibleCopy(TMP_Text label, string expected)
+    {
+        Assert.That(label.isActiveAndEnabled, Is.True, expected);
+        Assert.That(label.color.a, Is.GreaterThan(0f), expected);
+        Canvas.ForceUpdateCanvases();
+        label.ForceMeshUpdate();
+        Assert.That(label.isTextOverflowing, Is.False, expected);
+        Assert.That(label.isTextTruncated, Is.False, expected);
+        Assert.That(label.textInfo.characterCount, Is.EqualTo(expected.Length), expected);
+        for (int i = 0; i < expected.Length; i++)
+        {
+            TMP_CharacterInfo glyph = label.textInfo.characterInfo[i];
+            Assert.That(glyph.character, Is.EqualTo(expected[i]), expected + " glyph " + i);
+            if (!char.IsWhiteSpace(expected[i]))
+                Assert.That(glyph.isVisible, Is.True, expected + " glyph " + i);
         }
     }
 

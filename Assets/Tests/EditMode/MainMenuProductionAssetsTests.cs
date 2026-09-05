@@ -11,7 +11,12 @@ public sealed class MainMenuProductionAssetsTests
     [TestCase("reference/mascot_3_exact")]
     [TestCase("phase2a/hol_menu_boy_arms_crossed_r3")]
     [TestCase("phase2a/hol_menu_girl_forward_fist_r3")]
-    [TestCase("phase2a/hol_neon_reference_bg_r3")]
+    [TestCase("solo/production/solo_background_v1")]
+    [TestCase("solo/production/solo_decorations_v1")]
+    [TestCase("solo/production/solo_player_card_shell_v1")]
+    [TestCase("solo/production/solo_opponent_card_shell_v1")]
+    [TestCase("solo/production/solo_prompt_ribbon_v1")]
+    [TestCase("solo/production/solo_back_button_v1")]
     [TestCase("phase2a/hol_cta_gold_r2_9s")]
     [TestCase("phase2a/hol_cta_blue_r2_9s")]
     [TestCase("phase2a/hol_cta_magenta_r2_9s")]
@@ -40,9 +45,10 @@ public sealed class MainMenuProductionAssetsTests
     }
 
     [Test]
-    public void ReferenceBackgroundIsHighResolutionNineBySixteen()
+    public void VsAiBackgroundIsHighResolutionNineBySixteen()
     {
-        Sprite sprite = Resources.Load<Sprite>("phase2a/hol_neon_reference_bg_r3");
+        Sprite sprite = Resources.Load<Sprite>(
+            "solo/production/solo_background_v1");
         Assert.That(sprite, Is.Not.Null);
         Assert.That(sprite.texture.width, Is.GreaterThanOrEqualTo(900));
         Assert.That(sprite.texture.height, Is.GreaterThanOrEqualTo(1600));
@@ -73,11 +79,25 @@ public sealed class MainMenuProductionAssetsTests
             Assert.That(resources, Is.Not.Null);
             Assert.That(resources, Does.Not.Contain(rejected),
                 typeName + " must not restore the rejected cloud/stairs background.");
-            string approvedBackground = typeName == "MainMenuHomeVisuals"
-                ? "settings/hol_settings_bg_r1"
-                : "phase2a/hol_neon_reference_bg_r3";
+            string approvedBackground =
+                "solo/production/solo_background_v1";
             Assert.That(resources, Does.Contain(approvedBackground),
-                typeName + " must use its approved production background.");
+                typeName + " must use the accepted VS AI background.");
+            Assert.That(resources, Does.Contain(
+                    "solo/production/solo_player_card_shell_v1"),
+                typeName + " must use the accepted cyan VS AI card shell.");
+            Assert.That(resources, Does.Contain(
+                    "solo/production/solo_opponent_card_shell_v1"),
+                typeName + " must use the accepted magenta VS AI card shell.");
+            Assert.That(resources, Does.Not.Contain(
+                    "dailyhunt/v1/daily_action_guess_v1"),
+                typeName + " must not restore the rejected long-button steer.");
+            Assert.That(resources, Does.Not.Contain(
+                    "dailyhunt/v1/daily_action_share_v1"),
+                typeName + " must not restore the rejected long-button steer.");
+            Assert.That(resources, Does.Not.Contain(
+                    "dailyhunt/v1/daily_action_revive_v1"),
+                typeName + " must not restore the rejected long-button steer.");
         }
     }
 
@@ -93,24 +113,24 @@ public sealed class MainMenuProductionAssetsTests
     }
 
     [Test]
-    public void HomeCopyMatchesTheTruthfulPhase2AContractInBothLanguages()
+    public void HomeAndPlayHubCopyDescribeOnlyRealModesInBothLanguages()
     {
         var l10n = RuntimeType("L10n");
         var original = l10n.GetProperty("Current").GetValue(null, null);
         try
         {
             AssertCopy(0,
-                "PLAY SOLO", "Play and beat your high score!",
-                "PLAY WITH A FRIEND", "Create a room & play together!",
+                "Play", "Choose your game mode",
                 "DAILY HUNT", "A new challenge every day, big rewards!",
-                "TIP:", "Every guess narrows the range!",
-                "LOADING...");
+                "CHOOSE A MODE", "What do you want to play?",
+                "VS AI", "A number duel against the computer",
+                "PLAY WITH A FRIEND", "Create or join a private room");
             AssertCopy(1,
-                "ΠΑΙΞΕ SOLO", "Παίξε και σπάσε το ρεκόρ σου!",
-                "ΠΑΙΞΕ ΜΕ ΦΙΛΟ", "Δημιούργησε δωμάτιο & παίξε μαζί!",
-                "DAILY HUNT", "Πρόκληση κάθε μέρα, μεγάλα έπαθλα!",
-                "ΣΥΜΒΟΥΛΗ:", "Κάθε μαντεψιά μικραίνει το εύρος!",
-                "ΦΟΡΤΩΣΗ...");
+                "Παίξε", "Διάλεξε τρόπο παιχνιδιού",
+                "ΗΜΕΡΗΣΙΑ ΔΟΚΙΜΑΣΙΑ", "Πρόκληση κάθε μέρα, μεγάλα έπαθλα!",
+                "ΔΙΑΛΕΞΕ ΤΡΟΠΟ", "Τι θέλεις να παίξεις;",
+                "ΕΝΑΝΤΙΟΝ AI", "Μονομαχία αριθμών με τον υπολογιστή",
+                "ΠΑΙΞΕ ΜΕ ΦΙΛΟ", "Δημιούργησε ή μπες σε ιδιωτικό δωμάτιο");
         }
         finally
         {
@@ -122,10 +142,11 @@ public sealed class MainMenuProductionAssetsTests
     {
         string[] keys =
         {
-            "home_solo_title", "home_solo_subtitle",
-            "home_private_title", "home_private_subtitle",
+            "play", "home_play_subtitle",
             "home_daily_title", "home_daily_subtitle",
-            "home_tip_title", "home_tip_body", "splash_loading"
+            "play_hub_title", "play_hub_subtitle",
+            "play_hub_solo_title", "play_hub_solo_subtitle",
+            "play_hub_friend_title", "play_hub_friend_subtitle"
         };
         Assert.That(expected.Length, Is.EqualTo(keys.Length));
         SetLanguage(Enum.ToObject(RuntimeType("L10n").GetNestedType("Language"), language));
