@@ -2,6 +2,8 @@
 using System;
 using System.Collections;
 using System.IO;
+using System.Globalization;
+using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -172,6 +174,12 @@ public sealed class MainMenuLocalCapturePlayer : MonoBehaviour
         }
 
         DumpLayout(captureRoot);
+        if (!ValidateRenderedText(expectedRoot))
+        {
+            Debug.LogError("HOL_MAINMENU_TEXT_CENTERING_FAILED " + captureScreen);
+            Application.Quit(5);
+            yield break;
+        }
         ScreenCapture.CaptureScreenshot(capturePath, captureScale);
         for (int frame = 0; frame < 600; frame++)
         {
@@ -207,6 +215,63 @@ public sealed class MainMenuLocalCapturePlayer : MonoBehaviour
                     item.gameObject.SetActive(false);
             }
         }
+    }
+
+    // Evidence-only measurement, independent of the positioning algorithm.
+    // This reads the settled mesh; it never fixes text or changes capture timing.
+    static bool ValidateRenderedText(Transform root)
+    {
+        MainMenuCenteredTextRegion[] regions = captureScreen == HomeScreen
+            ? FindObjectOfType<MainMenuHomeVisuals>(true).CenteredTextRegions
+            : FindObjectOfType<MainMenuPlayVisuals>(true).CenteredTextRegions;
+        if (regions == null || regions.Length != 8) return false;
+        bool valid = true;
+        int measured = 0;
+        foreach (TMP_Text text in root.GetComponentsInChildren<TMP_Text>(false))
+        {
+            MainMenuCenteredTextRegion region = Array.Find(regions, item => item.Text == text);
+            if (region == null) { valid = false; continue; }
+            RectTransform rect = text.rectTransform;
+            Vector2 min = new Vector2(float.PositiveInfinity, float.PositiveInfinity);
+            Vector2 max = new Vector2(float.NegativeInfinity, float.NegativeInfinity);
+            int glyphs = 0;
+            for (int index = 0; index < text.textInfo.characterCount; index++)
+            {
+                TMP_CharacterInfo glyph = text.textInfo.characterInfo[index];
+                if (!glyph.isVisible) continue;
+                foreach (Vector3 vertex in new[]
+                         { glyph.bottomLeft, glyph.topLeft, glyph.topRight, glyph.bottomRight })
+                {
+                    Vector2 pixel = RectTransformUtility.WorldToScreenPoint(null,
+                        rect.TransformPoint(vertex)) * captureScale;
+                    min = Vector2.Min(min, pixel);
+                    max = Vector2.Max(max, pixel);
+                }
+                glyphs++;
+            }
+            Vector2 safeMin = RectTransformUtility.WorldToScreenPoint(null,
+                rect.parent.TransformPoint(region.SafeRect.min)) * captureScale;
+            Vector2 safeMax = RectTransformUtility.WorldToScreenPoint(null,
+                rect.parent.TransformPoint(region.SafeRect.max)) * captureScale;
+            Vector2 delta = (min + max - safeMin - safeMax) * 0.5f;
+            bool contained = min.x >= safeMin.x && min.y >= safeMin.y &&
+                             max.x <= safeMax.x && max.y <= safeMax.y;
+            bool passed = glyphs > 0 && contained &&
+                          Mathf.Abs(delta.x) <= 4f && Mathf.Abs(delta.y) <= 4f &&
+                          !text.isTextOverflowing && !text.isTextTruncated;
+            valid &= passed;
+            measured++;
+            Debug.Log(string.Format(CultureInfo.InvariantCulture,
+                "HOL_MAINMENU_GLYPH_CENTER {0} {1} {2} deltaPx=({3:F3},{4:F3}) " +
+                "glyphPx=({5:F3},{6:F3},{7:F3},{8:F3}) safePx=({9:F3},{10:F3},{11:F3},{12:F3}) " +
+                "font={13:F3} lines={14} glyphs={15} contained={16} overflow={17} truncated={18} pass={19}",
+                captureScreen, language, text.name, delta.x, delta.y,
+                min.x, min.y, max.x, max.y, safeMin.x, safeMin.y, safeMax.x, safeMax.y,
+                text.fontSize, text.textInfo.lineCount, glyphs, contained,
+                text.isTextOverflowing, text.isTextTruncated, passed));
+        }
+        Debug.Log("HOL_MAINMENU_GLYPH_CENTER_TOTAL " + measured + "/8 pass=" + valid);
+        return valid && measured == 8;
     }
 
     static void DumpLayout(Transform root)

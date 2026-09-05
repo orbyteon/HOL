@@ -11,7 +11,12 @@ public sealed class MainMenuProductionAssetsTests
     [TestCase("reference/mascot_3_exact")]
     [TestCase("phase2a/hol_menu_boy_arms_crossed_r3")]
     [TestCase("phase2a/hol_menu_girl_forward_fist_r3")]
-    [TestCase("phase2a/hol_neon_reference_bg_r3")]
+    [TestCase("solo/production/solo_background_v1")]
+    [TestCase("solo/production/solo_decorations_v1")]
+    [TestCase("solo/production/solo_player_card_shell_v1")]
+    [TestCase("solo/production/solo_opponent_card_shell_v1")]
+    [TestCase("solo/production/solo_prompt_ribbon_v1")]
+    [TestCase("solo/production/solo_back_button_v1")]
     [TestCase("phase2a/hol_cta_gold_r2_9s")]
     [TestCase("phase2a/hol_cta_blue_r2_9s")]
     [TestCase("phase2a/hol_cta_magenta_r2_9s")]
@@ -40,9 +45,10 @@ public sealed class MainMenuProductionAssetsTests
     }
 
     [Test]
-    public void ReferenceBackgroundIsHighResolutionNineBySixteen()
+    public void VsAiBackgroundIsHighResolutionNineBySixteen()
     {
-        Sprite sprite = Resources.Load<Sprite>("phase2a/hol_neon_reference_bg_r3");
+        Sprite sprite = Resources.Load<Sprite>(
+            "solo/production/solo_background_v1");
         Assert.That(sprite, Is.Not.Null);
         Assert.That(sprite.texture.width, Is.GreaterThanOrEqualTo(900));
         Assert.That(sprite.texture.height, Is.GreaterThanOrEqualTo(1600));
@@ -73,11 +79,25 @@ public sealed class MainMenuProductionAssetsTests
             Assert.That(resources, Is.Not.Null);
             Assert.That(resources, Does.Not.Contain(rejected),
                 typeName + " must not restore the rejected cloud/stairs background.");
-            string approvedBackground = typeName == "MainMenuHomeVisuals"
-                ? "settings/hol_settings_bg_r1"
-                : "phase2a/hol_neon_reference_bg_r3";
+            string approvedBackground =
+                "solo/production/solo_background_v1";
             Assert.That(resources, Does.Contain(approvedBackground),
-                typeName + " must use its approved production background.");
+                typeName + " must use the accepted VS AI background.");
+            Assert.That(resources, Does.Contain(
+                    "solo/production/solo_player_card_shell_v1"),
+                typeName + " must use the accepted cyan VS AI card shell.");
+            Assert.That(resources, Does.Contain(
+                    "solo/production/solo_opponent_card_shell_v1"),
+                typeName + " must use the accepted magenta VS AI card shell.");
+            Assert.That(resources, Does.Not.Contain(
+                    "dailyhunt/v1/daily_action_guess_v1"),
+                typeName + " must not restore the rejected long-button steer.");
+            Assert.That(resources, Does.Not.Contain(
+                    "dailyhunt/v1/daily_action_share_v1"),
+                typeName + " must not restore the rejected long-button steer.");
+            Assert.That(resources, Does.Not.Contain(
+                    "dailyhunt/v1/daily_action_revive_v1"),
+                typeName + " must not restore the rejected long-button steer.");
         }
     }
 

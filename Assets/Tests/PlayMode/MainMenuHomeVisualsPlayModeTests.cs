@@ -15,13 +15,9 @@ public sealed class MainMenuHomeVisualsPlayModeTests
     const BindingFlags InstanceFlags =
         BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
 
-    static readonly Rect SpeechCreamSafeRect =
-        Rect.MinMaxRect(-128f, -35f, 127f, 78f);
     static readonly Rect PromoInnerSafeRect =
-        Rect.MinMaxRect(-205f, -60f, 205f, 60f);
-    // Alpha-tested edge of the unchanged trophy sprite in its 68x68 placement;
-    // the RectTransform itself includes transparent source-image padding.
-    const float PromoTrophyOpaqueRight = -143f;
+        Rect.MinMaxRect(-260f, -68f, 260f, 68f);
+    const float PromoTrophyRight = -189f;
 
     struct SavedPreference
     {
@@ -64,6 +60,7 @@ public sealed class MainMenuHomeVisualsPlayModeTests
         string[] required =
         {
             "HomeBackground",
+            "HomeDecorations",
             "HomeOuterFrame",
             "HomeStars",
             "HomeConfetti",
@@ -113,7 +110,9 @@ public sealed class MainMenuHomeVisualsPlayModeTests
         }
 
         AssertSprite(root, "HomeBackground",
-            "settings/hol_settings_bg_r1", Image.Type.Simple);
+            "solo/production/solo_background_v1", Image.Type.Simple);
+        AssertSprite(root, "HomeDecorations",
+            "solo/production/solo_decorations_v1", Image.Type.Simple);
         AssertSprite(root, "HomeLogo",
             "reference/hol_logo_exact", Image.Type.Simple);
         AssertSprite(root, "HomeHeroBoy",
@@ -134,8 +133,9 @@ public sealed class MainMenuHomeVisualsPlayModeTests
         owner.GetType().GetMethod(
             "ApplyResponsiveLayoutForViewport", InstanceFlags)
             .Invoke(owner, new object[] { 1080, 1920, true });
-        Assert.That(outerFrame.rect.height, Is.GreaterThan(1920f),
-            "The reference frame must be vertically overscanned so its embedded chrome bands remain offscreen.");
+        Assert.That(outerFrame.rect.height, Is.EqualTo(1920f).Within(0.01f));
+        Assert.That(outerFrame.gameObject.activeInHierarchy, Is.False,
+            "The retired chrome-bearing Home frame must stay invisible.");
 
         Button play = Find(root, "ButtonPlay").GetComponent<Button>();
         Button daily = Find(canvas.transform, "DailyHuntButton").GetComponent<Button>();
@@ -150,8 +150,10 @@ public sealed class MainMenuHomeVisualsPlayModeTests
         Assert.That(Find(root, "ButtonPvP"), Is.Null,
             "Private Room must not remain an equal Home CTA.");
 
-        AssertProductionButton(play, "phase2a/hol_cta_gold_r2_9s");
-        AssertProductionButton(daily, "phase2a/hol_cta_magenta_r2_9s");
+        AssertProductionButton(
+            play, "solo/production/solo_player_card_shell_v1");
+        AssertProductionButton(
+            daily, "solo/production/solo_opponent_card_shell_v1");
 
         Assert.That(PersistentMethods(play), Does.Contain("OnPlayPressed"));
         Assert.That(PersistentMethods(settings), Does.Contain("OpenSettings"));
@@ -167,11 +169,10 @@ public sealed class MainMenuHomeVisualsPlayModeTests
             TMP_Text title = Find(root, titleName).GetComponent<TMP_Text>();
             Assert.That(title.font, Is.SameAs(Resources.Load<TMP_FontAsset>(
                 "phase2a/fonts/HOL Menu Display SDF")));
-            Assert.That(title.enableAutoSizing,
-                Is.EqualTo(titleName == "HomeDailyTitle"),
-                titleName + " must use only its deliberate localization policy.");
-            Assert.That(title.fontSize, Is.GreaterThanOrEqualTo(38f), titleName);
-            Assert.That(title.overflowMode, Is.EqualTo(TextOverflowModes.Overflow));
+            Assert.That(title.enableAutoSizing, Is.True, titleName);
+            float minimum = titleName == "HomePlayTitle" ? 42f : 22f;
+            Assert.That(title.fontSize, Is.GreaterThanOrEqualTo(minimum), titleName);
+            Assert.That(title.overflowMode, Is.EqualTo(TextOverflowModes.Truncate));
             if (titleName == "HomePlayTitle")
                 Assert.That((title.fontStyle & FontStyles.UpperCase) != 0,
                     "The dominant Home CTA must visibly read PLAY / ΠΑΙΞΕ.");
@@ -379,45 +380,45 @@ public sealed class MainMenuHomeVisualsPlayModeTests
                 float tall = Mathf.InverseLerp(
                     1.78f, 2.22f, viewport.y / (float)viewport.x);
                 AssertRectTransform(tracked[0],
-                    new Vector2(-432f, 838f + 45f * tall),
-                    new Vector2(124f, 124f), lane + " settings");
+                    new Vector2(-454f, 838f + 45f * tall),
+                    new Vector2(118f, 118f), lane + " settings");
                 AssertRectTransform(tracked[1],
-                    new Vector2(325f, 838f + 45f * tall),
-                    new Vector2(360f, 140f), lane + " chip");
+                    new Vector2(330f, 838f + 45f * tall),
+                    new Vector2(370f, 150f), lane + " chip");
                 AssertRectTransform(tracked[2], new Vector2(-126f, 0f),
                     new Vector2(108f, 108f), lane + " avatar ring");
                 AssertRectTransform(tracked[3], new Vector2(-126f, 0f),
                     new Vector2(92f, 92f), lane + " avatar portrait");
                 AssertRectTransform(tracked[4],
-                    new Vector2(-42f, 797f + 110f * tall),
-                    new Vector2(580f, 306f), lane + " logo");
+                    new Vector2(0f, 600f + 40f * tall),
+                    new Vector2(512.3f, 304.11f), lane + " logo");
                 AssertRectTransform(tracked[5],
-                    new Vector2(-205f, 430f + 62f * tall),
-                    new Vector2(455f, 455f), lane + " hero boy");
+                    new Vector2(-98f, 115f),
+                    new Vector2(410f, 410f), lane + " hero boy");
                 AssertRectTransform(tracked[6],
-                    new Vector2(92f, 425f + 62f * tall),
-                    new Vector2(460f, 460f), lane + " hero girl");
+                    new Vector2(58f, 60f),
+                    new Vector2(410f, 410f), lane + " hero girl");
                 AssertRectTransform(tracked[7],
-                    new Vector2(350f, 390f + 62f * tall),
+                    new Vector2(0f, 430f),
                     new Vector2(300f, 200f), lane + " speech bubble");
                 AssertRectTransform(tracked[8],
-                    new Vector2(0f, 70f + 24f * tall),
-                    new Vector2(990f, 230f), lane + " play");
+                    new Vector2(-260f, -100f + 18f * tall),
+                    new Vector2(560f, 1140f), lane + " play");
                 AssertRectTransform(tracked[9],
-                    new Vector2(0f, -205f + 24f * tall),
-                    new Vector2(990f, 205f), lane + " daily");
+                    new Vector2(260f, -100f + 18f * tall),
+                    new Vector2(560f, 1140f), lane + " daily");
                 AssertRectTransform(tracked[10],
-                    new Vector2(0f, -515f - 28f * tall),
-                    new Vector2(500f, 220f), lane + " promo");
+                    new Vector2(0f, -748f - 18f * tall),
+                    new Vector2(600f, 182f), lane + " promo");
                 AssertRectTransform(tracked[11],
-                    new Vector2(0f, -876f - 42f * tall),
-                    new Vector2(650f, 180f), lane + " portal");
+                    new Vector2(0f, -890f - 62f * tall),
+                    new Vector2(610f, 165f), lane + " portal");
                 AssertRectTransform(tracked[12],
-                    new Vector2(-380f, -700f - 42f * tall),
-                    new Vector2(300f, 350f), lane + " mascot six");
+                    new Vector2(-398f, -780f - 42f * tall),
+                    new Vector2(230f, 255f), lane + " mascot six");
                 AssertRectTransform(tracked[13],
-                    new Vector2(335f, -700f - 42f * tall),
-                    new Vector2(300f, 350f), lane + " mascot seven");
+                    new Vector2(398f, -780f - 42f * tall),
+                    new Vector2(220f, 255f), lane + " mascot seven");
             }
         }
         finally
@@ -452,14 +453,12 @@ public sealed class MainMenuHomeVisualsPlayModeTests
 
         Canvas canvas = owner.GetComponent<Canvas>();
         Transform root = Find(canvas.transform, "HomeVisualRoot");
-        RectTransform bubble = Find(root, "HomeSpeechBubble") as RectTransform;
         RectTransform promo = Find(root, "HomeDailyPromo") as RectTransform;
         RectTransform trophy = Find(root, "HomePromoTrophy") as RectTransform;
         RectTransform playButton = Find(root, "ButtonPlay") as RectTransform;
         RectTransform dailyButton = Find(root, "DailyHuntButton") as RectTransform;
         RectTransform mascotSix = Find(root, "HomeMascotSix") as RectTransform;
         RectTransform mascotSeven = Find(root, "HomeMascotSeven") as RectTransform;
-        TMP_Text speech = Find(root, "HomeSpeechText").GetComponent<TMP_Text>();
         TMP_Text playTitle = Find(root, "HomePlayTitle").GetComponent<TMP_Text>();
         TMP_Text playSubtitle = Find(root, "HomePlaySubtitle").GetComponent<TMP_Text>();
         TMP_Text dailyTitle = Find(root, "HomeDailyTitle").GetComponent<TMP_Text>();
@@ -490,7 +489,6 @@ public sealed class MainMenuHomeVisualsPlayModeTests
                 applyViewport.Invoke(
                     owner, new object[] { viewport.x, viewport.y, true });
                 Canvas.ForceUpdateCanvases();
-                speech.ForceMeshUpdate(true, true);
                 playTitle.ForceMeshUpdate(true, true);
                 playSubtitle.ForceMeshUpdate(true, true);
                 dailyTitle.ForceMeshUpdate(true, true);
@@ -506,19 +504,21 @@ public sealed class MainMenuHomeVisualsPlayModeTests
                     Assert.That(text.isTextOverflowing, Is.False,
                         lane + " " + text.name);
                 }
-                Assert.That(speech.textInfo.lineCount, Is.EqualTo(3), lane);
                 Assert.That(promoTitle.textInfo.lineCount, Is.EqualTo(1), lane);
                 Assert.That(promoBody.textInfo.lineCount, Is.EqualTo(2), lane);
-                Assert.That(speech.isTextOverflowing, Is.False, lane);
                 Assert.That(promoTitle.isTextOverflowing, Is.False, lane);
                 Assert.That(promoBody.isTextOverflowing, Is.False, lane);
-                Assert.That(speech.fontSize, Is.GreaterThanOrEqualTo(23f), lane);
-                Assert.That(playTitle.fontSize, Is.GreaterThanOrEqualTo(62f), lane);
+                Assert.That(playTitle.fontSize, Is.GreaterThanOrEqualTo(50f), lane);
                 Assert.That(playSubtitle.fontSize, Is.GreaterThanOrEqualTo(25f), lane);
-                Assert.That(dailyTitle.fontSize, Is.GreaterThanOrEqualTo(38f), lane);
-                Assert.That(dailySubtitle.fontSize, Is.GreaterThanOrEqualTo(23f), lane);
-                Assert.That(promoTitle.fontSize, Is.GreaterThanOrEqualTo(24f), lane);
-                Assert.That(promoBody.fontSize, Is.GreaterThanOrEqualTo(23f), lane);
+                Assert.That(dailyTitle.fontSize, Is.GreaterThanOrEqualTo(27f), lane);
+                Assert.That(dailySubtitle.fontSize, Is.GreaterThanOrEqualTo(24f), lane);
+                Assert.That(promoTitle.fontSize, Is.GreaterThanOrEqualTo(22f), lane);
+                Assert.That(promoBody.fontSize, Is.GreaterThanOrEqualTo(20f), lane);
+
+                AssertApprovedCenteredTextRegion(
+                    owner, dailyTitle, new Vector2(7f, 448.4f),
+                    new Vector2(210f, 101.3f), new Vector2(210f, 133.3f),
+                    0.01f, lane + " Daily title aperture");
 
                 AssertContained(playButton.rect,
                     GlyphBoundsAll(playTitle, playButton), 22f,
@@ -532,22 +532,6 @@ public sealed class MainMenuHomeVisualsPlayModeTests
                 AssertContained(dailyButton.rect,
                     GlyphBoundsAll(dailySubtitle, dailyButton), 16f,
                     lane + " Daily subtitle");
-
-                Rect speechLine0 = GlyphBounds(speech, bubble, 0);
-                Rect speechLine1 = GlyphBounds(speech, bubble, 1);
-                Rect speechBody = Union(speechLine0, speechLine1);
-                Rect speechEmphasis = GlyphBounds(speech, bubble, 2);
-                AssertContained(
-                    SpeechCreamSafeRect, speechBody, 4f, lane + " speech body");
-                AssertContained(
-                    SpeechCreamSafeRect, speechEmphasis, 4f,
-                    lane + " speech emphasis");
-                Assert.That(
-                    speechLine0.yMin - speechLine1.yMax,
-                    Is.GreaterThanOrEqualTo(2f), lane + " speech body lines");
-                Assert.That(
-                    speechBody.yMin - speechEmphasis.yMax,
-                    Is.GreaterThanOrEqualTo(8f), lane + " speech emphasis gap");
 
                 Rect titleGlyphs = GlyphBounds(promoTitle, promo, 0);
                 Rect rewardLine0 = GlyphBounds(promoBody, promo, 0);
@@ -572,20 +556,20 @@ public sealed class MainMenuHomeVisualsPlayModeTests
                     Is.GreaterThanOrEqualTo(6f), lane + " promo line gap");
 
                 Assert.That(
-                    rewardLine1.xMin - PromoTrophyOpaqueRight,
+                    rewardLine1.xMin - PromoTrophyRight,
                     Is.GreaterThanOrEqualTo(8f), lane + " trophy/text gap");
                 AssertRectTransform(
-                    trophy, new Vector2(-168f, -48f),
-                    new Vector2(68f, 68f), lane + " promo trophy");
+                    trophy, new Vector2(-220f, -18f),
+                    new Vector2(62f, 62f), lane + " promo trophy");
 
                 float aspect = viewport.y / (float)viewport.x;
                 float tall = Mathf.InverseLerp(1.78f, 2.22f, aspect);
                 AssertRectTransform(
-                    mascotSix, new Vector2(-380f, -700f - 42f * tall),
-                    new Vector2(300f, 350f), lane + " mascot 6");
+                    mascotSix, new Vector2(-398f, -780f - 42f * tall),
+                    new Vector2(230f, 255f), lane + " mascot 6");
                 AssertRectTransform(
-                    mascotSeven, new Vector2(335f, -700f - 42f * tall),
-                    new Vector2(300f, 350f), lane + " mascot 7");
+                    mascotSeven, new Vector2(398f, -780f - 42f * tall),
+                    new Vector2(220f, 255f), lane + " mascot 7");
             }
         }
 
@@ -674,6 +658,62 @@ public sealed class MainMenuHomeVisualsPlayModeTests
             label + " bottom containment");
         Assert.That(actual.yMax, Is.LessThanOrEqualTo(safe.yMax),
             label + " top containment");
+    }
+
+    // Fixed approved apertures are the expectation, not the runtime line box.
+    // TMP offsets its line box to centre visible glyphs; keep checking its size
+    // and the exact authored aperture, then independently check visible ink.
+    internal static void AssertApprovedCenteredTextRegion(
+        Component owner, TMP_Text text, Vector2 expectedCenter,
+        Vector2 expectedSize, Vector2 expectedLineBoxSize,
+        float geometryTolerance, string label)
+    {
+        PropertyInfo regionsProperty = owner.GetType().GetProperty(
+            "CenteredTextRegions", InstanceFlags);
+        Assert.That(regionsProperty, Is.Not.Null, label);
+        Array regions = regionsProperty.GetValue(owner, null) as Array;
+        Assert.That(regions, Is.Not.Null, label);
+        object matchingRegion = null;
+        int matches = 0;
+        foreach (object region in regions)
+        {
+            if (region.GetType().GetField("Text", InstanceFlags)
+                .GetValue(region) != (object)text) continue;
+            matchingRegion = region;
+            matches++;
+        }
+        Assert.That(matches, Is.EqualTo(1), label + " sole aperture");
+        Rect actualSafe = (Rect)matchingRegion.GetType()
+            .GetField("SafeRect", InstanceFlags).GetValue(matchingRegion);
+        Rect expectedSafe = new Rect(expectedCenter - expectedSize * 0.5f,
+            expectedSize);
+        Assert.That(actualSafe.center.x,
+            Is.EqualTo(expectedCenter.x).Within(geometryTolerance), label + " x");
+        Assert.That(actualSafe.center.y,
+            Is.EqualTo(expectedCenter.y).Within(geometryTolerance), label + " y");
+        Assert.That(actualSafe.width,
+            Is.EqualTo(expectedSize.x).Within(geometryTolerance), label + " width");
+        Assert.That(actualSafe.height,
+            Is.EqualTo(expectedSize.y).Within(geometryTolerance), label + " height");
+        Assert.That(text.rectTransform.sizeDelta.x,
+            Is.EqualTo(expectedLineBoxSize.x).Within(geometryTolerance),
+            label + " line box width");
+        Assert.That(text.rectTransform.sizeDelta.y,
+            Is.EqualTo(expectedLineBoxSize.y).Within(geometryTolerance),
+            label + " line box height");
+        Assert.That(text.rectTransform.anchorMin, Is.EqualTo(new Vector2(0.5f, 0.5f)));
+        Assert.That(text.rectTransform.anchorMax, Is.EqualTo(new Vector2(0.5f, 0.5f)));
+        Assert.That(text.rectTransform.pivot, Is.EqualTo(new Vector2(0.5f, 0.5f)));
+        Assert.That(text.alignment, Is.EqualTo(TextAlignmentOptions.Center), label);
+        Assert.That(text.isTextOverflowing, Is.False, label);
+        Assert.That(text.isTextTruncated, Is.False, label);
+        Rect glyphs = GlyphBoundsAll(text, text.rectTransform.parent as RectTransform);
+        AssertInside(expectedSafe, glyphs, label + " visible glyphs");
+        // Four reference pixels is the accepted 1080x1920 glyph-centering gate.
+        Assert.That(glyphs.center.x, Is.EqualTo(expectedCenter.x).Within(4f),
+            label + " glyph centre x");
+        Assert.That(glyphs.center.y, Is.EqualTo(expectedCenter.y).Within(4f),
+            label + " glyph centre y");
     }
 
     static void AssertRectTransform(
@@ -809,24 +849,21 @@ public sealed class MainMenuHomeVisualsPlayModeTests
     static void AssertProductionButton(Button button, string resource)
     {
         Image hitImage = button.GetComponent<Image>();
-        Transform frameTransform = Find(button.transform, "HomeCtaFrame");
-        Image frame = frameTransform == null
-            ? null
-            : frameTransform.GetComponent<Image>();
         Sprite sprite = Resources.Load<Sprite>(resource);
         Assert.That(hitImage, Is.Not.Null, button.name);
-        Assert.That(frame, Is.Not.Null, button.name + " visual frame");
         Assert.That(sprite, Is.Not.Null, resource);
-        Assert.That(frame.sprite, Is.SameAs(sprite), button.name);
-        Assert.That(frame.type, Is.EqualTo(Image.Type.Sliced),
-            button.name + " must preserve the approved 9-sliced frame.");
-        Assert.That(frame.color.a, Is.EqualTo(1f).Within(0.001f), button.name);
-        Assert.That(frame.raycastTarget, Is.False, button.name);
-        Assert.That(hitImage.sprite, Is.Null, button.name);
+        Assert.That(hitImage.sprite, Is.SameAs(sprite), button.name);
+        Assert.That(hitImage.type, Is.EqualTo(Image.Type.Simple), button.name);
+        Assert.That(hitImage.color.a, Is.EqualTo(1f).Within(0.001f), button.name);
         Assert.That(hitImage.raycastTarget, Is.True, button.name);
         Assert.That(button.targetGraphic, Is.SameAs(hitImage), button.name);
-        Assert.That(button.transition, Is.EqualTo(Selectable.Transition.None));
+        Assert.That(button.transition, Is.EqualTo(Selectable.Transition.ColorTint));
         Assert.That(button.interactable, Is.True, button.name);
+        Component juice = button.GetComponent("ButtonJuice");
+        Assert.That(juice, Is.Not.Null, button.name + " press feedback");
+        object pressedScale = juice.GetType().GetField("pressedScale").GetValue(juice);
+        Assert.That((float)pressedScale, Is.EqualTo(0.92f).Within(0.001f),
+            button.name + " press scale");
     }
 
     static void AssertReferenceComposition(
@@ -837,39 +874,31 @@ public sealed class MainMenuHomeVisualsPlayModeTests
         RectTransform logo = Find(root, "HomeLogo") as RectTransform;
         RectTransform boy = Find(root, "HomeHeroBoy") as RectTransform;
         RectTransform girl = Find(root, "HomeHeroGirl") as RectTransform;
-        RectTransform bubble = Find(root, "HomeSpeechBubble") as RectTransform;
         RectTransform promo = Find(root, "HomeDailyPromo") as RectTransform;
         RectTransform six = Find(root, "HomeMascotSix") as RectTransform;
         RectTransform seven = Find(root, "HomeMascotSeven") as RectTransform;
 
-        Assert.That(logo.sizeDelta.x, Is.GreaterThanOrEqualTo(540f));
-        Assert.That(boy.sizeDelta.x, Is.GreaterThanOrEqualTo(420f));
-        Assert.That(girl.sizeDelta.x, Is.GreaterThanOrEqualTo(420f));
-        Assert.That(bubble.anchoredPosition.x, Is.GreaterThan(250f));
-        Assert.That(promo.sizeDelta.x, Is.GreaterThanOrEqualTo(480f));
-        Assert.That(six.anchoredPosition.x, Is.LessThan(-250f));
-        Assert.That(seven.anchoredPosition.x, Is.GreaterThan(250f));
+        Assert.That(logo.sizeDelta.x, Is.EqualTo(512.3f).Within(0.01f));
+        Assert.That(boy.sizeDelta, Is.EqualTo(new Vector2(410f, 410f)));
+        Assert.That(girl.sizeDelta, Is.EqualTo(new Vector2(410f, 410f)));
+        Assert.That(boy.IsChildOf(play.transform), Is.True);
+        Assert.That(girl.IsChildOf(play.transform), Is.True);
+        Assert.That(promo.sizeDelta.x, Is.EqualTo(600f).Within(0.01f));
+        Assert.That(six.anchoredPosition.x, Is.LessThan(-300f));
+        Assert.That(seven.anchoredPosition.x, Is.GreaterThan(300f));
 
         RectTransform playHit = play.transform as RectTransform;
         RectTransform dailyHit = daily.transform as RectTransform;
-        RectTransform playVisual = Find(play.transform, "HomeCtaFrame")
-            as RectTransform;
-        RectTransform dailyVisual = Find(daily.transform, "HomeCtaFrame")
-            as RectTransform;
-        Assert.That(playHit.sizeDelta.x, Is.GreaterThanOrEqualTo(960f));
-        Assert.That(playHit.sizeDelta.y, Is.GreaterThanOrEqualTo(220f));
-        Assert.That(dailyHit.sizeDelta.x, Is.GreaterThanOrEqualTo(960f));
-        Assert.That(dailyHit.sizeDelta.y, Is.GreaterThanOrEqualTo(190f));
-        Assert.That(playVisual.sizeDelta.x, Is.GreaterThanOrEqualTo(980f));
-        Assert.That(dailyVisual.sizeDelta.x, Is.GreaterThanOrEqualTo(980f));
-        Assert.That(playVisual.sizeDelta.y, Is.GreaterThan(playHit.sizeDelta.y));
-        Assert.That(dailyVisual.sizeDelta.y, Is.GreaterThan(dailyHit.sizeDelta.y));
-        Assert.That(playVisual.sizeDelta.y, Is.GreaterThan(dailyVisual.sizeDelta.y),
-            "PLAY must remain visually dominant over the Daily event card.");
+        Assert.That(playHit.sizeDelta, Is.EqualTo(new Vector2(560f, 1140f)));
+        Assert.That(dailyHit.sizeDelta, Is.EqualTo(new Vector2(560f, 1140f)));
 
-        float playBottom = playHit.anchoredPosition.y - playHit.sizeDelta.y * 0.5f;
-        float dailyTop = dailyHit.anchoredPosition.y + dailyHit.sizeDelta.y * 0.5f;
-        Assert.That(playBottom, Is.GreaterThan(dailyTop),
+        Vector4 playPadding = play.GetComponent<Image>().raycastPadding;
+        Vector4 dailyPadding = daily.GetComponent<Image>().raycastPadding;
+        Assert.That(playPadding, Is.EqualTo(new Vector4(40f, 0f, 40f, 0f)));
+        Assert.That(dailyPadding, Is.EqualTo(playPadding));
+        float playRight = playHit.anchoredPosition.x + playHit.sizeDelta.x * 0.5f - playPadding.z;
+        float dailyLeft = dailyHit.anchoredPosition.x - dailyHit.sizeDelta.x * 0.5f + dailyPadding.x;
+        Assert.That(playRight, Is.LessThan(dailyLeft),
             "PLAY and Daily Hunt must not have overlapping touch ownership.");
     }
 

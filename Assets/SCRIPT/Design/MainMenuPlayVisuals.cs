@@ -13,43 +13,59 @@ public sealed class MainMenuPlayVisuals : MonoBehaviour
     public const string VisualRootName = "PlayVisualRoot";
     public const string SafeRootName = "PlaySafeAreaRoot";
     public const string BackgroundName = "PlayBackground";
+    public const string DecorationsName = "PlayDecorations";
     public const string LogoName = "PlayLogo";
+    public const string PromptRibbonName = "PlayTitleRibbon";
     public const string TitleName = "PlayHubTitle";
     public const string SubtitleName = "PlayHubSubtitle";
     public const string SoloIconName = "PlaySoloIcon";
     public const string SoloTitleName = "PlaySoloTitle";
     public const string SoloSubtitleName = "PlaySoloSubtitle";
+    public const string SoloActionName = "PlaySoloAction";
     public const string FriendIconName = "PlayFriendIcon";
     public const string FriendTitleName = "PlayFriendTitle";
     public const string FriendSubtitleName = "PlayFriendSubtitle";
-    public const string BackTitleName = "PlayBackTitle";
+    public const string FriendActionName = "PlayFriendAction";
+    public const string MascotSevenName = "PlayMascotSeven";
+    public const string MascotThreeName = "PlayMascotThree";
 
-    const string BackgroundResource = "phase2a/hol_neon_reference_bg_r3";
-    const string DecoStarsResource = "mainmenu/mainmenu_deco_stars";
+    const string BackgroundResource = "solo/production/solo_background_v1";
+    const string DecorationsResource = "solo/production/solo_decorations_v1";
     const string LogoResource = "reference/hol_logo_exact";
-    const string GoldCtaResource = "phase2a/hol_cta_gold_r2_9s";
-    const string BlueCtaResource = "phase2a/hol_cta_blue_r2_9s";
+    const string PromptRibbonResource =
+        "solo/production/solo_prompt_ribbon_v1";
+    const string SoloCardResource =
+        "solo/production/solo_player_card_shell_v1";
+    const string FriendCardResource =
+        "solo/production/solo_opponent_card_shell_v1";
+    const string BackButtonResource =
+        "solo/production/solo_back_button_v1";
     const string SoloIconResource = "phase2a/hol_mode_solo_r2";
     const string FriendIconResource = "phase2a/hol_mode_private_r2";
+    const string MascotSevenResource = "reference/mascot_7_exact";
+    const string MascotThreeResource = "reference/mascot_3_exact";
     const string DisplayFontResource = "phase2a/fonts/HOL Menu Display SDF";
     const string BodyFontResource = "phase2a/fonts/HOL Menu Body SDF";
 
     const float ReferenceWidth = 1080f;
     const float ReferenceHeight = 1920f;
 
-    static readonly Color Ink = new Color(0.09f, 0.05f, 0.16f, 1f);
     static readonly Color NearWhite = new Color(0.985f, 0.975f, 1f, 1f);
     static readonly Color Cyan = new Color(0.18f, 0.92f, 1f, 1f);
 
     public static readonly string[] LoadedResources =
     {
         BackgroundResource,
-        DecoStarsResource,
+        DecorationsResource,
         LogoResource,
-        GoldCtaResource,
-        BlueCtaResource,
+        PromptRibbonResource,
+        SoloCardResource,
+        FriendCardResource,
+        BackButtonResource,
         SoloIconResource,
         FriendIconResource,
+        MascotSevenResource,
+        MascotThreeResource,
     };
 
     public static readonly string[] LoadedFontResources =
@@ -61,20 +77,24 @@ public sealed class MainMenuPlayVisuals : MonoBehaviour
     RectTransform visualRoot;
     RectTransform safeRoot;
     RectTransform logoRect;
+    RectTransform promptRibbonRect;
     RectTransform titleRect;
     RectTransform subtitleRect;
     RectTransform soloButtonRect;
     RectTransform friendButtonRect;
     RectTransform backButtonRect;
+    RectTransform mascotSevenRect;
+    RectTransform mascotThreeRect;
     TMP_FontAsset displayFont;
     TMP_FontAsset bodyFont;
     TMP_Text titleText;
     TMP_Text subtitleText;
     TMP_Text soloTitleText;
     TMP_Text soloSubtitleText;
+    TMP_Text soloActionText;
     TMP_Text friendTitleText;
     TMP_Text friendSubtitleText;
-    TMP_Text backTitleText;
+    TMP_Text friendActionText;
     MenuManager menu;
     PvpGameController pvpController;
     Button soloButton;
@@ -87,6 +107,7 @@ public sealed class MainMenuPlayVisuals : MonoBehaviour
 
     public bool IsReady { get; private set; }
     public bool IsSettled { get; private set; }
+    internal MainMenuCenteredTextRegion[] CenteredTextRegions { get; private set; }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     static void Install()
@@ -172,7 +193,10 @@ public sealed class MainMenuPlayVisuals : MonoBehaviour
         if (visualRoot.gameObject.activeSelf != visible)
             visualRoot.gameObject.SetActive(visible);
         if (visible)
+        {
             ApplyResponsiveLayout();
+            CenterVisibleText();
+        }
     }
 
     bool IsIdlePlayVisible()
@@ -207,18 +231,25 @@ public sealed class MainMenuPlayVisuals : MonoBehaviour
         }
 
         Sprite background = LoadRequired(BackgroundResource);
-        Sprite stars = LoadRequired(DecoStarsResource);
+        Sprite decorations = LoadRequired(DecorationsResource);
         Sprite logo = LoadRequired(LogoResource);
-        Sprite gold = LoadRequired(GoldCtaResource);
-        Sprite blue = LoadRequired(BlueCtaResource);
+        Sprite promptRibbon = LoadRequired(PromptRibbonResource);
+        Sprite soloCard = LoadRequired(SoloCardResource);
+        Sprite friendCard = LoadRequired(FriendCardResource);
+        Sprite backSprite = LoadRequired(BackButtonResource);
         Sprite soloIcon = LoadRequired(SoloIconResource);
         Sprite friendIcon = LoadRequired(FriendIconResource);
+        Sprite mascotSeven = LoadRequired(MascotSevenResource);
+        Sprite mascotThree = LoadRequired(MascotThreeResource);
         displayFont = Resources.Load<TMP_FontAsset>(DisplayFontResource);
         bodyFont = Resources.Load<TMP_FontAsset>(BodyFontResource);
 
-        IsReady = background != null && stars != null && logo != null &&
-                  gold != null && blue != null && soloIcon != null &&
-                  friendIcon != null && displayFont != null && bodyFont != null;
+        IsReady = background != null && decorations != null && logo != null &&
+                  promptRibbon != null && soloCard != null &&
+                  friendCard != null && backSprite != null &&
+                  soloIcon != null && friendIcon != null &&
+                  mascotSeven != null && mascotThree != null &&
+                  displayFont != null && bodyFont != null;
         if (!IsReady)
         {
             Debug.LogError(
@@ -244,26 +275,31 @@ public sealed class MainMenuPlayVisuals : MonoBehaviour
         Stretch(bg.rectTransform);
         ConfigureImage(bg, background, false, Image.Type.Simple);
 
+        Image decorationImage = EnsureImage(visualRoot, DecorationsName);
+        Stretch(decorationImage.rectTransform);
+        ConfigureImage(
+            decorationImage, decorations, false, Image.Type.Simple);
+
         safeRoot = EnsureRect(visualRoot, SafeRootName);
         Stretch(safeRoot);
         ResponsiveSafeAreaRoot.Attach(
             safeRoot, (RectTransform)canvas.transform,
             new Vector2(ReferenceWidth, ReferenceHeight));
 
-        Image starsImage = EnsureImage(safeRoot, "PlayDecoStars");
-        ConfigureImage(starsImage, stars, false, Image.Type.Simple);
-        Place(starsImage.rectTransform, Vector2.zero,
-            new Vector2(ReferenceWidth, ReferenceHeight));
-
         Image logoImage = EnsureImage(safeRoot, LogoName);
         ConfigureImage(logoImage, logo, true, Image.Type.Simple);
         logoRect = logoImage.rectTransform;
 
+        Image ribbonImage = EnsureImage(safeRoot, PromptRibbonName);
+        ConfigureImage(ribbonImage, promptRibbon, true, Image.Type.Simple);
+        promptRibbonRect = ribbonImage.rectTransform;
+
         titleText = EnsureText(
-            safeRoot, TitleName, 64f, displayFont, NearWhite,
+            ribbonImage.transform, TitleName, 64f, displayFont, NearWhite,
             TextAlignmentOptions.Center);
         titleRect = titleText.rectTransform;
         ConfigureDisplayText(titleText, 42f, 66f);
+        Place(titleRect, new Vector2(0f, 8f), new Vector2(650f, 94f));
 
         subtitleText = EnsureText(
             safeRoot, SubtitleName, 31f, bodyFont, Cyan,
@@ -271,15 +307,26 @@ public sealed class MainMenuPlayVisuals : MonoBehaviour
         subtitleRect = subtitleText.rectTransform;
         ConfigureBodyText(subtitleText, 24f, 32f);
 
+        Image sevenImage = EnsureImage(safeRoot, MascotSevenName);
+        ConfigureImage(sevenImage, mascotSeven, true, Image.Type.Simple);
+        mascotSevenRect = sevenImage.rectTransform;
+
+        Image threeImage = EnsureImage(safeRoot, MascotThreeName);
+        ConfigureImage(threeImage, mascotThree, true, Image.Type.Simple);
+        mascotThreeRect = threeImage.rectTransform;
+
         soloButtonRect = RestyleModeButton(
-            soloButton, safeRoot, gold, soloIcon, SoloIconName,
+            soloButton, safeRoot, soloCard, soloIcon, SoloIconName,
             SoloTitleName, "play_hub_solo_title",
-            SoloSubtitleName, "play_hub_solo_subtitle", true);
+            SoloSubtitleName, "play_hub_solo_subtitle",
+            SoloActionName, true);
         friendButtonRect = RestyleModeButton(
-            friendButton, safeRoot, blue, friendIcon, FriendIconName,
+            friendButton, safeRoot, friendCard, friendIcon, FriendIconName,
             FriendTitleName, "play_hub_friend_title",
-            FriendSubtitleName, "play_hub_friend_subtitle", false);
-        backButtonRect = RestyleBackButton(backButton, safeRoot, blue);
+            FriendSubtitleName, "play_hub_friend_subtitle",
+            FriendActionName, false);
+        backButtonRect = RestyleBackButton(
+            backButton, safeRoot, backSprite);
 
         RemovePresentationListeners();
         soloButton.onClick.AddListener(menu.ClosePlayHubForSoloSelection);
@@ -300,6 +347,7 @@ public sealed class MainMenuPlayVisuals : MonoBehaviour
         string titleKey,
         string subtitleName,
         string subtitleKey,
+        string actionName,
         bool primary)
     {
         Reparent(button.transform, parent);
@@ -307,37 +355,60 @@ public sealed class MainMenuPlayVisuals : MonoBehaviour
         RectTransform rect = (RectTransform)button.transform;
         Image image = button.GetComponent<Image>();
         if (image == null) image = button.gameObject.AddComponent<Image>();
-        ConfigureInteractiveImage(image, frame, Image.Type.Sliced, 2f);
+        // The real callback-bearing mode button is also the complete approved
+        // actor-card surface. No decorative clone sits over its hit target.
+        ConfigureInteractiveImage(image, frame, Image.Type.Simple, 1f);
+        // Ignore only the authored transparent side gutters, so the enlarged
+        // paired card surfaces retain separate touch ownership.
+        image.raycastPadding = new Vector4(40f, 0f, 40f, 0f);
         button.targetGraphic = image;
         ConfigureButtonState(button);
+        ButtonJuice juice = RuntimeUI.AttachJuice(button);
+        rect.localScale = Vector3.one;
+        if (juice != null)
+            juice.ResetBaseScale(Vector3.one);
 
         Image iconImage = EnsureImage(button.transform, iconName);
         ConfigureImage(iconImage, icon, true, Image.Type.Simple);
-        Place(iconImage.rectTransform, new Vector2(-354f, 0f),
-            new Vector2(154f, 154f));
+        Place(iconImage.rectTransform, new Vector2(0f, 73f),
+            new Vector2(270f, 270f));
 
         TMP_Text title = EnsureText(
-            button.transform, titleName, primary ? 62f : 54f,
-            displayFont, primary ? Ink : NearWhite,
+            button.transform, titleName, primary ? 36f : 30f,
+            displayFont, NearWhite,
             TextAlignmentOptions.Center);
-        Place(title.rectTransform, new Vector2(72f, 35f),
-            new Vector2(660f, 82f));
-        ConfigureDisplayText(title, primary ? 42f : 34f,
-            primary ? 64f : 56f);
-        title.enableWordWrapping = false;
+        Place(title.rectTransform,
+            primary ? new Vector2(-16f, 283f) : new Vector2(7f, 283f),
+            new Vector2(210f, 76f));
+        ConfigureDisplayText(title, primary ? 32f : 24f,
+            primary ? 40f : 30f);
+        title.enableWordWrapping = !primary;
+        title.lineSpacing = 0f;
+        title.overflowMode = TextOverflowModes.Truncate;
 
         TMP_Text subtitle = EnsureText(
-            button.transform, subtitleName, 29f, bodyFont,
+            button.transform, subtitleName, 27f, bodyFont,
             NearWhite, TextAlignmentOptions.Center);
-        Place(subtitle.rectTransform, new Vector2(72f, -30f),
-            new Vector2(primary ? 660f : 680f, 64f));
-        ConfigureBodyText(subtitle, 22f, 30f);
-        subtitle.enableWordWrapping = false;
+        Place(subtitle.rectTransform, new Vector2(0f, -100f),
+            new Vector2(392f, 120f));
+        ConfigureBodyText(subtitle, 21f, 28f);
+        subtitle.enableWordWrapping = true;
+        subtitle.lineSpacing = 0f;
+        subtitle.overflowMode = TextOverflowModes.Truncate;
+
+        TMP_Text action = EnsureText(
+            button.transform, actionName, 45f, displayFont,
+            NearWhite, TextAlignmentOptions.Center);
+        Place(action.rectTransform, new Vector2(0f, -267f),
+            new Vector2(414f, 86f));
+        ConfigureDisplayText(action, 36f, 52f);
+        action.enableWordWrapping = false;
+        action.fontStyle |= FontStyles.UpperCase;
 
         if (primary)
         {
-            AddTextShadow(title, 0.28f);
-            AddTextShadow(subtitle, 0.20f);
+            AddTextShadow(title, 0.58f);
+            AddTextShadow(subtitle, 0.48f);
         }
         else
         {
@@ -347,15 +418,18 @@ public sealed class MainMenuPlayVisuals : MonoBehaviour
 
         SetLocalized(title, titleKey);
         SetLocalized(subtitle, subtitleKey);
+        SetLocalized(action, "play");
         if (primary)
         {
             soloTitleText = title;
             soloSubtitleText = subtitle;
+            soloActionText = action;
         }
         else
         {
             friendTitleText = title;
             friendSubtitleText = subtitle;
+            friendActionText = action;
         }
         return rect;
     }
@@ -370,16 +444,14 @@ public sealed class MainMenuPlayVisuals : MonoBehaviour
         RectTransform rect = (RectTransform)button.transform;
         Image image = button.GetComponent<Image>();
         if (image == null) image = button.gameObject.AddComponent<Image>();
-        ConfigureInteractiveImage(image, frame, Image.Type.Sliced, 2f);
+        ConfigureImage(image, frame, true, Image.Type.Simple);
+        image.raycastTarget = true;
         button.targetGraphic = image;
         ConfigureButtonState(button);
-
-        backTitleText = EnsureText(
-            button.transform, BackTitleName, 42f, displayFont, NearWhite,
-            TextAlignmentOptions.Center);
-        StretchText(backTitleText.rectTransform, 48f, 18f);
-        ConfigureDisplayText(backTitleText, 32f, 44f);
-        SetLocalized(backTitleText, "back");
+        ButtonJuice juice = RuntimeUI.AttachJuice(button);
+        rect.localScale = Vector3.one;
+        if (juice != null)
+            juice.ResetBaseScale(Vector3.one);
         return rect;
     }
 
@@ -389,9 +461,10 @@ public sealed class MainMenuPlayVisuals : MonoBehaviour
         SetLocalized(subtitleText, "play_hub_subtitle");
         SetLocalized(soloTitleText, "play_hub_solo_title");
         SetLocalized(soloSubtitleText, "play_hub_solo_subtitle");
+        SetLocalized(soloActionText, "play");
         SetLocalized(friendTitleText, "play_hub_friend_title");
         SetLocalized(friendSubtitleText, "play_hub_friend_subtitle");
-        SetLocalized(backTitleText, "back");
+        SetLocalized(friendActionText, "play");
         ApplyResponsiveLayoutForViewport(Screen.width, Screen.height, true);
     }
 
@@ -406,9 +479,11 @@ public sealed class MainMenuPlayVisuals : MonoBehaviour
         int height,
         bool force = false)
     {
-        if (logoRect == null || titleRect == null || subtitleRect == null ||
+        if (logoRect == null || promptRibbonRect == null || titleRect == null ||
+            subtitleRect == null ||
             soloButtonRect == null || friendButtonRect == null ||
-            backButtonRect == null)
+            backButtonRect == null || mascotSevenRect == null ||
+            mascotThreeRect == null)
             return;
 
         L10n.Language language = L10n.Current;
@@ -425,35 +500,86 @@ public sealed class MainMenuPlayVisuals : MonoBehaviour
             : ReferenceHeight / ReferenceWidth;
         float tall = Mathf.InverseLerp(1.78f, 2.22f, aspect);
 
-        Place(logoRect, new Vector2(0f, 610f + 80f * tall),
-            new Vector2(620f, 340f));
-        Place(titleRect, new Vector2(0f, 310f),
-            new Vector2(900f, 100f));
-        Place(subtitleRect, new Vector2(0f, 235f),
-            new Vector2(880f, 64f));
-        Place(soloButtonRect, new Vector2(0f, 70f + 20f * tall),
-            new Vector2(920f, 210f));
-        Place(friendButtonRect, new Vector2(0f, -190f + 8f * tall),
-            new Vector2(920f, 210f));
-        Place(backButtonRect, new Vector2(0f, -455f - 28f * tall),
-            new Vector2(700f, 120f));
+        Place(backButtonRect, new Vector2(-452f, 846f + 34f * tall),
+            new Vector2(118f, 118f));
+        Place(logoRect, new Vector2(0f, 760f + 40f * tall),
+            new Vector2(403.3f, 234.35f));
+        Place(promptRibbonRect, new Vector2(0f, 525f + 32f * tall),
+            new Vector2(720f, 215f));
+        Place(subtitleRect, new Vector2(0f, 370f + 24f * tall),
+            new Vector2(850f, 70f));
+
+        // These are the two real, callback-bearing choices. Their geometry is
+        // intentionally identical so neither mode implies unavailable status.
+        // Grow downward while retaining the safe-width gutters and top edge.
+        // Art, copy and CTA are independently reflowed inside the taller faces;
+        // neither the Canvas nor child transforms receive a blind scale.
+        Place(soloButtonRect, new Vector2(-260f, -110f + 10f * tall),
+            new Vector2(560f, 920f));
+        Place(friendButtonRect, new Vector2(260f, -110f + 10f * tall),
+            new Vector2(560f, 920f));
+
+        foreach (string iconName in new[] { SoloIconName, FriendIconName })
+        {
+            Transform icon = DeepFind(safeRoot, iconName);
+            if (icon != null)
+                Place((RectTransform)icon, new Vector2(0f, 93f),
+                    new Vector2(330f, 330f));
+        }
+
+        Place(mascotSevenRect,
+            new Vector2(-325f, -713f - 20f * tall),
+            new Vector2(360f, 410f));
+        Place(mascotThreeRect,
+            new Vector2(325f, -713f - 20f * tall),
+            new Vector2(360f, 410f));
 
         if (friendTitleText != null)
         {
-            friendTitleText.fontSizeMin = language == L10n.Language.Greek
-                ? 32f : 34f;
-            friendTitleText.fontSizeMax = 56f;
+            friendTitleText.fontSizeMin = 24f;
+            friendTitleText.fontSizeMax = 34f;
         }
         if (friendSubtitleText != null)
         {
-            friendSubtitleText.fontSizeMin = language == L10n.Language.Greek
-                ? 23f : 24f;
-            friendSubtitleText.fontSizeMax = 30f;
+            friendSubtitleText.fontSizeMin = 21f;
+            friendSubtitleText.fontSizeMax = 34f;
         }
+        if (soloTitleText != null) soloTitleText.fontSizeMax = 46f;
+        if (soloSubtitleText != null) soloSubtitleText.fontSizeMax = 34f;
+        if (soloActionText != null) soloActionText.fontSizeMax = 62f;
+        if (friendActionText != null) friendActionText.fontSizeMax = 62f;
 
         Canvas.ForceUpdateCanvases();
         ForceMesh(titleText, subtitleText, soloTitleText, soloSubtitleText,
-            friendTitleText, friendSubtitleText, backTitleText);
+            soloActionText, friendTitleText, friendSubtitleText,
+            friendActionText);
+
+        // The inner panel has two authored surfaces: supporting copy in its
+        // upper dark gradient and PLAY in the lower button face. Preserve their
+        // exact normalized glyph centres within the vertically enlarged faces.
+        CenteredTextRegions = new[]
+        {
+            new MainMenuCenteredTextRegion(titleText, 0f, 8f, 650f, 94f),
+            new MainMenuCenteredTextRegion(subtitleText, 0f, 370f + 24f * tall, 850f, 70f),
+            new MainMenuCenteredTextRegion(soloTitleText, -16f, 361.6f, 210f, 86.9f),
+            new MainMenuCenteredTextRegion(friendTitleText, 7f, 361.6f, 210f, 86.9f),
+            new MainMenuCenteredTextRegion(soloSubtitleText, -16f, -228.7f, 368f, 89.4f),
+            new MainMenuCenteredTextRegion(friendSubtitleText, 7f, -228.7f, 368f, 89.4f),
+            new MainMenuCenteredTextRegion(soloActionText, -16f, -327.1f, 368f, 79.2f),
+            new MainMenuCenteredTextRegion(friendActionText, 7f, -327.1f, 368f, 79.2f),
+        };
+        CenterVisibleText();
+    }
+
+    void CenterVisibleText()
+    {
+        if (CenteredTextRegions == null) return;
+        // Safe-area language refresh reapplies the generic wrapping policy.
+        // This screen owns its one-line VS AI tab; restore that intent after
+        // refresh, before measuring the final localized glyphs.
+        if (soloTitleText != null) soloTitleText.enableWordWrapping = false;
+        foreach (MainMenuCenteredTextRegion region in CenteredTextRegions)
+            region.Apply();
     }
 
     void RemovePresentationListeners()
@@ -654,16 +780,6 @@ public sealed class MainMenuPlayVisuals : MonoBehaviour
         rect.anchorMax = Vector2.one;
         rect.offsetMin = Vector2.zero;
         rect.offsetMax = Vector2.zero;
-        rect.localScale = Vector3.one;
-        rect.localRotation = Quaternion.identity;
-    }
-
-    static void StretchText(RectTransform rect, float horizontal, float vertical)
-    {
-        rect.anchorMin = Vector2.zero;
-        rect.anchorMax = Vector2.one;
-        rect.offsetMin = new Vector2(horizontal, vertical);
-        rect.offsetMax = new Vector2(-horizontal, -vertical);
         rect.localScale = Vector3.one;
         rect.localRotation = Quaternion.identity;
     }

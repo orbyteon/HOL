@@ -92,11 +92,13 @@ public sealed class MainMenuPlayVisualsPlayModeTests
         Assert.That(safe, Is.Not.Null);
         foreach (string required in new[]
         {
-            "PlayBackground", "PlayLogo", "PlayHubTitle", "PlayHubSubtitle",
+            "PlayBackground", "PlayDecorations", "PlayLogo",
+            "PlayTitleRibbon", "PlayHubTitle", "PlayHubSubtitle",
             "ButtonChallenger", "PlaySoloIcon", "PlaySoloTitle",
-            "PlaySoloSubtitle", "ButtonPvP", "PlayFriendIcon",
-            "PlayFriendTitle", "PlayFriendSubtitle", "ButtonBack",
-            "PlayBackTitle",
+            "PlaySoloSubtitle", "PlaySoloAction", "ButtonPvP",
+            "PlayFriendIcon", "PlayFriendTitle", "PlayFriendSubtitle",
+            "PlayFriendAction", "ButtonBack", "PlayMascotSeven",
+            "PlayMascotThree",
         })
         {
             Assert.That(Find(root, required), Is.Not.Null,
@@ -117,13 +119,16 @@ public sealed class MainMenuPlayVisualsPlayModeTests
         Button solo = Find(safe, "ButtonChallenger").GetComponent<Button>();
         Button friend = Find(safe, "ButtonPvP").GetComponent<Button>();
         Button back = Find(safe, "ButtonBack").GetComponent<Button>();
-        AssertProductionButton(solo, "phase2a/hol_cta_gold_r2_9s");
-        AssertProductionButton(friend, "phase2a/hol_cta_blue_r2_9s");
-        AssertProductionButton(back, "phase2a/hol_cta_blue_r2_9s");
+        AssertProductionButton(
+            solo, "solo/production/solo_player_card_shell_v1");
+        AssertProductionButton(
+            friend, "solo/production/solo_opponent_card_shell_v1");
+        AssertProductionButton(
+            back, "solo/production/solo_back_button_v1");
         Assert.That(safe.GetComponentsInChildren<Button>(false), Has.Length.EqualTo(3),
             "Selector must expose exactly VS AI, one Private Room route, and Back.");
-        Assert.That(root.GetComponentsInChildren<TMP_Text>(false), Has.Length.EqualTo(7),
-            "Selector must expose one heading/helper, two labels per real mode, and Back only.");
+        Assert.That(root.GetComponentsInChildren<TMP_Text>(false), Has.Length.EqualTo(8),
+            "Selector must expose one heading/helper and three live labels per real mode.");
         Assert.That(CountNamedButtons(canvas.transform, "ButtonPvP"), Is.EqualTo(1),
             "There must be exactly one active Private Room/PvP entry.");
         Assert.That(CountNamedButtons(canvas.transform, "ButtonPrivateRoom"), Is.Zero,
@@ -140,11 +145,11 @@ public sealed class MainMenuPlayVisualsPlayModeTests
         AssertLocalizedHubCopy(root, 0,
             "CHOOSE A MODE", "What do you want to play?",
             "VS AI", "A number duel against the computer",
-            "PLAY WITH A FRIEND", "Create or join a private room", "Back");
+            "PLAY WITH A FRIEND", "Create or join a private room", "Play");
         AssertLocalizedHubCopy(root, 1,
             "ΔΙΑΛΕΞΕ ΤΡΟΠΟ", "Τι θέλεις να παίξεις;",
             "ΕΝΑΝΤΙΟΝ AI", "Μονομαχία αριθμών με τον υπολογιστή",
-            "ΠΑΙΞΕ ΜΕ ΦΙΛΟ", "Δημιούργησε ή μπες σε ιδιωτικό δωμάτιο", "Πίσω");
+            "ΠΑΙΞΕ ΜΕ ΦΙΛΟ", "Δημιούργησε ή μπες σε ιδιωτικό δωμάτιο", "Παίξε");
         SetLanguage(0);
 
         string visibleCopy = VisibleCopy(root).ToUpperInvariant();
@@ -241,14 +246,16 @@ public sealed class MainMenuPlayVisualsPlayModeTests
         TMP_Text hubSubtitle = RequireText(root, "PlayHubSubtitle");
         TMP_Text soloTitle = RequireText(root, "PlaySoloTitle");
         TMP_Text soloSubtitle = RequireText(root, "PlaySoloSubtitle");
+        TMP_Text soloAction = RequireText(root, "PlaySoloAction");
         TMP_Text friendTitle = RequireText(root, "PlayFriendTitle");
         TMP_Text friendSubtitle = RequireText(root, "PlayFriendSubtitle");
-        TMP_Text backTitle = RequireText(root, "PlayBackTitle");
+        TMP_Text friendAction = RequireText(root, "PlayFriendAction");
         TMP_Text[] texts =
         {
             hubTitle, hubSubtitle, soloTitle, soloSubtitle,
-            friendTitle, friendSubtitle, backTitle,
+            soloAction, friendTitle, friendSubtitle, friendAction,
         };
+        AssertApprovedTitleApertures(owner, soloTitle, friendTitle, "initial");
         MethodInfo applyViewport = owner.GetType().GetMethod(
             "ApplyResponsiveLayoutForViewport", InstanceFlags);
         Assert.That(applyViewport, Is.Not.Null,
@@ -276,6 +283,7 @@ public sealed class MainMenuPlayVisualsPlayModeTests
                         lane + " " + text.name);
                 }
 
+                AssertApprovedTitleApertures(owner, soloTitle, friendTitle, lane);
                 AssertContained(safe.rect, GlyphBounds(hubTitle, safe), 28f,
                     lane + " hub title");
                 AssertContained(safe.rect, GlyphBounds(hubSubtitle, safe), 28f,
@@ -288,27 +296,42 @@ public sealed class MainMenuPlayVisualsPlayModeTests
                     lane + " friend title");
                 AssertContained(friend.rect, GlyphBounds(friendSubtitle, friend), 16f,
                     lane + " friend subtitle");
-                AssertContained(back.rect, GlyphBounds(backTitle, back), 18f,
-                    lane + " Back title");
+                AssertContained(solo.rect, GlyphBounds(soloAction, solo), 16f,
+                    lane + " VS AI action");
+                AssertContained(friend.rect, GlyphBounds(friendAction, friend), 16f,
+                    lane + " friend action");
 
                 Assert.That(hubTitle.fontSize, Is.GreaterThanOrEqualTo(42f), lane);
                 Assert.That(hubSubtitle.fontSize, Is.GreaterThanOrEqualTo(24f), lane);
-                Assert.That(soloTitle.fontSize, Is.GreaterThanOrEqualTo(40f), lane);
-                Assert.That(friendTitle.fontSize, Is.GreaterThanOrEqualTo(32f), lane);
-                Assert.That(soloSubtitle.fontSize, Is.GreaterThanOrEqualTo(22f), lane);
+                Assert.That(soloTitle.fontSize, Is.GreaterThanOrEqualTo(32f), lane);
+                Assert.That(friendTitle.fontSize, Is.GreaterThanOrEqualTo(24f), lane);
+                Assert.That(soloSubtitle.fontSize, Is.GreaterThanOrEqualTo(21f), lane);
                 Assert.That(friendSubtitle.fontSize, Is.GreaterThanOrEqualTo(21f), lane);
-                Assert.That(backTitle.fontSize, Is.GreaterThanOrEqualTo(32f), lane);
+                Assert.That(soloAction.fontSize, Is.GreaterThanOrEqualTo(36f), lane);
+                Assert.That(friendAction.fontSize, Is.GreaterThanOrEqualTo(36f), lane);
 
-                AssertRectSize(solo, new Vector2(920f, 210f), lane + " VS AI");
-                AssertRectSize(friend, new Vector2(920f, 210f), lane + " friend");
-                AssertRectSize(back, new Vector2(700f, 120f), lane + " Back");
-                AssertVerticalSeparation(solo, friend, lane + " mode buttons");
-                AssertVerticalSeparation(friend, back, lane + " friend/Back");
+                AssertRectSize(solo, new Vector2(560f, 920f), lane + " VS AI");
+                AssertRectSize(friend, new Vector2(560f, 920f), lane + " friend");
+                AssertRectSize(back, new Vector2(118f, 118f), lane + " Back");
+                AssertHorizontalSeparation(solo, friend, lane + " mode cards");
                 Assert.That(solo.sizeDelta.y, Is.GreaterThanOrEqualTo(48f));
                 Assert.That(friend.sizeDelta.y, Is.GreaterThanOrEqualTo(48f));
                 Assert.That(back.sizeDelta.y, Is.GreaterThanOrEqualTo(48f));
             }
         }
+    }
+
+    static void AssertApprovedTitleApertures(
+        Component owner, TMP_Text soloTitle, TMP_Text friendTitle, string lane)
+    {
+        MainMenuHomeVisualsPlayModeTests.AssertApprovedCenteredTextRegion(
+            owner, soloTitle, new Vector2(-16f, 361.6f),
+            new Vector2(210f, 86.9f), new Vector2(210f, 118.9f),
+            0f, lane + " VS AI title aperture");
+        MainMenuHomeVisualsPlayModeTests.AssertApprovedCenteredTextRegion(
+            owner, friendTitle, new Vector2(7f, 361.6f),
+            new Vector2(210f, 86.9f), new Vector2(210f, 118.9f),
+            0f, lane + " friend title aperture");
     }
 
     static IEnumerator LoadReadyMainMenu()
@@ -388,12 +411,16 @@ public sealed class MainMenuPlayVisualsPlayModeTests
             label + " top");
     }
 
-    static void AssertVerticalSeparation(
-        RectTransform upper, RectTransform lower, string label)
+    static void AssertHorizontalSeparation(
+        RectTransform left, RectTransform right, string label)
     {
-        float upperBottom = upper.anchoredPosition.y - upper.sizeDelta.y * 0.5f;
-        float lowerTop = lower.anchoredPosition.y + lower.sizeDelta.y * 0.5f;
-        Assert.That(upperBottom, Is.GreaterThan(lowerTop), label);
+        Vector4 leftPadding = left.GetComponent<Image>().raycastPadding;
+        Vector4 rightPadding = right.GetComponent<Image>().raycastPadding;
+        Assert.That(leftPadding, Is.EqualTo(new Vector4(40f, 0f, 40f, 0f)), label);
+        Assert.That(rightPadding, Is.EqualTo(leftPadding), label);
+        float leftEdge = left.anchoredPosition.x + left.sizeDelta.x * 0.5f - leftPadding.z;
+        float rightEdge = right.anchoredPosition.x - right.sizeDelta.x * 0.5f + rightPadding.x;
+        Assert.That(leftEdge, Is.LessThan(rightEdge), label);
     }
 
     static void AssertRectSize(RectTransform rect, Vector2 size, string label)
@@ -411,11 +438,16 @@ public sealed class MainMenuPlayVisualsPlayModeTests
         Assert.That(image, Is.Not.Null, button.name);
         Assert.That(sprite, Is.Not.Null, resource);
         Assert.That(image.sprite, Is.SameAs(sprite), button.name);
-        Assert.That(image.type, Is.EqualTo(Image.Type.Sliced), button.name);
+        Assert.That(image.type, Is.EqualTo(Image.Type.Simple), button.name);
         Assert.That(image.color.a, Is.EqualTo(1f).Within(0.001f), button.name);
         Assert.That(image.raycastTarget, Is.True, button.name);
         Assert.That(button.targetGraphic, Is.SameAs(image), button.name);
         Assert.That(button.interactable, Is.True, button.name);
+        Component juice = button.GetComponent("ButtonJuice");
+        Assert.That(juice, Is.Not.Null, button.name + " press feedback");
+        object pressedScale = juice.GetType().GetField("pressedScale").GetValue(juice);
+        Assert.That((float)pressedScale, Is.EqualTo(0.92f).Within(0.001f),
+            button.name + " press scale");
     }
 
     static void AssertLocalizedHubCopy(
@@ -427,7 +459,7 @@ public sealed class MainMenuPlayVisualsPlayModeTests
         string soloSubtitle,
         string friend,
         string friendSubtitle,
-        string back)
+        string action)
     {
         SetLanguage(language);
         Assert.That(Text(root, "PlayHubTitle"), Is.EqualTo(heading));
@@ -436,7 +468,8 @@ public sealed class MainMenuPlayVisualsPlayModeTests
         Assert.That(Text(root, "PlaySoloSubtitle"), Is.EqualTo(soloSubtitle));
         Assert.That(Text(root, "PlayFriendTitle"), Is.EqualTo(friend));
         Assert.That(Text(root, "PlayFriendSubtitle"), Is.EqualTo(friendSubtitle));
-        Assert.That(Text(root, "PlayBackTitle"), Is.EqualTo(back));
+        Assert.That(Text(root, "PlaySoloAction"), Is.EqualTo(action));
+        Assert.That(Text(root, "PlayFriendAction"), Is.EqualTo(action));
     }
 
     static string Text(Transform root, string name)
