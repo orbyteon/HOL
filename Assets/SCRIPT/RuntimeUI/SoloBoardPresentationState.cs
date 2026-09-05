@@ -366,6 +366,8 @@ public sealed class SoloBoardPresentationModel
     int playerRangeMax = 100;
     int aiRangeMin = 1;
     int aiRangeMax = 100;
+    int pendingAiRangeMin = 1;
+    int pendingAiRangeMax = 100;
     int playerSecretNumber;
     int opponentSecretNumber;
     int latestPlayerGuess;
@@ -399,8 +401,8 @@ public sealed class SoloBoardPresentationModel
     {
         history.Clear();
         opponentName = name ?? "";
-        playerRangeMin = aiRangeMin = 1;
-        playerRangeMax = aiRangeMax = 100;
+        playerRangeMin = aiRangeMin = pendingAiRangeMin = 1;
+        playerRangeMax = aiRangeMax = pendingAiRangeMax = 100;
         playerSecretNumber = 0;
         opponentSecretNumber = 0;
         latestPlayerGuess = latestAiGuess = 0;
@@ -576,7 +578,11 @@ public sealed class SoloBoardPresentationModel
         latestAiHandoffPinned = false;
         resultFollows = false;
         handoffActor = SoloBoardActor.Player;
-        ApplyRanges(playerMin, playerMax, newOpponentMin, newOpponentMax);
+        // Rules and AI have already advanced; the display must not disclose
+        // their narrowed range before the pending outcome is revealed.
+        ApplyRanges(playerMin, playerMax, aiRangeMin, aiRangeMax);
+        pendingAiRangeMin = newOpponentMin;
+        pendingAiRangeMax = newOpponentMax;
         AppendEvent(roundNumber, SoloBoardActor.Opponent,
             SoloBoardActor.Player, guess, outcome, usedLock,
             candidatesBefore);
@@ -597,6 +603,8 @@ public sealed class SoloBoardPresentationModel
             !ValidGuess(latestAiGuess) ||
             !ValidGuessOutcome(latestAiOutcome))
             return false;
+        aiRangeMin = pendingAiRangeMin;
+        aiRangeMax = pendingAiRangeMax;
         latestAiHandoffPinned = true;
         CommitTransition(
             SoloBoardPhase.AnswerOpponent,

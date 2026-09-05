@@ -174,6 +174,61 @@ public sealed class SoloProductionFlowPlayModeTests
     }
 
     [UnityTest]
+    public IEnumerator SceneWiredSecretSubmitKeepsRematchExclusiveToMatchResult()
+    {
+        UseFakePresentationClock();
+        var rematchObject = (GameObject)Field(game, "stopGameButton");
+        Button rematch = rematchObject.GetComponent<Button>();
+        Assert.That(Field(numberManager, "stopButton"), Is.SameAs(rematchObject));
+        Button submit = Submit();
+        Assert.That(Enumerable.Range(0, submit.onClick.GetPersistentEventCount())
+            .Any(index => submit.onClick.GetPersistentTarget(index) == numberManager &&
+                          submit.onClick.GetPersistentMethodName(index) == "SubmitNumber"), Is.True,
+            "Use the real scene-wired submission path, not a direct StartGame fixture.");
+        input.text = "80";
+        submit.onClick.Invoke();
+        AssertPhase("StarterReveal");
+        Assert.That(rematchObject.activeSelf, Is.False,
+            "A live starter reveal must not expose terminal-only Rematch.");
+        // Only the hidden AI secret is deterministic; preserve whichever
+        // actor the real production start selected and finish via live input.
+        SetField(game, "aiSecretNumber", 77);
+        for (int phase = 0; phase < 12 &&
+             StateProperty("Phase").ToString() != "MatchResult"; phase++)
+        {
+            Assert.That(rematchObject.activeSelf, Is.False,
+                "Rematch is unavailable throughout every non-terminal phase.");
+            if (StateProperty("Phase").ToString() == "PlayerGuess")
+            {
+                input.text = "77";
+                Assert.That(submit.interactable, Is.True);
+                submit.onClick.Invoke();
+            }
+            else
+            {
+                yield return AdvanceScheduledBeat();
+            }
+        }
+        AssertTerminal("Win");
+        Assert.That(rematchObject.activeInHierarchy && rematch.interactable, Is.True);
+        Assert.That(completedOutcomes, Has.Count.EqualTo(1));
+        int sceneHandle = SceneManager.GetActiveScene().handle;
+        rematch.onClick.Invoke();
+        yield return AdvancePresentationClock(20f);
+        AssertPhase("ChooseSecret");
+        Assert.That(SceneManager.GetActiveScene().handle, Is.EqualTo(sceneHandle));
+        Assert.That(rematchObject.activeSelf, Is.False);
+        Assert.That(HistoryEvents(), Is.Empty);
+        Assert.That(completedOutcomes, Has.Count.EqualTo(1));
+        Assert.That(statsChangedCount, Is.EqualTo(1));
+        input.text = "42";
+        submit.onClick.Invoke();
+        AssertPhase("StarterReveal");
+        Assert.That(rematchObject.activeSelf, Is.False,
+            "The next real match must retain terminal-only Rematch ownership.");
+    }
+
+    [UnityTest]
     public IEnumerator LossPublishesOutcomeAndRematchCannotDuplicateTerminalWork()
     {
         PlayerPrefs.SetInt("StatStreak", 3);

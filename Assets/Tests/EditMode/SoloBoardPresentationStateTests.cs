@@ -530,7 +530,16 @@ public sealed class SoloBoardPresentationStateTests
         Assert.That(Property(afterAi, "PlayerRangeMin"), Is.EqualTo(43));
         Assert.That(Property(afterAi, "PlayerRangeMax"), Is.EqualTo(90));
         Assert.That(Property(afterAi, "AiRangeMin"), Is.EqualTo(20));
-        Assert.That(Property(afterAi, "AiRangeMax"), Is.EqualTo(65));
+        Assert.That(Property(afterAi, "AiRangeMax"), Is.EqualTo(80),
+            "The guess-only phase must keep the last revealed display range.");
+        Assert.That(Call(model, "RevealOpponentOutcome"), Is.True);
+        Assert.That(Property(Current(model), "AiRangeMin"), Is.EqualTo(20));
+        Assert.That(Property(Current(model), "AiRangeMax"), Is.EqualTo(65));
+
+        Begin(model, "Luca");
+        Assert.That(Property(Current(model), "AiRangeMin"), Is.EqualTo(1));
+        Assert.That(Property(Current(model), "AiRangeMax"), Is.EqualTo(100));
+        AssertRejectedWithoutMutation(model, () => Call(model, "RevealOpponentOutcome"));
     }
 
     [Test]
