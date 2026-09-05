@@ -26,7 +26,7 @@ const filesBelow = directory => {
 };
 
 const approvedBackground =
-  "Assets/newdesign/Resources/settings/hol_settings_bg_r1.png";
+  "Assets/newdesign/Resources/solo/production/solo_background_v1.png";
 const rejectedCloudBackground =
   "Assets/newdesign/Resources/mainmenu/mainmenu_bg_stairs_clouds.png";
 
@@ -62,15 +62,20 @@ test("approved number six stays byte-exact", () => {
     "067beafc207aea302e0993a3bacdb2b69478429aa3685f275bb6705bd902ac4b");
 });
 
-test("approved spotlight Home background is high-resolution 9:16 art", () => {
+test("Home reuses approved Solo background with canonical 941x1672 portrait geometry", () => {
   const png = read(approvedBackground);
   const { width, height } = dimensions(png);
+  assert.equal(png.subarray(0, 8).toString("hex"), "89504e470d0a1a0a",
+    "Home background must be a PNG");
+  assert.equal(png[24], 8, "Home background must stay 8-bit");
+  // 04-solo-duel-approved-contract.md fixes the source at 941x1672.
+  assert.deepEqual({ width, height }, { width: 941, height: 1672 });
   assert.ok(width >= 900,
     `Home background width must stay production-resolution; got ${width}`);
   assert.ok(height >= 1600,
     `Home background height must stay production-resolution; got ${height}`);
   assert.ok(Math.abs(width / height - 9 / 16) <= 0.002,
-    `Home background must stay 9:16; got ${width}x${height}`);
+    `Home background must stay approximately 9:16; got ${width}x${height}`);
   assert.ok(colorType(png) === 2 || colorType(png) === 6,
     "Home background must be RGB or RGBA");
   assert.equal(exists(approvedBackground + ".meta"), true,
@@ -135,10 +140,12 @@ test("Home chrome PNGs stay text-free RGBA overlays or 9-slices", () => {
   }
 });
 
-test("Home owner uses approved background and cannot restore rejected one", () => {
+test("Home owner uses approved Solo background and cannot restore retired backgrounds", () => {
   const owner = "Assets/SCRIPT/Design/MainMenuHomeVisuals.cs";
   const source = read(owner).toString("utf8");
-  assert.match(source, /settings\/hol_settings_bg_r1/);
+  assert.match(source,
+    /const string BackgroundResource\s*=\s*"solo\/production\/solo_background_v1";/);
+  assert.equal(source.includes("settings/hol_settings_bg_r1"), false);
   assert.equal(source.includes("phase2a/hol_neon_reference_bg_r3"), false);
   assert.equal(source.includes("mainmenu_bg_stairs_clouds"), false);
 });
