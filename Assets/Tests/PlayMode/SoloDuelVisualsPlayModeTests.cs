@@ -2983,9 +2983,10 @@ public sealed class SoloDuelVisualsPlayModeTests
         Bounds bounds = RectTransformUtility.CalculateRelativeRectTransformBounds(
             outer, inner);
         Rect available = outer.rect;
-        // World/local float transforms can return 177.000015 for the exact
-        // 177px boundary. Allow one float ULP there, not a smaller safety inset.
-        const float transformRoundoff = 0.00002f;
+        // Accumulated world/local float transforms returned 177.000015 in CI
+        // and 177.000092 in the Main Menu hierarchy for the exact 177px edge.
+        // Cover that sub-pixel roundoff only; preserve the full safety inset.
+        const float transformRoundoff = 0.0001f;
         Assert.That(bounds.min.x, Is.GreaterThanOrEqualTo(available.xMin + inset - transformRoundoff),
             context + " left");
         Assert.That(bounds.max.x, Is.LessThanOrEqualTo(available.xMax - inset + transformRoundoff),
