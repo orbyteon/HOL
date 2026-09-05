@@ -9,15 +9,14 @@ using TMPro;
 //
 //   1. End-game "stop" button  -> rewired to GameManager.RestartMatch,
 //      relabeled "Rematch" (old StopGame no longer exists).
-//   2. Matchmaking search panel -> gets a Cancel button (CancelSearch).
-//   3. Settings panel -> gets EN/EL language buttons (LanguageSelector).
-//   4. Main menu -> gets a stats label fed by GameStats.
-//   5. Solo matchmaking panels -> "opponents are simulated" disclosure.
-//   6. Settings -> "Ads privacy" button re-opens the consent dialog.
-//   7. Attaches DailyStreak (it is placed in no scene) so streaks count.
-//   8. Scene-authored English labels -> LocalizedText via content mapping.
-//   9. Settings -> difficulty selector (Easy/Normal/Hard/Adaptive).
-//  10. Attaches the non-visual Daily Challenge event tracker once.
+//   2. Settings panel -> gets EN/EL language buttons (LanguageSelector).
+//   3. Main menu -> gets a stats label fed by GameStats.
+//   4. Solo matchmaking panels -> "opponents are simulated" disclosure.
+//   5. Settings -> "Ads privacy" button re-opens the consent dialog.
+//   6. Attaches DailyStreak (it is placed in no scene) so streaks count.
+//   7. Scene-authored English labels -> LocalizedText via content mapping.
+//   8. Settings -> difficulty selector (Easy/Normal/Hard/Adaptive).
+//   9. Attaches the non-visual Daily Challenge event tracker once.
 public class ExtrasRuntimeWiring : MonoBehaviour
 {
     // Functional fallback colors only; current screen owners assign production sprites.
@@ -41,7 +40,6 @@ public class ExtrasRuntimeWiring : MonoBehaviour
         WireDailyHunt();
         WireRematchButton();
         WireNumberInputSubmit();
-        WireMatchmakingCancel();
         WireLanguageButtons();
         WireConsentSettings();
         WireDifficultyButtons();
@@ -92,6 +90,12 @@ public class ExtrasRuntimeWiring : MonoBehaviour
     {
         foreach (var tmp in FindObjectsOfType<TMP_Text>(true))
         {
+            // SoloDuelVisuals owns dynamic actor, outcome and range copy. In
+            // particular, its input placeholder changes from the 1-100 secret
+            // domain to the narrowed live range; generic scene localization
+            // must not install a competing writer beneath that owner.
+            if (tmp.GetComponentInParent<SoloDuelVisuals>(true) != null)
+                continue;
             string key;
             if (!SceneTextKeys.TryGetValue(NormalizeSceneText(tmp.text), out key))
                 continue;
@@ -130,7 +134,9 @@ public class ExtrasRuntimeWiring : MonoBehaviour
     // only full-screen page roots so every page shares one coordinate system.
     void NormalizeReferencePanels()
     {
-        string[] pageNames = { "PanelGAME", "PanelPlay", "PanelSearching", "PanelSettings" };
+        // PanelGAME is owned and normalized exclusively by SoloDuelVisuals.
+        // Retain the existing behavior for other pages in this scoped phase.
+        string[] pageNames = { "PanelPlay", "PanelSearching", "PanelSettings" };
         foreach (var rect in FindObjectsOfType<RectTransform>(true))
         {
             bool isPage = false;
@@ -244,7 +250,8 @@ public class ExtrasRuntimeWiring : MonoBehaviour
 
     void WireRematchButton()
     {
-        var gm = FindObjectOfType<GameManager>();
+        // PanelGAME is inactive while this one-frame wiring pass runs.
+        var gm = FindObjectOfType<GameManager>(true);
         if (gm == null || gm.stopGameButton == null)
             return;
 
@@ -252,6 +259,17 @@ public class ExtrasRuntimeWiring : MonoBehaviour
         if (button == null)
             return;
 
+        // RemoveAllListeners clears runtime listeners only; the scene still
+        // serializes the retired NumberManager.ExitToMenu callback. Disable
+        // persistent entries first so one real REMATCH tap cannot restart and
+        // then immediately reload MainMenu.
+        for (int index = 0;
+             index < button.onClick.GetPersistentEventCount();
+             index++)
+        {
+            button.onClick.SetPersistentListenerState(
+                index, UnityEngine.Events.UnityEventCallState.Off);
+        }
         button.onClick.RemoveAllListeners();
         button.onClick.AddListener(gm.RestartMatch);
 
@@ -292,23 +310,7 @@ public class ExtrasRuntimeWiring : MonoBehaviour
         nm.numberInput.onSubmit.AddListener(_ => nm.SubmitNumber());
     }
 
-    // --- 2. Matchmaking cancel ---------------------------------------------
-
-    void WireMatchmakingCancel()
-    {
-        var mm = FindObjectOfType<FakeMatchmaking>();
-        if (mm == null || mm.searchingPanel == null)
-            return;
-
-        var cancel = RuntimeUI.CreateButton(mm.searchingPanel.transform,
-            "CancelButton", L10n.Get("cancel"),
-            new Vector2(0f, -420f), new Vector2(300f, 80f), Neutral);
-        ApplyWiringSprite(cancel, "mainmenu/mainmenu_cta_blue_9s");
-        cancel.onClick.AddListener(mm.CancelSearch);
-        RuntimeUI.Localize(cancel, "cancel");
-    }
-
-    // --- 3. Language buttons ------------------------------------------------
+    // --- 2. Language buttons ------------------------------------------------
 
     void WireLanguageButtons()
     {

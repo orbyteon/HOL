@@ -48,6 +48,7 @@ public sealed class SettingsVisuals : MonoBehaviour
     MenuManager menu;
     TMP_FontAsset displayFont;
     TMP_FontAsset bodyFont;
+    Image chipAvatarImage;
     TMP_Text chipName;
     TMP_Text chipStreak;
     TMP_Text musicStateText;
@@ -215,8 +216,12 @@ public sealed class SettingsVisuals : MonoBehaviour
         SetProductionImage(chip, PlayerChipResource, 1f);
         chip.raycastTarget = false;
 
-        AddSprite(go.transform, "PlayerAvatar", "reference/player_cyan_exact",
+        chipAvatarImage = AddSprite(
+            go.transform, "PlayerAvatar",
+            PlayerProfileAvatarResolver.FallbackResourcePath,
             new Vector2(-126f, -2f), new Vector2(76f, 82f));
+        if (chipAvatarImage != null)
+            chipAvatarImage.sprite = PlayerProfileAvatarResolver.Resolve();
 
         chipName = AddText(go.transform, "PlayerName", "", 31,
             new Vector2(35f, 23f), new Vector2(210f, 46f), NearWhite,
@@ -382,6 +387,8 @@ public sealed class SettingsVisuals : MonoBehaviour
         string stored = PlayerPrefs.GetString("PlayerName", "");
         string player = string.IsNullOrWhiteSpace(stored)
             ? L10n.Get("player_default") : stored;
+        if (chipAvatarImage != null)
+            chipAvatarImage.sprite = PlayerProfileAvatarResolver.Resolve();
         if (chipName != null) chipName.text = player;
         if (chipStreak != null)
             chipStreak.text = L10n.Get("stats_streak") + " " + GameStats.CurrentStreak;
@@ -664,7 +671,7 @@ public sealed class SettingsVisuals : MonoBehaviour
             MusicIconResource, DifficultyIconResource, PrivacyIconResource,
             BlueButtonResource, GoldButtonResource, NeutralButtonResource,
             MagentaButtonResource, PlayerChipResource, ChevronResource,
-            "reference/player_cyan_exact"
+            PlayerProfileAvatarResolver.FallbackResourcePath
         };
         for (int i = 0; i < sprites.Length; i++)
             if (Resources.Load<Sprite>(sprites[i]) == null) return false;

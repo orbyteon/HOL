@@ -49,7 +49,7 @@ public sealed class ProductionSymbolPlayModeTests
         var input = inputObject.GetComponent<TMP_InputField>();
         numberManager.GetType().GetField("numberInput").SetValue(numberManager, input);
 
-        Component layout = boardObject.AddComponent(RuntimeType("HolDuelBoardLayout"));
+        Component layout = boardObject.AddComponent(RuntimeType("SoloDuelVisuals"));
         ((Behaviour)layout).enabled = false;
         MethodInfo build = layout.GetType().GetMethod("Build",
             BindingFlags.Instance | BindingFlags.NonPublic);
@@ -59,9 +59,15 @@ public sealed class ProductionSymbolPlayModeTests
         Transform backspaceTransform = Find(boardObject.transform, "Key_BACKSPACE");
         Assert.That(backspaceTransform, Is.Not.Null,
             "The visible label must not also be the internal command identifier.");
-        var label = backspaceTransform.GetComponentInChildren<TMP_Text>();
-        Assert.That(label, Is.Not.Null);
-        Assert.That(label.text, Is.EqualTo(char.ConvertFromUtf32(0x2190)));
+        Transform iconTransform = Find(backspaceTransform, "KeyActionIcon");
+        Assert.That(iconTransform, Is.Not.Null);
+        var icon = iconTransform.GetComponent<Image>();
+        Assert.That(icon, Is.Not.Null);
+        Assert.That(icon.sprite, Is.SameAs(Resources.Load<Sprite>(
+            "solo/production/solo_key_backspace_icon_v1")));
+        var label = backspaceTransform.GetComponentInChildren<TMP_Text>(true);
+        Assert.That(label == null || string.IsNullOrEmpty(label.text), Is.True,
+            "Approved backspace artwork must not be replaced by a font glyph.");
 
         input.text = "123";
         backspaceTransform.GetComponent<Button>().onClick.Invoke();

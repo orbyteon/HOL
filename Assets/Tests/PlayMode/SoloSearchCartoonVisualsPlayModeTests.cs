@@ -10,44 +10,67 @@ using UnityEngine.UI;
 
 public sealed class SoloSearchCartoonVisualsPlayModeTests
 {
+    [TearDown]
+    public void TearDown()
+    {
+#if UNITY_EDITOR
+        FirstLaunchSoloEndToEndPlayModeTests.RestoreEditorWindowAfterSettlement();
+#endif
+    }
+
     [UnityTest]
     public IEnumerator SearchScreenUsesApprovedRadarAndSingleCancelableAiLifecycle()
     {
         Screen.SetResolution(1080, 1920, false);
-        InvokeStatic("SoloSearchVisuals", "Bootstrap");
         yield return SceneManager.LoadSceneAsync("MainMenu", LoadSceneMode.Single);
 
         Component matchmaking = null;
-        Component visuals = null;
         for (int frame = 0; frame < 120; frame++)
         {
             matchmaking = FindInScene(RuntimeType("FakeMatchmaking"));
-            visuals = FindInScene(RuntimeType("SoloSearchVisuals"));
-            if (matchmaking != null && visuals != null)
+            if (matchmaking != null)
                 break;
             yield return null;
         }
 
         Assert.That(matchmaking, Is.Not.Null);
+        Assert.That(CountInScene(RuntimeType("SoloSearchVisuals")), Is.Zero,
+            "The retired Solo Search owner must not auto-install in the live scene.");
+
+        InstallSoloSearch(matchmaking);
+        Component visuals = null;
+        for (int frame = 0; frame < 120; frame++)
+        {
+            visuals = FindInScene(RuntimeType("SoloSearchVisuals"));
+            if (visuals != null)
+                break;
+            yield return null;
+        }
+
         Assert.That(visuals, Is.Not.Null);
         Assert.That(CountInScene(RuntimeType("SoloSearchVisuals")), Is.EqualTo(1));
 
-        // Enter through the real MenuManager lifecycle. The searching modal is
-        // a child of the Play page; calling FakeMatchmaking directly while that
-        // parent is inactive cannot activate or initialize the modal hierarchy.
+        // The preparation modal is retained only as an isolated visual preview.
+        // Production MenuManager bypasses PanelPlay and reveals PanelGAME
+        // directly, so this test enables the legacy parent explicitly.
         Component menu = FindInScene(RuntimeType("MenuManager"));
         Assert.That(menu, Is.Not.Null);
-        menu.SendMessage("OnPlayPressed", SendMessageOptions.RequireReceiver);
+        GameObject panelPlay = GetField<GameObject>(menu, "panelPlay");
+        GameObject mainMenuPanel = GetField<GameObject>(menu, "mainMenuPanel");
+        Assert.That(panelPlay, Is.Not.Null);
+        Assert.That(mainMenuPanel, Is.Not.Null);
+        mainMenuPanel.SetActive(false);
+        panelPlay.SetActive(true);
         yield return null;
 
         GameObject searchPanel = GetField<GameObject>(matchmaking, "searchingPanel");
         GameObject gamePanel = GetField<GameObject>(matchmaking, "panelGame");
         Assert.That(searchPanel.transform.parent, Is.Not.Null);
         Assert.That(searchPanel.transform.parent.gameObject.activeInHierarchy, Is.True,
-            "The real Play page must be active before starting Solo preparation.");
+            "The isolated search preview parent must be active before preparation.");
 
         var layout = gamePanel.GetComponentInChildren(
-            RuntimeType("HolDuelBoardLayout"), true) as Behaviour;
+            RuntimeType("SoloDuelVisuals"), true) as Behaviour;
         Assert.That(layout, Is.Not.Null,
             "The Search lifecycle must wait on the real Solo board owner.");
 
@@ -79,6 +102,15 @@ public sealed class SoloSearchCartoonVisualsPlayModeTests
 
         Transform root = Find(searchPanel.transform, "SoloSearchVisualRoot");
         Assert.That(root, Is.Not.Null);
+        Assert.That(CountNamedButtons(searchPanel.transform, "CancelButton"),
+            Is.EqualTo(1), "Compatibility Search must have exactly one Cancel callback target.");
+        Assert.That(CountNamedButtons(searchPanel.transform, "SearchBackButton"),
+            Is.EqualTo(1), "Compatibility Search must have exactly one Back callback target.");
+        Assert.That(
+            searchPanel.GetComponentsInChildren(
+                RuntimeType("ResponsivePageLayout"), true).Length,
+            Is.Zero,
+            "SoloSearchVisuals owns its control geometry; no generic layout writer may attach.");
 
         foreach (string name in new[]
         {
@@ -180,7 +212,16 @@ public sealed class SoloSearchCartoonVisualsPlayModeTests
         if (Application.isBatchMode)
             yield return null;
         else
+        {
+#if UNITY_EDITOR
+            // Exercise the real presentation frame. A floating Test Runner can
+            // leave Unity's Game View inactive, in which case
+            // WaitForEndOfFrame is never scheduled by the Editor player loop.
+            FirstLaunchSoloEndToEndPlayModeTests.FocusGameViewForEndOfFrameSettlement();
+            yield return null;
+#endif
             yield return new WaitForEndOfFrame();
+        }
 
         Assert.That(searchPanel.activeSelf, Is.False);
         Assert.That(gamePanel.activeSelf, Is.True);
@@ -231,12 +272,12 @@ public sealed class SoloSearchCartoonVisualsPlayModeTests
             Is.LessThan(1f), name + " size drifted.");
     }
 
-    static void InvokeStatic(string typeName, string methodName)
+    static void InstallSoloSearch(Component matchmaking)
     {
-        MethodInfo method = RuntimeType(typeName).GetMethod(
-            methodName, BindingFlags.Static | BindingFlags.NonPublic);
-        Assert.That(method, Is.Not.Null, typeName + "." + methodName);
-        method.Invoke(null, null);
+        MethodInfo method = RuntimeType("SoloSearchVisuals").GetMethod(
+            "Install", BindingFlags.Static | BindingFlags.Public);
+        Assert.That(method, Is.Not.Null, "SoloSearchVisuals.Install");
+        method.Invoke(null, new object[] { matchmaking });
     }
 
     static object Invoke(Component target, string methodName)
@@ -281,6 +322,15 @@ public sealed class SoloSearchCartoonVisualsPlayModeTests
         int count = 0;
         foreach (GameObject root in SceneManager.GetActiveScene().GetRootGameObjects())
             count += root.GetComponentsInChildren(type, true).Length;
+        return count;
+    }
+
+    static int CountNamedButtons(Transform root, string name)
+    {
+        int count = 0;
+        foreach (Button button in root.GetComponentsInChildren<Button>(true))
+            if (button.name == name)
+                count++;
         return count;
     }
 

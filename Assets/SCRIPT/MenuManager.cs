@@ -1,6 +1,5 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
-using TMPro;
 
 public class MenuManager : MonoBehaviour
 {
@@ -12,19 +11,20 @@ public class MenuManager : MonoBehaviour
     public AdsManager adsManager;         // legacy reference; ads now show at match end (GameManager)
     public FakeMatchmaking matchmaking;   // optional: lets BackToMenu cancel a running search
 
-    // Leaving mid-match must be deliberate: one stray back gesture used to
-    // reload the scene and forfeit the whole match. The first press now
-    // shows a hint; a second within this window exits. Once the match is
-    // decided there is nothing left to forfeit, so back exits immediately.
-    const float BackConfirmSeconds = 2f;
-    float lastMatchBackTime = -10f;
-    TMP_Text backHintLabel; // transient, built lazily on the game panel
-
     GameManager gameManager; // found once; used to detect the decided state
+    SoloDuelVisuals soloVisuals;
+    bool exitInProgress;
+
+    public bool IsSoloLeaveConfirmationVisible =>
+        soloVisuals != null && soloVisuals.IsLeaveConfirmationVisible;
 
     void Start()
     {
-        gameManager = FindObjectOfType<GameManager>();
+        // PanelGAME is serialized inactive on MainMenu startup. Include it so
+        // decided-result Back can distinguish a finished match from a live one
+        // as soon as direct Solo entry activates the board.
+        gameManager = FindObjectOfType<GameManager>(true);
+        soloVisuals = FindObjectOfType<SoloDuelVisuals>(true);
     }
 
     void Update()
@@ -40,12 +40,10 @@ public class MenuManager : MonoBehaviour
         else if (matchmaking != null && matchmaking.panelGame != null
             && matchmaking.panelGame.activeSelf)
         {
-            // Mid-match exit, same as the old stop button: reload the scene
-            // for a clean state. Solo only — live PvP duels keep their
-            // explicit Leave button so the room closes cleanly.
-            // Checked BEFORE panelPlay: panelPlay stays active for the
-            // whole match, so it must not shadow this branch.
-            ConfirmMatchExit();
+            if (IsSoloLeaveConfirmationVisible)
+                CancelSoloMatchExit();
+            else
+                RequestSoloMatchExit();
         }
         else if (panelPlay != null && panelPlay.activeSelf)
             BackToMenu();
@@ -55,17 +53,7 @@ public class MenuManager : MonoBehaviour
 
     void ConfirmMatchExit()
     {
-        // A decided match has nothing to forfeit — exit on the first press.
-        bool matchLive = gameManager == null || !gameManager.IsMatchOver;
-
-        if (!matchLive || Time.unscaledTime - lastMatchBackTime <= BackConfirmSeconds)
-        {
-            SceneManager.LoadScene("MainMenu");
-            return;
-        }
-
-        lastMatchBackTime = Time.unscaledTime;
-        ShowBackHint();
+        RequestSoloMatchExit();
     }
 
     // Runtime solo-board Back uses exactly the same guarded path as Android's
@@ -73,30 +61,60 @@ public class MenuManager : MonoBehaviour
     // calling NumberManager.ExitToMenu directly.
     public void RequestSoloMatchExit()
     {
-        ConfirmMatchExit();
-    }
+        if (exitInProgress)
+            return;
+        if (gameManager == null)
+            gameManager = FindObjectOfType<GameManager>(true);
+        if (soloVisuals == null)
+            soloVisuals = FindObjectOfType<SoloDuelVisuals>(true);
 
-    void ShowBackHint()
-    {
-        if (backHintLabel == null)
+        // DuelRules may already be final while the truthful last move is held
+        // on screen. Its one scheduled presentation transition owns that
+        // brief state; Back must not bypass the canonical result.
+        if (gameManager != null && gameManager.IsResultPresentationPending)
+            return;
+
+        if (gameManager != null && gameManager.HasLiveMatch)
         {
-            backHintLabel = RuntimeUI.CreateText(matchmaking.panelGame.transform,
-                "BackExitHint", "", 26, new Vector2(0f, -760f), new Vector2(820f, 60f),
-                HolUiStateColors.WithAlpha(HolUiStateColors.TextPrimary, 0.85f));
-            backHintLabel.raycastTarget = false;
+            if (soloVisuals == null)
+            {
+                Debug.LogError(
+                    "[MenuManager] Refusing to leave a live Solo match " +
+                    "without its forfeit confirmation owner.");
+                return;
+            }
+            soloVisuals.SetLeaveConfirmationVisible(true);
+            return;
         }
 
-        backHintLabel.text = L10n.Get("back_again_to_leave");
-        backHintLabel.gameObject.SetActive(true);
-
-        CancelInvoke(nameof(HideBackHint));
-        Invoke(nameof(HideBackHint), BackConfirmSeconds);
+        ExitSoloToMainMenu();
     }
 
-    void HideBackHint()
+    public void ConfirmSoloMatchExit()
     {
-        if (backHintLabel != null)
-            backHintLabel.gameObject.SetActive(false);
+        if (exitInProgress)
+            return;
+        if (gameManager == null)
+            gameManager = FindObjectOfType<GameManager>(true);
+        if (gameManager != null)
+            gameManager.RecordLiveForfeitOnce();
+        ExitSoloToMainMenu();
+    }
+
+    public void CancelSoloMatchExit()
+    {
+        if (soloVisuals == null)
+            soloVisuals = FindObjectOfType<SoloDuelVisuals>(true);
+        if (soloVisuals != null)
+            soloVisuals.SetLeaveConfirmationVisible(false);
+    }
+
+    public void ExitSoloToMainMenu()
+    {
+        if (exitInProgress)
+            return;
+        exitInProgress = true;
+        SceneManager.LoadScene("MainMenu");
     }
 
     public void OpenSettings()
@@ -125,12 +143,22 @@ public class MenuManager : MonoBehaviour
         // Ads moved to match end (GameManager.EndGame): gating every Play
         // press with an interstitial hurt retention and monetized the fake
         // "opponent not found" retry loop.
-        OpenFindChallengerPanel();
-    }
+        if (matchmaking == null)
+            matchmaking = FindObjectOfType<FakeMatchmaking>();
+        if (matchmaking == null || matchmaking.panelGame == null)
+        {
+            Debug.LogError(
+                "[MenuManager] Solo match cannot start: " +
+                "FakeMatchmaking/panelGame is missing.");
+            return;
+        }
 
-    void OpenFindChallengerPanel()
-    {
-        mainMenuPanel.SetActive(false);
-        panelPlay.SetActive(true);
+        // Solo is a local AI match. Enter the real board in the same call and
+        // never expose the retired find-challenger/search presentation.
+        if (settingsPanel != null) settingsPanel.SetActive(false);
+        if (panelPlay != null) panelPlay.SetActive(false);
+        if (panelSearching != null) panelSearching.SetActive(false);
+        if (mainMenuPanel != null) mainMenuPanel.SetActive(false);
+        matchmaking.StartSearch();
     }
 }
