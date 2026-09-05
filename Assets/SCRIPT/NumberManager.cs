@@ -105,9 +105,6 @@ public class NumberManager : MonoBehaviour
                 return;
             gameStarted = true;
             RefreshPlayerLabel();
-
-            if (stopButton != null)
-                stopButton.SetActive(true);
         }
         else
         {

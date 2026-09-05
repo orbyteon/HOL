@@ -55,6 +55,7 @@ public sealed class SoloBoardPresenterPlayModeTests
     [UnityTest]
     public IEnumerator SecretEntryUsesOneSubmitAndSuppressesTheSoftKeyboard()
     {
+        UseFakePresentationClock();
         AssertPhase("ChooseSecret");
         Assert.That(((TMP_Text)Field(game, "turnText")).text,
             Is.EqualTo(Localized("solo_choose_secret")));
@@ -76,11 +77,18 @@ public sealed class SoloBoardPresenterPlayModeTests
         AssertPhase("StarterReveal");
         Assert.That(Property(State(), "NextAction").ToString(), Is.EqualTo("Start"));
         Assert.That(input.gameObject.activeSelf, Is.False);
+        var rematch = (GameObject)Field(game, "stopGameButton");
+        Assert.That(Field(numberManager, "stopButton"), Is.SameAs(rematch),
+            "Exercise the real scene-wired shared Rematch control.");
+        Assert.That(rematch.activeSelf, Is.False,
+            "Secret submission must not re-enable the terminal-only Rematch button.");
 
         TMP_Text round = Find(panel.transform, "RoundLabel").GetComponent<TMP_Text>();
         Assert.That(round.text, Is.EqualTo(Localized("round_label_open", 1)));
         Assert.That(round.text, Does.Not.Contain("/"));
-        yield return null;
+        yield return AdvanceScheduledBeat();
+        Assert.That(rematch.activeSelf, Is.False,
+            "Rematch must remain unavailable after starter reveal during active play.");
     }
 
     [UnityTest]
@@ -363,11 +371,13 @@ public sealed class SoloBoardPresenterPlayModeTests
     public IEnumerator AiTurnAdvancesOnceWithoutPermissionAndHoldsTruthfulOutcome()
     {
         var difficulty = new PrefValue("AIDifficulty");
+        var language = new PrefValue("Language");
         try
         {
             PlayerPrefs.SetInt("AIDifficulty", 2);
             UseFakePresentationClock();
             StartWithOpener("Guest", 80);
+            SetField(game, "aiSecretNumber", 90);
             AssertPhase("StarterReveal");
             Assert.That(CurrentHold(), Is.InRange(2.2f, 3.2f));
             yield return AdvanceScheduledBeat();
@@ -391,6 +401,15 @@ public sealed class SoloBoardPresenterPlayModeTests
             Assert.That(History("AiGuessHistory"), Has.Length.EqualTo(1));
             Assert.That(continueButton.gameObject.activeInHierarchy, Is.False);
             Assert.That(CurrentHold(), Is.InRange(1.5f, 2.2f));
+            AssertAiDisplayRangeInBothLanguages(1, 100);
+            Assert.That(Field(game, "min"), Is.EqualTo(51),
+                "Authoritative AI decisions must already use the narrowed range.");
+            object rules = Field(game, "rules");
+            MethodInfo candidatesFor = rules.GetType().GetMethod("CandidatesFor");
+            Assert.That(candidatesFor, Is.Not.Null);
+            object aiSide = Enum.Parse(
+                candidatesFor.GetParameters()[0].ParameterType, "Guest");
+            Assert.That(candidatesFor.Invoke(rules, new[] { aiSide }), Is.EqualTo(50));
             TMP_Text guessReveal = Find(panel.transform, "CentralGuess")
                 .GetComponent<TMP_Text>();
             TMP_Text resultPending = (TMP_Text)Field(game, "turnText");
@@ -410,6 +429,7 @@ public sealed class SoloBoardPresenterPlayModeTests
 
             yield return AdvanceScheduledBeat();
             AssertPhase("AnswerOpponent");
+            AssertAiDisplayRangeInBothLanguages(51, 100);
             Assert.That(pendingHistoryOutcome.text,
                 Is.EqualTo(Localized("solo_history_higher")));
             Assert.That(AnswerActions().Any(action => action.activeSelf), Is.False);
@@ -460,9 +480,52 @@ public sealed class SoloBoardPresenterPlayModeTests
             yield return null;
             Assert.That(Property(State(), "LatestAiHandoffPinned"), Is.False,
                 "The first deliberate keypad action dismisses the retained fact.");
+
+            // A later guess must retain the last revealed range, not reset it
+            // to 1-100 or expose the next pending narrowing on language refresh.
+            Assert.That(Invoke(game, "PlayerGuess", 50), Is.EqualTo(true));
+            yield return AdvanceScheduledBeat();
+            yield return AdvanceScheduledBeat();
+            AssertPhase("OpponentGuess");
+            Assert.That(Field(game, "aiGuess"), Is.EqualTo(75));
+            Assert.That(Field(game, "min"), Is.EqualTo(76));
+            AssertAiDisplayRangeInBothLanguages(51, 100);
+            yield return AdvanceScheduledBeat();
+            AssertPhase("AnswerOpponent");
+            AssertAiDisplayRangeInBothLanguages(76, 100);
+            yield return AdvanceScheduledBeat();
+            AssertPhase("PlayerGuess");
+
+            Assert.That(Invoke(game, "PlayerGuess", 75), Is.EqualTo(true));
+            yield return AdvanceScheduledBeat();
+            yield return AdvanceScheduledBeat();
+            AssertPhase("OpponentGuess");
+            Assert.That(Field(game, "aiGuess"), Is.EqualTo(88));
+            Assert.That(Field(game, "max"), Is.EqualTo(87));
+            AssertAiDisplayRangeInBothLanguages(76, 100);
+
+            Invoke(game, "RestartMatch");
+            AssertPhase("ChooseSecret");
+            AssertAiDisplayRangeInBothLanguages(1, 100, false);
+            yield return AdvancePresentationClock(20f);
+            AssertPhase("ChooseSecret");
+            AssertAiDisplayRangeInBothLanguages(1, 100, false);
+            Assert.That(History("AiGuessHistory"), Is.Empty);
+
+            StartWithOpener("Guest", 20);
+            yield return AdvanceScheduledBeat();
+            yield return AdvanceScheduledBeat();
+            AssertPhase("OpponentGuess");
+            Assert.That(Field(game, "aiGuess"), Is.EqualTo(50));
+            Assert.That(Field(game, "max"), Is.EqualTo(49));
+            AssertAiDisplayRangeInBothLanguages(1, 100);
+            yield return AdvanceScheduledBeat();
+            AssertPhase("AnswerOpponent");
+            AssertAiDisplayRangeInBothLanguages(1, 49);
         }
         finally
         {
+            language.Restore();
             difficulty.Restore();
         }
     }
@@ -922,6 +985,23 @@ public sealed class SoloBoardPresenterPlayModeTests
         // TMP appends a zero-width caret marker to its render string while
         // the field is active. It is not part of the submitted value.
         return input.textComponent.text.TrimEnd('\u200B');
+    }
+
+    void AssertAiDisplayRangeInBothLanguages(int minimum, int maximum, bool visible = true)
+    {
+        MethodInfo setLanguage = RuntimeType("L10n").GetMethod("SetLanguage");
+        Assert.That(setLanguage, Is.Not.Null);
+        Type languageType = setLanguage.GetParameters()[0].ParameterType;
+        TMP_Text range = Find(panel.transform, "OpponentRangeLabel").GetComponent<TMP_Text>();
+        foreach (string language in new[] { "English", "Greek" })
+        {
+            setLanguage.Invoke(null, new[] { Enum.Parse(languageType, language) });
+            Assert.That(Property(State(), "AiRangeMin"), Is.EqualTo(minimum), language);
+            Assert.That(Property(State(), "AiRangeMax"), Is.EqualTo(maximum), language);
+            Assert.That(range.gameObject.activeInHierarchy, Is.EqualTo(visible), language);
+            Assert.That(range.text, Is.EqualTo(Localized("solo_range_ai", minimum, maximum)),
+                language + " must render only the last revealed AI range.");
+        }
     }
 
     string RenderedAiFactSnapshot()
