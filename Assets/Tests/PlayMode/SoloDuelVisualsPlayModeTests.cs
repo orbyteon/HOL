@@ -2983,13 +2983,16 @@ public sealed class SoloDuelVisualsPlayModeTests
         Bounds bounds = RectTransformUtility.CalculateRelativeRectTransformBounds(
             outer, inner);
         Rect available = outer.rect;
-        Assert.That(bounds.min.x, Is.GreaterThanOrEqualTo(available.xMin + inset),
+        // World/local float transforms can return 177.000015 for the exact
+        // 177px boundary. Allow one float ULP there, not a smaller safety inset.
+        const float transformRoundoff = 0.00002f;
+        Assert.That(bounds.min.x, Is.GreaterThanOrEqualTo(available.xMin + inset - transformRoundoff),
             context + " left");
-        Assert.That(bounds.max.x, Is.LessThanOrEqualTo(available.xMax - inset),
+        Assert.That(bounds.max.x, Is.LessThanOrEqualTo(available.xMax - inset + transformRoundoff),
             context + " right");
-        Assert.That(bounds.min.y, Is.GreaterThanOrEqualTo(available.yMin + inset),
+        Assert.That(bounds.min.y, Is.GreaterThanOrEqualTo(available.yMin + inset - transformRoundoff),
             context + " bottom");
-        Assert.That(bounds.max.y, Is.LessThanOrEqualTo(available.yMax - inset),
+        Assert.That(bounds.max.y, Is.LessThanOrEqualTo(available.yMax - inset + transformRoundoff),
             context + " top");
     }
 
