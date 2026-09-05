@@ -187,6 +187,7 @@ public sealed class ResponsiveUIFoundationPlayModeTests
             SetLanguage("English");
             string english = Localized("play_hub_solo_title");
             Assert.That(label.text, Is.EqualTo(english));
+            AssertCompleteVisibleCopy(label, english);
             Vector2 position = ((RectTransform)button).anchoredPosition;
             int childCount = safe.childCount;
             int enabledCount = Property<int>(owner, "RecalculationCount");
@@ -199,7 +200,11 @@ public sealed class ResponsiveUIFoundationPlayModeTests
                 Is.GreaterThan(enabledCount));
             Assert.That(label.enableAutoSizing, Is.True);
             Assert.That(label.fontSizeMin, Is.GreaterThanOrEqualTo(18f));
-            Assert.That(label.overflowMode, Is.EqualTo(TextOverflowModes.Overflow));
+            // MainMenuPlayVisuals authors Truncate; the language event's final
+            // ResponsiveTextPolicy pass selects Ellipsis. This is a safety mode,
+            // not permission to omit any of the approved EN/EL title glyphs.
+            Assert.That(label.overflowMode, Is.EqualTo(TextOverflowModes.Ellipsis));
+            AssertCompleteVisibleCopy(label, Localized("play_hub_solo_title"));
 
             safe.gameObject.SetActive(false);
             int disabledCount = Property<int>(owner, "RecalculationCount");
@@ -211,6 +216,7 @@ public sealed class ResponsiveUIFoundationPlayModeTests
             safe.gameObject.SetActive(true);
             yield return null;
             Assert.That(label.text, Is.EqualTo(english));
+            AssertCompleteVisibleCopy(label, english);
             Assert.That(((RectTransform)button).anchoredPosition, Is.EqualTo(position));
             Assert.That(safe.childCount, Is.EqualTo(childCount));
             Assert.That(Property<int>(owner, "RecalculationCount"),
@@ -245,6 +251,24 @@ public sealed class ResponsiveUIFoundationPlayModeTests
             AssertSafeRoot(safe, viewport, safePixels, CanvasSize(viewport),
                 "SplashLogo", "SplashHeroBoy", "SplashHeroGirl",
                 "SplashProgressTrack");
+        }
+    }
+
+    static void AssertCompleteVisibleCopy(TMP_Text label, string expected)
+    {
+        Assert.That(label.isActiveAndEnabled, Is.True, expected);
+        Assert.That(label.color.a, Is.GreaterThan(0f), expected);
+        Canvas.ForceUpdateCanvases();
+        label.ForceMeshUpdate();
+        Assert.That(label.isTextOverflowing, Is.False, expected);
+        Assert.That(label.isTextTruncated, Is.False, expected);
+        Assert.That(label.textInfo.characterCount, Is.EqualTo(expected.Length), expected);
+        for (int i = 0; i < expected.Length; i++)
+        {
+            TMP_CharacterInfo glyph = label.textInfo.characterInfo[i];
+            Assert.That(glyph.character, Is.EqualTo(expected[i]), expected + " glyph " + i);
+            if (!char.IsWhiteSpace(expected[i]))
+                Assert.That(glyph.isVisible, Is.True, expected + " glyph " + i);
         }
     }
 
