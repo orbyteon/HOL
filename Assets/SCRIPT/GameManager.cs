@@ -1,5 +1,8 @@
+using System;
+using System.Collections;
 using UnityEngine;
 using TMPro;
+using Random = UnityEngine.Random;
 
 // Solo duel against the on-device AI. Turn order, rounds and the Lock all live
 // in DuelRules, which the PvP backends mirror — so a player learns one set of
@@ -27,7 +30,7 @@ public class GameManager : MonoBehaviour
     public TMP_Text turnText;
     public TMP_Text opponentNameText;
 
-    // Runtime bindings populated by HolDuelBoardLayout. The presenter is the
+    // Runtime bindings populated by SoloDuelVisuals. The presenter is the
     // only writer of these fields; they stay public because the current visual
     // polish layer reads their references without owning their content.
     public TMP_Text rangeText;
@@ -50,7 +53,8 @@ public class GameManager : MonoBehaviour
     // The player may guess only on their own turn, and only once they have
     // answered the opponent's outstanding guess.
     public bool IsPlayerTurn => matchSetUp && !rules.Finished &&
-                                rules.Turn == PlayerSide && !awaitingAnswer;
+                                rules.Turn == PlayerSide && !awaitingAnswer &&
+                                presentationPhase == SoloBoardPhase.PlayerGuess;
 
     // "This match is decided, stop taking input." NumberManager gates the whole
     // submit path on this, so it MUST go false again once RestartMatch clears
@@ -59,13 +63,71 @@ public class GameManager : MonoBehaviour
     // simply rules.Finished: the rules object stays finished until the next
     // StartMatch, which does not happen until a number has been submitted.
     public bool IsMatchOver => matchSetUp && rules.Finished;
+    public bool HasLiveMatch => matchSetUp && !rules.Finished;
+    public bool IsResultPresentationPending =>
+        matchSetUp && rules.Finished && !terminalRecorded;
 
     public string CurrentOpponentName => currentOpponent;
     public int CurrentRoundNumber => matchSetUp ? rules.RoundIndex + 1 : 0;
+    public SoloBoardPhase CurrentPresentationPhase => presentationPhase;
+    public int CurrentPlayerRangeMin => playerMin;
+    public int CurrentPlayerRangeMax => playerMax;
+    public bool HasAutomaticTransitionScheduled =>
+        automaticTransition != null && !PresentationIsSuspended;
+    public float CurrentAutomaticHoldSeconds => automaticTransitionHoldSeconds;
+    public float CurrentAutomaticRemainingSeconds
+    {
+        get
+        {
+            if (hasSuspendedTransition)
+                return suspendedTransitionRemaining;
+            if (!hasAutomaticTransitionDeadline)
+                return 0f;
+            return Mathf.Max(
+                0f,
+                (float)(automaticTransitionDeadline - PresentationNow()));
+        }
+    }
+    public bool HasHumanDecision =>
+        presentationPhase == SoloBoardPhase.ChooseSecret ||
+        presentationPhase == SoloBoardPhase.PlayerGuess ||
+        presentationPhase == SoloBoardPhase.MatchResult;
 
     readonly DuelRules rules = new DuelRules();
     bool awaitingAnswer;
+    DuelRules.Hint pendingAiHint;
     bool lockArmed;
+    SoloBoardPhase presentationPhase = SoloBoardPhase.ChooseSecret;
+    SoloBoardActor pendingForfeitActor = SoloBoardActor.None;
+    bool pendingForfeitNotice;
+    int pendingForfeitRound;
+    bool lastLicksAcknowledged;
+    bool presentationTransitioning;
+    bool terminalRecorded;
+    int lastAcknowledgementFrame = -1;
+    int lastLockToggleFrame = -1;
+
+    // Presentation beats are paced by one cancellable owner. These are not
+    // gameplay timers: DuelRules has already accepted the move before an
+    // outcome hold begins, and no rule or difficulty decision depends on the
+    // elapsed time.
+    Coroutine automaticTransition;
+    int automaticTransitionGeneration;
+    Func<double> presentationNow = DefaultPresentationNow;
+    double automaticTransitionDeadline;
+    float automaticTransitionHoldSeconds;
+    bool hasAutomaticTransitionDeadline;
+    bool hasSuspendedTransition;
+    SoloBoardPhase suspendedTransitionPhase;
+    float suspendedTransitionRemaining;
+    float suspendedTransitionOriginalHold;
+    bool automaticTransitionsSuspended;
+    bool applicationPaused;
+    bool applicationFocused = true;
+
+    bool PresentationIsSuspended =>
+        automaticTransitionsSuspended || applicationPaused ||
+        !applicationFocused;
 
     // True from StartGame until RestartMatch clears the board. It stays true
     // across the result screen — the match is over, but it is still the match
@@ -90,7 +152,7 @@ public class GameManager : MonoBehaviour
     int playerGuessCount;
 
     string currentOpponent;
-    HolDuelBoardLayout boardPresenter;
+    SoloDuelVisuals boardPresenter;
 
     // Built at runtime next to the stop button, the same way the rewarded
     // streak-save offer is, so no scene surgery is needed.
@@ -122,6 +184,7 @@ public class GameManager : MonoBehaviour
     public void SetPlayerNumber(int number)
     {
         playerSecretNumber = number;
+        Presenter()?.SetPlayerSecret(number);
     }
 
     public void StartGame()
@@ -131,7 +194,14 @@ public class GameManager : MonoBehaviour
 
     void StartGameWithOpener(DuelRules.Side opener)
     {
-        CancelInvoke();
+        CancelPendingPresentation();
+
+        SoloDuelVisuals presenter = Presenter();
+        if (presenter == null)
+        {
+            RequirePresentation(false, "starter reveal");
+            return;
+        }
 
         min = 1;
         max = 100;
@@ -139,11 +209,20 @@ public class GameManager : MonoBehaviour
         playerMax = 100;
 
         awaitingAnswer = false;
+        pendingAiHint = DuelRules.Hint.None;
         lockArmed = false;
-        matchSetUp = true;
+        matchSetUp = false;
         lockRevealedThisMatch = false;
         firstAIGuess = true;
         playerGuessCount = 0;
+        pendingForfeitActor = SoloBoardActor.None;
+        pendingForfeitNotice = false;
+        pendingForfeitRound = 0;
+        lastLicksAcknowledged = false;
+        presentationTransitioning = false;
+        terminalRecorded = false;
+        lastAcknowledgementFrame = -1;
+        lastLockToggleFrame = -1;
 
         aiSecretNumber = Random.Range(1, 101);
 
@@ -153,20 +232,28 @@ public class GameManager : MonoBehaviour
         stopGameButton.SetActive(false);
         HideButtons();
 
+        // Validate the mandatory presentation owner before starting canonical
+        // rules. A board that cannot show the starter must fail closed while
+        // the player can still safely retry secret entry.
+        bool starterPresented = presenter.RevealStarter(
+            opener == PlayerSide
+                ? SoloBoardActor.Player
+                : SoloBoardActor.Opponent,
+            1,
+            playerMin, playerMax, min, max);
+        if (!starterPresented)
+        {
+            RequirePresentation(false, "starter reveal");
+            return;
+        }
+
         // A fair coin decides who opens; the equal-turns rule then makes sure
         // opening is not itself worth a win.
         rules.StartMatch(opener);
+        matchSetUp = true;
+        presentationPhase = SoloBoardPhase.StarterReveal;
         RefreshLockButton();
-
-        if (rules.Turn == AiSide)
-        {
-            Present(SoloBoardPhase.OpponentThinking, SoloBoardPrompt.OpponentThinking);
-            Invoke(nameof(AIGuess), Random.Range(0.8f, 1.5f));
-        }
-        else
-        {
-            Present(SoloBoardPhase.PlayerGuess, SoloBoardPrompt.YourGuess);
-        }
+        ScheduleAutomaticTransition();
     }
 
     void HideButtons()
@@ -176,76 +263,357 @@ public class GameManager : MonoBehaviour
         correctButton.SetActive(false);
     }
 
+    // Compatibility seam for deterministic Editor fixtures. The production
+    // board never exposes an acknowledgement control for automatic phases;
+    // its sole progression owner is ScheduleAutomaticTransition below.
+    public void AcknowledgePresentation()
+    {
+        if (presentationTransitioning ||
+            lastAcknowledgementFrame == Time.frameCount)
+            return;
+
+        lastAcknowledgementFrame = Time.frameCount;
+        CancelAutomaticTransition();
+        AdvanceAutomaticPhase(presentationPhase);
+    }
+
+    void AdvanceAutomaticPhase(SoloBoardPhase expectedPhase)
+    {
+        if (presentationTransitioning || automaticTransitionsSuspended ||
+            applicationPaused || !applicationFocused ||
+            expectedPhase != presentationPhase ||
+            !IsAutomaticPhase(expectedPhase))
+            return;
+
+        presentationTransitioning = true;
+        try
+        {
+            if (expectedPhase == SoloBoardPhase.StarterReveal)
+            {
+                RouteToCurrentTurn();
+            }
+            else if (expectedPhase == SoloBoardPhase.PlayerOutcome)
+            {
+                ContinueAfterMove();
+            }
+            else if (expectedPhase == SoloBoardPhase.OpponentThinking)
+            {
+                AIGuess();
+            }
+            else if (expectedPhase == SoloBoardPhase.OpponentGuess)
+            {
+                bool presented = Presenter()?.RevealOpponentOutcome() == true;
+                presentationPhase = SoloBoardPhase.AnswerOpponent;
+                RequirePresentation(presented, "opponent outcome");
+                ScheduleAutomaticTransition();
+            }
+            else if (expectedPhase == SoloBoardPhase.AnswerOpponent)
+            {
+                AnswerGiven(pendingAiHint);
+            }
+            else if (expectedPhase == SoloBoardPhase.LastLicks)
+            {
+                lastLicksAcknowledged = true;
+                BeginPlayerTurn(true);
+            }
+            else if (expectedPhase == SoloBoardPhase.LockForfeit)
+            {
+                pendingForfeitActor = SoloBoardActor.None;
+                RouteToCurrentTurn();
+            }
+        }
+        finally
+        {
+            presentationTransitioning = false;
+        }
+    }
+
+    static bool IsAutomaticPhase(SoloBoardPhase phase)
+    {
+        return phase == SoloBoardPhase.StarterReveal ||
+               phase == SoloBoardPhase.PlayerOutcome ||
+               phase == SoloBoardPhase.OpponentThinking ||
+               phase == SoloBoardPhase.OpponentGuess ||
+               phase == SoloBoardPhase.AnswerOpponent ||
+               phase == SoloBoardPhase.LastLicks ||
+               phase == SoloBoardPhase.LockForfeit;
+    }
+
+    float AutomaticDelayFor(SoloBoardPhase phase)
+    {
+        SoloDuelVisuals presenter = Presenter();
+        string finalVisibleCopy = presenter != null
+            ? presenter.CurrentPresentationTimingText
+            : string.Empty;
+        return SoloPresentationTiming.DurationFor(
+            phase, finalVisibleCopy);
+    }
+
+    void ScheduleAutomaticTransition()
+    {
+        CancelAutomaticTransition();
+        if (!isActiveAndEnabled || !matchSetUp || terminalRecorded ||
+            PresentationIsSuspended ||
+            !IsAutomaticPhase(presentationPhase))
+            return;
+
+        float hold = AutomaticDelayFor(presentationPhase);
+        StartAutomaticTransition(presentationPhase, hold, hold);
+    }
+
+    void StartAutomaticTransition(
+        SoloBoardPhase expectedPhase,
+        float remainingSeconds,
+        float originalHoldSeconds)
+    {
+        hasSuspendedTransition = false;
+        suspendedTransitionRemaining = 0f;
+        suspendedTransitionOriginalHold = 0f;
+        automaticTransitionHoldSeconds = originalHoldSeconds;
+        automaticTransitionDeadline =
+            PresentationNow() + Math.Max(0f, remainingSeconds);
+        hasAutomaticTransitionDeadline = true;
+        int generation = automaticTransitionGeneration;
+        automaticTransition = StartCoroutine(
+            AdvanceAfterDeadline(expectedPhase, generation));
+    }
+
+    IEnumerator AdvanceAfterDeadline(
+        SoloBoardPhase expectedPhase,
+        int generation)
+    {
+        // StartCoroutine executes synchronously until the first yield.  Always
+        // yield once so StartAutomaticTransition can retain the handle before
+        // an already-expired resumed deadline advances and schedules its
+        // successor phase.
+        yield return null;
+
+        while (generation == automaticTransitionGeneration &&
+               expectedPhase == presentationPhase &&
+               !PresentationIsSuspended && isActiveAndEnabled &&
+               PresentationNow() < automaticTransitionDeadline)
+            yield return null;
+
+        if (generation != automaticTransitionGeneration ||
+            expectedPhase != presentationPhase ||
+            PresentationIsSuspended || !isActiveAndEnabled)
+            yield break;
+
+        automaticTransition = null;
+        hasAutomaticTransitionDeadline = false;
+        automaticTransitionHoldSeconds = 0f;
+        AdvanceAutomaticPhase(expectedPhase);
+    }
+
+    void CancelAutomaticTransition(bool clearSuspended = true)
+    {
+        automaticTransitionGeneration++;
+        if (automaticTransition != null)
+            StopCoroutine(automaticTransition);
+        automaticTransition = null;
+        hasAutomaticTransitionDeadline = false;
+        automaticTransitionHoldSeconds = 0f;
+        if (!clearSuspended)
+            return;
+        hasSuspendedTransition = false;
+        suspendedTransitionRemaining = 0f;
+        suspendedTransitionOriginalHold = 0f;
+    }
+
+    void CancelPendingPresentation()
+    {
+        CancelInvoke();
+        CancelAutomaticTransition();
+    }
+
+    public void SetPresentationSuspended(bool suspended)
+    {
+        if (automaticTransitionsSuspended == suspended)
+            return;
+        bool wasSuspended = PresentationIsSuspended;
+        automaticTransitionsSuspended = suspended;
+        HandlePresentationSuspensionChange(wasSuspended);
+    }
+
+    void HandlePresentationSuspensionChange(bool wasSuspended)
+    {
+        bool isSuspended = PresentationIsSuspended;
+        if (!wasSuspended && isSuspended)
+            SuspendAutomaticTransition();
+        else if (wasSuspended && !isSuspended)
+            ResumeAutomaticTransition();
+    }
+
+    void SuspendAutomaticTransition()
+    {
+        if (automaticTransition != null &&
+            hasAutomaticTransitionDeadline)
+        {
+            hasSuspendedTransition = true;
+            suspendedTransitionPhase = presentationPhase;
+            suspendedTransitionRemaining = Mathf.Max(
+                0f,
+                (float)(automaticTransitionDeadline - PresentationNow()));
+            suspendedTransitionOriginalHold =
+                automaticTransitionHoldSeconds;
+        }
+        CancelAutomaticTransition(false);
+    }
+
+    void ResumeAutomaticTransition()
+    {
+        if (hasSuspendedTransition &&
+            suspendedTransitionPhase == presentationPhase &&
+            IsAutomaticPhase(presentationPhase) &&
+            isActiveAndEnabled && matchSetUp && !terminalRecorded)
+        {
+            float remaining = suspendedTransitionRemaining;
+            float originalHold = suspendedTransitionOriginalHold;
+            StartAutomaticTransition(
+                presentationPhase, remaining, originalHold);
+            return;
+        }
+
+        hasSuspendedTransition = false;
+        ScheduleAutomaticTransition();
+    }
+
+    static double DefaultPresentationNow()
+    {
+        return Time.realtimeSinceStartupAsDouble;
+    }
+
+    double PresentationNow()
+    {
+        return presentationNow != null
+            ? presentationNow()
+            : DefaultPresentationNow();
+    }
+
+    // Deterministic PlayMode seam: tests inject a monotonic clock before a
+    // match starts, then advance phase deadlines without real multi-second
+    // waits. Production never calls this method.
+    void SetPresentationClockForTests(Func<double> clock)
+    {
+        if (clock == null)
+            throw new ArgumentNullException(nameof(clock));
+        if (automaticTransition != null || hasSuspendedTransition)
+            throw new InvalidOperationException(
+                "Set the Solo presentation clock before scheduling a beat.");
+        presentationNow = clock;
+    }
+
     void AIGuess()
     {
-        if (rules.Finished || rules.Turn != AiSide) return;
+        if (rules.Finished || rules.Turn != AiSide ||
+            presentationPhase != SoloBoardPhase.OpponentThinking)
+            return;
 
-        if (firstAIGuess)
-        {
-            // Hard opens on the midpoint like a solver should; the softer modes
-            // keep the random opening, which costs about a quarter of a guess.
-            aiGuess = Difficulty() == 2 ? (min + max) / 2 : Random.Range(min, max + 1);
-            firstAIGuess = false;
-        }
-        else
-        {
-            int difficulty = Difficulty();
-            float randomChance = difficulty == 3
-                ? AdaptiveRandomChance()
-                : DifficultyRandomChance[difficulty];
-
-            if (Random.value < randomChance)
-                aiGuess = Random.Range(min, max + 1);
-            else
-                aiGuess = (min + max) / 2;
-        }
+        aiGuess = ChooseAiGuess();
 
         int submittedRound = rules.RoundIndex + 1;
+        int candidatesBefore = rules.CandidatesFor(AiSide);
         bool aiLocks = DuelRules.ShouldLock(AiLockStyle(), max - min + 1, rules.LockAvailable(AiSide));
         var move = rules.Submit(AiSide, aiGuess, playerSecretNumber, aiLocks);
         if (!move.Accepted) return;
 
         aiNumberText.text = currentOpponent + ": " + aiGuess +
                             (aiLocks ? "  [" + L10n.Get("lock_armed") + "]" : "");
-        Presenter()?.RecordAiGuess(aiGuess);
 
-        // If that guess closed the round the match is already decided, so do
-        // not make the player answer a guess nobody can act on — it would put
-        // a dead tap between them and the result.
-        if (rules.Finished)
+        if (move.Hint == DuelRules.Hint.Higher)
+            min = aiGuess + 1;
+        else if (move.Hint == DuelRules.Hint.Lower)
+            max = aiGuess - 1;
+
+        pendingAiHint = move.Hint;
+        awaitingAnswer = true;
+        if (aiLocks && move.Hint != DuelRules.Hint.Correct)
         {
-            if (move.Hint == DuelRules.Hint.Correct)
-                aiAnswerText.text = L10n.Get("opponent_found_number", currentOpponent);
-
-            awaitingAnswer = false;
-            HideButtons();
-            ContinueAfterMove();
-            return;
+            pendingForfeitNotice = true;
+            pendingForfeitActor = SoloBoardActor.Opponent;
+            pendingForfeitRound = submittedRound;
         }
 
-        // The player still confirms the answer, so the hint the rules computed
-        // decides which single button is offered — a player cannot lie.
-        awaitingAnswer = true;
-        Present(SoloBoardPhase.AnswerOpponent, SoloBoardPrompt.AnswerOpponent, 0, submittedRound);
+        SoloDuelVisuals presenter = Presenter();
+        bool presented = presenter?.RecordOpponentMove(
+            submittedRound, aiGuess, move.Hint, aiLocks,
+            candidatesBefore, playerMin, playerMax, min, max) == true;
+        if (presented)
+            presented = presenter.SetOutcomeDestination(
+                rules.Finished, PresentationActorForCurrentTurn());
+        presentationPhase = SoloBoardPhase.OpponentGuess;
+        RequirePresentation(presented, "opponent guess");
+
         HideButtons();
-
-        if (move.Hint == DuelRules.Hint.Higher) higherButton.SetActive(true);
-        else if (move.Hint == DuelRules.Hint.Lower) lowerButton.SetActive(true);
-        else correctButton.SetActive(true);
-
+        aiAnswerText.text = OpponentFeedbackText(move.Hint);
         RefreshLockButton();
+        ScheduleAutomaticTransition();
+    }
+
+    int ChooseAiGuess()
+    {
+        if (firstAIGuess)
+        {
+            // Hard opens on the midpoint like a solver should; the softer modes
+            // keep the random opening, which costs about a quarter of a guess.
+            int openingGuess = Difficulty() == 2
+                ? (min + max) / 2
+                : Random.Range(min, max + 1);
+            firstAIGuess = false;
+            return openingGuess;
+        }
+
+        int difficulty = Difficulty();
+        float randomChance = difficulty == 3
+            ? AdaptiveRandomChance()
+            : DifficultyRandomChance[difficulty];
+        return Random.value < randomChance
+            ? Random.Range(min, max + 1)
+            : (min + max) / 2;
+    }
+
+    static SoloBoardPrompt OpponentFeedbackPrompt(DuelRules.Hint hint)
+    {
+        if (hint == DuelRules.Hint.Higher)
+            return SoloBoardPrompt.OpponentGuessedHigher;
+        if (hint == DuelRules.Hint.Lower)
+            return SoloBoardPrompt.OpponentGuessedLower;
+        return SoloBoardPrompt.OpponentGuessedCorrect;
+    }
+
+    static string OpponentFeedbackText(DuelRules.Hint hint)
+    {
+        if (hint == DuelRules.Hint.Higher)
+            return L10n.Get("your_number_is_higher");
+        if (hint == DuelRules.Hint.Lower)
+            return L10n.Get("your_number_is_lower");
+        return L10n.Get("your_number_is_correct");
+    }
+
+    void ResolveAiAnswerAutomatically()
+    {
+        // Legacy deterministic-fixture seam. Production uses the single
+        // coroutine owner and never simulates a presentation-button tap.
+        if (!awaitingAnswer) return;
+        CancelAutomaticTransition();
+        if (presentationPhase == SoloBoardPhase.OpponentGuess)
+        {
+            bool presented = Presenter()?.RevealOpponentOutcome() == true;
+            presentationPhase = SoloBoardPhase.AnswerOpponent;
+            RequirePresentation(presented, "legacy opponent outcome");
+        }
+        if (presentationPhase == SoloBoardPhase.AnswerOpponent)
+            AnswerGiven(pendingAiHint);
     }
 
     public void Higher()
     {
-        min = aiGuess + 1;
-        AnswerGiven();
+        AnswerGiven(DuelRules.Hint.Higher);
     }
 
     public void Lower()
     {
-        max = aiGuess - 1;
-        AnswerGiven();
+        AnswerGiven(DuelRules.Hint.Lower);
     }
 
     // The opponent found the player's number. Under the equal-turns rule that
@@ -253,15 +621,24 @@ public class GameManager : MonoBehaviour
     // guess before the match is called.
     public void Correct()
     {
-        aiAnswerText.text = L10n.Get("opponent_found_number", currentOpponent);
-        AnswerGiven();
+        AnswerGiven(DuelRules.Hint.Correct);
     }
 
-    void AnswerGiven()
+    void AnswerGiven(DuelRules.Hint answer)
     {
-        if (!awaitingAnswer) return;
+        // The rule engine already computed the truthful hint. Public button
+        // callbacks may arrive late or be miswired, so they must never mutate
+        // the AI's search interval unless they match that pending authority.
+        if (!awaitingAnswer || answer != pendingAiHint ||
+            presentationPhase != SoloBoardPhase.AnswerOpponent)
+            return;
+
+        if (pendingAiHint == DuelRules.Hint.Correct)
+            aiAnswerText.text = L10n.Get(
+                "opponent_found_number", currentOpponent);
 
         awaitingAnswer = false;
+        pendingAiHint = DuelRules.Hint.None;
         HideButtons();
         ContinueAfterMove();
     }
@@ -307,6 +684,8 @@ public class GameManager : MonoBehaviour
             return false;
         }
 
+        int submittedRound = rules.RoundIndex + 1;
+        int candidatesBefore = rules.CandidatesFor(PlayerSide);
         bool staked = lockArmed;
         var move = rules.Submit(PlayerSide, guess, aiSecretNumber, staked);
         if (!move.Accepted) return false;
@@ -322,8 +701,6 @@ public class GameManager : MonoBehaviour
             playerLabel += "  [" + L10n.Get("lock_armed") + "]";
 
         aiAnswerText.text = playerLabel + ": " + guess;
-        Presenter()?.RecordPlayerGuess(guess);
-
         if (move.Hint == DuelRules.Hint.Correct)
         {
             // Not "you win" yet — the opponent may still answer this round.
@@ -342,9 +719,25 @@ public class GameManager : MonoBehaviour
         }
 
         if (staked && move.Hint != DuelRules.Hint.Correct)
+        {
             aiAnswerText.text += "\n" + L10n.Get("lock_missed");
+            pendingForfeitNotice = true;
+            pendingForfeitActor = SoloBoardActor.Player;
+            pendingForfeitRound = submittedRound;
+        }
 
-        ContinueAfterMove();
+        lastLicksAcknowledged = false;
+        SoloDuelVisuals presenter = Presenter();
+        bool presented = presenter?.RecordPlayerMove(
+            submittedRound, guess, move.Hint, staked,
+            candidatesBefore, playerMin, playerMax, min, max) == true;
+        if (presented)
+            presented = presenter.SetOutcomeDestination(
+                rules.Finished, PresentationActorForCurrentTurn());
+        presentationPhase = SoloBoardPhase.PlayerOutcome;
+        RequirePresentation(presented, "player guess");
+        RefreshLockButton();
+        ScheduleAutomaticTransition();
         return true;
     }
 
@@ -352,7 +745,6 @@ public class GameManager : MonoBehaviour
     // just closed settled it.
     void ContinueAfterMove()
     {
-        Present(SoloBoardPhase.RoundResolution, SoloBoardPrompt.ResolvingRound);
         RefreshLockButton();
 
         if (rules.Finished)
@@ -361,29 +753,76 @@ public class GameManager : MonoBehaviour
             return;
         }
 
-        if (rules.Turn == AiSide)
+        if (pendingForfeitNotice)
         {
-            Present(SoloBoardPhase.OpponentThinking,
-                rules.ForfeitPending(AiSide)
-                    ? SoloBoardPrompt.OpponentForfeits
-                    : SoloBoardPrompt.OpponentThinking);
-            Invoke(nameof(AIGuess), Random.Range(1.5f, 3.5f));
+            pendingForfeitNotice = false;
+            presentationPhase = SoloBoardPhase.LockForfeit;
+            RequirePresentation(
+                Presenter()?.ShowLockForfeit(
+                    pendingForfeitActor, pendingForfeitRound) == true,
+                "Lock forfeit");
+            RefreshLockButton();
+            ScheduleAutomaticTransition();
             return;
         }
 
-        if (rules.IsMatchPointAgainst(PlayerSide))
-            Present(SoloBoardPhase.PlayerGuess, SoloBoardPrompt.MatchPoint);
-        else if (rules.PendingWin == PlayerSide)
-            Present(SoloBoardPhase.PlayerGuess, SoloBoardPrompt.MatchPointYours);
-        else if (rules.ForfeitPending(PlayerSide))
-            Present(SoloBoardPhase.PlayerGuess, SoloBoardPrompt.TurnForfeited);
-        else
-            Present(SoloBoardPhase.PlayerGuess, SoloBoardPrompt.YourGuess);
+        RouteToCurrentTurn();
+    }
+
+    void RouteToCurrentTurn()
+    {
+        if (rules.Finished)
+        {
+            EndGame();
+            return;
+        }
+
+        if (rules.Turn == AiSide)
+        {
+            lastLicksAcknowledged = false;
+            presentationPhase = SoloBoardPhase.OpponentThinking;
+            RequirePresentation(Presenter()?.BeginOpponentThinking(
+                rules.RoundIndex + 1,
+                playerMin, playerMax, min, max) == true,
+                "opponent thinking");
+            RefreshLockButton();
+            ScheduleAutomaticTransition();
+            return;
+        }
+
+        if (rules.IsMatchPointAgainst(PlayerSide) && !lastLicksAcknowledged)
+        {
+            presentationPhase = SoloBoardPhase.LastLicks;
+            RequirePresentation(
+                Presenter()?.ShowLastLicks(rules.RoundIndex + 1) == true,
+                "last licks");
+            RefreshLockButton();
+            ScheduleAutomaticTransition();
+            return;
+        }
+
+        BeginPlayerTurn(rules.IsMatchPointAgainst(PlayerSide));
+    }
+
+    void BeginPlayerTurn(bool lastLicks)
+    {
+        CancelAutomaticTransition();
+        presentationPhase = SoloBoardPhase.PlayerGuess;
+        RequirePresentation(Presenter()?.BeginPlayerTurn(
+            rules.RoundIndex + 1,
+            playerMin, playerMax, min, max, lastLicks) == true,
+            "player turn");
+        RefreshLockButton();
     }
 
     void EndGame()
     {
+        if (terminalRecorded)
+            return;
+        CancelPendingPresentation();
+        terminalRecorded = true;
         awaitingAnswer = false;
+        pendingAiHint = DuelRules.Hint.None;
         lockArmed = false;
 
         HideButtons();
@@ -399,7 +838,6 @@ public class GameManager : MonoBehaviour
             Haptics.Light();
             GameEvents.MatchCompleted(SoloOutcome(MatchOutcome.Result.Draw));
 
-            Present(SoloBoardPhase.MatchResult, SoloBoardPrompt.Draw, playerGuessCount);
         }
         else if (rules.Result == DuelRules.Outcome.HostWins)
         {
@@ -407,7 +845,6 @@ public class GameManager : MonoBehaviour
             Haptics.Success();
             GameEvents.MatchCompleted(SoloOutcome(MatchOutcome.Result.Win));
 
-            Present(SoloBoardPhase.MatchResult, SoloBoardPrompt.Win, playerGuessCount);
             if (audioSource != null && winSound != null)
                 audioSource.PlayOneShot(winSound);
             if (winConfetti != null)
@@ -420,12 +857,20 @@ public class GameManager : MonoBehaviour
             Haptics.Error();
             GameEvents.MatchCompleted(SoloOutcome(MatchOutcome.Result.Loss));
 
-            Present(SoloBoardPhase.MatchResult, SoloBoardPrompt.Loss, aiSecretNumber);
             if (audioSource != null && loseSound != null)
                 audioSource.PlayOneShot(loseSound);
 
             OfferStreakSave(streakBeforeLoss);
         }
+
+        // Persist the terminal result before rendering it. The presenter reads
+        // live GameStats, so rendering first would display the previous wins
+        // value even though the rules outcome was already final.
+        presentationPhase = SoloBoardPhase.MatchResult;
+        RequirePresentation(Presenter()?.CompleteMatch(
+            rules.Result, playerSecretNumber, aiSecretNumber,
+            rules.GuessCount(PlayerSide), rules.GuessCount(AiSide)) == true,
+            "match result");
 
         if (adsManager != null && GameStats.Matches % 2 == 0)
             adsManager.ShowAd(null);
@@ -453,9 +898,12 @@ public class GameManager : MonoBehaviour
 
     public void OnLockTogglePressed()
     {
-        if (!matchSetUp || rules.Finished) return;
+        if (!IsPlayerTurn) return;
         if (!rules.LockAvailable(PlayerSide)) return;
+        if (lastLockToggleFrame == Time.frameCount) return;
 
+        lastLockToggleFrame = Time.frameCount;
+        Presenter()?.DismissLatestAiHandoff();
         lockArmed = !lockArmed;
         Haptics.Light();
         RefreshLockButton();
@@ -478,6 +926,7 @@ public class GameManager : MonoBehaviour
 
         btn.onClick.AddListener(OnLockTogglePressed);
         lockButton = btn;
+        Presenter()?.RegisterLockControl(lockButton);
 
         lockButtonLabel = btn.GetComponentInChildren<TMP_Text>();
         if (lockButtonLabel != null) lockButtonLabel.fontSize = 26;
@@ -489,33 +938,39 @@ public class GameManager : MonoBehaviour
     {
         if (lockButton == null) return;
 
-        // Not offered until the player has taken a turn: a first match should
-        // feel like plain higher-or-lower, and staking the Lock on an opening
-        // guess is a trap rather than a choice.
-        bool revealed = rules.GuessCount(PlayerSide) > 0;
-        bool available = matchSetUp && !rules.Finished && revealed &&
-                         rules.LockAvailable(PlayerSide);
+        // DuelRules owns legality: a player's one Lock is available even on
+        // their opening guess. Presentation may teach it progressively, but it
+        // must never silently narrow the canonical rule.
+        bool revealed = matchSetUp;
+        bool lockStillAvailable = rules.LockAvailable(PlayerSide);
+        bool available = IsPlayerTurn && lockStillAvailable;
+        bool show = matchSetUp && !rules.Finished;
 
-        lockButton.gameObject.SetActive(available);
-        if (!available) return;
+        lockButton.gameObject.SetActive(show);
+        lockButton.interactable = available;
+        Presenter()?.UpdateLockState(
+            revealed, available, lockArmed,
+            matchSetUp && !rules.LockAvailable(PlayerSide),
+            playerMax >= playerMin ? playerMax - playerMin + 1 : 0);
+        if (!show) return;
 
-        if (!lockRevealedThisMatch)
+        if (revealed && !lockRevealedThisMatch)
         {
             lockRevealedThisMatch = true;
             if (LockIntro.ShouldExplain)
             {
-                // Keep the presenter's valid-range line truthful. The one-time
-                // Lock explanation uses the ordinary feedback slot instead.
-                if (aiAnswerText != null)
-                    aiAnswerText.text = L10n.Get("lock_hint");
                 LockIntro.MarkExplained();
             }
         }
 
         int left = playerMax >= playerMin ? playerMax - playerMin + 1 : 0;
-        string text = lockArmed
+        string text = !revealed
+            ? L10n.Get("lock")
+            : !lockStillAvailable
+            ? L10n.Get("lock_spent")
+            : lockArmed
             ? L10n.Get("lock_armed")
-            : DuelRules.ShouldSuggestLock(left, true)
+            : DuelRules.ShouldSuggestLock(left, lockStillAvailable)
                 ? L10n.Get("lock_suggest", left)
                 : L10n.Get("lock");
 
@@ -562,6 +1017,7 @@ public class GameManager : MonoBehaviour
         rect.anchoredPosition = stopRect.anchoredPosition + new Vector2(0f, 120f);
 
         streakSaveButton = btn.gameObject;
+        Presenter()?.RegisterSaveStreakControl(btn);
         btn.onClick.AddListener(() =>
         {
             bool shown = adsManager.ShowRewardedAd(() =>
@@ -595,7 +1051,7 @@ public class GameManager : MonoBehaviour
 
     public void RestartMatch()
     {
-        CancelInvoke();
+        CancelPendingPresentation();
 
         if (streakSaveButton != null)
         {
@@ -606,8 +1062,21 @@ public class GameManager : MonoBehaviour
         // Clearing this is what re-opens number entry for the next match.
         matchSetUp = false;
         awaitingAnswer = false;
+        pendingAiHint = DuelRules.Hint.None;
         lockArmed = false;
         lockRevealedThisMatch = false;
+        pendingForfeitActor = SoloBoardActor.None;
+        pendingForfeitNotice = false;
+        pendingForfeitRound = 0;
+        lastLicksAcknowledged = false;
+        presentationTransitioning = false;
+        terminalRecorded = false;
+        lastAcknowledgementFrame = -1;
+        lastLockToggleFrame = -1;
+        automaticTransitionsSuspended = false;
+        applicationPaused = false;
+        applicationFocused = true;
+        presentationPhase = SoloBoardPhase.ChooseSecret;
         playerMin = 1;
         playerMax = 100;
         RefreshLockButton();
@@ -625,17 +1094,84 @@ public class GameManager : MonoBehaviour
             numberManager.ResetForNewMatch();
     }
 
+    // Called only after the explicit leave confirmation. It records one real
+    // Solo loss before MenuManager leaves the scene; repeated confirm taps are
+    // idempotent.
+    public bool RecordLiveForfeitOnce()
+    {
+        if (!HasLiveMatch || terminalRecorded)
+            return false;
+
+        CancelPendingPresentation();
+        terminalRecorded = true;
+        awaitingAnswer = false;
+        pendingAiHint = DuelRules.Hint.None;
+        lockArmed = false;
+        GameStats.RecordLoss();
+        Haptics.Error();
+        GameEvents.MatchCompleted(SoloOutcome(MatchOutcome.Result.Loss));
+        return true;
+    }
+
+    // There is no Solo gameplay timeout. Pause/focus suspend the one readable
+    // presentation hold and resume its exact remaining time; DuelRules state
+    // is never advanced in the background.
+    void OnApplicationPause(bool paused)
+    {
+        bool wasSuspended = PresentationIsSuspended;
+        applicationPaused = paused;
+        HandlePresentationSuspensionChange(wasSuspended);
+    }
+
+    void OnApplicationFocus(bool focused)
+    {
+        bool wasSuspended = PresentationIsSuspended;
+        applicationFocused = focused;
+        HandlePresentationSuspensionChange(wasSuspended);
+    }
+
+    void OnDisable()
+    {
+        CancelPendingPresentation();
+    }
+
+    void OnEnable()
+    {
+        ScheduleAutomaticTransition();
+    }
+
+    void OnDestroy()
+    {
+        CancelPendingPresentation();
+    }
+
     void SelectOpponent()
     {
         int randomIndex = Random.Range(0, fakeNames.Length);
         currentOpponent = fakeNames[randomIndex];
     }
 
-    HolDuelBoardLayout Presenter()
+    SoloBoardActor PresentationActorForCurrentTurn()
+    {
+        if (rules.Finished || rules.Turn == DuelRules.Side.None)
+            return SoloBoardActor.None;
+        return rules.Turn == PlayerSide
+            ? SoloBoardActor.Player
+            : SoloBoardActor.Opponent;
+    }
+
+    SoloDuelVisuals Presenter()
     {
         if (boardPresenter == null)
-            boardPresenter = FindObjectOfType<HolDuelBoardLayout>(true);
+            boardPresenter = FindObjectOfType<SoloDuelVisuals>(true);
         return boardPresenter;
+    }
+
+    static void RequirePresentation(bool accepted, string context)
+    {
+        if (!accepted)
+            Debug.LogError("[GameManager] Solo presentation rejected " +
+                           context + ".");
     }
 
     void Present(SoloBoardPhase phase, SoloBoardPrompt prompt, int detailValue = 0,

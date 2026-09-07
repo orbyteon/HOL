@@ -81,7 +81,17 @@ public sealed class PanelPlayCapturePlayModeTests
             var scene = SceneManager.GetActiveScene();
             var menu = FindInScene(scene, RuntimeType("MenuManager"));
             Assert.That(menu, Is.Not.Null);
-            menu.SendMessage("OnPlayPressed", SendMessageOptions.RequireReceiver);
+            var panelPlay = (GameObject)menu.GetType().GetField(
+                "panelPlay", InstanceFlags).GetValue(menu);
+            var mainMenuPanel = (GameObject)menu.GetType().GetField(
+                "mainMenuPanel", InstanceFlags).GetValue(menu);
+            Assert.That(panelPlay, Is.Not.Null);
+            Assert.That(mainMenuPanel, Is.Not.Null);
+
+            // Capture tooling owns this isolated legacy preview. Production
+            // OnPlayPressed intentionally bypasses PanelPlay.
+            mainMenuPanel.SetActive(false);
+            panelPlay.SetActive(true);
             for (int i = 0; i < 8; i++)
                 yield return null;
             owner = FindInScene(scene, RuntimeType("MainMenuPlayVisuals"));

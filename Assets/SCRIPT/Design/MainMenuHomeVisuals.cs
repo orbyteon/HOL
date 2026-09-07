@@ -41,7 +41,8 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
 
     const string BackgroundResource = "settings/hol_settings_bg_r1";
     const string LogoResource = "reference/hol_logo_exact";
-    const string AvatarResource = "reference/player_cyan_exact";
+    const string AvatarResource =
+        PlayerProfileAvatarResolver.FallbackResourcePath;
     const string HeroBoyResource = "phase2a/hol_menu_boy_arms_crossed_r3";
     const string HeroGirlResource = "phase2a/hol_menu_girl_forward_fist_r3";
     const string MascotSixResource = "reference/mascot_6_exact";
@@ -139,7 +140,6 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
 
     TMP_FontAsset displayFont;
     TMP_FontAsset bodyFont;
-    Sprite defaultAvatarSprite;
     Image chipAvatarImage;
     TMP_Text chipText;
     TMP_Text chipScoreText;
@@ -263,7 +263,6 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         Sprite background = LoadRequired(BackgroundResource);
         Sprite logo = LoadRequired(LogoResource);
         Sprite avatar = LoadRequired(AvatarResource);
-        defaultAvatarSprite = avatar;
         Sprite heroBoy = LoadRequired(HeroBoyResource);
         Sprite heroGirl = LoadRequired(HeroGirlResource);
         Sprite six = LoadRequired(MascotSixResource);
@@ -680,7 +679,7 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
     void RefreshChip()
     {
         if (chipAvatarImage != null)
-            chipAvatarImage.sprite = ResolveProfileAvatar(defaultAvatarSprite);
+            chipAvatarImage.sprite = PlayerProfileAvatarResolver.Resolve();
 
         if (chipText == null || chipScoreText == null) return;
 
@@ -690,20 +689,6 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
 
         chipText.text = player;
         chipScoreText.text = GameStats.Wins.ToString("N0");
-    }
-
-    static Sprite ResolveProfileAvatar(Sprite fallback)
-    {
-        if (!OnboardingProfile.TryLoadCommittedAvatar(out int avatarIndex))
-            return fallback;
-
-        OnboardingAvatarCatalog.Entry entry =
-            OnboardingAvatarCatalog.Get(avatarIndex);
-        if (string.IsNullOrWhiteSpace(entry.ResourcePath))
-            return fallback;
-
-        Sprite selected = Resources.Load<Sprite>(entry.ResourcePath);
-        return selected != null ? selected : fallback;
     }
 
     void ApplyResponsiveLayout(bool force = false)

@@ -151,9 +151,22 @@ public sealed class SoloSearchCaptureBootstrap : MonoBehaviour
             !homeVisuals.IsReady || !homeVisuals.IsSettled)
             return;
 
+        if (matchmaking == null)
+            matchmaking = FindInScene<FakeMatchmaking>();
+        if (matchmaking == null || matchmaking.searchingPanel == null)
+            return;
+
         if (!openedPlay)
         {
-            menu.OnPlayPressed();
+            // Explicit compatibility-capture seam for the retired
+            // preparation presentation. Production ButtonPlay deliberately
+            // bypasses PanelPlay/PanelSearching and enters PanelGAME.
+            if (menu.settingsPanel != null) menu.settingsPanel.SetActive(false);
+            if (menu.mainMenuPanel != null) menu.mainMenuPanel.SetActive(false);
+            if (menu.panelSearching != null) menu.panelSearching.SetActive(false);
+            if (matchmaking.panelGame != null) matchmaking.panelGame.SetActive(false);
+            if (menu.panelPlay != null) menu.panelPlay.SetActive(true);
+            SoloSearchVisuals.Install(matchmaking);
             openedPlay = true;
             return;
         }
@@ -162,11 +175,6 @@ public sealed class SoloSearchCaptureBootstrap : MonoBehaviour
             playVisuals = FindInScene<MainMenuPlayVisuals>();
         if (playVisuals == null ||
             !playVisuals.IsReady || !playVisuals.IsSettled)
-            return;
-
-        if (matchmaking == null)
-            matchmaking = FindInScene<FakeMatchmaking>();
-        if (matchmaking == null || matchmaking.searchingPanel == null)
             return;
 
         if (!startedSearch)

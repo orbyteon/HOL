@@ -1,6 +1,5 @@
 using TMPro;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 // Sole presentation owner for the truthful Solo-vs-AI preparation screen.
@@ -8,6 +7,7 @@ using UnityEngine.UI;
 // this class only composes approved modular sprites around the real status and
 // Cancel control.
 [DefaultExecutionOrder(2500)]
+[DisallowMultipleComponent]
 public sealed class SoloSearchVisuals : MonoBehaviour
 {
     public const string VisualRootName = "SoloSearchVisualRoot";
@@ -73,21 +73,8 @@ public sealed class SoloSearchVisuals : MonoBehaviour
 
     public bool IsReady { get; private set; }
 
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
-    static void Bootstrap()
-    {
-        SceneManager.sceneLoaded -= OnSceneLoaded;
-        SceneManager.sceneLoaded += OnSceneLoaded;
-    }
-
-    static void OnSceneLoaded(Scene scene, LoadSceneMode mode)
-    {
-        if (!scene.IsValid() || !scene.isLoaded) return;
-
-        var owner = FindInScene<FakeMatchmaking>(scene);
-        Install(owner);
-    }
-
+    // Retired compatibility preview only. Production Solo entry never calls
+    // this method; capture/test seams must opt in explicitly.
     public static void Install(FakeMatchmaking owner)
     {
         if (owner == null || owner.searchingPanel == null) return;
@@ -180,15 +167,9 @@ public sealed class SoloSearchVisuals : MonoBehaviour
             legacyImage.raycastTarget = false;
         }
 
-        cancelButton = Find<Button>(transform, "CancelButton");
-        if (cancelButton == null)
-        {
-            cancelButton = RuntimeUI.CreateButton(
-                transform, "CancelButton", L10n.Get("cancel"),
-                Vector2.zero, new Vector2(520f, 110f), Color.white,
-                Ink);
-            cancelButton.onClick.AddListener(matchmaking.CancelSearch);
-        }
+        cancelButton = EnsureOwnedButton(transform, "CancelButton");
+        cancelButton.onClick.RemoveListener(matchmaking.CancelSearch);
+        cancelButton.onClick.AddListener(matchmaking.CancelSearch);
         ClearButtonPresentation(cancelButton.transform);
 
         visualRoot = (RectTransform)RuntimeUI.CreateObject(
@@ -347,10 +328,11 @@ public sealed class SoloSearchVisuals : MonoBehaviour
         Sprite chevron,
         Sprite streak)
     {
-        backButton = RuntimeUI.CreateButton(
-            safe, "SearchBackButton", string.Empty,
-            new Vector2(-484f, 842f), new Vector2(90f, 90f),
-            Color.white, NearWhite);
+        backButton = EnsureOwnedButton(safe, "SearchBackButton");
+        Place(
+            (RectTransform)backButton.transform,
+            new Vector2(-484f, 842f), new Vector2(90f, 90f));
+        backButton.onClick.RemoveListener(matchmaking.CancelSearch);
         backButton.onClick.AddListener(matchmaking.CancelSearch);
         StyleButton(backButton, purple, NearWhite);
         HideButtonLabels(backButton.transform);
@@ -595,6 +577,22 @@ public sealed class SoloSearchVisuals : MonoBehaviour
         return (RectTransform)RuntimeUI.CreateObject(name, parent).transform;
     }
 
+    static Button EnsureOwnedButton(Transform parent, string name)
+    {
+        RectTransform rect = EnsureRect(parent, name);
+        var image = rect.GetComponent<Image>();
+        if (image == null)
+            image = rect.gameObject.AddComponent<Image>();
+        image.raycastTarget = true;
+
+        var button = rect.GetComponent<Button>();
+        if (button == null)
+            button = rect.gameObject.AddComponent<Button>();
+        button.targetGraphic = image;
+        RuntimeUI.AttachJuice(button);
+        return button;
+    }
+
     static Image EnsureImage(Transform parent, string name)
     {
         RectTransform rect = EnsureRect(parent, name);
@@ -703,14 +701,4 @@ public sealed class SoloSearchVisuals : MonoBehaviour
         return null;
     }
 
-    static T FindInScene<T>(Scene scene) where T : Component
-    {
-        if (!scene.IsValid()) return null;
-        foreach (GameObject root in scene.GetRootGameObjects())
-        {
-            T found = root.GetComponentInChildren<T>(true);
-            if (found != null) return found;
-        }
-        return null;
-    }
 }

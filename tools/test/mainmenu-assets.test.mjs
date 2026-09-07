@@ -158,13 +158,53 @@ test("Home profile avatar reuses the sole Onboarding key and catalog mapping", (
   assert.deepEqual(keyOwners, ["Onboarding/OnboardingProfile.cs"]);
   assert.deepEqual(pathOwners, ["Onboarding/OnboardingAvatarCatalog.cs"]);
 
-  const owner = read("Assets/SCRIPT/Design/MainMenuHomeVisuals.cs")
+  const sharedOwners = [
+    "Assets/SCRIPT/Design/MainMenuHomeVisuals.cs",
+    "Assets/SCRIPT/Design/SoloDuelVisuals.cs",
+    "Assets/SCRIPT/Design/DailyHuntVisuals.cs",
+    "Assets/SCRIPT/Design/SettingsVisuals.cs",
+  ];
+  const resolver = read("Assets/SCRIPT/Design/PlayerProfileAvatarResolver.cs")
     .toString("utf8");
-  assert.match(owner, /OnboardingProfile\.TryLoadCommittedAvatar/);
-  assert.match(owner, /OnboardingAvatarCatalog\.Get/);
-  assert.match(owner, /reference\/player_cyan_exact/);
-  assert.equal(owner.includes("HOL.Onboarding.Avatar"), false);
-  assert.equal(/onboarding\/avatars\/avatar_\d+/.test(owner), false);
+  for (const ownerPath of sharedOwners) {
+    const owner = read(ownerPath).toString("utf8");
+    assert.match(owner, /PlayerProfileAvatarResolver\.Resolve\s*\(\s*\)/,
+      ownerPath);
+    assert.match(owner, /PlayerProfileAvatarResolver\.FallbackResourcePath/,
+      ownerPath);
+    assert.equal(owner.includes("HOL.Onboarding.Avatar"), false, ownerPath);
+    assert.equal(owner.includes("OnboardingProfile.AvatarKey"), false,
+      ownerPath);
+    assert.doesNotMatch(owner, /OnboardingProfile\.TryCommit\s*\(/,
+      ownerPath);
+    assert.doesNotMatch(owner, /OnboardingAvatarCatalog\.Get\s*\(/,
+      ownerPath);
+    assert.equal(/"onboarding\/avatars\/avatar_\d+/.test(owner), false,
+      ownerPath);
+  }
+  assert.match(resolver, /OnboardingProfile\.TryLoadCommittedAvatar/);
+  assert.match(resolver, /OnboardingAvatarCatalog\.Get/);
+  assert.match(resolver,
+    /public const string FallbackResourcePath\s*=\s*"reference\/player_cyan_exact"/);
+  assert.equal(resolver.includes("HOL.Onboarding.Avatar"), false);
+  assert.equal(/onboarding\/avatars\/avatar_\d+/.test(resolver), false);
+  assert.doesNotMatch(resolver, /PlayerPrefs\./);
+  assert.doesNotMatch(resolver, /OnboardingProfile\.TryCommit/);
+  assert.doesNotMatch(resolver,
+    /^\s*(?:public|private|internal|protected)?\s*static\s+(?:readonly\s+)?Sprite\s+\w+\s*(?:=|;)/m);
+  assert.doesNotMatch(resolver, /(?:Dictionary|ConcurrentDictionary|List)</);
+
+  assert.equal(read("Assets/SCRIPT/Design/MainMenuHomeVisuals.cs")
+    .toString("utf8").includes('"reference/player_cyan_exact"'), false);
+  assert.equal(read("Assets/SCRIPT/Design/DailyHuntVisuals.cs")
+    .toString("utf8").includes('"reference/player_cyan_exact"'), false);
+  assert.equal(read("Assets/SCRIPT/Design/SettingsVisuals.cs")
+    .toString("utf8").includes('"reference/player_cyan_exact"'), false);
+  const soloOwner = read("Assets/SCRIPT/Design/SoloDuelVisuals.cs")
+    .toString("utf8");
+  assert.match(soloOwner,
+    /const string PlayerResource\s*=\s*"reference\/player_cyan_exact"/);
+  assert.equal(soloOwner.includes("solo_player_avatar_v1"), false);
 
   const capture = read("Assets/SCRIPT/Design/MainMenuLocalCapturePlayer.cs")
     .toString("utf8").trim();
