@@ -13,7 +13,7 @@ public sealed class MainMenuHomeSubtitlePlayModeTests
         BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
 
     [UnityTest]
-    public IEnumerator SoloSubtitleIsSingleLocalizedReadableLabel()
+    public IEnumerator PlaySubtitleIsSingleLocalizedReadableLabel()
     {
         bool hadLanguage = PlayerPrefs.HasKey("Language");
         int savedLanguage = PlayerPrefs.GetInt("Language", 0);
@@ -40,42 +40,74 @@ public sealed class MainMenuHomeSubtitlePlayModeTests
             Assert.That(Property<bool>(owner, "IsReady"), Is.True);
             Assert.That(Property<bool>(owner, "IsSettled"), Is.True);
 
-            Transform solo = Find(owner.transform, "ButtonPlay");
-            Assert.That(solo, Is.Not.Null);
+            Transform play = Find(owner.transform, "ButtonPlay");
+            Assert.That(play, Is.Not.Null);
 
             TMP_Text[] visibleLabels =
-                solo.GetComponentsInChildren<TMP_Text>(false);
+                play.GetComponentsInChildren<TMP_Text>(false);
             Assert.That(visibleLabels, Has.Length.EqualTo(2),
-                "Solo CTA must expose exactly its title and subtitle; no legacy label may remain visible.");
+                "PLAY must expose exactly its title and subtitle; no retired mode label may remain visible.");
 
-            TMP_Text title = Find(solo, "HomeSoloTitle")
+            TMP_Text title = Find(play, "HomePlayTitle")
                 ?.GetComponent<TMP_Text>();
-            TMP_Text subtitle = Find(solo, "HomeSoloSubtitle")
+            TMP_Text subtitle = Find(play, "HomePlaySubtitle")
                 ?.GetComponent<TMP_Text>();
             Assert.That(title, Is.Not.Null);
             Assert.That(subtitle, Is.Not.Null);
             Assert.That(title.gameObject.activeInHierarchy, Is.True);
             Assert.That(subtitle.gameObject.activeInHierarchy, Is.True);
-            Assert.That(subtitle.text, Is.EqualTo(Localized("home_solo_subtitle")));
+            Assert.That(title.text, Is.EqualTo(Localized("play")));
+            Assert.That(subtitle.text, Is.EqualTo(Localized("home_play_subtitle")));
             Assert.That(subtitle.raycastTarget, Is.False);
-            Assert.That(subtitle.color.r, Is.LessThan(0.25f));
-            Assert.That(subtitle.color.g, Is.LessThan(0.25f));
-            Assert.That(subtitle.color.b, Is.LessThan(0.30f),
-                "Solo subtitle must retain the approved dark-ink treatment on gold.");
+            AssertApprovedSubtitle(subtitle, Localized("home_play_subtitle"));
 
             SetLanguage(1);
+            Assert.That(title.text, Is.EqualTo("Παίξε"));
             Assert.That(subtitle.text,
-                Is.EqualTo(Localized("home_solo_subtitle")));
+                Is.EqualTo(Localized("home_play_subtitle")));
             Assert.That(subtitle.text,
-                Is.EqualTo("Παίξε και σπάσε το ρεκόρ σου!"));
-            Assert.That(solo.GetComponentsInChildren<TMP_Text>(false),
+                Is.EqualTo("Διάλεξε τρόπο παιχνιδιού"));
+            Assert.That(play.GetComponentsInChildren<TMP_Text>(false),
                 Has.Length.EqualTo(2));
+            AssertApprovedSubtitle(subtitle, Localized("home_play_subtitle"));
         }
         finally
         {
             SetLanguage(savedLanguage == 1 ? 1 : 0);
             if (!hadLanguage)
                 PlayerPrefs.DeleteKey("Language");
+        }
+    }
+
+    static void AssertApprovedSubtitle(TMP_Text subtitle, string expected)
+    {
+        // Approved VS-AI-derived Home: near-white copy with an ink outline
+        // inside the dark inset, not the retired dark-ink-on-gold subtitle.
+        Assert.That(subtitle.color.r, Is.EqualTo(0.985f).Within(0.001f));
+        Assert.That(subtitle.color.g, Is.EqualTo(0.975f).Within(0.001f));
+        Assert.That(subtitle.color.b, Is.EqualTo(1f).Within(0.001f));
+        Assert.That(subtitle.color.a, Is.EqualTo(1f).Within(0.001f));
+        // TMP exposes outlineColor as Color32; compare normalized Color units.
+        Color outline = subtitle.outlineColor;
+        Assert.That(outline.r, Is.EqualTo(0.09f).Within(0.001f));
+        Assert.That(outline.g, Is.EqualTo(0.05f).Within(0.001f));
+        Assert.That(outline.b, Is.EqualTo(0.16f).Within(0.001f));
+        Assert.That(subtitle.outlineWidth, Is.EqualTo(0.12f).Within(0.001f));
+        Assert.That(subtitle.alignment, Is.EqualTo(TextAlignmentOptions.Center));
+        Assert.That(subtitle.raycastTarget, Is.False);
+        Assert.That(subtitle.isActiveAndEnabled, Is.True);
+        Canvas.ForceUpdateCanvases();
+        subtitle.ForceMeshUpdate();
+        Assert.That(subtitle.fontSize, Is.GreaterThanOrEqualTo(25f));
+        Assert.That(subtitle.isTextOverflowing, Is.False, expected);
+        Assert.That(subtitle.isTextTruncated, Is.False, expected);
+        Assert.That(subtitle.textInfo.characterCount, Is.EqualTo(expected.Length));
+        for (int i = 0; i < expected.Length; i++)
+        {
+            TMP_CharacterInfo glyph = subtitle.textInfo.characterInfo[i];
+            Assert.That(glyph.character, Is.EqualTo(expected[i]), expected + " glyph " + i);
+            if (!char.IsWhiteSpace(expected[i]))
+                Assert.That(glyph.isVisible, Is.True, expected + " glyph " + i);
         }
     }
 

@@ -12,7 +12,7 @@ const dimensions = png => ({
 });
 
 const approvedBackground =
-  "Assets/newdesign/Resources/phase2a/hol_neon_reference_bg_r3.png";
+  "Assets/newdesign/Resources/solo/production/solo_background_v1.png";
 const rejectedCloudBackground =
   "Assets/newdesign/Resources/mainmenu/mainmenu_bg_stairs_clouds.png";
 
@@ -33,15 +33,22 @@ test("approved number six stays byte-exact", () => {
     "067beafc207aea302e0993a3bacdb2b69478429aa3685f275bb6705bd902ac4b");
 });
 
-test("Play reuses the approved high-resolution 9:16 Revision 3 background", () => {
+test("Play reuses approved Solo background with canonical 941x1672 portrait geometry", () => {
   const png = read(approvedBackground);
   const { width, height } = dimensions(png);
+  assert.equal(png.subarray(0, 8).toString("hex"), "89504e470d0a1a0a",
+    "Play background must be a PNG");
+  assert.equal(png[24], 8, "Play background must stay 8-bit");
+  // 04-solo-duel-approved-contract.md fixes the source at 941x1672.
+  assert.deepEqual({ width, height }, { width: 941, height: 1672 });
   assert.ok(width >= 900,
     `Play background width must stay production-resolution; got ${width}`);
   assert.ok(height >= 1600,
     `Play background height must stay production-resolution; got ${height}`);
   assert.ok(Math.abs(width / height - 9 / 16) <= 0.002,
-    `Play background must stay 9:16; got ${width}x${height}`);
+    `Play background must stay approximately 9:16; got ${width}x${height}`);
+  assert.ok(png[25] === 2 || png[25] === 6,
+    "Play background must be RGB or RGBA");
 });
 
 test("every current cartoon Play asset has a Unity meta", () => {
@@ -63,13 +70,16 @@ test("rejected Play backgrounds and obsolete CTA stay deleted", () => {
     false);
 });
 
-test("Play owner uses current art and never loads splash or rejected background", () => {
+test("Play owner uses approved Solo art and never loads Splash or retired backgrounds", () => {
   const owner = "Assets/SCRIPT/Design/MainMenuPlayVisuals.cs";
   assert.equal(exists(owner), true, owner);
   const source = read(owner).toString("utf8");
   assert.equal(source.includes('Resources.Load("splash/'), false);
   assert.equal(source.includes("splash/"), false);
-  assert.match(source, /phase2a\/hol_neon_reference_bg_r3/);
+  assert.match(source,
+    /const string BackgroundResource\s*=\s*"solo\/production\/solo_background_v1";/);
+  assert.equal(source.includes("phase2a/hol_neon_reference_bg_r3"), false);
+  assert.equal(source.includes("settings/hol_settings_bg_r1"), false);
   assert.equal(source.includes("mainmenu_bg_stairs_clouds"), false);
   assert.match(source, /reference\/hol_logo_exact/);
 });

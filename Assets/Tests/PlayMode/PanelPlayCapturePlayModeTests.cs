@@ -88,12 +88,14 @@ public sealed class PanelPlayCapturePlayModeTests
             Assert.That(panelPlay, Is.Not.Null);
             Assert.That(mainMenuPanel, Is.Not.Null);
 
-            // Capture tooling owns this isolated legacy preview. Production
-            // OnPlayPressed intentionally bypasses PanelPlay.
-            mainMenuPanel.SetActive(false);
-            panelPlay.SetActive(true);
+            // The evidence seam must exercise the same production transition
+            // as Home PLAY. It must never force selector hierarchy state.
+            menu.GetType().GetMethod(
+                "OnPlayPressed", InstanceFlags).Invoke(menu, null);
             for (int i = 0; i < 8; i++)
                 yield return null;
+            Assert.That(mainMenuPanel.activeInHierarchy, Is.False);
+            Assert.That(panelPlay.activeInHierarchy, Is.True);
             owner = FindInScene(scene, RuntimeType("MainMenuPlayVisuals"));
             Assert.That(owner, Is.Not.Null);
             settled = owner.GetType().GetProperty("IsSettled", InstanceFlags);

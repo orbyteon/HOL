@@ -133,12 +133,9 @@ public sealed class PanelPlayCaptureBootstrap : MonoBehaviour
         {
             var menu = FindInScene<MenuManager>();
             if (menu == null) return;
-            // This development-only capture seam may still expose the retired
-            // PanelPlay artwork explicitly. Product navigation no longer does.
-            if (menu.settingsPanel != null) menu.settingsPanel.SetActive(false);
-            if (menu.panelSearching != null) menu.panelSearching.SetActive(false);
-            if (menu.mainMenuPanel != null) menu.mainMenuPanel.SetActive(false);
-            if (menu.panelPlay != null) menu.panelPlay.SetActive(true);
+            // Capture the same production route a player uses. The seam never
+            // forces selector hierarchy state directly.
+            menu.OnPlayPressed();
             openedPlay = true;
             return;
         }

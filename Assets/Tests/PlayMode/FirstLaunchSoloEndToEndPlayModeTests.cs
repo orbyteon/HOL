@@ -235,11 +235,7 @@ public sealed class FirstLaunchSoloEndToEndPlayModeTests
             homeOwner.transform, "HomePlayerAvatar", committedAvatar,
             "First-launch Home");
 
-        Button soloEntry = Find(homeCanvas.transform, "ButtonPlay")
-            .GetComponent<Button>();
-        Assert.That(PersistentMethods(soloEntry), Does.Contain("OnPlayPressed"));
-        Assert.That(soloEntry.interactable, Is.True);
-        Click(soloEntry);
+        yield return EnterSoloThroughPlayHub(homeOwner);
 
         Component matchmaking = FindInScene(
             SceneManager.GetActiveScene(), RuntimeType("FakeMatchmaking"));
@@ -249,7 +245,7 @@ public sealed class FirstLaunchSoloEndToEndPlayModeTests
         Assert.That(menu, Is.Not.Null);
 
         GameObject gamePanel = GetField<GameObject>(matchmaking, "panelGame");
-        GameObject retiredPlay = GetField<GameObject>(menu, "panelPlay");
+        GameObject playHub = GetField<GameObject>(menu, "panelPlay");
         GameObject retiredSearch = GetField<GameObject>(menu, "panelSearching");
         Assert.That(gamePanel, Is.Not.Null);
 
@@ -262,12 +258,12 @@ public sealed class FirstLaunchSoloEndToEndPlayModeTests
                    GetProperty<GameObject>(soloOwner, "KeypadRoot") != null &&
                    GetProperty<Button>(soloOwner, "SubmitControl") != null &&
                    !GetProperty<bool>(matchmaking, "IsPreparing");
-        }, 8f, "Direct Solo entry did not expose a ready real board.");
+        }, 8f, "PLAY -> VS AI did not expose a ready real board.");
 
-        Assert.That(retiredPlay == null || !retiredPlay.activeInHierarchy, Is.True,
-            "Direct Solo entry exposed the retired intermediate screen.");
+        Assert.That(playHub == null || !playHub.activeInHierarchy, Is.True,
+            "The mode selector must close after the player chooses VS AI.");
         Assert.That(retiredSearch == null || !retiredSearch.activeInHierarchy, Is.True,
-            "Direct Solo entry exposed the retired search screen.");
+            "VS AI must not expose the retired search screen.");
         Assert.That(CountInScene(
             SceneManager.GetActiveScene(), RuntimeType("SoloDuelVisuals")),
             Is.EqualTo(1), "Solo must have one presentation owner.");
@@ -484,9 +480,7 @@ public sealed class FirstLaunchSoloEndToEndPlayModeTests
         AssertAvatar(homeOwner.transform, "HomePlayerAvatar", expected, "Home");
         AssertPersistedAvatar(selectedAvatar, "Home");
 
-        Button solo = Find(homeOwner.transform, "ButtonPlay").GetComponent<Button>();
-        Assert.That(PersistentMethods(solo), Does.Contain("OnPlayPressed"));
-        Click(solo);
+        yield return EnterSoloThroughPlayHub(homeOwner);
 
         Component soloOwner = null;
         yield return WaitUntilOrFail(() =>
@@ -936,6 +930,52 @@ public sealed class FirstLaunchSoloEndToEndPlayModeTests
         for (int index = 0; index < count; index++)
             methods[index] = button.onClick.GetPersistentMethodName(index);
         return methods;
+    }
+
+    static IEnumerator EnterSoloThroughPlayHub(Component homeOwner)
+    {
+        Canvas homeCanvas = homeOwner.GetComponent<Canvas>();
+        Assert.That(homeCanvas, Is.Not.Null);
+        Transform playTransform = Find(homeCanvas.transform, "ButtonPlay");
+        Assert.That(playTransform, Is.Not.Null,
+            "The production Home PLAY entry is missing.");
+        Button play = playTransform.GetComponent<Button>();
+        Assert.That(play, Is.Not.Null);
+        Assert.That(PersistentMethods(play), Does.Contain("OnPlayPressed"),
+            "Home PLAY must open the production mode selector.");
+        Assert.That(play.interactable, Is.True);
+        Click(play);
+
+        Component menu = null;
+        Component selectorOwner = null;
+        Button vsAi = null;
+        yield return WaitUntilOrFail(() =>
+        {
+            Scene scene = SceneManager.GetActiveScene();
+            menu = FindInScene(scene, RuntimeType("MenuManager"));
+            selectorOwner = FindInScene(
+                scene, RuntimeType("MainMenuPlayVisuals"));
+            GameObject panelPlay = menu == null
+                ? null
+                : GetField<GameObject>(menu, "panelPlay");
+            Transform entry = selectorOwner == null
+                ? null
+                : Find(selectorOwner.transform, "ButtonChallenger");
+            vsAi = entry == null ? null : entry.GetComponent<Button>();
+            return panelPlay != null && panelPlay.activeInHierarchy &&
+                   selectorOwner != null &&
+                   GetProperty<bool>(selectorOwner, "IsReady") &&
+                   GetProperty<bool>(selectorOwner, "IsSettled") &&
+                   vsAi != null && vsAi.gameObject.activeInHierarchy &&
+                   vsAi.interactable;
+        }, 8f, "Home PLAY did not expose the ready production mode selector.");
+
+        Assert.That(CountInScene(
+            SceneManager.GetActiveScene(), RuntimeType("MainMenuPlayVisuals")),
+            Is.EqualTo(1), "The mode selector must have one presentation owner.");
+        Assert.That(PersistentMethods(vsAi), Does.Contain("StartSearch"),
+            "VS AI must retain the authoritative Solo entry callback.");
+        Click(vsAi);
     }
 
     static string Localized(string key, params object[] arguments)

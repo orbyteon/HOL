@@ -52,6 +52,21 @@ public static class L10n
         { "play",                    new[] { "Play", "Παίξε" } },
         { "play_solo",               new[] { "Play Solo vs AI", "Παίξε Solo με AI" } },
         { "private_room",            new[] { "Private Room", "Ιδιωτικό δωμάτιο" } },
+        { "home_play_subtitle",      new[] {
+            "Choose your game mode", "Διάλεξε τρόπο παιχνιδιού" } },
+        { "play_hub_title",          new[] {
+            "CHOOSE A MODE", "ΔΙΑΛΕΞΕ ΤΡΟΠΟ" } },
+        { "play_hub_subtitle",       new[] {
+            "What do you want to play?", "Τι θέλεις να παίξεις;" } },
+        { "play_hub_solo_title",     new[] { "VS AI", "ΕΝΑΝΤΙΟΝ AI" } },
+        { "play_hub_solo_subtitle",  new[] {
+            "A number duel against the computer",
+            "Μονομαχία αριθμών με τον υπολογιστή" } },
+        { "play_hub_friend_title",   new[] {
+            "PLAY WITH A FRIEND", "ΠΑΙΞΕ ΜΕ ΦΙΛΟ" } },
+        { "play_hub_friend_subtitle", new[] {
+            "Create or join a private room",
+            "Δημιούργησε ή μπες σε ιδιωτικό δωμάτιο" } },
         { "home_solo_title",         new[] { "PLAY SOLO", "ΠΑΙΞΕ SOLO" } },
         { "home_solo_subtitle",      new[] {
             "Play and beat your high score!", "Παίξε και σπάσε το ρεκόρ σου!" } },
@@ -63,7 +78,8 @@ public static class L10n
         { "home_private_subtitle",   new[] {
             "Create a room & play together!",
             "Δημιούργησε δωμάτιο & παίξε μαζί!" } },
-        { "home_daily_title",        new[] { "DAILY HUNT", "DAILY HUNT" } },
+        { "home_daily_title",        new[] {
+            "DAILY HUNT", "ΗΜΕΡΗΣΙΑ ΔΟΚΙΜΑΣΙΑ" } },
         { "home_daily_subtitle",     new[] {
             "A new challenge every day, big rewards!",
             "Πρόκληση κάθε μέρα, μεγάλα έπαθλα!" } },

@@ -1108,16 +1108,57 @@ public sealed class SoloDuelVisualsPlayModeTests
         Assert.That(homeOwner, Is.Not.Null,
             "The production Home owner did not become ready.");
         Assert.That(soloEntry, Is.Not.Null,
-            "The production PLAY SOLO entry is missing.");
+            "The production Home PLAY entry is missing.");
         Assert.That(soloEntry.interactable, Is.True);
         string[] persistentMethods = Enumerable.Range(
                 0, soloEntry.onClick.GetPersistentEventCount())
             .Select(soloEntry.onClick.GetPersistentMethodName)
             .ToArray();
         Assert.That(persistentMethods, Does.Contain("OnPlayPressed"),
-            "The test must enter Solo through the production callback.");
+            "The test must open the mode selector through production PLAY.");
 
         soloEntry.onClick.Invoke();
+
+        Component selectorOwner = null;
+        Component menu = null;
+        Button vsAiEntry = null;
+        for (int frame = 0; frame < 600; frame++)
+        {
+            selectorOwner = FindInScene(RuntimeType("MainMenuPlayVisuals"));
+            menu = FindInScene(RuntimeType("MenuManager"));
+            GameObject panelPlay = menu == null
+                ? null
+                : GetField<GameObject>(menu, "panelPlay");
+            Transform entryTransform = selectorOwner == null
+                ? null
+                : Find(selectorOwner.transform, "ButtonChallenger");
+            vsAiEntry = entryTransform == null
+                ? null
+                : entryTransform.GetComponent<Button>();
+            if (panelPlay != null && panelPlay.activeInHierarchy &&
+                selectorOwner != null &&
+                GetProperty<bool>(selectorOwner, "IsReady") &&
+                GetProperty<bool>(selectorOwner, "IsSettled") &&
+                vsAiEntry != null &&
+                vsAiEntry.gameObject.activeInHierarchy &&
+                vsAiEntry.interactable)
+                break;
+            yield return null;
+        }
+
+        Assert.That(selectorOwner, Is.Not.Null,
+            "The production mode selector owner is missing.");
+        Assert.That(vsAiEntry, Is.Not.Null,
+            "The production VS AI entry is missing.");
+        Assert.That(vsAiEntry.interactable, Is.True);
+        string[] vsAiPersistentMethods = Enumerable.Range(
+                0, vsAiEntry.onClick.GetPersistentEventCount())
+            .Select(vsAiEntry.onClick.GetPersistentMethodName)
+            .ToArray();
+        Assert.That(vsAiPersistentMethods, Does.Contain("StartSearch"),
+            "VS AI must retain the authoritative Solo callback.");
+
+        vsAiEntry.onClick.Invoke();
 
         Component layout = null;
         Component matchmaking = null;
@@ -1149,7 +1190,9 @@ public sealed class SoloDuelVisualsPlayModeTests
         Assert.That(panelGame, Is.Not.Null,
             "The production Solo panel is missing.");
         Assert.That(panelGame.activeInHierarchy, Is.True,
-            "PLAY SOLO did not activate the production Solo panel.");
+            "PLAY -> VS AI did not activate the production Solo panel.");
+        Assert.That(GetField<GameObject>(menu, "panelPlay").activeInHierarchy,
+            Is.False, "The mode selector must close after VS AI selection.");
         Assert.That(layout, Is.Not.Null,
             "The sole Solo presentation owner is missing.");
         Assert.That(layout.gameObject.activeInHierarchy, Is.True);

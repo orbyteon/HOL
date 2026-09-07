@@ -389,6 +389,12 @@ public class ExtrasRuntimeWiring : MonoBehaviour
 
     void AddDisclosureLabels()
     {
+        // The production Play Hub names the VS AI choice explicitly and owns
+        // every visible selector label. The legacy simulated-opponent helper
+        // must not add a second presentation writer to that panel.
+        if (FindObjectOfType<MainMenuPlayVisuals>(true) != null)
+            return;
+
         var menu = FindObjectOfType<MenuManager>();
         if (menu != null && menu.panelPlay != null)
         {
