@@ -125,9 +125,13 @@ public sealed class PvpProductionPresentationPlayModeTests
     public IEnumerator ApprovedSpritesKeepTheirMeshCornersAndOpaqueNormalFace()
     {
         yield return Build();
-        // The pre-match owner uses the committed join-door SVG. Rocket belonged
-        // to the retired pre-match decoration, not the approved current screen.
-        foreach (var name in new[] { "PvpVsBurst", "PvpResultTrophy", "PrivateRoomJoinDoor" })
+        // The match now uses the exact approved Solo v2 burst. The unchanged
+        // result trophy retains its original SVG mesh, never a UI rectangle.
+        var burst = Find(root.transform, "PvpVsBurst").GetComponent<Image>();
+        Assert.That(burst.sprite, Is.SameAs(Resources.Load<Sprite>("solo/production/solo_vs_burst_v2")));
+        Assert.That(burst.type, Is.EqualTo(Image.Type.Simple));
+        Assert.That(burst.color, Is.EqualTo(Color.white));
+        foreach (var name in new[] { "PvpResultTrophy" })
         {
             var node = Find(root.transform, name);
             Assert.That(node, Is.Not.Null, name + " must be constructed by its owner");
@@ -138,6 +142,18 @@ public sealed class PvpProductionPresentationPlayModeTests
             Assert.That(sprite.vertices.Length, Is.GreaterThan(3), name);
             Assert.That(art.color, Is.EqualTo(Color.white), name);
         }
+        foreach (string name in new[] { "PrivateRoomCreateCard", "PrivateRoomJoinCard" })
+        {
+            var image = Find(root.transform, name).GetComponent<Image>();
+            Assert.That(image.sprite, Is.SameAs(Resources.Load<Sprite>(name == "PrivateRoomCreateCard"
+                ? "reference/hol_private_create_card_v1" : "reference/hol_private_join_card_v1")), name);
+            Assert.That(image.type, Is.EqualTo(Image.Type.Simple), name);
+            Assert.That(image.preserveAspect, Is.True, name);
+            Assert.That(image.color, Is.EqualTo(Color.white), name);
+            Assert.That(image.raycastTarget, Is.False, name);
+        }
+        Assert.That(Find(root.transform, "PrivateRoomJoinDoor"), Is.Null,
+            "An outline-door overlay must not replace or cover the illustrated panel.");
         Assert.That(typeof(MonoBehaviour).IsAssignableFrom(T("PrivateRoomPortraitArtEnvelope")), Is.False,
             "The aspect helper must not install a second scene-wide presentation owner or timer.");
         foreach (string name in new[] { "PrivateRoomBackground", "PvPCreatePanelVisualsBackground", "PvPJoinPanelVisualsBackground" })
@@ -153,9 +169,9 @@ public sealed class PvpProductionPresentationPlayModeTests
         }
         Assert.That(Find(root.transform, "PrivateRoomStars"), Is.Null);
         Assert.That(Find(root.transform, "PrivateRoomConfetti"), Is.Null);
-        Assert.That(Find(root.transform, "PvpSignalBubble").GetComponent<Image>().sprite,
-            Is.SameAs(Resources.Load<Sprite>("cartoon/cartoon_speech_bubble_raster")));
-        foreach (var name in new[] { "Key1", "LockButton", "SubmitGuessButton", "ResultConfirmRematchButton", "PvpMatchPlayerChip" })
+        Assert.That(Find(root.transform, "PvpSignalBubbleArtwork").GetComponent<Image>().sprite,
+            Is.SameAs(Resources.Load<Sprite>("solo/production/solo_opponent_speech_bubble_v2")));
+        foreach (var name in new[] { "LockButton", "ResultConfirmRematchButton" })
         {
             var image = Find(root.transform, name).GetComponent<Image>();
             Assert.That(image.sprite, Is.Not.Null, name);
@@ -168,6 +184,92 @@ public sealed class PvpProductionPresentationPlayModeTests
             Assert.That((border.y + border.w) / units,
                 Is.LessThan(image.rectTransform.rect.height - 16), name + " vertical face remains open");
         }
+    }
+
+    [UnityTest]
+    public IEnumerator MatchUsesMeasuredSoloGeometryAssetsAndRealData()
+    {
+        yield return Build();
+        ShowCase("PlayerTurn");
+        yield return null;
+        var owner = root.GetComponent(T("PvpDuelCartoonVisuals"));
+        Invoke(owner, "ApplyResponsiveLayoutForViewport", 1080f, 1920f);
+        Invoke(owner, "RefreshMatchPresentation");
+        // Independent transcription of the approved Solo production measurements.
+        var expected = new[] {
+            new { Name="PvpPlayerCard", Art="solo_player_card_shell_v1", X=-276f, Y=472f, W=514f, H=620f },
+            new { Name="PvpOpponentCard", Art="solo_opponent_card_shell_v1", X=282f, Y=470f, W=514f, H=620f },
+            new { Name="PvpPromptRibbon", Art="solo_prompt_ribbon_v1", X=-18f, Y=86f, W=636f, H=181f },
+            new { Name="PvpInteractionCard", Art="solo_interaction_board_v2", X=-189f, Y=-488f, W=760f, H=1004f },
+            new { Name="PvpTipCard", Art="solo_tip_board_v1", X=0f, Y=-330f, W=390f, H=260f },
+            new { Name="GuessInput", Art="solo_input_field_v1", X=-13f, Y=285f, W=520f, H=140f },
+            new { Name="Key1", Art="solo_keypad_key_v1", X=-203f, Y=165f, W=186f, H=108f },
+            new { Name="SubmitGuessButton", Art="solo_primary_cta_v1", X=-150f, Y=-385f, W=276f, H=94f },
+            new { Name="PvpMatchPlayerChip", Art="solo_player_chip_v1", X=339f, Y=860f, W=370f, H=150f },
+        };
+        foreach (var item in expected)
+        {
+            var rect = (RectTransform)Find(root.transform, item.Name);
+            Assert.That(rect.anchoredPosition, Is.EqualTo(new Vector2(item.X, item.Y)), item.Name);
+            Assert.That(rect.sizeDelta, Is.EqualTo(new Vector2(item.W, item.H)), item.Name);
+            var image = rect.GetComponent<Image>();
+            Assert.That(image.sprite, Is.SameAs(Resources.Load<Sprite>("solo/production/" + item.Art)), item.Name);
+            Assert.That(image.type, Is.EqualTo(Image.Type.Simple), item.Name);
+            Assert.That(image.color.a, Is.EqualTo(1), item.Name);
+        }
+        // Only the history container uses 20px less height, providing the
+        // extra PvP Signals control a non-overlapping gap above its title.
+        var historyRect = (RectTransform)Find(root.transform, "PvpHistoryCard");
+        Assert.That(historyRect.anchoredPosition, Is.EqualTo(Vector2.zero));
+        Assert.That(historyRect.sizeDelta, Is.EqualTo(new Vector2(374, 400)));
+        Assert.That(historyRect.GetComponent<Image>().sprite,
+            Is.SameAs(Resources.Load<Sprite>("solo/production/solo_history_board_v1")));
+        Assert.That(Find(root.transform, "PvpDuelCartoonRootStars"), Is.Null);
+        Assert.That(Find(root.transform, "PvpDuelCartoonRootOuterFrame"), Is.Null);
+        Assert.That(Find(root.transform, "PvpDuelCartoonRootBackground").GetComponent<Image>().sprite,
+            Is.SameAs(Resources.Load<Sprite>("solo/production/solo_background_v1")));
+        Assert.That(Find(root.transform, "PvpMatchLogo").GetComponent<Image>().preserveAspect, Is.False,
+            "Match the approved Solo logo's exact authored face, not a smaller aspect-fit box.");
+        Assert.That(Find(root.transform, "Key1").GetComponentInChildren<TMP_Text>().fontSizeMax, Is.EqualTo(76));
+        Assert.That(Find(root.transform, "PvpCurrentRange").GetComponent<TMP_Text>().text, Does.Contain("1–49"));
+        Assert.That(Find(root.transform, "PvpOpponentSecretPrivate").GetComponent<TMP_Text>().text, Is.EqualTo(L("pvp_secret_private")));
+        var history = (Component)Get(controller, "historyRail");
+        int count = (int)history.GetType().GetProperty("EventCount").GetValue(history);
+        string[] identities = Enumerable.Range(0, count).Select(i => (string)Invoke(history, "IdentityAt", i)).ToArray();
+        SetLanguage("el");
+        Invoke(owner, "RefreshMatchPresentation");
+        CollectionAssert.AreEqual(identities, Enumerable.Range(0, count).Select(i => (string)Invoke(history, "IdentityAt", i)).ToArray(),
+            "A language repaint must not record a second event.");
+        Set(controller, "myMin", 48);
+        Set(controller, "myMax", 50);
+        Invoke(controller, "RefreshLockButton");
+        Assert.That(((TMP_Text)Get(controller, "lockButtonLabel")).text, Is.EqualTo(L("lock")));
+        var suggestion = Find(root.transform, "PvpLockSuggestion").GetComponent<TMP_Text>();
+        Assert.That(suggestion.text, Is.EqualTo(L("lock_suggest", 3)));
+        Assert.That(suggestion.isActiveAndEnabled, Is.True, "The full suggestion is not lost to fit a small button.");
+        Invoke(controller, "OnLeaveMatchPressed");
+    }
+
+    [UnityTest]
+    public IEnumerator SignalsDrawerPreservesIndexedCallbacksAndCancelsOnExit()
+    {
+        yield return Build();
+        ShowCase("PlayerTurn");
+        yield return null;
+        var toggle = Find(root.transform, "OpenSignals").GetComponent<Button>();
+        toggle.onClick.Invoke();
+        var overlay = Find(root.transform, "PvpSignalsOverlay").gameObject;
+        Assert.That(overlay.activeInHierarchy, Is.True);
+        Assert.That(overlay.GetComponent<Image>().raycastTarget, Is.True);
+        Assert.That(Find(overlay.transform, "MatchSignalChoices").GetComponentsInChildren<Button>().Length, Is.EqualTo(6));
+        Find(overlay.transform, "Signal0").GetComponent<Button>().onClick.Invoke();
+        Assert.That(overlay.activeSelf, Is.False);
+        Assert.That(((TMP_Text)Get(controller, "signalFeedText")).text, Does.Contain(L("signal_luck")));
+        toggle.onClick.Invoke();
+        Invoke(controller, "OnLeaveMatchPressed");
+        yield return null;
+        Assert.That(overlay.activeSelf, Is.False);
+        Assert.That(overlay.activeInHierarchy, Is.False);
     }
 
     [UnityTest]
@@ -299,7 +401,7 @@ public sealed class PvpProductionPresentationPlayModeTests
     }
 
     static readonly string[] Cases = { "PrivateRoom", "CreateEntry", "JoinEntry", "Waiting",
-        "PlayerTurn", "OpponentTurn", "LockMiss", "LockIntro", "LockArmed", "LockSuggested", "Signal",
+        "PlayerTurn", "OpponentTurn", "LockMiss", "LockIntro", "LockArmed", "LockSuggested", "Signal", "IncomingSignal", "SignalsOpen",
         "ResultWin", "ResultLoss", "ResultDraw", "RematchWaiting", "ConnectionLost" };
 
     static readonly string[] PrematchCases = { "PrivateRoom", "CreateSecret", "JoinSecret",
@@ -325,14 +427,93 @@ public sealed class PvpProductionPresentationPlayModeTests
             Canvas.ForceUpdateCanvases();
             string context = language + " " + state + " " + viewport;
             AuditGlyphs(context, errors);
+            if (state == "Creating" || state == "Waiting" || state == "Joining")
+            {
+                var panel = ((GameObject)Get(controller,
+                    state == "Joining" ? "joinPanel" : "createPanel")).transform;
+                var board = (RectTransform)Find(panel, "PrebattleBoard");
+                Assert.That(board.sizeDelta, Is.EqualTo(new Vector2(960, 1280)), context);
+                Assert.That(board.anchoredPosition, Is.EqualTo(new Vector2(0, -165)), context);
+                // Conservative inner face measured from the unchanged board
+                // artwork. Its transparent outer rect is not usable space.
+                var innerFace = new Rect(-390, -525, 780, 1040);
+                foreach (string cardName in new[] { "YouCard", "OpponentCard" })
+                {
+                    var card = (RectTransform)Find(panel, cardName);
+                    Assert.That(card.gameObject.activeInHierarchy, Is.True, context);
+                    Assert.That(card.sizeDelta, Is.EqualTo(new Vector2(340, 252)), context);
+                    Assert.That(card.anchoredPosition, Is.EqualTo(new Vector2(
+                        cardName == "YouCard" ? -200 : 200, 205)), context);
+                    Assert.That(card.localScale, Is.EqualTo(Vector3.one), context);
+                    var image = card.GetComponent<Image>();
+                    Assert.That(image.sprite, Is.SameAs(Resources.Load<Sprite>(
+                        "phase2a/hol_tip_frame_r2_9s")), context);
+                    Assert.That(image.type, Is.EqualTo(Image.Type.Sliced), context);
+                    Assert.That(image.raycastTarget, Is.False, context);
+                    var corners = new Vector3[4];
+                    card.GetWorldCorners(corners);
+                    foreach (var corner in corners)
+                    {
+                        Vector3 point = board.InverseTransformPoint(corner);
+                        if (point.x < innerFace.xMin || point.x > innerFace.xMax ||
+                            point.y < innerFace.yMin || point.y > innerFace.yMax)
+                            errors.Add(context + " " + cardName + " crosses visible board face: " + point);
+                    }
+                    foreach (var text in card.GetComponentsInChildren<TMP_Text>(false))
+                    {
+                        bool caption = text.name.EndsWith("Caption", StringComparison.Ordinal);
+                        Assert.That(text.fontSize, Is.EqualTo(caption ? 30 : 31), context);
+                        AuditFace(text, card, caption ? new Rect(-142, 62, 284, 52)
+                            : new Rect(-144, -72, 288, 112), context, errors);
+                    }
+                }
+            }
+            if (state == "PrivateRoom")
+            {
+                var heading = Find(root.transform, "PrivateRoomJoinHeading").GetComponent<TMP_Text>();
+                Assert.That(heading.text, Is.EqualTo(language == "el"
+                    ? "ΣΥΜΜΕΤΟΧΗ ΣΕ ΔΩΜΑΤΙΟ" : "JOIN A ROOM"), context);
+                Assert.That(heading.fontStyle & FontStyles.UpperCase, Is.EqualTo((FontStyles)0),
+                    "Use intentional localized casing, not invariant uppercase with Greek tonos.");
+                Assert.That(L("private_room_join_title"), Is.EqualTo(language == "el"
+                    ? "Συμμετοχή σε δωμάτιο" : "Join a room"), "The form title remains unchanged.");
+                var safe = (RectTransform)Find(root.transform, "PrivateRoomSafeRoot");
+                var tip = (RectTransform)Find(root.transform, "PrivateRoomTipCard");
+                foreach (string name in new[] { "PrivateRoomMascotSix", "PrivateRoomMascotSeven" })
+                {
+                    var mascot = (RectTransform)Find(root.transform, name);
+                    Assert.That(mascot.sizeDelta, Is.EqualTo(new Vector2(197, 235)), context);
+                    Assert.That(mascot.GetComponent<Image>().preserveAspect, Is.True);
+                    Assert.That(mascot.GetComponent<Image>().raycastTarget, Is.False);
+                    // Authoring-space apertures share this one safe root. Full
+                    // sprite rectangles must fit and not intrude on the tip.
+                    var bounds = new Rect(mascot.anchoredPosition - mascot.sizeDelta * .5f, mascot.sizeDelta);
+                    var tipBounds = new Rect(tip.anchoredPosition - tip.sizeDelta * .5f, tip.sizeDelta);
+                    Assert.That(mascot.parent, Is.SameAs(safe));
+                    Assert.That(bounds.xMin, Is.GreaterThanOrEqualTo(-540));
+                    Assert.That(bounds.xMax, Is.LessThanOrEqualTo(540));
+                    Assert.That(bounds.yMin, Is.GreaterThanOrEqualTo(-960));
+                    Assert.That(bounds.yMax, Is.LessThanOrEqualTo(960));
+                    Assert.That(bounds.Overlaps(tipBounds), Is.False, context + " " + name);
+                }
+            }
             foreach (var text in root.GetComponentsInChildren<TMP_Text>(false))
             {
-                if (text.name == "PrivateRoomCreateHeading" || text.name == "PrivateRoomJoinHeading")
+                if (text.name == "PrivateRoomCreateHeading")
                     AuditFace(text, (RectTransform)text.transform.parent,
-                        new Rect(-99, 246, 188, 62), context, errors);
+                        new Rect(65, 42, 380, 120), context, errors);
+                if (text.name == "PrivateRoomJoinHeading")
+                    AuditFace(text, (RectTransform)text.transform.parent,
+                        new Rect(-5, 79, 420, 110), context, errors);
                 if (text.name == "PrivateRoomCreateHint")
                     AuditFace(text, (RectTransform)text.transform.parent,
-                        new Rect(-170, -232, 320, 80), context, errors);
+                        new Rect(72, -53, 366, 84), context, errors);
+                if (text.name == "PrivateRoomCodeCaption")
+                    AuditFace(text, (RectTransform)text.transform.parent,
+                        new Rect(5, 36, 400, 36), context, errors);
+                if (text.name == "PrivateRoomTip")
+                    AuditFace(text, (RectTransform)text.transform.parent,
+                        new Rect(-270, -65, 540, 130), context, errors);
                 if (text.name == "PrivateRoomPlayerName" || text.name == "PvPCreatePanelPlayerName" ||
                     text.name == "PvPJoinPanelPlayerName")
                     AuditFace(text, (RectTransform)text.transform.parent,
@@ -353,8 +534,11 @@ public sealed class PvpProductionPresentationPlayModeTests
                 if (label == null) continue; // Back is an icon, never a hidden third mode.
                 var image = button.GetComponent<Image>();
                 bool secondary = button.name == "CancelButton";
-                Assert.That(image.sprite, Is.SameAs(Resources.Load<Sprite>(secondary
-                    ? "phase2a/hol_tip_frame_r2_9s" : "solo/production/solo_primary_cta_v1")), context);
+                bool illustratedCreate = button.name == "CreateButton";
+                Assert.That(image.sprite, Is.SameAs(Resources.Load<Sprite>(illustratedCreate
+                    ? "phase2a/hol_cta_blue_r2_9s" : secondary
+                        ? "phase2a/hol_tip_frame_r2_9s" : "solo/production/solo_primary_cta_v1")), context);
+                if (illustratedCreate) Assert.That(image.type, Is.EqualTo(Image.Type.Sliced), context);
                 Assert.That(label.font, Is.SameAs(Resources.Load<TMP_FontAsset>("phase2a/fonts/HOL Menu Display SDF")));
                 Assert.That(label.fontStyle & FontStyles.Bold, Is.EqualTo(FontStyles.Bold));
                 Assert.That(label.fontSize, Is.GreaterThanOrEqualTo(34), context);
@@ -362,8 +546,9 @@ public sealed class PvpProductionPresentationPlayModeTests
                 // Independent measured faces for the two actual production
                 // button sizes, not the runtime centering helper's SafeRect.
                 Rect face = secondary ? new Rect(-144, -27, 288, 64.8f)
-                    : button.name == "CreateButton" || button.name == "JoinButton"
-                        ? new Rect(-140.8f, -29.29f, 281.6f, 65.65f)
+                    : illustratedCreate ? new Rect(-152, -24.2f, 304, 55)
+                    : button.name == "JoinButton"
+                        ? new Rect(-137.6f, -31.9f, 275.2f, 71.5f)
                         : new Rect(-233.6f, -43.79f, 467.2f, 98.15f);
                 AuditFace(label, (RectTransform)button.transform, face, context, errors);
             }
@@ -486,8 +671,64 @@ public sealed class PvpProductionPresentationPlayModeTests
                     new Rect(0, 44, viewport.x, viewport.y - 88), new Vector2(1080, 1920));
             // Audit synchronously after injection: a subsequent LateUpdate
             // would replace the requested safe viewport with the Editor view.
+            var owner = root.GetComponent(T("PvpDuelCartoonVisuals"));
+            Invoke(owner, "ApplyResponsiveLayoutForViewport", viewport.x, viewport.y);
+            Invoke(owner, "RefreshMatchPresentation");
+            Invoke(owner, "CenterButtonFaces");
             Canvas.ForceUpdateCanvases();
             AuditGlyphs(language + " " + state + " " + viewport, violations);
+            if (state == "IncomingSignal")
+            {
+                // Every server-supported signal, with a long real-name shape,
+                // must fit the cream artwork face, not only its TMP rectangle.
+                for (int signal = 0; signal < 6; signal++)
+                {
+                    Invoke(controller, "ShowSignalLine", "Κωνσταντίνος", signal);
+                    AuditGlyphs(language + " incoming signal " + signal + " " + viewport, violations);
+                }
+            }
+            if (state == "SignalsOpen")
+            {
+                var drawer = (RectTransform)Find(root.transform, "PvpSignalsDrawer");
+                // Measured inner artwork face, excluding its transparent
+                // corners and purple rim. Check controls, not just glyphs.
+                var inner = new Rect(-335, -246, 670, 490);
+                foreach (var button in drawer.GetComponentsInChildren<Button>(false))
+                {
+                    var corners = new Vector3[4];
+                    ((RectTransform)button.transform).GetWorldCorners(corners);
+                    foreach (var corner in corners)
+                    {
+                        Vector2 point = drawer.InverseTransformPoint(corner);
+                        if (!inner.Contains(point))
+                            violations.Add(language + " " + state + " " + viewport + " " +
+                                button.name + " leaves the drawer's usable artwork face: " + point);
+                    }
+                }
+            }
+            if (((GameObject)Get(controller, "matchPanel")).activeInHierarchy)
+            {
+                var historyPanel = (RectTransform)Find(root.transform, "PvpHistoryCard");
+                var signalButton = (RectTransform)Find(root.transform, "OpenSignals");
+                var corners = new Vector3[4];
+                signalButton.GetWorldCorners(corners);
+                float bottom = historyPanel.parent.InverseTransformPoint(corners[0]).y;
+                float top = historyPanel.anchoredPosition.y + historyPanel.rect.height / 2;
+                if (bottom < top + 4)
+                    violations.Add(language + " " + state + " " + viewport + " Signals covers the history frame/title");
+            }
+            if (((GameObject)Get(controller, "matchPanel")).activeInHierarchy)
+            foreach (var button in ((GameObject)Get(controller, "matchPanel")).GetComponentsInChildren<Button>(false))
+            {
+                var label = button.GetComponentsInChildren<TMP_Text>(false).FirstOrDefault(t => t.name == "Label");
+                if (label == null || string.IsNullOrEmpty(label.text)) continue;
+                var size = ((RectTransform)button.transform).rect.size;
+                bool primary = button.GetComponent<Image>().sprite == Resources.Load<Sprite>("solo/production/solo_primary_cta_v1");
+                float w = size.x * (primary ? .86f : .84f), h = size.y * (primary ? .65f : .70f);
+                float cy = size.y * (primary ? .035f : .02f);
+                AuditFace(label, (RectTransform)button.transform, new Rect(-w / 2, cy - h / 2, w, h),
+                    language + " " + state + " " + viewport, violations);
+            }
         }
         Assert.That(violations, Is.Empty, string.Join("\n", violations));
     }
@@ -529,11 +770,15 @@ public sealed class PvpProductionPresentationPlayModeTests
             if (prematchOnly) ShowPrematchCase(state); else ShowCase(state);
             yield return null;
             yield return null;
+            yield return (IEnumerator)tool.GetMethod("WaitForStableNativeViewport")
+                .Invoke(null, new object[] { root.transform, viewport.x, viewport.y });
             Canvas.ForceUpdateCanvases();
             Assert.That(Screen.width, Is.EqualTo(viewport.x));
             Assert.That(Screen.height, Is.EqualTo(viewport.y));
             string path = Path.Combine(output, "fixture-" + state + "-" + language + "-" + viewport.x + "x" + viewport.y + ".png");
             Assert.That(File.Exists(path), Is.False);
+            tool.GetMethod("WriteViewportMetrics").Invoke(null, new object[] { path + ".geometry.json", root.transform,
+                new[] { "PvpDuelCartoonRootSafeRoot", "PvpMatchLogo", "PvpPlayerCard", "PvpInteractionCard", "PvpHistoryCard" } });
             // Unity queues the next fully rendered Game View frame. The
             // bounded file/dimension checks remain independent of Editor EOF
             // coroutine scheduling, which can stall in a Simulator layout.
@@ -598,6 +843,31 @@ public sealed class PvpProductionPresentationPlayModeTests
                 if (bottom < -115)
                     errors.Add(context + " " + text.name + " touches prebattle card lower rim: " + bottom);
             }
+            if (hasGlyph)
+            {
+                var parent = text.transform.parent as RectTransform;
+                Rect? inner = null;
+                if (parent.name == "PvpPromptRibbon" && text.name != "Result")
+                    inner = new Rect(-298, -54, 596, 129);
+                if (text.name == "PvpCurrentNumberHeading")
+                    inner = new Rect(-304, -450, 590, parent.rect.height / 2 + 426);
+                if (text.name == "PvpPlayerWins" || text.name == "PvpOpponentAttempts")
+                    inner = new Rect(-225, -270, 450, 50);
+                if (parent.name == "PvpTipCard")
+                    inner = new Rect(-parent.rect.width / 2 + 18, -parent.rect.height / 2 + 20,
+                        parent.rect.width - 36, parent.rect.height - 44);
+                if (parent.name == "PvpSignalBubble")
+                    inner = new Rect(-116, -53, 232, 122);
+                if (inner.HasValue)
+                {
+                    Vector3 bottom = parent.InverseTransformPoint(text.transform.TransformPoint(new Vector3(minX, minY)));
+                    Vector3 top = parent.InverseTransformPoint(text.transform.TransformPoint(new Vector3(maxX, maxY)));
+                    var face = inner.Value;
+                    if (bottom.x < face.xMin - 1 || top.x > face.xMax + 1 ||
+                        bottom.y < face.yMin - 1 || top.y > face.yMax + 1)
+                        errors.Add(context + " " + text.name + " leaves artwork inner face: " + bottom + " to " + top + " in " + face);
+                }
+            }
         }
     }
 
@@ -640,6 +910,17 @@ public sealed class PvpProductionPresentationPlayModeTests
         S(live, "lastLocked", state == "LockMiss");
         S(live, "turn", state == "OpponentTurn" ? "host" : "guest");
         Emit(live);
+        if (state == "PlayerTurn")
+        {
+            // Retain both accepted events for a useful real-owner comparison
+            // with Solo: our 50 was lower, then the opponent's 50 was higher.
+            S(live, "hostGuessCount", 2);
+            S(live, "lastBy", "host");
+            S(live, "lastGuess", 50);
+            S(live, "lastHint", "higher");
+            S(live, "lastLocked", false);
+            Emit(live);
+        }
         if (state == "LockArmed") Invoke(controller, "OnLockTogglePressed");
         if (state == "LockSuggested")
         {
@@ -649,6 +930,18 @@ public sealed class PvpProductionPresentationPlayModeTests
             Invoke(controller, "RefreshLockButton");
         }
         if (state == "Signal") Invoke(controller, "OnSignalPressed", 5);
+        if (state == "IncomingSignal")
+        {
+            S(live, "signalSeq", 1);
+            S(live, "signalBy", "host");
+            S(live, "signalId", 5);
+            Emit(live);
+        }
+        if (state == "SignalsOpen")
+        {
+            Invoke(root.GetComponent(T("PvpDuelCartoonVisuals")), "RefreshMatchPresentation");
+            Find(root.transform, "OpenSignals").GetComponent<Button>().onClick.Invoke();
+        }
         if (!state.StartsWith("Result", StringComparison.Ordinal) && state != "RematchWaiting") return;
         var done = State("done");
         S(done, "winner", state == "ResultDraw" ? "draw" : state == "ResultLoss" ? "host" : "guest");
@@ -677,7 +970,7 @@ public sealed class PvpProductionPresentationPlayModeTests
         var type = method.GetParameters()[0].ParameterType;
         method.Invoke(null, new[] { Enum.Parse(type, language == "el" ? "Greek" : "English") });
     }
-    static string L(string key) => (string)T("L10n").GetMethod("Get", new[] { typeof(string), typeof(object[]) }).Invoke(null, new object[] { key, Array.Empty<object>() });
+    static string L(string key, params object[] args) => (string)T("L10n").GetMethod("Get", new[] { typeof(string), typeof(object[]) }).Invoke(null, new object[] { key, args });
     static void S(object target, string name, object value) { target.GetType().GetField(name).SetValue(target, value); }
     static void Set(Component c, string name, object value) { c.GetType().GetField(name, Flags).SetValue(c, value); }
     static object Get(Component c, string name) => c.GetType().GetField(name, Flags).GetValue(c);

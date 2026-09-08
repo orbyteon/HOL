@@ -7,6 +7,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
+using UnityEngine.UI;
 
 public sealed class ResponsiveUIFoundationPlayModeTests
 {
@@ -335,6 +336,15 @@ public sealed class ResponsiveUIFoundationPlayModeTests
     static void AssertPvpSafeRoot(Transform root, Vector2 viewport, Rect safePixels,
         Vector2 canvasSize, string[] childNames)
     {
+        // Invoke the sole production layout owner for the requested viewport;
+        // do not retain the Editor's prior tall layout while testing 720x1280.
+        if (root.name == "PvpDuelCartoonRootSafeRoot")
+        {
+            Component matchOwner = root.GetComponentInParent(RuntimeType("PvpDuelCartoonVisuals"));
+            Assert.That(matchOwner, Is.Not.Null);
+            matchOwner.GetType().GetMethod("ApplyResponsiveLayoutForViewport", InstanceFlags)
+                .Invoke(matchOwner, new object[] { safePixels.width, safePixels.height });
+        }
         Type ownerType = RuntimeType("ResponsiveSafeAreaRoot");
         Component owner = root.GetComponent(ownerType);
         ownerType.GetMethod("ApplyViewport", InstanceFlags).Invoke(owner, new object[]
@@ -349,6 +359,25 @@ public sealed class ResponsiveUIFoundationPlayModeTests
             Assert.That(child, Is.Not.Null, root.name + " missing " + name);
             var corners = new Vector3[4];
             child.GetWorldCorners(corners);
+            if (name == "PvpInteractionCard")
+            {
+                var image = child.GetComponent<Image>();
+                Assert.That(image.sprite, Is.SameAs(Resources.Load<Sprite>("solo/production/solo_interaction_board_v2")));
+                Assert.That(image.type, Is.EqualTo(Image.Type.Simple));
+                Assert.That(image.preserveAspect, Is.False);
+                // This exact Solo PNG has transparent overscan. Test every
+                // nonzero-alpha pixel, not its invisible rectangular padding.
+                Rect visible = VisiblePngBounds(image.sprite);
+                Rect rect = child.rect;
+                var local = new Rect(rect.xMin + visible.xMin * rect.width,
+                    rect.yMin + visible.yMin * rect.height,
+                    visible.width * rect.width, visible.height * rect.height);
+                corners = new[] {
+                    child.TransformPoint(new Vector3(local.xMin, local.yMin)),
+                    child.TransformPoint(new Vector3(local.xMin, local.yMax)),
+                    child.TransformPoint(new Vector3(local.xMax, local.yMax)),
+                    child.TransformPoint(new Vector3(local.xMax, local.yMin)) };
+            }
             Vector2 minimum = new Vector2(float.PositiveInfinity, float.PositiveInfinity);
             Vector2 maximum = new Vector2(float.NegativeInfinity, float.NegativeInfinity);
             foreach (Vector3 corner in corners)
@@ -364,6 +393,39 @@ public sealed class ResponsiveUIFoundationPlayModeTests
             AssertContained(safeRect, Rect.MinMaxRect(minimum.x, minimum.y, maximum.x, maximum.y),
                 viewport + " / " + name);
         }
+    }
+
+    static readonly Dictionary<Sprite, Rect> VisiblePngBoundsCache = new Dictionary<Sprite, Rect>();
+    static Rect VisiblePngBounds(Sprite sprite)
+    {
+        Rect bounds;
+        if (VisiblePngBoundsCache.TryGetValue(sprite, out bounds)) return bounds;
+#if UNITY_EDITOR
+        string path = UnityEditor.AssetDatabase.GetAssetPath(sprite);
+        Assert.That(path.EndsWith(".png", StringComparison.OrdinalIgnoreCase), Is.True);
+        var texture = new Texture2D(2, 2);
+        try
+        {
+            Assert.That(texture.LoadImage(System.IO.File.ReadAllBytes(path)), Is.True);
+            var pixels = texture.GetPixels32();
+            int left = texture.width, bottom = texture.height, right = -1, top = -1;
+            for (int y = 0; y < texture.height; y++)
+            for (int x = 0; x < texture.width; x++)
+                if (pixels[y * texture.width + x].a != 0)
+                {
+                    left = Mathf.Min(left, x); right = Mathf.Max(right, x);
+                    bottom = Mathf.Min(bottom, y); top = Mathf.Max(top, y);
+                }
+            Assert.That(right, Is.GreaterThanOrEqualTo(left), "Required artwork cannot be empty.");
+            bounds = Rect.MinMaxRect((float)left / texture.width, (float)bottom / texture.height,
+                (float)(right + 1) / texture.width, (float)(top + 1) / texture.height);
+            VisiblePngBoundsCache.Add(sprite, bounds);
+            return bounds;
+        }
+        finally { UnityEngine.Object.DestroyImmediate(texture); }
+#else
+        throw new InvalidOperationException("Exact source-PNG alpha containment requires the Editor test lane.");
+#endif
     }
 
     static Component FindOwner(RectTransform target, Type layoutType)

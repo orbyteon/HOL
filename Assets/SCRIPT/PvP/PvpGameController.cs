@@ -97,6 +97,15 @@ public class PvpGameController : MonoBehaviour
     int myMax = 100;
     bool lockArmed;
 
+    // Read-only presentation bridge. The screen paints the same accepted
+    // snapshot/range as the controller; it never advances rules or networking.
+    public PvpBackend.RoomState PresentationState => lastState;
+    public int PlayerRangeMinimum => myMin;
+    public int PlayerRangeMaximum => myMax;
+    public bool PresentationMatchOver => matchOver || abnormalTerminal;
+    public bool PresentationGuessInFlight => guessInFlight;
+    public bool PresentationLockArmed => lockArmed;
+
     int lastSignalSeq;
     int signalsSent;
 
@@ -1023,8 +1032,8 @@ public class PvpGameController : MonoBehaviour
         rangeText.text = L10n.Get("between_range", myMin, myMax);
     }
 
-    // The Lock button doubles as the tutorial for the mechanic: once the range
-    // is down to a few candidates it stops saying "LOCK" and starts asking.
+    // Once the range is down to a few candidates the presentation asks about
+    // LOCK beside number entry, while its button keeps a concise action label.
     // Two players who never lock draw roughly a quarter of their duels, so the
     // prompt is what keeps the draw rate down in practice.
     void RefreshLockButton()
@@ -1060,6 +1069,12 @@ public class PvpGameController : MonoBehaviour
         if (lockButtonLabel == null) return;
 
         int left = CandidatesLeft();
+        var presentation = GetComponent<PvpDuelCartoonVisuals>();
+        if (presentation != null && presentation.IsReady)
+        {
+            presentation.PresentLockCaption(lockArmed, DuelRules.ShouldSuggestLock(left, true), left);
+            return;
+        }
         if (lockArmed)
             lockButtonLabel.text = L10n.Get("lock_armed");
         else if (DuelRules.ShouldSuggestLock(left, true))

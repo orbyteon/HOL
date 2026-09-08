@@ -16,8 +16,9 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
     public const string SafeRootName = "PrivateRoomSafeRoot";
     public const string BackgroundResource = "solo/production/solo_background_v1";
     const string LogoResource = "reference/hol_logo_exact";
-    const string BlueCardResource = "solo/production/solo_player_card_shell_v1";
-    const string PinkCardResource = "solo/production/solo_opponent_card_shell_v1";
+    const string CreateCardResource = "reference/hol_private_create_card_v1";
+    const string JoinCardResource = "reference/hol_private_join_card_v1";
+    const string CreateActionResource = "phase2a/hol_cta_blue_r2_9s";
     const string BoardResource = "solo/production/solo_interaction_board_v2";
     const string RibbonResource = "solo/production/solo_prompt_ribbon_v1";
     const string PrimaryResource = "solo/production/solo_primary_cta_v1";
@@ -98,10 +99,9 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
         displayFont = Resources.Load<TMP_FontAsset>(DisplayFontResource);
         bodyFont = Resources.Load<TMP_FontAsset>(BodyFontResource);
         resourcesReady = displayFont != null && bodyFont != null;
-        foreach (string resource in new[] { BackgroundResource, LogoResource, BlueCardResource,
-            PinkCardResource, BoardResource, RibbonResource, PrimaryResource, InputResource,
-            ChipResource, BackResource, PurpleResource, "reference/char_boy_exact",
-            "reference/char_girl_exact", "reference/board_join_exact",
+        foreach (string resource in new[] { BackgroundResource, LogoResource, CreateCardResource,
+            JoinCardResource, CreateActionResource, BoardResource, RibbonResource, PrimaryResource, InputResource,
+            ChipResource, BackResource, PurpleResource,
             "reference/mascot_6_exact", "reference/mascot_7_exact",
             "mainmenu/mainmenu_icon_streak", PlayerProfileAvatarResolver.CircularApertureResourcePath })
             resourcesReady &= Resources.Load<Sprite>(resource) != null;
@@ -124,41 +124,36 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
         Header(safe, "PrivateRoom", back);
         Title(safe, "PrivateRoom", "private_room_title");
 
-        var createCard = Sprite(safe, "PrivateRoomCreateCard", BlueCardResource,
-            new Vector2(-251, 55), new Vector2(492, 700));
-        var joinCard = Sprite(safe, "PrivateRoomJoinCard", PinkCardResource,
-            new Vector2(251, 55), new Vector2(492, 700));
-        // The shell's colored tab is narrower than the card body. Its concise
-        // live label must fit the artwork; the form ribbon retains the full title.
-        Copy(createCard.transform, "PrivateRoomCreateHeading", "private_room_create_tab",
-            36, new Rect(-99, 246, 188, 62), White);
-        Copy(joinCard.transform, "PrivateRoomJoinHeading", "private_room_join_tab",
-            36, new Rect(-99, 246, 188, 62), White);
-        Sprite(createCard.transform, "PrivateRoomCreateBoy", "reference/char_boy_exact",
-            new Vector2(-74, 51), new Vector2(240, 295), true);
-        Sprite(createCard.transform, "PrivateRoomCreateGirl", "reference/char_girl_exact",
-            new Vector2(91, 51), new Vector2(220, 280), true);
-        // This is the actual committed outline-door mesh, not a claim that the
-        // missing illustrated pink-door reference has been found or recreated.
-        Vector(joinCard.transform, "PrivateRoomJoinDoor", "reference/board_join_exact",
-            new Vector2(0, 86), new Vector2(182, 206));
+        // Exact recovered artwork contains the high-five pair / illustrated
+        // pink door on the left, and an empty live-content face on the right.
+        // Preserve each PNG's native aspect; never stretch or 9-slice characters.
+        var createCard = Sprite(safe, "PrivateRoomCreateCard", CreateCardResource,
+            new Vector2(0, 173), new Vector2(960, 442.5743f), true);
+        var joinCard = Sprite(safe, "PrivateRoomJoinCard", JoinCardResource,
+            new Vector2(0, -297), new Vector2(960, 456.8073f), true);
+        Copy(createCard.transform, "PrivateRoomCreateHeading", "private_room_create_title",
+            42, new Rect(65, 42, 380, 120), White);
+        // The localized all-caps card title omits Greek tonos without changing
+        // the sentence-case form title or relying on TMP's invariant casing.
+        Copy(joinCard.transform, "PrivateRoomJoinHeading", "private_room_join_card_title",
+            42, new Rect(-5, 79, 420, 110), White);
         Copy(createCard.transform, "PrivateRoomCreateHint", "private_room_create_hint",
-            29, new Rect(-170, -232, 320, 80), White, false);
-        Copy(joinCard.transform, "PrivateRoomCodeCaption", "private_room_optional_code",
-            25, new Rect(-185, -67, 370, 50), White, false);
+            31, new Rect(72, -53, 366, 84), Cyan, false);
+        Copy(joinCard.transform, "PrivateRoomCodeCaption", "pvp_enter_code",
+            25, new Rect(5, 36, 400, 36), White, false);
         landingCodeInput = Field(joinCard.transform, "PrivateRoomLandingCodeInput",
-            "pvp_enter_code", new Vector2(0, -133), new Vector2(386, 100), true, 38);
+            "pvp_enter_code", new Vector2(208, -21), new Vector2(420, 94), true, 38);
         landingCodeInput.onValueChanged.AddListener(NormalizeLandingCode);
         SeatAction(create, createCard.transform, "private_room_create_action",
-            new Vector2(0, -287), new Vector2(440, 101), 36, true);
+            new Vector2(255, -143), new Vector2(400, 110), 37, true, true);
         SeatAction(join, joinCard.transform, "private_room_join_action",
-            new Vector2(0, -287), new Vector2(440, 101), 40, true);
+            new Vector2(208, -149), new Vector2(430, 110), 40, true);
         join.onClick.AddListener(CopyLandingCodeIntoJoinFlow);
 
         var tip = Slice(safe, "PrivateRoomTipCard", PurpleResource,
-            new Vector2(0, -502), new Vector2(780, 202));
+            new Vector2(0, -666), new Vector2(640, 230));
         Copy(tip.transform, "PrivateRoomTip", "private_room_tip",
-            32, new Rect(-330, -63, 660, 126), White, false);
+            32, new Rect(-270, -65, 540, 130), White, false);
         Mascots(safe, "PrivateRoom");
         built = true;
         IsReady = true;
@@ -221,9 +216,9 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
     void Mascots(Transform safe, string prefix)
     {
         Sprite(safe, prefix + "MascotSix", "reference/mascot_6_exact",
-            new Vector2(-391, -755), new Vector2(205, 244), true);
+            new Vector2(-428, -775), new Vector2(197, 235), true);
         Sprite(safe, prefix + "MascotSeven", "reference/mascot_7_exact",
-            new Vector2(391, -755), new Vector2(205, 244), true);
+            new Vector2(428, -775), new Vector2(197, 235), true);
     }
 
     public PrebattleParts BuildPrebattlePanel(string name, bool createMode)
@@ -275,10 +270,12 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
         parts.entryStatus = Text(entry, "EntryStatus", "", 32,
             new Rect(-350, -641, 700, 151), White, false);
 
+        // Seat both complete frames inside the board's visible inner aperture,
+        // not its wider transparent image rect. Preserve text size and height.
         var you = Slice(waiting, "YouCard", PurpleResource,
-            new Vector2(-225, 205), new Vector2(385, 252));
+            new Vector2(-200, 205), new Vector2(340, 252));
         var opponent = Slice(waiting, "OpponentCard", PurpleResource,
-            new Vector2(225, 205), new Vector2(385, 252));
+            new Vector2(200, 205), new Vector2(340, 252));
         Copy(you.transform, "YouCaption", "prebattle_you", 30,
             new Rect(-142, 62, 284, 52), Cyan);
         Copy(you.transform, "YouReady", "private_room_secret_ready", 31,
@@ -445,7 +442,7 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
     }
 
     void SeatAction(Button button, Transform parent, string key,
-        Vector2 position, Vector2 size, float fontSize, bool primary)
+        Vector2 position, Vector2 size, float fontSize, bool primary, bool cyan = false)
     {
         button.transform.SetParent(parent, false);
         Place((RectTransform)button.transform, position, size);
@@ -455,12 +452,12 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
             old.gameObject.SetActive(false);
         var image = button.GetComponent<Image>();
         if (image == null) image = button.gameObject.AddComponent<Image>();
-        image.sprite = Resources.Load<Sprite>(primary ? PrimaryResource : PurpleResource);
-        image.type = primary ? Image.Type.Simple : Image.Type.Sliced;
+        image.sprite = Resources.Load<Sprite>(cyan ? CreateActionResource : primary ? PrimaryResource : PurpleResource);
+        image.type = primary && !cyan ? Image.Type.Simple : Image.Type.Sliced;
         image.preserveAspect = false;
         image.color = Color.white;
         image.raycastTarget = true;
-        if (!primary) FitSlice(image, size);
+        if (!primary || cyan) FitSlice(image, size);
         button.targetGraphic = image;
         var colors = button.colors;
         colors.normalColor = colors.highlightedColor = colors.selectedColor = Color.white;
@@ -470,11 +467,13 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
         button.colors = colors;
         // Measured Solo CTA face: between the two stars, clear of its lower
         // bevel. Rect is in the button's coordinates, not its full image box.
-        var face = primary
+        var face = cyan
+            ? new Rect(-size.x * .38f, -size.y * .22f, size.x * .76f, size.y * .50f)
+            : primary
             ? new Rect(-size.x * .32f, -size.y * .29f, size.x * .64f, size.y * .65f)
             : new Rect(-size.x * .40f, -size.y * .25f, size.x * .80f, size.y * .60f);
         if (key != null) Copy(button.transform, "PrivateRoomActionLabel", key,
-            fontSize, face, primary ? Ink : White);
+            fontSize, face, primary && !cyan ? Ink : White);
         RuntimeUI.AttachJuice(button);
     }
 
@@ -539,15 +538,6 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
     {
         if (image.sprite != null) image.pixelsPerUnitMultiplier = Mathf.Max(2f,
             image.sprite.rect.width / size.x, image.sprite.rect.height / size.y);
-    }
-
-    void Vector(Transform parent, string name, string resource, Vector2 position, Vector2 size)
-    {
-        var image = Rect(parent, name, position, size).gameObject.AddComponent<Unity.VectorGraphics.SVGImage>();
-        image.sprite = Resources.Load<Sprite>(resource);
-        image.color = Color.white;
-        image.preserveAspect = true;
-        image.raycastTarget = false;
     }
 
     static RectTransform Rect(Transform parent, string name, Vector2 position, Vector2 size)

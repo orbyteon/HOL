@@ -15,6 +15,66 @@ public static class PvpPresentationReviewTools
 {
     const string OutputKey = "HOL.PvpPresentationReview.Output";
     public static string OutputDirectory => SessionState.GetString(OutputKey, "");
+    [Serializable] sealed class ViewportMetrics
+    {
+        public int width, height;
+        public Rect safeArea;
+        public RegionMetrics[] regions;
+    }
+    [Serializable] sealed class RegionMetrics
+    {
+        public string name;
+        public Rect rect;
+        public Vector3 scale;
+        public Vector3[] screenCorners;
+    }
+    public static IEnumerator WaitForStableNativeViewport(Transform root, int width, int height)
+    {
+        // A native resize reaches Screen, CanvasScaler and the safe-area owner
+        // on different frames. Record settled production geometry, never the
+        // first frame with merely the requested PNG dimensions.
+        string previous = null;
+        int stable = 0;
+        for (int frame = 0; frame < 120; frame++)
+        {
+            yield return null;
+            Canvas.ForceUpdateCanvases();
+            string current = Screen.width + "x" + Screen.height + "/" + Screen.safeArea;
+            foreach (var rect in root.GetComponentsInChildren<RectTransform>(false))
+                if (rect.name.EndsWith("SafeRoot", StringComparison.Ordinal) || rect.GetComponent<Canvas>() != null)
+                    current += "/" + rect.GetInstanceID() + ":" + rect.rect + ":" + rect.lossyScale;
+            stable = Screen.width == width && Screen.height == height && current == previous ? stable + 1 : 0;
+            previous = current;
+            if (stable >= 3) yield break;
+        }
+        throw new InvalidOperationException("Native viewport did not settle at " + width + "x" + height);
+    }
+    public static void WriteViewportMetrics(string path, Transform root, string[] names)
+    {
+        // Device Simulator can retain a different device safe area while a
+        // native Game View is resized. Such frames are not comparable native
+        // evidence: fail rather than silently recording a clipped tall layout.
+        Rect area = Screen.safeArea;
+        if (area.width <= 0 || area.height <= 0 || area.xMin < 0 || area.yMin < 0 ||
+            area.xMax > Screen.width || area.yMax > Screen.height)
+            throw new InvalidOperationException("Native capture has a conflicting safe area " + area +
+                " for " + Screen.width + "x" + Screen.height + ". Close Device Simulator before native capture.");
+        var all = root.GetComponentsInChildren<RectTransform>(true);
+        var metrics = new ViewportMetrics {
+            width = Screen.width, height = Screen.height, safeArea = Screen.safeArea,
+            regions = names.Select(name => {
+                var rect = all.First(r => r.name == name);
+                var corners = new Vector3[4];
+                rect.GetWorldCorners(corners);
+                for (int i = 0; i < corners.Length; i++)
+                    corners[i] = RectTransformUtility.WorldToScreenPoint(null, corners[i]);
+                return new RegionMetrics { name = name, rect = rect.rect,
+                    scale = rect.lossyScale, screenCorners = corners };
+            }).ToArray()
+        };
+        using (var stream = new FileStream(path, FileMode.CreateNew))
+        using (var writer = new StreamWriter(stream)) writer.Write(JsonUtility.ToJson(metrics, true));
+    }
     static readonly TestRunnerApi Api;
     static readonly ResultsObserver Observer;
 
@@ -78,9 +138,26 @@ public static class PvpPresentationReviewTools
             throw new InvalidOperationException("Wait for the Editor to be idle before capture.");
         if (!Directory.Exists(OutputDirectory)) ChooseCaptureFolder();
         if (!Directory.Exists(OutputDirectory)) return;
+        OnboardingGameViewCapture.SetResolution(1080, 1920);
+        FocusNativeGameView();
         Api.Execute(new ExecutionSettings(new Filter {
             testMode = TestMode.PlayMode,
             testNames = new[] { "PvpProductionPresentationPlayModeTests.CaptureNativeEnElFlowAndTallViewports" }
+        }));
+    }
+
+    [MenuItem("HOL/PvP/Capture Current Solo Reference")]
+    public static void CaptureCurrentSoloReference()
+    {
+        if (EditorApplication.isPlayingOrWillChangePlaymode || EditorApplication.isCompiling || EditorApplication.isUpdating)
+            throw new InvalidOperationException("Wait for the Editor to be idle before reference capture.");
+        if (!Directory.Exists(OutputDirectory)) ChooseCaptureFolder();
+        if (!Directory.Exists(OutputDirectory)) return;
+        OnboardingGameViewCapture.SetResolution(1080, 1920);
+        FocusNativeGameView();
+        Api.Execute(new ExecutionSettings(new Filter {
+            testMode = TestMode.PlayMode,
+            testNames = new[] { "SoloDuelVisualsPlayModeTests.CaptureCurrentSoloReferenceForPvp" }
         }));
     }
 
@@ -98,6 +175,8 @@ public static class PvpPresentationReviewTools
             testMode = TestMode.PlayMode,
             testNames = new[] {
                 fixture + "ApprovedSpritesKeepTheirMeshCornersAndOpaqueNormalFace",
+                fixture + "MatchUsesMeasuredSoloGeometryAssetsAndRealData",
+                fixture + "SignalsDrawerPreservesIndexedCallbacksAndCancelsOnExit",
                 fixture + "DirectConstructionHasOneOwnerSharedProfileAndTouchRematch",
                 fixture + "EntireEnElPortraitFlowKeepsRenderedGlyphsInsideOwnedRegions",
                 fixture + "KeypadSubmitAndLockReflectAuthoritativeTurnAndInFlightGuards",

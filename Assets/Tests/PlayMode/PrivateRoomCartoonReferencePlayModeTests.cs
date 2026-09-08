@@ -67,28 +67,41 @@ public sealed class PrivateRoomCartoonReferencePlayModeTests
         AssertRect(root, "PrivateRoomTitleRibbon",
             new Vector2(0f, 493f), new Vector2(938f, 181f));
         AssertRect(root, "PrivateRoomCreateCard",
-            new Vector2(-251f, 55f), new Vector2(492f, 700f));
+            new Vector2(0f, 173f), new Vector2(960f, 442.5743f));
         AssertRect(root, "PrivateRoomJoinCard",
-            new Vector2(251f, 55f), new Vector2(492f, 700f));
+            new Vector2(0f, -297f), new Vector2(960f, 456.8073f));
         AssertRect(root, "PrivateRoomTipCard",
-            new Vector2(0f, -502f), new Vector2(780f, 202f));
+            new Vector2(0f, -666f), new Vector2(640f, 230f));
         AssertRect(root, "PrivateRoomMascotSix",
-            new Vector2(-391f, -755f), new Vector2(205f, 244f));
+            new Vector2(-428f, -775f), new Vector2(197f, 235f));
         AssertRect(root, "PrivateRoomMascotSeven",
-            new Vector2(391f, -755f), new Vector2(205f, 244f));
+            new Vector2(428f, -775f), new Vector2(197f, 235f));
 
         foreach (string objectName in new[]
         {
             "PrivateRoomBackground",
-            "PrivateRoomCreateBoy",
-            "PrivateRoomCreateGirl",
-            "PrivateRoomJoinDoor",
+            "PrivateRoomCreateCard",
+            "PrivateRoomJoinCard",
             "PrivateRoomLandingCodeInput",
             "PrivateRoomStepText",
         })
         {
             Assert.That(Find(root, objectName), Is.Not.Null,
                 "Missing approved modular object: " + objectName);
+        }
+
+        foreach (string retired in new[] { "PrivateRoomCreateBoy", "PrivateRoomCreateGirl", "PrivateRoomJoinDoor" })
+            Assert.That(Find(root, retired), Is.Null, "Do not overlay substitute art on the approved illustrated panels.");
+        foreach (string cardName in new[] { "PrivateRoomCreateCard", "PrivateRoomJoinCard" })
+        {
+            var card = Find(root, cardName).GetComponent<Image>();
+            string resource = cardName == "PrivateRoomCreateCard"
+                ? "reference/hol_private_create_card_v1" : "reference/hol_private_join_card_v1";
+            Assert.That(card.sprite, Is.SameAs(Resources.Load<Sprite>(resource)));
+            Assert.That(card.type, Is.EqualTo(Image.Type.Simple));
+            Assert.That(card.preserveAspect, Is.True, "Never stretch or 9-slice the high-five pair / illustrated door.");
+            Assert.That(card.color, Is.EqualTo(Color.white));
+            Assert.That(card.raycastTarget, Is.False);
         }
 
         foreach (string overlayName in PortraitOverlayNames)
