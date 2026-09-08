@@ -143,7 +143,7 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
         Vector(joinCard.transform, "PrivateRoomJoinDoor", "reference/board_join_exact",
             new Vector2(0, 86), new Vector2(182, 206));
         Copy(createCard.transform, "PrivateRoomCreateHint", "private_room_create_hint",
-            29, new Rect(-173, -232, 346, 80), White, false);
+            29, new Rect(-170, -232, 320, 80), White, false);
         Copy(joinCard.transform, "PrivateRoomCodeCaption", "private_room_optional_code",
             25, new Rect(-185, -67, 370, 50), White, false);
         landingCodeInput = Field(joinCard.transform, "PrivateRoomLandingCodeInput",
@@ -175,9 +175,7 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
         var image = Sprite(visual, name == VisualRootName ? "PrivateRoomBackground" : name + "Background",
             BackgroundResource, Vector2.zero, new Vector2(1080, 1920));
         image.raycastTarget = true; // Prevent clicks leaking into Home.
-        var aspect = image.gameObject.AddComponent<AspectRatioFitter>();
-        aspect.aspectMode = AspectRatioFitter.AspectMode.EnvelopeParent;
-        aspect.aspectRatio = 1080f / 1920f;
+        PrivateRoomPortraitArtEnvelope.Attach(image);
         var safe = Rect(visual, safeName, Vector2.zero, Vector2.zero);
         RuntimeUI.Stretch(safe.gameObject);
         var canvas = panel.GetComponentInParent<Canvas>();

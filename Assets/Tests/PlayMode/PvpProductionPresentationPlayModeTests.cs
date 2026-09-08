@@ -125,15 +125,34 @@ public sealed class PvpProductionPresentationPlayModeTests
     public IEnumerator ApprovedSpritesKeepTheirMeshCornersAndOpaqueNormalFace()
     {
         yield return Build();
-        foreach (var name in new[] { "PvpVsBurst", "PvpResultTrophy", "Rocket" })
+        // The pre-match owner uses the committed join-door SVG. Rocket belonged
+        // to the retired pre-match decoration, not the approved current screen.
+        foreach (var name in new[] { "PvpVsBurst", "PvpResultTrophy", "PrivateRoomJoinDoor" })
         {
-            var art = Find(root.transform, name).GetComponent<Graphic>();
+            var node = Find(root.transform, name);
+            Assert.That(node, Is.Not.Null, name + " must be constructed by its owner");
+            var art = node.GetComponent<Graphic>();
             Assert.That(art.GetType().FullName, Is.EqualTo("Unity.VectorGraphics.SVGImage"), name);
             var sprite = (Sprite)art.GetType().GetProperty("sprite").GetValue(art);
             Assert.That(sprite, Is.Not.Null, name);
             Assert.That(sprite.vertices.Length, Is.GreaterThan(3), name);
             Assert.That(art.color, Is.EqualTo(Color.white), name);
         }
+        Assert.That(typeof(MonoBehaviour).IsAssignableFrom(T("PrivateRoomPortraitArtEnvelope")), Is.False,
+            "The aspect helper must not install a second scene-wide presentation owner or timer.");
+        foreach (string name in new[] { "PrivateRoomBackground", "PvPCreatePanelVisualsBackground", "PvPJoinPanelVisualsBackground" })
+        {
+            var background = Find(root.transform, name);
+            Assert.That(background, Is.Not.Null, name);
+            Assert.That(background.GetComponents<AspectRatioFitter>().Length, Is.EqualTo(1), name);
+            var fitter = background.GetComponent<AspectRatioFitter>();
+            Assert.That(fitter.aspectMode, Is.EqualTo(AspectRatioFitter.AspectMode.EnvelopeParent), name);
+            Assert.That(fitter.aspectRatio, Is.EqualTo(1080f / 1920f).Within(.0001f), name);
+            Assert.That(background.GetComponent<Image>().sprite,
+                Is.SameAs(Resources.Load<Sprite>("solo/production/solo_background_v1")), name);
+        }
+        Assert.That(Find(root.transform, "PrivateRoomStars"), Is.Null);
+        Assert.That(Find(root.transform, "PrivateRoomConfetti"), Is.Null);
         Assert.That(Find(root.transform, "PvpSignalBubble").GetComponent<Image>().sprite,
             Is.SameAs(Resources.Load<Sprite>("cartoon/cartoon_speech_bubble_raster")));
         foreach (var name in new[] { "Key1", "LockButton", "SubmitGuessButton", "ResultConfirmRematchButton", "PvpMatchPlayerChip" })
@@ -313,7 +332,7 @@ public sealed class PvpProductionPresentationPlayModeTests
                         new Rect(-99, 246, 188, 62), context, errors);
                 if (text.name == "PrivateRoomCreateHint")
                     AuditFace(text, (RectTransform)text.transform.parent,
-                        new Rect(-173, -232, 346, 80), context, errors);
+                        new Rect(-170, -232, 320, 80), context, errors);
                 if (text.name == "PrivateRoomPlayerName" || text.name == "PvPCreatePanelPlayerName" ||
                     text.name == "PvPJoinPanelPlayerName")
                     AuditFace(text, (RectTransform)text.transform.parent,
