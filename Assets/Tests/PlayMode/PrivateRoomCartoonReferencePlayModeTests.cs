@@ -15,8 +15,6 @@ public sealed class PrivateRoomCartoonReferencePlayModeTests
     static readonly string[] PortraitOverlayNames =
     {
         "PrivateRoomBackground",
-        "PrivateRoomStars",
-        "PrivateRoomConfetti",
     };
 
     [UnityTest]
@@ -62,41 +60,31 @@ public sealed class PrivateRoomCartoonReferencePlayModeTests
         for (int frame = 0; frame < 60 && !PortraitEnvelopeReady(root); frame++)
             yield return null;
 
-        AssertRect(root, "PrivateRoomStepPill",
-            new Vector2(-292f, 842f), new Vector2(350f, 82f));
         AssertRect(root, "PrivateRoomPlayerChip",
-            new Vector2(352f, 842f), new Vector2(360f, 118f));
+            new Vector2(330f, 840f), new Vector2(356f, 138f));
         AssertRect(root, "PrivateRoomLogo",
-            new Vector2(0f, 690f), new Vector2(585f, 310f));
+            new Vector2(0f, 696f), new Vector2(500f, 232f));
         AssertRect(root, "PrivateRoomTitleRibbon",
-            new Vector2(0f, 500f), new Vector2(900f, 150f));
+            new Vector2(0f, 493f), new Vector2(938f, 181f));
         AssertRect(root, "PrivateRoomCreateCard",
-            new Vector2(0f, 205f), new Vector2(930f, 430f));
+            new Vector2(-251f, 55f), new Vector2(492f, 700f));
         AssertRect(root, "PrivateRoomJoinCard",
-            new Vector2(0f, -250f), new Vector2(930f, 390f));
-        AssertRect(root, "PrivateRoomShareButton",
-            new Vector2(0f, -515f), new Vector2(430f, 92f));
+            new Vector2(251f, 55f), new Vector2(492f, 700f));
         AssertRect(root, "PrivateRoomTipCard",
-            new Vector2(0f, -715f), new Vector2(760f, 170f));
+            new Vector2(0f, -502f), new Vector2(780f, 202f));
         AssertRect(root, "PrivateRoomMascotSix",
-            new Vector2(-430f, -805f), new Vector2(250f, 285f));
+            new Vector2(-391f, -755f), new Vector2(205f, 244f));
         AssertRect(root, "PrivateRoomMascotSeven",
-            new Vector2(430f, -805f), new Vector2(250f, 285f));
+            new Vector2(391f, -755f), new Vector2(205f, 244f));
 
         foreach (string objectName in new[]
         {
             "PrivateRoomBackground",
-            "PrivateRoomStars",
-            "PrivateRoomConfetti",
-            "PrivateRoomOuterFrame",
             "PrivateRoomCreateBoy",
             "PrivateRoomCreateGirl",
-            "PrivateRoomCreateIcon",
             "PrivateRoomJoinDoor",
             "PrivateRoomLandingCodeInput",
-            "PrivateRoomShareIcon",
-            "PrivateRoomTipIcon",
-            "PrivateRoomBackIcon",
+            "PrivateRoomStepText",
         })
         {
             Assert.That(Find(root, objectName), Is.Not.Null,
@@ -124,7 +112,8 @@ public sealed class PrivateRoomCartoonReferencePlayModeTests
                 image.name + " hides approved artwork.");
             bool interactive =
                 image.GetComponent<Button>() != null ||
-                image.GetComponent<TMP_InputField>() != null;
+                image.GetComponent<TMP_InputField>() != null ||
+                image.name == "PrivateRoomBackground";
             Assert.That(
                 image.raycastTarget,
                 interactive ? Is.True : Is.False,
@@ -133,14 +122,14 @@ public sealed class PrivateRoomCartoonReferencePlayModeTests
 
         var create = Find(menuPanel.transform, "CreateButton")?.GetComponent<Button>();
         var join = Find(menuPanel.transform, "JoinButton")?.GetComponent<Button>();
-        var back = Find(menuPanel.transform, "PrivateRoomBackIcon")
-            ?.GetComponentInParent<Button>();
-        var share = Find(menuPanel.transform, "PrivateRoomShareButton")
-            ?.GetComponent<Button>();
+        var back = Find(menuPanel.transform, "BackButton")?.GetComponent<Button>();
+        var share = GetField<GameObject>(controller, "createCopyButton")?.GetComponent<Button>();
         Assert.That(create, Is.Not.Null);
         Assert.That(join, Is.Not.Null);
         Assert.That(back, Is.Not.Null);
         Assert.That(share, Is.Not.Null);
+        Assert.That(share.transform.IsChildOf(GetField<GameObject>(controller, "createWaitingRoot").transform),
+            Is.True, "Only the real waiting state offers a room invite, not a decorative landing share.");
         Assert.That(create.onClick.GetPersistentEventCount() +
                     RuntimeListenerCount(create), Is.GreaterThan(0));
         Assert.That(join.onClick.GetPersistentEventCount() +

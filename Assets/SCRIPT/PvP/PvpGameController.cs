@@ -113,6 +113,7 @@ public class PvpGameController : MonoBehaviour
 
     int flowGeneration;
     bool joinCreateInFlight;
+    string createStatusKey = "";
 
     void OnEnable()
     {
@@ -136,6 +137,11 @@ public class PvpGameController : MonoBehaviour
     // polling, or send a request merely because the language changed.
     void RefreshLocalizedPresentation()
     {
+        // Repaint pre-match copy without issuing a room request or changing
+        // the flow generation. Animated waiting feedback keeps the new base.
+        if (createStatusEllipsis != null && createStatusEllipsis.enabled &&
+            !string.IsNullOrEmpty(createStatusKey))
+            createStatusEllipsis.SetBaseText(L10n.Get(createStatusKey));
         if (lastState == null || abnormalTerminal) return;
         string opponent = client.IsHost ? lastState.guestName : lastState.hostName;
         if (opponentNameText != null) opponentNameText.text = opponent;
@@ -178,7 +184,7 @@ public class PvpGameController : MonoBehaviour
         if (!TryReadSecret(createSecretInput, out secret))
         {
             if (createEntryStatusText != null)
-                createEntryStatusText.text = L10n.Get("pvp_secret");
+                SetPrebattleMessage(createEntryStatusText, "pvp_secret");
             createPanel.SetActive(true);
             pvpMenuPanel.SetActive(false);
             return;
@@ -187,7 +193,7 @@ public class PvpGameController : MonoBehaviour
         pvpMenuPanel.SetActive(false);
         createPanel.SetActive(true);
         ShowCreateWaiting();
-        SetCreateStatus(L10n.Get("pvp_creating"), true);
+        SetCreateStatus("pvp_creating", true);
         roomCodeText.text = "-----";
 
         joinCreateInFlight = true;
@@ -201,11 +207,11 @@ public class PvpGameController : MonoBehaviour
             }
             if (!ok)
             {
-                ShowCreateEntry(L10n.Get("pvp_network_error"));
+                ShowCreateEntry("pvp_network_error");
                 return;
             }
             roomCodeText.text = codeOrError;
-            SetCreateStatus(L10n.Get("prebattle_waiting"), true);
+            SetCreateStatus("prebattle_waiting", true);
             BeginMatchPolling();
         });
     }
@@ -216,7 +222,7 @@ public class PvpGameController : MonoBehaviour
 
         GUIUtility.systemCopyBuffer = L10n.Get("pvp_invite_text", client.RoomCode);
         GameEvents.RoomShared();
-        SetCreateStatus(L10n.Get("pvp_invite_copied"), false);
+        SetCreateStatus("pvp_invite_copied", false);
         CancelInvoke(nameof(ResumeWaitingStatus));
         Invoke(nameof(ResumeWaitingStatus), 2.5f);
     }
@@ -230,16 +236,18 @@ public class PvpGameController : MonoBehaviour
         if (lastState != null && lastState.phase != "waiting")
             return;
 
-        SetCreateStatus(L10n.Get("prebattle_waiting"), true);
+        SetCreateStatus("prebattle_waiting", true);
     }
 
-    void SetCreateStatus(string message, bool animateDots)
+    void SetCreateStatus(string key, bool animateDots)
     {
+        createStatusKey = key;
+        string message = L10n.Get(key);
         if (createStatusEllipsis != null)
             createStatusEllipsis.enabled = false;
         if (createCopyButton != null) createCopyButton.SetActive(true);
 
-        createStatusText.text = message;
+        SetPrebattleMessage(createStatusText, key);
 
         if (animateDots && createStatusEllipsis != null)
         {
@@ -256,12 +264,13 @@ public class PvpGameController : MonoBehaviour
         ShowCreateEntry("");
         ShowJoinEntry("");
         if (roomCodeText != null) roomCodeText.text = "-----";
-        if (createStatusText != null) createStatusText.text = "";
-        if (joinStatusText != null) joinStatusText.text = "";
+        createStatusKey = "";
+        SetPrebattleMessage(createStatusText, "");
+        SetPrebattleMessage(joinStatusText, "");
         if (createOpponentStatusText != null)
-            createOpponentStatusText.text = L10n.Get("prebattle_waiting_short");
+            SetPrebattleMessage(createOpponentStatusText, "prebattle_waiting_short");
         if (joinOpponentStatusText != null)
-            joinOpponentStatusText.text = L10n.Get("prebattle_waiting_short");
+            SetPrebattleMessage(joinOpponentStatusText, "prebattle_waiting_short");
         if (createStatusEllipsis != null)
             createStatusEllipsis.enabled = false;
     }
@@ -272,7 +281,7 @@ public class PvpGameController : MonoBehaviour
         if (createWaitingRoot != null) createWaitingRoot.SetActive(false);
         if (createSecretInput != null) createSecretInput.gameObject.SetActive(true);
         if (createConfirmButton != null) createConfirmButton.SetActive(true);
-        if (createEntryStatusText != null) createEntryStatusText.text = message;
+        SetPrebattleMessage(createEntryStatusText, message);
     }
 
     void ShowCreateWaiting()
@@ -288,7 +297,7 @@ public class PvpGameController : MonoBehaviour
         if (joinCodeInput != null) joinCodeInput.gameObject.SetActive(true);
         if (joinSecretInput != null) joinSecretInput.gameObject.SetActive(true);
         if (joinConfirmButton != null) joinConfirmButton.SetActive(true);
-        if (joinEntryStatusText != null) joinEntryStatusText.text = message;
+        SetPrebattleMessage(joinEntryStatusText, message);
     }
 
     void ShowJoinWaiting()
@@ -305,18 +314,18 @@ public class PvpGameController : MonoBehaviour
         if (!TryReadSecret(joinSecretInput, out secret))
         {
             if (joinEntryStatusText != null)
-                joinEntryStatusText.text = L10n.Get("pvp_secret");
+                SetPrebattleMessage(joinEntryStatusText, "pvp_secret");
             return;
         }
         if (string.IsNullOrEmpty(joinCodeInput.text.Trim()))
         {
             if (joinEntryStatusText != null)
-                joinEntryStatusText.text = L10n.Get("pvp_enter_code");
+                SetPrebattleMessage(joinEntryStatusText, "pvp_enter_code");
             return;
         }
 
         ShowJoinWaiting();
-        joinStatusText.text = L10n.Get("pvp_joining");
+        SetPrebattleMessage(joinStatusText, "pvp_joining");
         joinCreateInFlight = true;
         int gen = flowGeneration;
         client.JoinRoom(joinCodeInput.text, MyName, secret, (ok, error) =>
@@ -328,14 +337,41 @@ public class PvpGameController : MonoBehaviour
             }
             if (!ok)
             {
-                ShowJoinEntry(error);
+                // The transport returns these existing localized errors. Keep
+                // their exact meaning and retain a key for live EN/EL repaint.
+                string key = "";
+                foreach (string known in new[] { "pvp_room_not_found", "pvp_room_full", "pvp_network_error" })
+                    if (error == L10n.Get(known)) { key = known; break; }
+                ShowJoinEntry(key);
+                if (string.IsNullOrEmpty(key) && joinEntryStatusText != null)
+                    joinEntryStatusText.text = error;
                 return;
             }
             if (joinOpponentStatusText != null)
-                joinOpponentStatusText.text = L10n.Get("prebattle_found");
-            joinStatusText.text = L10n.Get("prebattle_waiting");
+                SetPrebattleMessage(joinOpponentStatusText, "prebattle_found");
+            SetPrebattleMessage(joinStatusText, "prebattle_waiting");
             BeginMatchPolling();
         });
+    }
+
+    static void SetPrebattleMessage(TMP_Text text, string key)
+    {
+        if (text == null) return;
+        var localized = text.GetComponent<LocalizedText>();
+        if (string.IsNullOrEmpty(key))
+        {
+            if (localized != null) localized.enabled = false;
+            text.text = "";
+            return;
+        }
+        if (localized == null)
+        {
+            RuntimeUI.Localize(text, key);
+            localized = text.GetComponent<LocalizedText>();
+        }
+        localized.key = key;
+        localized.enabled = true;
+        text.text = L10n.Get(key);
     }
 
     public void OnSubmitGuessPressed()

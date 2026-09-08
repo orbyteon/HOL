@@ -7,7 +7,15 @@ public sealed class PrivateRoomProductionAssetsTests
 {
     static readonly string[] RequiredSprites =
     {
-        "phase2a/hol_neon_reference_bg_r3",
+        "solo/production/solo_background_v1",
+        "solo/production/solo_player_card_shell_v1",
+        "solo/production/solo_opponent_card_shell_v1",
+        "solo/production/solo_interaction_board_v2",
+        "solo/production/solo_prompt_ribbon_v1",
+        "solo/production/solo_primary_cta_v1",
+        "solo/production/solo_input_field_v1",
+        "solo/production/solo_player_chip_v1",
+        "solo/production/solo_back_button_v1",
         "reference/hol_logo_exact",
         "reference/char_boy_exact",
         "reference/char_girl_exact",

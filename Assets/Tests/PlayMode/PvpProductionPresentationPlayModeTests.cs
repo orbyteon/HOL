@@ -65,7 +65,8 @@ public sealed class PvpProductionPresentationPlayModeTests
         controller = root.AddComponent(T("PvpGameController"));
         Set(controller, "client", backend);
         Invoke(ui, "BuildPanels", controller);
-        root.AddComponent(T("PrivateRoomVisuals"));
+        Assert.That(root.GetComponents(T("PrivateRoomVisuals")).Length, Is.EqualTo(1),
+            "The real runtime constructs the sole pre-match owner directly.");
         yield return null;
         yield return null;
         Assert.That((bool)root.GetComponent(T("PvpDuelCartoonVisuals")).GetType().GetProperty("IsReady")
@@ -96,12 +97,27 @@ public sealed class PvpProductionPresentationPlayModeTests
         Assert.That(input.keyboardType, Is.EqualTo(TouchScreenKeyboardType.NumberPad));
         Assert.That(((TMP_InputField)Get(controller, "guessInput")).shouldHideSoftKeyboard, Is.True);
         var selected = (Sprite)T("PlayerProfileAvatarResolver").GetMethod("Resolve").Invoke(null, null);
-        foreach (var name in new[] { "PrivateRoomPlayerAvatar", "PvpMatchPlayerChipAvatar", "PvpResultPlayerChipAvatar" })
+        foreach (var name in new[] { "PrivateRoomPlayerAvatar", "PvPCreatePanelPlayerAvatar",
+            "PvPJoinPanelPlayerAvatar", "PvpMatchPlayerChipAvatar", "PvpResultPlayerChipAvatar" })
         {
             var portrait = Find(root.transform, name).GetComponent<Image>();
             Assert.That(portrait.sprite, Is.SameAs(selected), name);
             Assert.That(portrait.raycastTarget, Is.False);
             Assert.That(portrait.transform.parent.GetComponent<Mask>(), Is.Not.Null);
+        }
+        string savedName = PlayerPrefs.GetString("PlayerName", "");
+        string expectedName = string.IsNullOrWhiteSpace(savedName) ? L("player_default") : savedName;
+        foreach (string name in new[] { "PrivateRoomPlayerName", "PvPCreatePanelPlayerName", "PvPJoinPanelPlayerName" })
+            Assert.That(Find(root.transform, name).GetComponent<TMP_Text>().text, Is.EqualTo(expectedName),
+                "Every pre-match header reads the same saved production name.");
+        foreach (string panelField in new[] { "createPanel", "joinPanel" })
+        {
+            var panel = ((GameObject)Get(controller, panelField)).transform;
+            var board = Find(panel, "PrebattleBoard");
+            var cancel = Find(panel, "CancelButton");
+            Assert.That(board.parent, Is.SameAs(cancel.parent));
+            Assert.That(board.GetSiblingIndex(), Is.LessThan(cancel.GetSiblingIndex()),
+                "The opaque board must never visually cover Cancel even though it is raycast-transparent.");
         }
     }
 
@@ -267,6 +283,168 @@ public sealed class PvpProductionPresentationPlayModeTests
         "PlayerTurn", "OpponentTurn", "LockMiss", "LockIntro", "LockArmed", "LockSuggested", "Signal",
         "ResultWin", "ResultLoss", "ResultDraw", "RematchWaiting", "ConnectionLost" };
 
+    static readonly string[] PrematchCases = { "PrivateRoom", "CreateSecret", "JoinSecret",
+        "Creating", "Waiting", "Joining", "JoinError" };
+
+    [UnityTest]
+    public IEnumerator PrematchButtonsUseSoloFacesAndCenteredNativeGlyphsInEnEl()
+    {
+        yield return Build();
+        var errors = new List<string>();
+        foreach (var viewport in new[] { new Vector2(1080, 1920), new Vector2(1080, 2400), new Vector2(1179, 2556) })
+        foreach (string language in new[] { "en", "el" })
+        foreach (string state in PrematchCases)
+        {
+            SetLanguage(language);
+            ShowPrematchCase(state);
+            yield return null;
+            yield return null;
+            Canvas.ForceUpdateCanvases();
+            foreach (var safe in root.GetComponentsInChildren(T("ResponsiveSafeAreaRoot"), true))
+                Invoke(safe, "ApplyViewport", new Rect(Vector2.zero, viewport),
+                    new Rect(0, 44, viewport.x, viewport.y - 88), new Vector2(1080, 1920));
+            Canvas.ForceUpdateCanvases();
+            string context = language + " " + state + " " + viewport;
+            AuditGlyphs(context, errors);
+            foreach (var text in root.GetComponentsInChildren<TMP_Text>(false))
+            {
+                if (text.name == "PrivateRoomCreateHeading" || text.name == "PrivateRoomJoinHeading")
+                    AuditFace(text, (RectTransform)text.transform.parent,
+                        new Rect(-99, 246, 188, 62), context, errors);
+                if (text.name == "PrivateRoomCreateHint")
+                    AuditFace(text, (RectTransform)text.transform.parent,
+                        new Rect(-173, -232, 346, 80), context, errors);
+                if (text.name == "PrivateRoomPlayerName" || text.name == "PvPCreatePanelPlayerName" ||
+                    text.name == "PvPJoinPanelPlayerName")
+                    AuditFace(text, (RectTransform)text.transform.parent,
+                        new Rect(-147, 1, 191, 50), context, errors);
+            }
+            foreach (string prefix in new[] { "PrivateRoom", "PvPCreatePanel", "PvPJoinPanel" })
+            {
+                var aperture = (RectTransform)Find(root.transform, prefix + "PlayerAvatarAperture");
+                Assert.That(aperture.anchoredPosition, Is.EqualTo(new Vector2(114, 0)),
+                    "The actual Solo chip portrait ring is on the right, not the name area.");
+                Assert.That(aperture.sizeDelta, Is.EqualTo(new Vector2(102, 102)));
+                Assert.That(aperture.GetComponent<Mask>().showMaskGraphic, Is.False);
+            }
+            foreach (var button in root.GetComponentsInChildren<Button>(false))
+            {
+                var label = button.GetComponentsInChildren<TMP_Text>(false)
+                    .FirstOrDefault(t => t.name == "PrivateRoomActionLabel");
+                if (label == null) continue; // Back is an icon, never a hidden third mode.
+                var image = button.GetComponent<Image>();
+                bool secondary = button.name == "CancelButton";
+                Assert.That(image.sprite, Is.SameAs(Resources.Load<Sprite>(secondary
+                    ? "phase2a/hol_tip_frame_r2_9s" : "solo/production/solo_primary_cta_v1")), context);
+                Assert.That(label.font, Is.SameAs(Resources.Load<TMP_FontAsset>("phase2a/fonts/HOL Menu Display SDF")));
+                Assert.That(label.fontStyle & FontStyles.Bold, Is.EqualTo(FontStyles.Bold));
+                Assert.That(label.fontSize, Is.GreaterThanOrEqualTo(34), context);
+                Assert.That(label.fontSizeMin, Is.EqualTo(label.fontSizeMax), "Never shrink a CTA into tiny text.");
+                // Independent measured faces for the two actual production
+                // button sizes, not the runtime centering helper's SafeRect.
+                Rect face = secondary ? new Rect(-144, -27, 288, 64.8f)
+                    : button.name == "CreateButton" || button.name == "JoinButton"
+                        ? new Rect(-140.8f, -29.29f, 281.6f, 65.65f)
+                        : new Rect(-233.6f, -43.79f, 467.2f, 98.15f);
+                AuditFace(label, (RectTransform)button.transform, face, context, errors);
+            }
+        }
+        Assert.That(errors, Is.Empty, string.Join("\n", errors));
+    }
+
+    [UnityTest]
+    public IEnumerator PrematchValidationKeyboardLanguageAndCancelRemainTruthful()
+    {
+        yield return Build();
+        SetLanguage("en");
+        Find(root.transform, "CreateButton").GetComponent<Button>().onClick.Invoke();
+        var secret = (TMP_InputField)Get(controller, "createSecretInput");
+        var confirm = ((GameObject)Get(controller, "createConfirmButton")).GetComponent<Button>();
+        foreach (string invalid in new[] { "", "0", "101" })
+        {
+            secret.text = invalid;
+            yield return null;
+            Assert.That(confirm.interactable, Is.False, invalid);
+        }
+        foreach (string valid in new[] { "1", "100" })
+        {
+            secret.text = valid;
+            yield return null;
+            Assert.That(confirm.interactable, Is.True, valid);
+        }
+        Assert.That(secret.keyboardType, Is.EqualTo(TouchScreenKeyboardType.NumberPad));
+        Assert.That(secret.readOnly, Is.False);
+        Set(backend, "HoldRequests", true);
+        confirm.onClick.Invoke();
+        confirm.onClick.Invoke();
+        yield return null;
+        Assert.That((int)Get(backend, "CreateCalls"), Is.EqualTo(1));
+        Assert.That(((GameObject)Get(controller, "createCopyButton")).GetComponent<Button>().interactable, Is.False);
+        Assert.That(secret.gameObject.activeInHierarchy, Is.False, "Waiting never displays the secret.");
+        SetLanguage("el");
+        yield return null;
+        Assert.That(((TMP_Text)Get(controller, "createStatusText")).text, Does.StartWith(L("pvp_creating")));
+        var completion = (Action<bool, string>)Get(backend, "PendingRoomRequest");
+        Find(((GameObject)Get(controller, "createPanel")).transform, "PvPCreatePanelTopBack")
+            .GetComponent<Button>().onClick.Invoke();
+        completion(true, "MTW8H");
+        Assert.That(((GameObject)Get(controller, "pvpMenuPanel")).activeSelf, Is.True);
+        Assert.That(((GameObject)Get(controller, "createPanel")).activeSelf, Is.False);
+        ShowPrematchCase("JoinError");
+        Assert.That(((TMP_Text)Get(controller, "joinEntryStatusText")).text, Is.EqualTo(L("pvp_room_not_found")));
+        SetLanguage("en");
+        yield return null;
+        Assert.That(((TMP_Text)Get(controller, "joinEntryStatusText")).text, Is.EqualTo(L("pvp_room_not_found")));
+        var code = (TMP_InputField)Get(controller, "joinCodeInput");
+        Assert.That(code.characterLimit, Is.EqualTo(5));
+        Assert.That(code.keyboardType, Is.EqualTo(TouchScreenKeyboardType.ASCIICapable));
+        Assert.That(code.onValidateInput("", 0, 'a'), Is.EqualTo('A'));
+        Assert.That(code.onValidateInput("", 0, 'Ω'), Is.EqualTo('\0'));
+        code.text = "AB12";
+        yield return null;
+        Assert.That(((GameObject)Get(controller, "joinConfirmButton")).GetComponent<Button>().interactable, Is.False);
+    }
+
+    static void AuditFace(TMP_Text text, RectTransform owner, Rect face, string context, List<string> errors)
+    {
+        text.ForceMeshUpdate();
+        var minimum = new Vector2(float.PositiveInfinity, float.PositiveInfinity);
+        var maximum = new Vector2(float.NegativeInfinity, float.NegativeInfinity);
+        int visible = 0;
+        foreach (var glyph in text.textInfo.characterInfo.Take(text.textInfo.characterCount))
+        {
+            if (!glyph.isVisible) continue;
+            Vector2 bottom = owner.InverseTransformPoint(text.transform.TransformPoint(glyph.bottomLeft));
+            Vector2 top = owner.InverseTransformPoint(text.transform.TransformPoint(glyph.topRight));
+            minimum = Vector2.Min(minimum, Vector2.Min(bottom, top));
+            maximum = Vector2.Max(maximum, Vector2.Max(bottom, top));
+            visible++;
+        }
+        if (visible == 0) { errors.Add(context + " " + owner.name + " has no visible CTA glyphs"); return; }
+        if (minimum.x < face.xMin || maximum.x > face.xMax || minimum.y < face.yMin || maximum.y > face.yMax)
+            errors.Add(context + " " + owner.name + " glyphs leave usable face: " + minimum + " to " + maximum + " in " + face);
+        Vector2 expected = RectTransformUtility.WorldToScreenPoint(null, owner.TransformPoint(face.center));
+        Vector2 actual = RectTransformUtility.WorldToScreenPoint(null, owner.TransformPoint((minimum + maximum) * .5f));
+        if (Mathf.Abs(actual.x - expected.x) > 4 || Mathf.Abs(actual.y - expected.y) > 4)
+            errors.Add(context + " " + owner.name + " glyph center offset in pixels " + (actual - expected));
+    }
+
+    void ShowPrematchCase(string state)
+    {
+        Invoke(controller, "OnLeaveMatchPressed");
+        Set(backend, "HoldRequests", false);
+        if (state == "PrivateRoom") return;
+        bool create = state == "CreateSecret" || state == "Creating" || state == "Waiting";
+        Find(root.transform, create ? "CreateButton" : "JoinButton").GetComponent<Button>().onClick.Invoke();
+        ((TMP_InputField)Get(controller, create ? "createSecretInput" : "joinSecretInput")).text = "80";
+        if (!create) ((TMP_InputField)Get(controller, "joinCodeInput")).text = "MTW8H";
+        if (state == "CreateSecret" || state == "JoinSecret") return;
+        Set(backend, "HoldRequests", state != "Waiting");
+        ((GameObject)Get(controller, create ? "createConfirmButton" : "joinConfirmButton")).GetComponent<Button>().onClick.Invoke();
+        if (state == "JoinError")
+            ((Action<bool, string>)Get(backend, "PendingRoomRequest"))(false, L("pvp_room_not_found"));
+    }
+
     [UnityTest]
     public IEnumerator EntireEnElPortraitFlowKeepsRenderedGlyphsInsideOwnedRegions()
     {
@@ -298,6 +476,17 @@ public sealed class PvpProductionPresentationPlayModeTests
     [UnityTest, Explicit("Native presentation fixtures; choose a new external evidence folder in HOL/PvP first.")]
     public IEnumerator CaptureNativeEnElFlowAndTallViewports()
     {
+        yield return CaptureNative(false);
+    }
+
+    [UnityTest, Explicit("Bounded native pre-match evidence; choose a new external folder in HOL/PvP.")]
+    public IEnumerator CaptureNativePrematchEnElAndRepresentativeTall()
+    {
+        yield return CaptureNative(true);
+    }
+
+    IEnumerator CaptureNative(bool prematchOnly)
+    {
         var tool = T("PvpPresentationReviewTools");
         string output = (string)tool.GetProperty("OutputDirectory").GetValue(null);
         Assert.That(Directory.Exists(output), Is.True, "Choose the new external capture folder via HOL/PvP.");
@@ -307,9 +496,10 @@ public sealed class PvpProductionPresentationPlayModeTests
         yield return Build();
         foreach (var viewport in new[] { new Vector2Int(1080, 1920), new Vector2Int(1080, 2400), new Vector2Int(1179, 2556) })
         foreach (string language in new[] { "en", "el" })
-        foreach (string state in Cases)
+        foreach (string state in prematchOnly ? PrematchCases : Cases)
         {
-            if (viewport.y != 1920 && state != "PrivateRoom" && state != "Waiting" && state != "PlayerTurn" && state != "ResultWin") continue;
+            if (viewport.y != 1920 && state != "PrivateRoom" && state != "Waiting" &&
+                (prematchOnly || (state != "PlayerTurn" && state != "ResultWin"))) continue;
             T("OnboardingGameViewCapture").GetMethod("SetResolution").Invoke(null, new object[] { viewport.x, viewport.y });
             // A previous scene test may restore Screen's runtime size while
             // Game View already has this selectedSizeIndex. Re-selecting that
@@ -317,7 +507,7 @@ public sealed class PvpProductionPresentationPlayModeTests
             // too, then retain the exact dimensional gate below.
             Screen.SetResolution(viewport.x, viewport.y, false);
             SetLanguage(language);
-            ShowCase(state);
+            if (prematchOnly) ShowPrematchCase(state); else ShowCase(state);
             yield return null;
             yield return null;
             Canvas.ForceUpdateCanvases();
@@ -325,8 +515,9 @@ public sealed class PvpProductionPresentationPlayModeTests
             Assert.That(Screen.height, Is.EqualTo(viewport.y));
             string path = Path.Combine(output, "fixture-" + state + "-" + language + "-" + viewport.x + "x" + viewport.y + ".png");
             Assert.That(File.Exists(path), Is.False);
-            // Let Unity capture its next rendered frame. Waiting on an EOF
-            // enumerator can stall while the Editor has another view focused.
+            // Unity queues the next fully rendered Game View frame. The
+            // bounded file/dimension checks remain independent of Editor EOF
+            // coroutine scheduling, which can stall in a Simulator layout.
             ScreenCapture.CaptureScreenshot(path);
             float deadline = Time.realtimeSinceStartup + 10f;
             while ((!File.Exists(path) || new FileInfo(path).Length == 0) && Time.realtimeSinceStartup < deadline)

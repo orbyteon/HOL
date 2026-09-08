@@ -83,9 +83,9 @@ public sealed class ResponsiveUIFoundationPlayModeTests
         var pvpSafeTargets = new Dictionary<Transform, string[]>
         {
             { Find(pvpCreate.transform, "PvPCreatePanelVisualsSafeRoot"), new[] {
-                "YouCard", "OpponentCard", "RuleCard", "CancelButton", "ConfirmCreateButton" } },
+                "YouCard", "OpponentCard", "PrebattleBoard", "CancelButton", "ConfirmCreateButton", "SecretInput", "RoomCodeFrame" } },
             { Find(pvpJoin.transform, "PvPJoinPanelVisualsSafeRoot"), new[] {
-                "YouCard", "OpponentCard", "RuleCard", "CancelButton", "ConfirmJoinButton" } },
+                "YouCard", "OpponentCard", "PrebattleBoard", "CancelButton", "ConfirmJoinButton", "CodeInput", "SecretInput" } },
             { Find(pvpMatch.transform, "PvpDuelCartoonRootSafeRoot"), new[] {
                 "PvpPlayerCard", "PvpOpponentCard", "PvpPromptRibbon", "PvpInteractionCard",
                 "PvpSignalBubble", "PvpHistoryCard", "PvpTipCard", "LeaveButton" } },

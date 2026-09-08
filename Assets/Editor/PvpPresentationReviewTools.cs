@@ -107,6 +107,79 @@ public static class PvpPresentationReviewTools
         }));
     }
 
+    [MenuItem("HOL/PvP/Run Focused Pre-match Regressions")]
+    public static void RunPrematchRegressions()
+    {
+        if (EditorApplication.isPlayingOrWillChangePlaymode || EditorApplication.isCompiling || EditorApplication.isUpdating)
+            throw new InvalidOperationException("Wait for the Editor to be idle before focused validation.");
+        if (!Directory.Exists(OutputDirectory)) ChooseCaptureFolder();
+        if (!Directory.Exists(OutputDirectory)) return;
+        Api.Execute(new ExecutionSettings(new Filter {
+            testMode = TestMode.PlayMode,
+            testNames = new[] {
+                "PvpProductionPresentationPlayModeTests.PrematchButtonsUseSoloFacesAndCenteredNativeGlyphsInEnEl",
+                "PvpProductionPresentationPlayModeTests.PrematchValidationKeyboardLanguageAndCancelRemainTruthful",
+                "PvpProductionPresentationPlayModeTests.DirectConstructionHasOneOwnerSharedProfileAndTouchRematch",
+                "PvpProductionPresentationPlayModeTests.RealCreateJoinValidationWaitingCancelAndLateCallbackRemainWired",
+                "PvpProductionPresentationPlayModeTests.ResultCaptionsRepaintOpponentArrivesAndRealRematchResets",
+                "PrivateRoomVisualsPlayModeTests.PrivateRoomUsesOneProductionOwnerAndPreservesCreateJoinFlows",
+                "PrivateRoomCartoonReferencePlayModeTests.ApprovedReferenceGeometryAndRealControlsRemainAuthoritative"
+            }
+        }));
+    }
+
+    [MenuItem("HOL/PvP/Run Native Pre-match Capture %&#p")]
+    public static void RunPrematchCapture()
+    {
+        if (EditorApplication.isPlayingOrWillChangePlaymode || EditorApplication.isCompiling || EditorApplication.isUpdating)
+            throw new InvalidOperationException("Wait for the Editor to be idle before capture.");
+        if (!Directory.Exists(OutputDirectory)) ChooseCaptureFolder();
+        if (!Directory.Exists(OutputDirectory)) return;
+        // Capture the real Game View, not the Simulator preview surface.
+        OnboardingGameViewCapture.SetResolution(1080, 1920);
+        FocusNativeGameView();
+        Api.Execute(new ExecutionSettings(new Filter {
+            testMode = TestMode.PlayMode,
+            testNames = new[] { "PvpProductionPresentationPlayModeTests.CaptureNativePrematchEnElAndRepresentativeTall" }
+        }));
+    }
+
+    [MenuItem("HOL/PvP/Run Existing Responsive Integration Regression")]
+    public static void RunResponsiveIntegrationRegression()
+    {
+        if (EditorApplication.isPlayingOrWillChangePlaymode || EditorApplication.isCompiling || EditorApplication.isUpdating)
+            throw new InvalidOperationException("Wait for the Editor to be idle before responsive validation.");
+        if (!Directory.Exists(OutputDirectory)) ChooseCaptureFolder();
+        if (!Directory.Exists(OutputDirectory)) return;
+        Api.Execute(new ExecutionSettings(new Filter {
+            testMode = TestMode.PlayMode,
+            testNames = new[] { "ResponsiveUIFoundationPlayModeTests.LivePagesShareTheViewportContractAcrossTheRequiredMatrix" }
+        }));
+    }
+
+    public static void FocusNativeGameView()
+    {
+        if (!EditorApplication.ExecuteMenuItem("Window/General/Game"))
+            throw new InvalidOperationException("Unity could not open its real Game View.");
+        var game = EditorWindow.GetWindow(typeof(EditorWindow).Assembly.GetType("UnityEditor.GameView", true));
+        game.ShowTab();
+        game.Focus();
+        game.Repaint();
+    }
+
+    [MenuItem("HOL/PvP/Run Pre-match Asset Contracts %&a")]
+    public static void RunPrematchAssetContracts()
+    {
+        if (EditorApplication.isPlayingOrWillChangePlaymode || EditorApplication.isCompiling || EditorApplication.isUpdating)
+            throw new InvalidOperationException("Wait for the Editor to be idle before asset validation.");
+        if (!Directory.Exists(OutputDirectory)) ChooseCaptureFolder();
+        if (!Directory.Exists(OutputDirectory)) return;
+        Api.Execute(new ExecutionSettings(new Filter {
+            testMode = TestMode.EditMode,
+            testNames = new[] { "PrivateRoomProductionAssetsTests" }
+        }));
+    }
+
     [MenuItem("HOL/PvP/Run Existing Route And Terminal Regressions %&#t")]
     public static void RunExistingRouteRegressions()
     {
@@ -151,10 +224,45 @@ public static class PvpPresentationReviewTools
     [MenuItem("HOL/PvP/Choose New External Capture Folder %&d")]
     public static void ChooseCaptureFolder()
     {
-        string parent = EditorUtility.OpenFolderPanel("Choose external PvP evidence parent", "", "");
-        if (string.IsNullOrEmpty(parent)) return;
+        // Keep configuration inside Unity's non-modal Editor UI. Windows'
+        // native folder picker can leave its disabled owner inaccessible to
+        // desktop input; no capture or test starts until a valid path is set.
+        var window = EditorWindow.GetWindow<EvidenceParentWindow>();
+        window.titleContent = new GUIContent("PvP Evidence Folder");
+        window.minSize = new Vector2(760, 170);
+        window.Show();
+        window.Focus();
+    }
+
+    public sealed class EvidenceParentWindow : EditorWindow
+    {
+        string parent = "";
+        string error = "";
+
+        void OnGUI()
+        {
+            EditorGUILayout.HelpBox("Paste an existing absolute folder outside the Unity project. A new uniquely named evidence directory will be created inside it. No tests or captures start here.", MessageType.Info);
+            EditorGUILayout.LabelField("External evidence parent");
+            parent = EditorGUILayout.TextField(parent);
+            if (!string.IsNullOrEmpty(error)) EditorGUILayout.HelpBox(error, MessageType.Error);
+            using (new EditorGUI.DisabledScope(string.IsNullOrWhiteSpace(parent)))
+            {
+                if (GUILayout.Button("Create fresh evidence directory", GUILayout.Height(32)))
+                {
+                    try { SetExternalEvidenceParent(parent); Close(); }
+                    catch (Exception exception) { error = exception.Message; }
+                }
+            }
+        }
+    }
+
+    static void SetExternalEvidenceParent(string parent)
+    {
+        if (!Path.IsPathRooted(parent) || !Directory.Exists(parent))
+            throw new InvalidOperationException("Choose an existing absolute external parent directory.");
+        parent = Path.GetFullPath(parent);
         string project = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
-        if ((Path.GetFullPath(parent) + Path.DirectorySeparatorChar).StartsWith(
+        if ((parent.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar).StartsWith(
             project + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("PvP evidence must be outside the Unity project.");
         string output = Path.Combine(parent, "HOL_PVP_FIXTURE_CAPTURE_" + DateTime.UtcNow.ToString("yyyyMMdd_HHmmss_fff"));

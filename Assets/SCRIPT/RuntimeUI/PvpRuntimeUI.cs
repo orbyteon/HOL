@@ -2,8 +2,8 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
-// Runtime wiring only. Final match/result/prebattle artwork is constructed
-// directly by PvpDuelCartoonVisuals; PrivateRoomVisuals owns the landing.
+// Runtime wiring only. PvpDuelCartoonVisuals owns match/result;
+// PrivateRoomVisuals owns the complete landing/Create/Join/Waiting flow.
 [RequireComponent(typeof(Canvas), typeof(GraphicRaycaster))]
 public class PvpRuntimeUI : MonoBehaviour
 {
@@ -44,9 +44,10 @@ public class PvpRuntimeUI : MonoBehaviour
             L10n.Get("pvp_join_room"), Vector2.zero, new Vector2(430f, 104f), Color.white);
         var back = RuntimeUI.CreateButton(menu.transform, "BackButton",
             L10n.Get("back"), Vector2.zero, new Vector2(90f, 90f), Color.white);
-        var visuals = GetComponent<PvpDuelCartoonVisuals>();
-        var prebattleCreate = visuals.BuildPrebattlePanel("PvPCreatePanel", true);
-        var prebattleJoin = visuals.BuildPrebattlePanel("PvPJoinPanel", false);
+        var privateVisuals = GetComponent<PrivateRoomVisuals>();
+        if (privateVisuals == null) privateVisuals = gameObject.AddComponent<PrivateRoomVisuals>();
+        var prebattleCreate = privateVisuals.BuildPrebattlePanel("PvPCreatePanel", true);
+        var prebattleJoin = privateVisuals.BuildPrebattlePanel("PvPJoinPanel", false);
         controller.pvpMenuPanel = menu;
         controller.createPanel = prebattleCreate.panel;
         controller.joinPanel = prebattleJoin.panel;
@@ -73,6 +74,8 @@ public class PvpRuntimeUI : MonoBehaviour
         prebattleEllipsis.text = prebattleCreate.status;
         prebattleEllipsis.enabled = false;
         controller.createStatusEllipsis = prebattleEllipsis;
+
+        privateVisuals.Build(controller);
 
         create.onClick.AddListener(() => ShowOnly(controller, prebattleCreate.panel));
         join.onClick.AddListener(() => ShowOnly(controller, prebattleJoin.panel));
