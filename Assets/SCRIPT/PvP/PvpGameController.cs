@@ -114,6 +114,39 @@ public class PvpGameController : MonoBehaviour
     int flowGeneration;
     bool joinCreateInFlight;
 
+    void OnEnable()
+    {
+        L10n.OnLanguageChanged -= RefreshLocalizedPresentation;
+        L10n.OnLanguageChanged += RefreshLocalizedPresentation;
+    }
+
+    void OnDisable()
+    {
+        L10n.OnLanguageChanged -= RefreshLocalizedPresentation;
+    }
+
+    void OnDestroy()
+    {
+        flowGeneration++;
+        CancelInvoke();
+        if (client != null) client.StopPolling();
+    }
+
+    // Repaint only: never replay OnState, record a result, advance rematch
+    // polling, or send a request merely because the language changed.
+    void RefreshLocalizedPresentation()
+    {
+        if (lastState == null || abnormalTerminal) return;
+        string opponent = client.IsHost ? lastState.guestName : lastState.hostName;
+        if (opponentNameText != null) opponentNameText.text = opponent;
+        if (resultPresentation != null) resultPresentation.SetOpponentName(opponent);
+        if (lastState.phase != "play" || matchOver) return;
+        if (roundText != null) roundText.text = L10n.Get("round_label_open", lastState.roundIndex + 1);
+        if (!guessInFlight) UpdateTurnText(lastState, client.IsHost ? "host" : "guest", opponent);
+        UpdateRangeText();
+        RefreshLockButton();
+    }
+
     string MyName
     {
         get
@@ -328,6 +361,7 @@ public class PvpGameController : MonoBehaviour
         guessInput.text = "";
         turnText.text = L10n.Get("pvp_sending");
         guessInFlight = true;
+        RefreshGuessAvailability();
         int gen = flowGeneration;
         int sentMatchIndex = lastState.matchIndex;
         client.SubmitGuess(guess, staked, lastState, ok =>
@@ -341,6 +375,7 @@ public class PvpGameController : MonoBehaviour
 
             guessInFlight = false;
             if (abnormalTerminal) return;
+            RefreshGuessAvailability();
             if (ok)
             {
                 lockArmed = false;
@@ -638,7 +673,10 @@ public class PvpGameController : MonoBehaviour
         }
 
         string opponentName = client.IsHost ? s.guestName : s.hostName;
-        opponentNameText.text = L10n.Get("opponent_label", opponentName);
+        // The final card already owns its localized Opponent caption.
+        opponentNameText.text = opponentName;
+        if (resultPresentation != null)
+            resultPresentation.SetOpponentName(opponentName);
 
         // Optional HUD: the live round number, blank once the match is over so
         // the result banner has the slot to itself.
@@ -901,6 +939,9 @@ public class PvpGameController : MonoBehaviour
     {
         if (rematchButton != null) rematchButton.SetActive(visible);
         if (rematchSecretInput != null) rematchSecretInput.gameObject.SetActive(visible);
+        // An earlier disconnected room hid this control. A later, legitimate
+        // completed match must restore Exit as well as the rematch controls.
+        if (visible && resultExitButton != null) resultExitButton.SetActive(true);
 
         // The guess controls are dead once the match is decided, so the rematch
         // controls take their slot rather than sitting beside a field that can
@@ -952,6 +993,7 @@ public class PvpGameController : MonoBehaviour
     // prompt is what keeps the draw rate down in practice.
     void RefreshLockButton()
     {
+        RefreshGuessAvailability();
         if (lockButton == null) return;
 
         string me = client != null && client.IsHost ? "host" : "guest";
@@ -988,6 +1030,24 @@ public class PvpGameController : MonoBehaviour
             lockButtonLabel.text = L10n.Get("lock_suggest", left);
         else
             lockButtonLabel.text = L10n.Get("lock");
+    }
+
+    // Reflect the existing authoritative submit guard in the visible native
+    // controls. No rule or room mutation is performed by this presentation pass.
+    void RefreshGuessAvailability()
+    {
+        string me = client != null && client.IsHost ? "host" : "guest";
+        bool canGuess = !matchOver && !abnormalTerminal && !guessInFlight &&
+            lastState != null && lastState.phase == "play" && lastState.turn == me;
+        if (guessInput != null) guessInput.interactable = canGuess;
+        foreach (var control in new[] { guessButton, lockButton })
+        {
+            var button = control != null ? control.GetComponent<UnityEngine.UI.Button>() : null;
+            if (button != null) button.interactable = canGuess;
+        }
+        if (keypadRoot != null)
+            foreach (var button in keypadRoot.GetComponentsInChildren<UnityEngine.UI.Button>(true))
+                button.interactable = canGuess;
     }
 
     void RefreshSignalsAvailability()

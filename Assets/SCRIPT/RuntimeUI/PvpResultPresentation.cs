@@ -11,12 +11,22 @@ public sealed class PvpResultPresentation : MonoBehaviour
     public TMP_Text opponentAttemptsText;
     public TMP_Text revealedNumberText;
     public TMP_Text playerChipText;
+    public TMP_Text opponentNameText;
     public GameObject trophy;
 
     string localizedTitleKey = "";
     string displayedTitle = "";
     int displayedRevealedNumber;
     bool isShown;
+    string opponentName = "";
+
+    // Called for every arriving room snapshot, including later finished-room
+    // polls. Never freeze an empty construction-time label as opponent identity.
+    public void SetOpponentName(string value)
+    {
+        opponentName = value ?? "";
+        if (opponentNameText != null) opponentNameText.text = opponentName;
+    }
 
     void OnEnable()
     {
@@ -42,6 +52,7 @@ public sealed class PvpResultPresentation : MonoBehaviour
             revealedNumberText.text =
                 L10n.Get("number_was", displayedRevealedNumber);
         RefreshPlayerChip();
+        SetOpponentName(opponentName);
     }
 
     public void Show(string title, int playerAttempts, int opponentAttempts,

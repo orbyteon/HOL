@@ -25,7 +25,6 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
     const string ShareIconResource = "reference/board_friend_exact";
     const string MascotSixResource = "reference/mascot_6_exact";
     const string MascotSevenResource = "reference/mascot_7_exact";
-    const string AvatarResource = "reference/player_cyan_exact";
     const string BackChevronResource = "phase2a/hol_chevron_r2";
     const string ConfettiResource = "mainmenu/mainmenu_deco_confetti";
     const string StarsResource = "mainmenu/mainmenu_deco_stars";
@@ -59,6 +58,8 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
     TMP_Text playerNameText;
     TMP_Text streakText;
     TMP_Text stepText;
+    Image playerAvatar;
+    RectTransform playerAvatarAperture;
     Button createButton;
     Button joinButton;
     Button backButton;
@@ -128,7 +129,7 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
         Sprite shareIcon = LoadRequired(ShareIconResource);
         Sprite six = LoadRequired(MascotSixResource);
         Sprite seven = LoadRequired(MascotSevenResource);
-        Sprite avatar = LoadRequired(AvatarResource);
+        Sprite avatar = PlayerProfileAvatarResolver.Resolve();
         Sprite blue = LoadRequired(BlueFrameResource);
         Sprite gold = LoadRequired(GoldFrameResource);
         Sprite magenta = LoadRequired(MagentaFrameResource);
@@ -273,12 +274,18 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
             chip.rectTransform, new Vector2(352f, 842f),
             new Vector2(360f, 118f));
 
-        var avatarImage = EnsureImage(
-            chip.transform, "PrivateRoomPlayerAvatar");
-        ConfigureImage(avatarImage, avatar, true, Image.Type.Simple);
+        var aperture = EnsureImage(chip.transform, "PrivateRoomPlayerAvatarAperture");
+        ConfigureImage(aperture,
+            LoadRequired(PlayerProfileAvatarResolver.CircularApertureResourcePath),
+            true, Image.Type.Simple);
         Place(
-            avatarImage.rectTransform, new Vector2(-128f, 0f),
+            aperture.rectTransform, new Vector2(-128f, 0f),
             new Vector2(84f, 84f));
+        aperture.gameObject.AddComponent<Mask>().showMaskGraphic = false;
+        playerAvatarAperture = aperture.rectTransform;
+        playerAvatar = EnsureImage(aperture.transform, "PrivateRoomPlayerAvatar");
+        ConfigureImage(playerAvatar, avatar, true, Image.Type.Simple);
+        PlayerProfileAvatarFraming.Apply(playerAvatar, playerAvatarAperture);
 
         playerNameText = EnsureText(
             chip.transform, "PrivateRoomPlayerName", 31f, bodyFont,
@@ -629,6 +636,11 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
 
     void RefreshPlayerChip()
     {
+        if (playerAvatar != null)
+        {
+            playerAvatar.sprite = PlayerProfileAvatarResolver.Resolve();
+            PlayerProfileAvatarFraming.Apply(playerAvatar, playerAvatarAperture);
+        }
         if (playerNameText == null || streakText == null) return;
 
         string player = PlayerPrefs.GetString("PlayerName", "");

@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
@@ -9,6 +10,33 @@ using UnityEngine.UI;
 
 public sealed class PvpTerminalPresentationPlayModeTests
 {
+    readonly Dictionary<string, int?> savedPreferences = new Dictionary<string, int?>();
+    object savedLanguage;
+
+    [SetUp]
+    public void PreservePlayerState()
+    {
+        // Real terminal snapshots record real statistics. Focused Editor tests
+        // must not leave those synthetic results in the player's saved profile.
+        foreach (string key in new[] { "StatWins", "StatLosses", "StatStreak", "StatBestStreak",
+            "StatBestGuesses", "StatDraws", "StatMatches", "StatRecentBits", "StatRecentCount",
+            "Language", "LockIntroShown", "LockEverUsed" })
+            savedPreferences[key] = PlayerPrefs.HasKey(key) ? (int?)PlayerPrefs.GetInt(key) : null;
+        savedLanguage = RuntimeType("L10n").GetProperty("Current").GetValue(null);
+        var language = RuntimeType("L10n").GetMethod("SetLanguage");
+        language.Invoke(null, new[] { Enum.Parse(language.GetParameters()[0].ParameterType, "English") });
+    }
+
+    [TearDown]
+    public void RestorePlayerState()
+    {
+        RuntimeType("L10n").GetMethod("SetLanguage").Invoke(null, new[] { savedLanguage });
+        foreach (var item in savedPreferences)
+            if (item.Value.HasValue) PlayerPrefs.SetInt(item.Key, item.Value.Value);
+            else PlayerPrefs.DeleteKey(item.Key);
+        PlayerPrefs.Save();
+    }
+
     [UnityTest]
     public IEnumerator ConnectionLossLocksEveryControlAndExitReturnsToMenu()
     {
