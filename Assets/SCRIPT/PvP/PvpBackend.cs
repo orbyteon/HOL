@@ -21,8 +21,8 @@ public abstract class PvpBackend : MonoBehaviour
     public Action OnRoomClosed;
     public Action OnConnectionLost;
 
-    public abstract void CreateRoom(string hostName, int hostSecret, Action<bool, string> done);
-    public abstract void JoinRoom(string code, string guestName, int guestSecret, Action<bool, string> done);
+    public abstract void CreateRoom(string hostName, string hostAvatarId, int hostSecret, Action<bool, string> done);
+    public abstract void JoinRoom(string code, string guestName, string guestAvatarId, int guestSecret, Action<bool, string> done);
 
     // useLock stakes this side's single Lock on the guess: it wins a same-round
     // tie, and a miss forfeits the next turn.

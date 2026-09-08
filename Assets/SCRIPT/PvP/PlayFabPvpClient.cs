@@ -144,7 +144,7 @@ public class PlayFabPvpClient : PvpBackend
     Action<bool, string> pendingRoomDone;
     bool pendingRequestIsJoin;
 
-    public override void CreateRoom(string hostName, int hostSecret, Action<bool, string> done)
+    public override void CreateRoom(string hostName, string hostAvatarId, int hostSecret, Action<bool, string> done)
     {
         int requestEpoch = ++roomRequestEpoch;
         pendingRoomCode = "";
@@ -161,6 +161,7 @@ public class PlayFabPvpClient : PvpBackend
             }
 
             string args = "{\"hostName\":\"" + EscapeJson(hostName) +
+                          "\",\"hostAvatarId\":\"" + EscapeJson(hostAvatarId) +
                           "\",\"hostSecret\":" + hostSecret + "}";
             ExecuteCloudScript("createRoom", args, (ok2, resp) =>
             {
@@ -195,7 +196,7 @@ public class PlayFabPvpClient : PvpBackend
         });
     }
 
-    public override void JoinRoom(string code, string guestName, int guestSecret, Action<bool, string> done)
+    public override void JoinRoom(string code, string guestName, string guestAvatarId, int guestSecret, Action<bool, string> done)
     {
         code = (code ?? "").Trim().ToUpperInvariant();
         int requestEpoch = ++roomRequestEpoch;
@@ -214,6 +215,7 @@ public class PlayFabPvpClient : PvpBackend
 
             string args = "{\"roomId\":\"" + EscapeJson(code) +
                           "\",\"guestName\":\"" + EscapeJson(guestName) +
+                          "\",\"guestAvatarId\":\"" + EscapeJson(guestAvatarId) +
                           "\",\"guestSecret\":" + guestSecret + "}";
             ExecuteCloudScript("joinRoom", args, (ok2, resp) =>
             {
@@ -536,6 +538,8 @@ public class PlayFabPvpClient : PvpBackend
 
             current.hostName = applied.hostName;
             current.guestName = applied.guestName;
+            current.hostAvatarId = applied.hostAvatarId;
+            current.guestAvatarId = applied.guestAvatarId;
             current.turn = applied.turn;
             current.phase = applied.phase;
             current.lastGuess = applied.lastGuess;

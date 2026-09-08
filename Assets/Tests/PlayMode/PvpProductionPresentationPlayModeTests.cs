@@ -15,15 +15,17 @@ public sealed class PvpProductionPresentationPlayModeTests
     const BindingFlags Flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
     static readonly string[] StatKeys = { "StatWins", "StatLosses", "StatStreak", "StatBestStreak",
         "StatBestGuesses", "StatDraws", "StatMatches", "StatRecentBits", "StatRecentCount",
-        "Language", "LockIntroShown", "LockEverUsed" };
+        "Language", "LockIntroShown", "LockEverUsed", "HOL.Onboarding.Avatar", "HOL.Onboarding.Version" };
     readonly Dictionary<string, int?> savedStats = new Dictionary<string, int?>();
     object savedLanguage;
+    string savedPlayerName;
     GameObject root;
     Component controller, backend;
 
     [SetUp]
     public void PreservePlayerState()
     {
+        savedPlayerName = PlayerPrefs.HasKey("PlayerName") ? PlayerPrefs.GetString("PlayerName") : null;
         foreach (var key in StatKeys)
             savedStats[key] = PlayerPrefs.HasKey(key) ? (int?)PlayerPrefs.GetInt(key) : null;
         savedLanguage = T("L10n").GetProperty("Current", BindingFlags.Public | BindingFlags.Static).GetValue(null);
@@ -37,6 +39,8 @@ public sealed class PvpProductionPresentationPlayModeTests
         foreach (var item in savedStats)
             if (item.Value.HasValue) PlayerPrefs.SetInt(item.Key, item.Value.Value);
             else PlayerPrefs.DeleteKey(item.Key);
+        if (savedPlayerName == null) PlayerPrefs.DeleteKey("PlayerName");
+        else PlayerPrefs.SetString("PlayerName", savedPlayerName);
         PlayerPrefs.Save();
     }
 
@@ -73,6 +77,189 @@ public sealed class PvpProductionPresentationPlayModeTests
             .GetValue(root.GetComponent(T("PvpDuelCartoonVisuals"))), Is.True);
         Invoke(controller, "OpenPvpMenu");
         yield return null;
+    }
+
+    [UnityTest]
+    public IEnumerator ExplicitRoomAvatarIdsUseCanonicalCatalogAndNeverTheLocalSelection()
+    {
+        yield return Build();
+        PlayerPrefs.SetInt("HOL.Onboarding.Version", 1);
+        PlayerPrefs.SetInt("HOL.Onboarding.Avatar", 6);
+        var resolver = T("PlayerProfileAvatarResolver").GetMethod("ResolveId");
+        var catalog = T("OnboardingAvatarCatalog");
+        int count = (int)catalog.GetProperty("Count").GetValue(null);
+        var fallback = Resources.Load<Sprite>("reference/player_cyan_exact");
+        Assert.That(fallback, Is.Not.Null);
+        for (int id = 0; id < count; id++)
+        {
+            var entry = catalog.GetMethod("Get").Invoke(null, new object[] { id });
+            string resource = (string)entry.GetType().GetProperty("ResourcePath").GetValue(entry);
+            bool valid = (bool)catalog.GetMethod("CanEverSelect").Invoke(null, new object[] { id });
+            Sprite expected = valid ? Resources.Load<Sprite>(resource) : fallback;
+            Assert.That(expected, Is.Not.Null, resource);
+            Assert.That(resolver.Invoke(null, new object[] { id.ToString(System.Globalization.CultureInfo.InvariantCulture) }),
+                Is.SameAs(expected), "canonical id " + id);
+        }
+        foreach (string invalid in new[] { null, "", "-1", "11", "12", "01", "0 ", " 0", "1\n", "1.0", "1e0",
+            "2147483648", "reference/player_cyan_exact" })
+            Assert.That(resolver.Invoke(null, new object[] { invalid }), Is.SameAs(fallback), "invalid " + invalid);
+        Assert.That(resolver.Invoke(null, new object[] { "0" }),
+            Is.SameAs(Resources.Load<Sprite>("onboarding/avatars/avatar_01_teal_boy")));
+        Assert.That(PlayerPrefs.GetInt("HOL.Onboarding.Avatar"), Is.EqualTo(6));
+    }
+
+    [UnityTest]
+    public IEnumerator RoomIdentitiesStayAuthoritativeAcrossSeatsRefreshRematchAndExit()
+    {
+        yield return Build();
+        var violations = new List<string>();
+        foreach (bool host in new[] { true, false })
+        {
+            Invoke(controller, "OnLeaveMatchPressed");
+            PlayerPrefs.SetString("PlayerName", host ? "Marinos" : "Ελένη");
+            PlayerPrefs.SetInt("HOL.Onboarding.Version", 1);
+            PlayerPrefs.SetInt("HOL.Onboarding.Avatar", host ? 1 : 6);
+            if (host)
+            {
+                Find(root.transform, "CreateButton").GetComponent<Button>().onClick.Invoke();
+                ((TMP_InputField)Get(controller, "createSecretInput")).text = "42";
+                ((GameObject)Get(controller, "createConfirmButton")).GetComponent<Button>().onClick.Invoke();
+            }
+            else StartJoined();
+            Assert.That((string)Get(backend, "LastName"), Is.EqualTo(host ? "Marinos" : "Ελένη"));
+            Assert.That((string)Get(backend, "LastAvatarId"), Is.EqualTo(host ? "1" : "6"));
+            var stalePoll = (Delegate)Get(backend, "observer");
+            var staleClosed = (Action)Get(backend, "OnRoomClosed");
+            var staleLost = (Action)Get(backend, "OnConnectionLost");
+            var waiting = State("waiting");
+            S(waiting, "hostName", "Marinos"); S(waiting, "guestName", host ? "" : "Ελένη");
+            S(waiting, "hostAvatarId", "1"); S(waiting, "guestAvatarId", host ? "" : "6");
+            Emit(waiting);
+            yield return null;
+            var form = ((GameObject)Get(controller, host ? "createPanel" : "joinPanel")).transform;
+            Assert.That(Find(form, "WaitingPlayerName").GetComponent<TMP_Text>().text, Is.EqualTo(host ? "Marinos" : "Ελένη"));
+            Assert.That(Find(form, "WaitingOpponentAvatar").gameObject.activeSelf, Is.EqualTo(!host),
+                "No fabricated opponent while the room has no guest.");
+            var live = State("play");
+            S(live, "hostName", "Marinos"); S(live, "guestName", "Ελένη");
+            Emit(live);
+            // Preferences can change while a room exists; its accepted identity
+            // must remain the snapshot, including on periodic/language repaint.
+            PlayerPrefs.SetString("PlayerName", "Unrelated");
+            PlayerPrefs.SetInt("HOL.Onboarding.Avatar", 0);
+            string[] requestCounters = { "CreateCalls", "JoinCalls", "GuessCalls", "RematchCalls", "LeaveCalls", "PollCalls", "SignalCalls" };
+            int[] beforeRefresh = requestCounters.Select(key => (int)Get(backend, key)).ToArray();
+            foreach (string language in new[] { "en", "el" })
+            {
+                SetLanguage(language);
+                Set(root.GetComponent(T("PvpDuelCartoonVisuals")), "nextIdentityRefresh", -1f);
+                Set(root.GetComponent(T("PrivateRoomVisuals")), "nextIdentityRefresh", -1f);
+                yield return null;
+                AssertRoomIdentity(host, "1", "6", "Marinos", "Ελένη");
+                AuditGlyphs(language + " identity", violations);
+            }
+            CollectionAssert.AreEqual(beforeRefresh, requestCounters.Select(key => (int)Get(backend, key)).ToArray(),
+                "Periodic and language identity repaint must not send a request or restart polling.");
+            var done = State("done");
+            S(done, "hostName", "Marinos"); S(done, "guestName", "Ελένη");
+            S(done, "winner", "draw");
+            Emit(done);
+            yield return null;
+            AssertRoomIdentity(host, "1", "6", "Marinos", "Ελένη");
+            ((TMP_InputField)Get(controller, "rematchSecretInput")).text = "32";
+            ((GameObject)Get(controller, "rematchButton")).GetComponent<Button>().onClick.Invoke();
+            S(live, "matchIndex", 1);
+            Emit(live);
+            yield return null;
+            AssertRoomIdentity(host, "1", "6", "Marinos", "Ελένη");
+            Assert.That(PlayerPrefs.GetString("PlayerName"), Is.EqualTo("Unrelated"));
+            Assert.That(PlayerPrefs.GetInt("HOL.Onboarding.Avatar"), Is.Zero);
+            Invoke(controller, "OnLeaveMatchPressed");
+            StartJoined();
+            // Reused room code is deliberately not sufficient: the previous
+            // generation's retained callback must not restore the old room.
+            stalePoll.DynamicInvoke(live);
+            staleClosed();
+            staleLost();
+            Assert.That(controller.GetType().GetProperty("PresentationState").GetValue(controller), Is.Null);
+            var replacement = State("play");
+            S(replacement, "hostName", "Zero"); S(replacement, "guestName", "Legacy");
+            S(replacement, "hostAvatarId", "0"); S(replacement, "guestAvatarId", null);
+            Emit(replacement);
+            yield return null;
+            AssertRoomIdentity(false, "0", null, "Zero", "Legacy");
+        }
+        Assert.That(violations, Is.Empty, string.Join("\n", violations));
+    }
+
+    void AssertRoomIdentity(bool host, string hostId, string guestId, string hostName, string guestName)
+    {
+        Sprite mine = ResolveId(host ? hostId : guestId), theirs = ResolveId(host ? guestId : hostId);
+        foreach (string name in new[] { "PvpPlayerCharacter", "PvpResultHero", "PvpMatchPlayerChipAvatar", "PvpResultPlayerChipAvatar",
+            "PrivateRoomPlayerAvatar", "PvPCreatePanelPlayerAvatar", "PvPJoinPanelPlayerAvatar" })
+        {
+            var image = Find(root.transform, name).GetComponent<Image>();
+            Assert.That(image.sprite, Is.SameAs(mine), name);
+            Assert.That(image.raycastTarget, Is.False, name);
+            Assert.That(image.preserveAspect, Is.True, name);
+        }
+        foreach (string name in new[] { "PvpOpponentCharacter", "PvpResultOpponentCharacter", "PvpSignalOpponentAvatar" })
+            Assert.That(Find(root.transform, name).GetComponent<Image>().sprite, Is.SameAs(theirs), name);
+        foreach (string name in new[] { "PvpPlayerName", "PvpResultPlayerName", "PrivateRoomPlayerName" })
+            Assert.That(Find(root.transform, name).GetComponent<TMP_Text>().text, Is.EqualTo(host ? hostName : guestName), name);
+        foreach (string name in new[] { "PvpOpponentName", "PvpResultOpponentName" })
+            Assert.That(Find(root.transform, name).GetComponent<TMP_Text>().text, Is.EqualTo(host ? guestName : hostName), name);
+    }
+
+    static Sprite ResolveId(string id) => (Sprite)T("PlayerProfileAvatarResolver").GetMethod("ResolveId").Invoke(null, new object[] { id });
+
+    [UnityTest]
+    public IEnumerator EveryRoomPortraitFitsWaitingMatchAndResultAcrossEnElViewports()
+    {
+        yield return Build();
+        var errors = new List<string>();
+        foreach (var viewport in new[] { new Vector2(720, 1280), new Vector2(1080, 1920),
+            new Vector2(1080, 2400), new Vector2(1179, 2556) })
+        foreach (string language in new[] { "en", "el" })
+        foreach (string phase in new[] { "waiting", "play", "done" })
+        {
+            SetLanguage(language);
+            Invoke(controller, "OnLeaveMatchPressed");
+            StartJoined();
+            var state = State(phase);
+            S(state, "hostName", "Κωνσταντίνος"); S(state, "guestName", "Αλεξάνδρα");
+            S(state, "winner", phase == "done" ? "draw" : "");
+            Emit(state);
+            yield return null;
+            foreach (var safe in root.GetComponentsInChildren(T("ResponsiveSafeAreaRoot"), true))
+                Invoke(safe, "ApplyViewport", new Rect(Vector2.zero, viewport),
+                    new Rect(0, 44, viewport.x, viewport.y - 88), new Vector2(1080, 1920));
+            Invoke(root.GetComponent(T("PvpDuelCartoonVisuals")), "ApplyResponsiveLayoutForViewport", viewport.x, viewport.y);
+            // Exercise every catalog identity in both seats, plus canonical
+            // fallback. Measurements below are independent test-owned alpha
+            // footprints, not the production framing calculation.
+            for (int id = 0; id <= 11; id++)
+            {
+                S(state, "hostAvatarId", id.ToString());
+                S(state, "guestAvatarId", ((id + 6) % 12).ToString());
+                Emit(state);
+                Canvas.ForceUpdateCanvases();
+                string context = language + " " + phase + " " + viewport + " id=" + id;
+                foreach (var portrait in root.GetComponentsInChildren<Image>(false))
+                {
+                    if (!portrait.name.EndsWith("Avatar", StringComparison.Ordinal) &&
+                        portrait.name != "PvpPlayerCharacter" && portrait.name != "PvpOpponentCharacter" &&
+                        portrait.name != "PvpResultHero" && portrait.name != "PvpResultOpponentCharacter") continue;
+                    var aperture = portrait.transform.parent as RectTransform;
+                    Assert.That(aperture.GetComponent<Mask>() != null || aperture.GetComponent<RectMask2D>() != null,
+                        Is.True, context + " " + portrait.name + " must retain a real mask");
+                    PlayerProfileAvatarFramingTestAssertions.AssertLayout(portrait, aperture, context + " " + portrait.name);
+                    Assert.That(portrait.raycastTarget, Is.False, context);
+                }
+                AuditGlyphs(context, errors);
+            }
+        }
+        Assert.That(errors, Is.Empty, string.Join("\n", errors));
     }
 
     [UnityTest]
@@ -462,9 +649,14 @@ public sealed class PvpProductionPresentationPlayModeTests
                     foreach (var text in card.GetComponentsInChildren<TMP_Text>(false))
                     {
                         bool caption = text.name.EndsWith("Caption", StringComparison.Ordinal);
-                        Assert.That(text.fontSize, Is.EqualTo(caption ? 30 : 31), context);
+                        bool identity = text.name == "WaitingPlayerName" || text.name == "WaitingOpponentName";
+                        Assert.That(text.fontSize, Is.EqualTo(caption ? 30 : identity ? 26 : 31), context + " " + text.name);
+                        // The approved card shell is unchanged. Identity now
+                        // owns the middle row beside its 80px portrait; ready
+                        // status owns the separate lower row, never the name.
                         AuditFace(text, card, caption ? new Rect(-142, 62, 284, 52)
-                            : new Rect(-144, -72, 288, 112), context, errors);
+                            : identity ? new Rect(-44, -16, 186, 68)
+                            : new Rect(-144, -94, 288, 76), context, errors);
                     }
                 }
             }
@@ -647,6 +839,7 @@ public sealed class PvpProductionPresentationPlayModeTests
         ((GameObject)Get(controller, create ? "createConfirmButton" : "joinConfirmButton")).GetComponent<Button>().onClick.Invoke();
         if (state == "JoinError")
             ((Action<bool, string>)Get(backend, "PendingRoomRequest"))(false, L("pvp_room_not_found"));
+        if (state == "Waiting") Emit(State("waiting"));
     }
 
     [UnityTest]
@@ -745,7 +938,14 @@ public sealed class PvpProductionPresentationPlayModeTests
         yield return CaptureNative(true);
     }
 
-    IEnumerator CaptureNative(bool prematchOnly)
+    [UnityTest, Explicit("Bounded room-identity evidence; choose a new external folder in HOL/PvP.")]
+    public IEnumerator CaptureNativeRoomIdentitiesEnElAndTall()
+    {
+        T("PvpPresentationReviewTools").GetMethod("FocusNativeGameView").Invoke(null, null);
+        yield return CaptureNative(false, true);
+    }
+
+    IEnumerator CaptureNative(bool prematchOnly, bool identityOnly = false)
     {
         var tool = T("PvpPresentationReviewTools");
         string output = (string)tool.GetProperty("OutputDirectory").GetValue(null);
@@ -756,8 +956,11 @@ public sealed class PvpProductionPresentationPlayModeTests
         yield return Build();
         foreach (var viewport in new[] { new Vector2Int(1080, 1920), new Vector2Int(1080, 2400), new Vector2Int(1179, 2556) })
         foreach (string language in new[] { "en", "el" })
-        foreach (string state in prematchOnly ? PrematchCases : Cases)
+        foreach (string state in identityOnly ? new[] { "Waiting", "GuestWaiting", "PlayerTurn", "ResultWin" } :
+            prematchOnly ? PrematchCases : Cases)
         {
+            if (identityOnly && viewport.y != 1920 &&
+                (viewport.y != 2400 || language != "el" || (state != "PlayerTurn" && state != "ResultWin"))) continue;
             if (viewport.y != 1920 && state != "PrivateRoom" && state != "Waiting" &&
                 (prematchOnly || (state != "PlayerTurn" && state != "ResultWin"))) continue;
             T("OnboardingGameViewCapture").GetMethod("SetResolution").Invoke(null, new object[] { viewport.x, viewport.y });
@@ -767,7 +970,15 @@ public sealed class PvpProductionPresentationPlayModeTests
             // too, then retain the exact dimensional gate below.
             Screen.SetResolution(viewport.x, viewport.y, false);
             SetLanguage(language);
-            if (prematchOnly) ShowPrematchCase(state); else ShowCase(state);
+            if (identityOnly && state == "GuestWaiting")
+            {
+                Invoke(controller, "OnLeaveMatchPressed");
+                StartJoined();
+                var waiting = State("waiting");
+                S(waiting, "guestName", "Player"); S(waiting, "guestAvatarId", "6");
+                Emit(waiting);
+            }
+            else if (prematchOnly) ShowPrematchCase(state); else ShowCase(state);
             yield return null;
             yield return null;
             yield return (IEnumerator)tool.GetMethod("WaitForStableNativeViewport")
@@ -842,6 +1053,8 @@ public sealed class PvpProductionPresentationPlayModeTests
                 float bottom = panel.InverseTransformPoint(text.transform.TransformPoint(new Vector3(minX, minY))).y;
                 if (bottom < -115)
                     errors.Add(context + " " + text.name + " touches prebattle card lower rim: " + bottom);
+                if (bottom < -95)
+                    errors.Add(context + " " + text.name + " leaves the inset waiting text face: " + bottom);
             }
             if (hasGlyph)
             {
@@ -891,6 +1104,7 @@ public sealed class PvpProductionPresentationPlayModeTests
             {
                 ((TMP_InputField)Get(controller, "createSecretInput")).text = "80";
                 ((GameObject)Get(controller, "createConfirmButton")).GetComponent<Button>().onClick.Invoke();
+                Emit(State("waiting"));
             }
             return;
         }
@@ -960,7 +1174,8 @@ public sealed class PvpProductionPresentationPlayModeTests
     {
         object state = Activator.CreateInstance(T("PvpBackend").GetNestedType("RoomState"));
         S(state, "phase", phase); S(state, "turn", "guest"); S(state, "matchIndex", 0);
-        S(state, "hostName", "Κωνσταντίνος"); S(state, "guestName", "Player"); S(state, "opener", "host");
+        S(state, "hostName", "Κωνσταντίνος"); S(state, "guestName", phase == "waiting" ? "" : "Player"); S(state, "opener", "host");
+        S(state, "hostAvatarId", "1"); S(state, "guestAvatarId", phase == "waiting" ? "" : "6");
         return state;
     }
     void Emit(object state) { Invoke(backend, "Emit", state); }

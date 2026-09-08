@@ -11,6 +11,12 @@ public class PvpRoomState
 {
     public string hostName = "";
     public string guestName = "";
+    // Canonical catalog indices as strings: "0" is valid, absent/empty is not.
+    public string hostAvatarId = "";
+    public string guestAvatarId = "";
+
+    public string NameFor(bool host) => (host ? hostName : guestName) ?? "";
+    public string AvatarIdFor(bool host) => (host ? hostAvatarId : guestAvatarId) ?? "";
 
     public string turn = "";    // "host" | "guest"
     public string phase = "";   // "waiting" | "play" | "done" | "closed"

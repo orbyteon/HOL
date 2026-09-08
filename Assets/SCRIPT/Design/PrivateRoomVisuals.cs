@@ -53,6 +53,8 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
         public TMP_Text codeText, entryStatus, opponentStatus, status;
         public Button copy, back;
         internal bool createMode;
+        internal TMP_Text playerName, opponentName;
+        internal Image playerPortrait, opponentPortrait;
     }
 
     IEnumerator Start()
@@ -279,11 +281,17 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
         Copy(you.transform, "YouCaption", "prebattle_you", 30,
             new Rect(-142, 62, 284, 52), Cyan);
         Copy(you.transform, "YouReady", "private_room_secret_ready", 31,
-            new Rect(-144, -72, 288, 112), White, false);
+            new Rect(-144, -94, 288, 76), White, false);
         Copy(opponent.transform, "OpponentCaption", "prebattle_opponent", 30,
             new Rect(-142, 62, 284, 52), Cyan);
         parts.opponentStatus = Copy(opponent.transform, "Status", "prebattle_waiting_short", 31,
-            new Rect(-144, -72, 288, 112), White, false);
+            new Rect(-144, -94, 288, 76), White, false);
+        parts.playerPortrait = WaitingPortrait(you.transform, "WaitingPlayerAvatar");
+        parts.opponentPortrait = WaitingPortrait(opponent.transform, "WaitingOpponentAvatar");
+        parts.playerName = Text(you.transform, "WaitingPlayerName", "", 26,
+            new Rect(-44, -16, 186, 68), White, false);
+        parts.opponentName = Text(opponent.transform, "WaitingOpponentName", "", 26,
+            new Rect(-44, -16, 186, 68), White, false);
 
         if (createMode)
         {
@@ -323,18 +331,50 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
         foreach (var region in centered) region.Apply();
     }
 
+    Image WaitingPortrait(Transform parent, string name)
+    {
+        var aperture = Sprite(parent, name + "Aperture",
+            PlayerProfileAvatarResolver.CircularApertureResourcePath,
+            new Vector2(-105, 18), new Vector2(80, 80), true);
+        aperture.gameObject.AddComponent<Mask>().showMaskGraphic = false;
+        return Sprite(aperture.transform, name, null, Vector2.zero, new Vector2(80, 80), true);
+    }
+
+    public void RefreshRoomIdentity() { RefreshIdentity(); }
+
     void RefreshIdentity()
     {
-        string name = PlayerPrefs.GetString("PlayerName", "");
+        string name = "", avatarId = "";
+        bool accepted = pvp != null && pvp.TryGetPresentationIdentity(false, out name, out avatarId);
+        if (!accepted) name = PlayerPrefs.GetString(OnboardingProfile.PlayerNameKey, "");
         if (string.IsNullOrWhiteSpace(name)) name = L10n.Get("player_default");
         foreach (var text in names) if (text != null) text.text = name;
         foreach (var text in streaks) if (text != null) text.text = GameStats.CurrentStreak.ToString();
         foreach (var portrait in portraits)
         {
             if (portrait == null) continue;
-            portrait.sprite = PlayerProfileAvatarResolver.Resolve();
+            portrait.sprite = accepted ? PlayerProfileAvatarResolver.ResolveId(avatarId) : PlayerProfileAvatarResolver.Resolve();
             PlayerProfileAvatarFraming.Apply(portrait, portrait.transform.parent as RectTransform);
         }
+        string opponentName = "", opponentId = "";
+        if (pvp != null) pvp.TryGetPresentationIdentity(true, out opponentName, out opponentId);
+        foreach (var form in forms)
+        {
+            form.playerName.text = accepted ? name : "";
+            form.opponentName.text = accepted ? opponentName : "";
+            form.playerName.gameObject.SetActive(accepted && !string.IsNullOrWhiteSpace(name));
+            form.opponentName.gameObject.SetActive(accepted && !string.IsNullOrWhiteSpace(opponentName));
+            PaintWaitingPortrait(form.playerPortrait, avatarId, accepted);
+            PaintWaitingPortrait(form.opponentPortrait, opponentId,
+                accepted && !string.IsNullOrWhiteSpace(opponentName));
+        }
+    }
+
+    static void PaintWaitingPortrait(Image portrait, string avatarId, bool present)
+    {
+        portrait.gameObject.SetActive(present);
+        portrait.sprite = present ? PlayerProfileAvatarResolver.ResolveId(avatarId) : null;
+        if (present) PlayerProfileAvatarFraming.Apply(portrait, portrait.transform.parent as RectTransform);
     }
 
     void RefreshAvailability()

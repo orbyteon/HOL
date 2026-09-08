@@ -357,19 +357,31 @@ public class ExactReferenceAssetsTests
             roomType.GetField("matchIndex").SetValue(current, 1);
             roomType.GetField("hostGuessCount").SetValue(current, 0);
             roomType.GetField("phase").SetValue(current, "play");
+            roomType.GetField("hostAvatarId").SetValue(current, "1");
+            roomType.GetField("guestAvatarId").SetValue(current, "6");
 
             InvokePrivate(client, "ApplyReturnedState", current,
                 "{\"ok\":true,\"state\":\"{\\\"matchIndex\\\":0," +
-                "\\\"hostGuessCount\\\":9,\\\"phase\\\":\\\"done\\\"}\"}");
+                "\\\"hostGuessCount\\\":9,\\\"phase\\\":\\\"done\\\",\\\"hostAvatarId\\\":\\\"0\\\",\\\"guestAvatarId\\\":\\\"2\\\"}\"}");
 
             Assert.AreEqual(1, roomType.GetField("matchIndex").GetValue(current));
             Assert.AreEqual(0, roomType.GetField("hostGuessCount").GetValue(current));
             Assert.AreEqual("play", roomType.GetField("phase").GetValue(current));
+            Assert.AreEqual("1", roomType.GetField("hostAvatarId").GetValue(current));
+            Assert.AreEqual("6", roomType.GetField("guestAvatarId").GetValue(current));
 
             InvokePrivate(client, "ApplyReturnedState", current,
                 "{\"ok\":true,\"state\":\"{\\\"matchIndex\\\":1," +
-                "\\\"hostGuessCount\\\":2,\\\"phase\\\":\\\"play\\\"}\"}");
+                "\\\"hostGuessCount\\\":2,\\\"phase\\\":\\\"play\\\",\\\"hostAvatarId\\\":\\\"0\\\",\\\"guestAvatarId\\\":\\\"6\\\"}\"}");
             Assert.AreEqual(2, roomType.GetField("hostGuessCount").GetValue(current));
+            Assert.AreEqual("0", roomType.GetField("hostAvatarId").GetValue(current));
+            Assert.AreEqual("6", roomType.GetField("guestAvatarId").GetValue(current));
+
+            InvokePrivate(client, "ApplyReturnedState", current,
+                "{\"ok\":true,\"state\":\"{\\\"matchIndex\\\":1,\\\"phase\\\":\\\"play\\\"}\"}");
+            Assert.That(string.IsNullOrEmpty((string)roomType.GetField("hostAvatarId").GetValue(current)), Is.True,
+                "A legacy snapshot must clear, not retain, a stale host portrait.");
+            Assert.That(string.IsNullOrEmpty((string)roomType.GetField("guestAvatarId").GetValue(current)), Is.True);
         }
         finally
         {

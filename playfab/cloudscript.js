@@ -383,6 +383,15 @@ function narrowFor(state, side, guess, hint) {
     }
 }
 
+// Cosmetic catalog membership only, not purchase/ownership authorization.
+// Parity with OnboardingAvatarCatalog.CanEverSelect is enforced by Node tests.
+function validAvatarId(value) {
+    if (typeof value !== "string") return "";
+    var index = Number(value);
+    return value === String(index) && index >= 0 && index <= 10 &&
+        Math.floor(index) === index ? value : "";
+}
+
 function viewFor(state, playerId) {
     var side = sideForPlayer(state, playerId);
     var revealed = 0;
@@ -392,6 +401,8 @@ function viewFor(state, playerId) {
     return {
         hostName: String(state.hostName || ""),
         guestName: String(state.guestName || ""),
+        hostAvatarId: validAvatarId(state.hostAvatarId),
+        guestAvatarId: validAvatarId(state.guestAvatarId),
         turn: String(state.turn || ""),
         phase: String(state.phase || ""),
         lastGuess: state.lastGuess | 0,
@@ -496,6 +507,8 @@ handlers.createRoom = function (args, context) {
             guestId: "",
             hostName: hostName,
             guestName: "",
+            hostAvatarId: validAvatarId(args && args.hostAvatarId),
+            guestAvatarId: "",
             hostSecret: hostSecret,
             guestSecret: 0,
             // The opener is drawn when the guest arrives, so neither side can
@@ -563,6 +576,7 @@ handlers.joinRoom = function (args, context) {
 
         state.guestId = playerId;
         state.guestName = cleanName(args.guestName, "Player");
+        state.guestAvatarId = validAvatarId(args.guestAvatarId);
         state.guestSecret = guestSecret;
         state.phase = "play";
         state.opener = Math.random() < 0.5 ? "host" : "guest";

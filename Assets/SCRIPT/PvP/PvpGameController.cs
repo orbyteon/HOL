@@ -84,6 +84,7 @@ public class PvpGameController : MonoBehaviour
     public AudioClip loseSound;
 
     PvpBackend.RoomState lastState;
+    string presentationRoomCode = "";
     bool matchOver;
     bool guessInFlight;
     bool abnormalTerminal;
@@ -105,6 +106,34 @@ public class PvpGameController : MonoBehaviour
     public bool PresentationMatchOver => matchOver || abnormalTerminal;
     public bool PresentationGuessInFlight => guessInFlight;
     public bool PresentationLockArmed => lockArmed;
+
+    // Both visual owners read the same accepted room identity, including on
+    // language/periodic repaint. They must not substitute this device's prefs.
+    public bool TryGetPresentationIdentity(bool opponent, out string name, out string avatarId)
+    {
+        name = avatarId = "";
+        if (lastState == null || client == null ||
+            presentationRoomCode != client.RoomCode) return false;
+        bool host = opponent ? !client.IsHost : client.IsHost;
+        name = lastState.NameFor(host);
+        avatarId = lastState.AvatarIdFor(host);
+        if (string.IsNullOrWhiteSpace(name) && !(opponent && lastState.phase == "waiting"))
+            name = L10n.Get("player_default");
+        return true;
+    }
+
+    void RefreshRoomIdentity()
+    {
+        GetComponent<PrivateRoomVisuals>()?.RefreshRoomIdentity();
+        GetComponent<PvpDuelCartoonVisuals>()?.RefreshRoomIdentity();
+    }
+
+    void ClearRoomIdentity()
+    {
+        lastState = null;
+        presentationRoomCode = "";
+        RefreshRoomIdentity();
+    }
 
     int lastSignalSeq;
     int signalsSent;
@@ -146,6 +175,7 @@ public class PvpGameController : MonoBehaviour
     // polling, or send a request merely because the language changed.
     void RefreshLocalizedPresentation()
     {
+        RefreshRoomIdentity();
         // Repaint pre-match copy without issuing a room request or changing
         // the flow generation. Animated waiting feedback keeps the new base.
         if (createStatusEllipsis != null && createStatusEllipsis.enabled &&
@@ -173,6 +203,7 @@ public class PvpGameController : MonoBehaviour
 
     public void OpenPvpMenu()
     {
+        if (client == null || string.IsNullOrEmpty(client.RoomCode)) ClearRoomIdentity();
         abnormalTerminal = false;
         authoritativeResultShown = false;
         if (terminalPresentation != null) terminalPresentation.Hide();
@@ -207,13 +238,14 @@ public class PvpGameController : MonoBehaviour
 
         joinCreateInFlight = true;
         int gen = flowGeneration;
-        client.CreateRoom(MyName, secret, (ok, codeOrError) =>
+        ClearRoomIdentity();
+        client.CreateRoom(MyName, PlayerProfileAvatarResolver.ReadCommittedId(), secret, (ok, codeOrError) =>
         {
-            joinCreateInFlight = false;
             if (gen != flowGeneration)
             {
                 return;
             }
+            joinCreateInFlight = false;
             if (!ok)
             {
                 ShowCreateEntry("pvp_network_error");
@@ -337,13 +369,14 @@ public class PvpGameController : MonoBehaviour
         SetPrebattleMessage(joinStatusText, "pvp_joining");
         joinCreateInFlight = true;
         int gen = flowGeneration;
-        client.JoinRoom(joinCodeInput.text, MyName, secret, (ok, error) =>
+        ClearRoomIdentity();
+        client.JoinRoom(joinCodeInput.text, MyName, PlayerProfileAvatarResolver.ReadCommittedId(), secret, (ok, error) =>
         {
-            joinCreateInFlight = false;
             if (gen != flowGeneration)
             {
                 return;
             }
+            joinCreateInFlight = false;
             if (!ok)
             {
                 // The transport returns these existing localized errors. Keep
@@ -582,6 +615,8 @@ public class PvpGameController : MonoBehaviour
 
     void BeginMatchPolling()
     {
+        ClearRoomIdentity();
+        presentationRoomCode = client.RoomCode;
         matchOver = false;
         guessInFlight = false;
         abnormalTerminal = false;
@@ -604,9 +639,17 @@ public class PvpGameController : MonoBehaviour
         RefreshSignalsAvailability();
         if (signalFeedText != null) signalFeedText.text = "";
         if (resultSignalFeedText != null) resultSignalFeedText.text = "";
-        client.OnRoomClosed = HandleRoomClosed;
-        client.OnConnectionLost = HandleConnectionLost;
-        client.StartPolling(OnState);
+        int generation = flowGeneration;
+        string room = client.RoomCode;
+        client.OnRoomClosed = () => {
+            if (generation == flowGeneration && room == client.RoomCode) HandleRoomClosed();
+        };
+        client.OnConnectionLost = () => {
+            if (generation == flowGeneration && room == client.RoomCode) HandleConnectionLost();
+        };
+        client.StartPolling(state => {
+            if (generation == flowGeneration && room == client.RoomCode) OnState(state);
+        });
     }
 
     void HandleRoomClosed()
@@ -684,6 +727,7 @@ public class PvpGameController : MonoBehaviour
         }
 
         lastState = s;
+        RefreshRoomIdentity();
 
         string me = client.IsHost ? "host" : "guest";
 

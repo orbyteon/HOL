@@ -7,7 +7,9 @@ using System;
 public sealed class PvpPresentationFixtureBackend : PvpBackend
 {
     public int CreateCalls, JoinCalls, GuessCalls, RematchCalls, LeaveCalls;
+    public int PollCalls, SignalCalls;
     public int LastSecret, LastGuess;
+    public string LastName, LastAvatarId;
     public bool LastLock;
     public bool HoldRequests;
     public bool HoldGuesses;
@@ -17,15 +19,17 @@ public sealed class PvpPresentationFixtureBackend : PvpBackend
     public override bool IsServerAuthoritative => true;
     public void Configure(bool host) { IsHost = host; }
     public void Emit(RoomState state) { observer?.Invoke(state); }
-    public override void CreateRoom(string name, int secret, Action<bool, string> done)
+    public override void CreateRoom(string name, string avatarId, int secret, Action<bool, string> done)
     {
+        LastName = name; LastAvatarId = avatarId;
         CreateCalls++; LastSecret = secret; IsHost = true;
         if (HoldRequests) { PendingRoomRequest = done; return; }
         RoomCode = "MTW8H";
         done(true, RoomCode);
     }
-    public override void JoinRoom(string code, string name, int secret, Action<bool, string> done)
+    public override void JoinRoom(string code, string name, string avatarId, int secret, Action<bool, string> done)
     {
+        LastName = name; LastAvatarId = avatarId;
         JoinCalls++; LastSecret = secret; IsHost = false;
         if (HoldRequests) { PendingRoomRequest = done; return; }
         RoomCode = code;
@@ -42,8 +46,8 @@ public sealed class PvpPresentationFixtureBackend : PvpBackend
     {
         RematchCalls++; LastSecret = secret; done(true);
     }
-    public override void SendSignal(int id, int matchIndex, Action<bool> done) { done(true); }
-    public override void StartPolling(Action<RoomState> onState) { observer = onState; }
+    public override void SendSignal(int id, int matchIndex, Action<bool> done) { SignalCalls++; done(true); }
+    public override void StartPolling(Action<RoomState> onState) { PollCalls++; observer = onState; }
     public override void StopPolling() { observer = null; }
     public override void DeleteRoom() { LeaveCalls++; RoomCode = ""; observer = null; }
 }

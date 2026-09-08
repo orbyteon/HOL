@@ -35,7 +35,6 @@ public sealed class PvpDuelCartoonVisuals : MonoBehaviour
     const string LowerResource = "solo/production/solo_history_low_v1";
     const string CorrectResource = "solo/production/solo_history_correct_v1";
     const string LogoResource = "reference/hol_logo_exact";
-    const string OpponentResource = "reference/opponent_purple_exact";
     static readonly Color White = new Color(0.985f, 0.975f, 1f, 1f);
     static readonly Color Ink = new Color(0.09f, 0.05f, 0.16f, 1f);
     static readonly Color Cyan = new Color(0.20f, 0.94f, 1f, 1f);
@@ -47,6 +46,8 @@ public sealed class PvpDuelCartoonVisuals : MonoBehaviour
     TMP_FontAsset displayFont;
     TMP_FontAsset bodyFont;
     readonly List<Image> profilePortraits = new List<Image>();
+    readonly List<Image> playerPortraits = new List<Image>();
+    readonly List<Image> opponentPortraits = new List<Image>();
     readonly List<TMP_Text> nameLabels = new List<TMP_Text>();
     readonly List<TMP_Text> chipLabels = new List<TMP_Text>();
     TMP_Text resultStreak;
@@ -121,23 +122,56 @@ public sealed class PvpDuelCartoonVisuals : MonoBehaviour
         CenterButtonFaces();
     }
 
+    public void RefreshRoomIdentity() { RefreshIdentity(); }
+
     void RefreshIdentity()
     {
-        string player = PlayerPrefs.GetString("PlayerName", "");
+        string player = "", avatarId = "";
+        bool accepted = pvp != null && pvp.TryGetPresentationIdentity(false, out player, out avatarId);
+        if (!accepted) player = PlayerPrefs.GetString(OnboardingProfile.PlayerNameKey, "");
         if (string.IsNullOrWhiteSpace(player)) player = L10n.Get("player_default");
         foreach (var label in nameLabels) if (label != null) label.text = player;
         foreach (var label in chipLabels)
             if (label != null) label.text = GameStats.Wins.ToString();
         if (playerWins != null) playerWins.text = GameStats.Wins.ToString();
-        Sprite selected = PlayerProfileAvatarResolver.Resolve();
+        Sprite selected = accepted ? PlayerProfileAvatarResolver.ResolveId(avatarId) : PlayerProfileAvatarResolver.Resolve();
         foreach (var portrait in profilePortraits)
         {
             if (portrait == null) continue;
             portrait.sprite = selected;
             PlayerProfileAvatarFraming.Apply(portrait, portrait.transform.parent as RectTransform);
         }
+        PaintPortraits(playerPortraits, selected);
+        string opponentName = "", opponentAvatarId = "";
+        if (pvp != null) pvp.TryGetPresentationIdentity(true, out opponentName, out opponentAvatarId);
+        PaintPortraits(opponentPortraits, PlayerProfileAvatarResolver.ResolveId(opponentAvatarId));
+        if (pvp != null && pvp.opponentNameText != null) pvp.opponentNameText.text = opponentName;
+        if (pvp != null && pvp.resultPresentation != null) pvp.resultPresentation.SetOpponentName(opponentName);
         if (resultStreak != null)
             resultStreak.text = L10n.Get("stats_streak") + ": " + GameStats.CurrentStreak;
+    }
+
+    static void PaintPortraits(List<Image> portraits, Sprite sprite)
+    {
+        foreach (var portrait in portraits)
+        {
+            if (portrait == null) continue;
+            portrait.sprite = sprite;
+            PlayerProfileAvatarFraming.Apply(portrait, portrait.transform.parent as RectTransform);
+        }
+    }
+
+    Image RoomPortrait(Transform parent, string name, bool opponent, Vector2 position, Vector2 size)
+    {
+        // Keep the approved card shell; only its identity aperture owns pixels.
+        var aperture = AddSprite(parent, name + "Aperture",
+            PlayerProfileAvatarResolver.CircularApertureResourcePath, position, size);
+        aperture.gameObject.AddComponent<Mask>().showMaskGraphic = false;
+        var portrait = AddSprite(aperture.transform, name,
+            PlayerProfileAvatarResolver.FallbackResourcePath, Vector2.zero, size);
+        (opponent ? opponentPortraits : playerPortraits).Add(portrait);
+        PlayerProfileAvatarFraming.Apply(portrait, aperture.rectTransform);
+        return portrait;
     }
 
     void BuildMatch()
@@ -150,9 +184,7 @@ public sealed class PvpDuelCartoonVisuals : MonoBehaviour
 
         var player = Frame(safe, "PvpPlayerCard", PlayerCardResource,
             new Vector2(-276, 472), new Vector2(514, 620));
-        // Like Solo, the large characters are approved decorative artwork.
-        // Only the masked header portrait claims the saved player identity.
-        AddSprite(player.transform, "PvpPlayerCharacter", "reference/player_cyan_exact",
+        RoomPortrait(player.transform, "PvpPlayerCharacter", false,
             new Vector2(-52, 62), new Vector2(350, 350));
         Label(player.transform, "PvpPlayerCaption", "solo_you_header", 38,
             new Vector2(0, 248), new Vector2(320, 52));
@@ -172,7 +204,7 @@ public sealed class PvpDuelCartoonVisuals : MonoBehaviour
 
         var opponent = Frame(safe, "PvpOpponentCard", OpponentCardResource,
             new Vector2(282, 470), new Vector2(514, 620));
-        AddSprite(opponent.transform, "PvpOpponentCharacter", OpponentResource,
+        RoomPortrait(opponent.transform, "PvpOpponentCharacter", true,
             new Vector2(-20, 72), new Vector2(344, 344));
         Label(opponent.transform, "PvpOpponentCaption", "prebattle_opponent", 37,
             new Vector2(0, 248), new Vector2(320, 52));
@@ -244,8 +276,18 @@ public sealed class PvpDuelCartoonVisuals : MonoBehaviour
         signalPlaceholder = Label(bubble.transform, "SignalPlaceholder", "pvp_signal_idle", 24,
             new Vector2(0, 8), new Vector2(218, 110), Ink);
         signalPlaceholder.outlineWidth = 0;
-        AddSprite(bubble.transform, "PvpSignalOpponentMedallion", "solo/production/solo_opponent_medallion_v1",
+        var medallion = AddSprite(bubble.transform, "PvpSignalOpponentMedallion", "solo/production/solo_opponent_medallion_v1",
             new Vector2(160, -20), new Vector2(130, 130));
+        // Retain the approved outer ring, but its baked Solo opponent is not
+        // a PvP identity. The existing opaque disc owns only the inner face.
+        var face = AddSprite(medallion.transform, "PvpSignalIdentityFace",
+            PlayerProfileAvatarResolver.CircularApertureResourcePath, Vector2.zero, new Vector2(130, 130));
+        face.color = new Color(.035f, .015f, .10f, 1f);
+        face.gameObject.AddComponent<Mask>().showMaskGraphic = true;
+        var signalPortrait = AddSprite(face.transform, "PvpSignalOpponentAvatar",
+            PlayerProfileAvatarResolver.FallbackResourcePath, Vector2.zero, new Vector2(130, 130));
+        opponentPortraits.Add(signalPortrait);
+        PlayerProfileAvatarFraming.Apply(signalPortrait, face.rectTransform);
 
         BuildHistory(rail.transform);
         var tip = Frame(rail.transform, "PvpTipCard", TipResource,
@@ -577,14 +619,16 @@ public sealed class PvpDuelCartoonVisuals : MonoBehaviour
             new Vector2(0, 650), new Vector2(900, 160));
         var title = Text(titleRibbon.transform, "ResultTitle", "", 65,
             Vector2.zero, new Vector2(790, 112));
-        AddSprite(safe, "PvpResultHero", "reference/char_boy_exact",
-            new Vector2(-220, 285), new Vector2(520, 540));
+        RoomPortrait(safe, "PvpResultHero", false,
+            new Vector2(-220, 335), new Vector2(420, 360));
+        nameLabels.Add(Text(safe, "PvpResultPlayerName", "", 30,
+            new Vector2(-220, 125), new Vector2(420, 50)));
         var trophy = AddVectorSprite(safe, "PvpResultTrophy", "reference/board_trophy_exact",
             new Vector2(65, 345), new Vector2(250, 280));
         var opponent = Frame(safe, "PvpResultOpponentCard", MagentaFrameResource,
             new Vector2(330, 285), new Vector2(330, 420));
-        AddSprite(opponent.transform, "PvpResultOpponentCharacter", OpponentResource,
-            new Vector2(0, 20), new Vector2(220, 225));
+        RoomPortrait(opponent.transform, "PvpResultOpponentCharacter", true,
+            new Vector2(0, 40), new Vector2(210, 180));
         Label(opponent.transform, "PvpResultOpponentLabel", "prebattle_opponent", 25,
             new Vector2(0, 165), new Vector2(280, 42));
         var opponentName = Text(opponent.transform, "PvpResultOpponentName", "", 30,
