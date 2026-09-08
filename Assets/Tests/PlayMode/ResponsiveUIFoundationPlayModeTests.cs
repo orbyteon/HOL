@@ -73,22 +73,33 @@ public sealed class ResponsiveUIFoundationPlayModeTests
         var pvpMatch = (GameObject)Field(pvp, "matchPanel");
         AddTargets(targets, pvpMenu.transform,
             "CreateButton", "JoinButton", "PrivateRoomTipCard");
-        AddTargets(targets, pvpCreate.transform,
-            "YouCard", "OpponentCard", "RuleCard", "CancelButton",
-            "ConfirmCreateButton");
-        AddTargets(targets, pvpJoin.transform,
-            "YouCard", "OpponentCard", "RuleCard", "CancelButton",
-            "ConfirmJoinButton");
-        AddTargets(targets, pvpMatch.transform,
-            "PlayerCard", "OpponentCard", "PromptBanner", "GuessCard",
-            "SignalBubble", "HistoryCard", "TipCard", "LeaveButton");
         Transform result = Find(pvpMatch.transform, "ResultVisualRoot");
         Transform terminal = Find(pvpMatch.transform, "PvpTerminalRoot");
         Assert.That(result, Is.Not.Null);
         Assert.That(terminal, Is.Not.Null);
-        AddTargets(targets, result,
-            "ResultPopTarget", "RematchCard", "ResultRematchStatus", "ReactionCard");
-        AddTargets(targets, terminal, "TerminalCard");
+        // Final PvP construction owns measured safe roots, not the retired
+        // generic page-layout hierarchy. Keep every semantic region under the
+        // same viewport/safe-area containment gate using the real final names.
+        var pvpSafeTargets = new Dictionary<Transform, string[]>
+        {
+            { Find(pvpCreate.transform, "PvPCreatePanelVisualsSafeRoot"), new[] {
+                "YouCard", "OpponentCard", "RuleCard", "CancelButton", "ConfirmCreateButton" } },
+            { Find(pvpJoin.transform, "PvPJoinPanelVisualsSafeRoot"), new[] {
+                "YouCard", "OpponentCard", "RuleCard", "CancelButton", "ConfirmJoinButton" } },
+            { Find(pvpMatch.transform, "PvpDuelCartoonRootSafeRoot"), new[] {
+                "PvpPlayerCard", "PvpOpponentCard", "PvpPromptRibbon", "PvpInteractionCard",
+                "PvpSignalBubble", "PvpHistoryCard", "PvpTipCard", "LeaveButton" } },
+            { Find(result, "PvpResultCartoonRootSafeRoot"), new[] {
+                "PvpResultHero", "PvpResultOpponentCard", "PvpResultStatsCard",
+                "PvpResultActions", "ResultRematchStatus", "ResultSignals" } },
+            { Find(terminal, "PvpTerminalVisualsSafeRoot"), new[] { "TerminalCard" } }
+        };
+        foreach (var pair in pvpSafeTargets)
+        {
+            AssertSingleSafeOwner(pair.Key);
+            Assert.That(pair.Key.GetComponent(RuntimeType("ResponsivePageLayout")), Is.Null,
+                pair.Key.name + " must not have a competing generic page writer.");
+        }
 
         Type layoutType = RuntimeType("ResponsivePageLayout");
         var owners = new Dictionary<Component, List<RectTransform>>();
@@ -137,6 +148,8 @@ public sealed class ResponsiveUIFoundationPlayModeTests
                 AssertSafeRoot(playSafe, viewport, safe, canvasSize,
                     "ButtonChallenger", "ButtonPvP", "ButtonBack",
                     "PlayHubTitle", "PlayHubSubtitle");
+                foreach (var pair in pvpSafeTargets)
+                    AssertPvpSafeRoot(pair.Key, viewport, safe, canvasSize, pair.Value);
             }
         }
 
@@ -316,6 +329,40 @@ public sealed class ResponsiveUIFoundationPlayModeTests
             var found = Find(root, name) as RectTransform;
             Assert.That(found, Is.Not.Null, root.name + " missing " + name);
             targets.Add(found);
+        }
+    }
+
+    static void AssertPvpSafeRoot(Transform root, Vector2 viewport, Rect safePixels,
+        Vector2 canvasSize, string[] childNames)
+    {
+        Type ownerType = RuntimeType("ResponsiveSafeAreaRoot");
+        Component owner = root.GetComponent(ownerType);
+        ownerType.GetMethod("ApplyViewport", InstanceFlags).Invoke(owner, new object[]
+        {
+            new Rect(Vector2.zero, viewport), safePixels, canvasSize
+        });
+        Rect safeRect = Property<Rect>(owner, "LastSafeRect");
+        Vector2 scale = ((RectTransform)root).localScale;
+        foreach (string name in childNames)
+        {
+            var child = Find(root, name) as RectTransform;
+            Assert.That(child, Is.Not.Null, root.name + " missing " + name);
+            var corners = new Vector3[4];
+            child.GetWorldCorners(corners);
+            Vector2 minimum = new Vector2(float.PositiveInfinity, float.PositiveInfinity);
+            Vector2 maximum = new Vector2(float.NegativeInfinity, float.NegativeInfinity);
+            foreach (Vector3 corner in corners)
+            {
+                // Unlike top-level cards, text/actions may be nested. Include
+                // every parent transform instead of treating anchoredPosition
+                // as if it were relative to the safe root.
+                Vector2 local = root.InverseTransformPoint(corner);
+                Vector2 point = safeRect.center + Vector2.Scale(local, scale);
+                minimum = Vector2.Min(minimum, point);
+                maximum = Vector2.Max(maximum, point);
+            }
+            AssertContained(safeRect, Rect.MinMaxRect(minimum.x, minimum.y, maximum.x, maximum.y),
+                viewport + " / " + name);
         }
     }
 

@@ -79,14 +79,15 @@ public sealed class ProductionSymbolPlayModeTests
     }
 
     [UnityTest]
-    public IEnumerator ApprovedSoloTrophyIsARealProductionSprite()
+    public IEnumerator ApprovedPvpTrophyIsARealProductionSprite()
     {
         // Exercise the real result-overlay construction. A standalone PlayMode
         // test can run before Vector Graphics has crossed a scene-load boundary,
         // while production always requests this sprite from the live MainMenu UI.
         yield return SceneManager.LoadSceneAsync("MainMenu", LoadSceneMode.Single);
 
-        Image trophyImage = null;
+        Graphic trophyImage = null;
+        Sprite renderedTrophy = null;
         for (int frame = 0; frame < 120 && trophyImage == null; frame++)
         {
             Transform resultRoot = null;
@@ -97,11 +98,18 @@ public sealed class ProductionSymbolPlayModeTests
                     break;
             }
 
-            Transform trophyObject = Find(resultRoot, "Trophy");
+            Transform trophyObject = Find(resultRoot, "PvpResultTrophy");
             if (trophyObject != null)
             {
-                var image = trophyObject.GetComponent<Image>();
-                if (image != null && image.sprite != null)
+                var image = trophyObject.GetComponent<Graphic>();
+                if (image != null)
+                {
+                    Assert.That(image.GetType().FullName,
+                        Is.EqualTo("Unity.VectorGraphics.SVGImage"),
+                        "The approved vector artwork requires its actual mesh renderer.");
+                    renderedTrophy = (Sprite)image.GetType().GetProperty("sprite").GetValue(image);
+                }
+                if (renderedTrophy != null)
                     trophyImage = image;
             }
 
@@ -114,7 +122,9 @@ public sealed class ProductionSymbolPlayModeTests
         var trophy = Resources.Load<Sprite>("reference/board_trophy_exact");
         Assert.That(trophy, Is.Not.Null,
             "Result presentation requires the approved trophy resource.");
-        Assert.That(trophyImage.sprite, Is.SameAs(trophy));
+        Assert.That(renderedTrophy, Is.SameAs(trophy));
+        Assert.That(trophyImage.color, Is.EqualTo(Color.white),
+            "The normal approved artwork must remain opaque and untinted.");
 
         // Vector Graphics sprites are geometry-backed and are not required to
         // expose a raster Texture2D. Validate the imported vector mesh instead.
