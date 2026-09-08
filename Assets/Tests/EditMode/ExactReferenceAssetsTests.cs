@@ -117,13 +117,16 @@ public class ExactReferenceAssetsTests
         {
             var ui = host.AddComponent(RuntimeType("PvpRuntimeUI"));
             var controller = host.AddComponent(RuntimeType("PvpGameController"));
-            var match = Child(host.transform, "PvPMatchPanel");
+            // Exercise the real construction seam: runtime wiring delegates
+            // directly to the sole final owner, not a removed overlay builder.
+            InvokePrivate(ui, "BuildPanels", controller);
+            var match = FindDescendant(host.transform, "PvPMatchPanel");
 
-            InvokePrivate(ui, "BuildResultOverlay", controller, match);
-
-            Assert.AreEqual(1, DescendantCount(match.transform, "ResultVisualRoot"));
+            Assert.AreEqual(1, host.GetComponents(RuntimeType("PvpDuelCartoonVisuals")).Length);
+            Assert.AreEqual(1, DirectChildCount(host.transform, "PvPMatchPanel"));
+            Assert.AreEqual(1, DescendantCount(match, "ResultVisualRoot"));
             for (int i = 0; i < 6; i++)
-                Assert.AreEqual(1, DescendantCount(match.transform,
+                Assert.AreEqual(1, DescendantCount(match,
                     "ResultSignal" + i));
         }
         finally
