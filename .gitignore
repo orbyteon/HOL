@@ -28,6 +28,12 @@
 # Visual Studio cache directory
 .vs/
 
+# AI editor project-local configuration; the repository stays tool-agnostic
+/.cursor/
+/.cursorrules
+/.cursorignore
+/.cursorindexingignore
+
 # Gradle cache directory
 .gradle/
 
