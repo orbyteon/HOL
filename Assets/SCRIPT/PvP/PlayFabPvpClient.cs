@@ -68,7 +68,8 @@ public class PlayFabPvpClient : PvpBackend
 
         bool clientCreates = ClientAccountCreationEnabled();
         bool missingAccount = response.Contains("AccountNotFound") || response.Contains("PlayerCreationDisabled");
-        if (!clientCreates && allowProvisioning && missingAccount)
+        if (PvpIsolatedPlaytest.AllowsProductionProvisioning(
+            PvpIsolatedPlaytest.Enabled, clientCreates, allowProvisioning, missingAccount))
         {
             bool provisionFinished = false;
             bool provisioned = false;
@@ -91,7 +92,9 @@ public class PlayFabPvpClient : PvpBackend
             yield break;
         }
 
-        if (response.Contains("PlayerCreationDisabled"))
+        if (PvpIsolatedPlaytest.Enabled && missingAccount)
+            Debug.LogWarning("HOL_PVP_TEST_PROVISION_REQUIRED: operator must provision this device CustomID in test Title 11CB9E.");
+        else if (response.Contains("PlayerCreationDisabled"))
             Debug.LogError("PlayFab client-side account creation is disabled. Use the production provisioning flow.");
         else if (response.Contains("AccountNotFound"))
             Debug.LogError("No PlayFab account is linked to this Custom ID.");
@@ -101,7 +104,8 @@ public class PlayFabPvpClient : PvpBackend
 
     bool ClientAccountCreationEnabled()
     {
-        return Debug.isDebugBuild && allowClientAccountCreationInDebugBuilds;
+        return PvpIsolatedPlaytest.AllowsClientCreation(PvpIsolatedPlaytest.Enabled,
+            Debug.isDebugBuild, allowClientAccountCreationInDebugBuilds);
     }
 
     string LoginBody()
@@ -645,6 +649,14 @@ public class PlayFabPvpClient : PvpBackend
 
     IEnumerator PostOnce(string url, string body, bool authed, Action<bool, string, bool> done)
     {
+        if (PvpIsolatedPlaytest.Enabled && !PvpIsolatedPlaytest.AllowsRequest(
+            titleId, url, Application.identifier,
+            Application.platform == RuntimePlatform.Android, Debug.isDebugBuild))
+        {
+            Debug.LogError("HOL_PVP_TEST_TARGET_REJECTED: no request sent.");
+            done?.Invoke(false, "Isolated playtest target rejected", false);
+            yield break;
+        }
         var req = new UnityWebRequest(url, "POST");
         req.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(body));
         req.downloadHandler = new DownloadHandlerBuffer();

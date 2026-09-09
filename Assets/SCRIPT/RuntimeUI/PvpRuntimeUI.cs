@@ -14,6 +14,7 @@ public class PvpRuntimeUI : MonoBehaviour
     {
         var backend = gameObject.AddComponent<PlayFabPvpClient>();
         backend.titleId = playFabTitleId;
+        PvpIsolatedPlaytest.Configure(backend);
         var controller = gameObject.AddComponent<PvpGameController>();
         controller.client = backend;
         BuildPanels(controller);
