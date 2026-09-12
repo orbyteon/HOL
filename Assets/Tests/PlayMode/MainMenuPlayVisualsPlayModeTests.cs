@@ -288,9 +288,18 @@ public sealed class MainMenuPlayVisualsPlayModeTests
 
                 AssertApprovedTitleApertures(owner, soloTitle, friendTitle, viewport.x, viewport.y,
                     ref expectedTitleLineBoxHeight, lane);
-                AssertContained(safe.rect, GlyphBounds(hubTitle, safe), 28f,
+                // ApplyMenuViewport supplies a virtual portrait canvas. In
+                // batch CI the actual Game View may still be landscape, so
+                // safe.rect is not that virtual viewport's authored bounds.
+                // Keep the same 28-unit inset against the independent portrait
+                // expectation, not the unrelated host window dimensions.
+                float referenceHeight = MainMenuHomeVisualsPlayModeTests
+                    .ExpectedReferenceHeight(viewport.x, viewport.y);
+                Rect expectedSafe = new Rect(-540f, -referenceHeight * .5f,
+                    1080f, referenceHeight);
+                AssertContained(expectedSafe, GlyphBounds(hubTitle, safe), 28f,
                     lane + " hub title");
-                AssertContained(safe.rect, GlyphBounds(hubSubtitle, safe), 28f,
+                AssertContained(expectedSafe, GlyphBounds(hubSubtitle, safe), 28f,
                     lane + " hub subtitle");
                 AssertContained(solo.rect, GlyphBounds(soloTitle, solo), 20f,
                     lane + " VS AI title");
