@@ -258,7 +258,9 @@ public sealed class MainMenuPlayVisualsPlayModeTests
             soloAction, friendTitle, friendSubtitle, friendAction,
         };
         MainMenuHomeVisualsPlayModeTests.ApplyMenuViewport(owner, "PlaySafeAreaRoot", 1080, 1920);
-        AssertApprovedTitleApertures(owner, soloTitle, friendTitle, 1080, 1920, "initial");
+        float expectedTitleLineBoxHeight = 0f;
+        AssertApprovedTitleApertures(owner, soloTitle, friendTitle, 1080, 1920,
+            ref expectedTitleLineBoxHeight, "initial");
         MethodInfo applyViewport = owner.GetType().GetMethod(
             "ApplyResponsiveLayoutForViewport", InstanceFlags);
         Assert.That(applyViewport, Is.Not.Null,
@@ -284,7 +286,8 @@ public sealed class MainMenuPlayVisualsPlayModeTests
                         lane + " " + text.name);
                 }
 
-                AssertApprovedTitleApertures(owner, soloTitle, friendTitle, viewport.x, viewport.y, lane);
+                AssertApprovedTitleApertures(owner, soloTitle, friendTitle, viewport.x, viewport.y,
+                    ref expectedTitleLineBoxHeight, lane);
                 AssertContained(safe.rect, GlyphBounds(hubTitle, safe), 28f,
                     lane + " hub title");
                 AssertContained(safe.rect, GlyphBounds(hubSubtitle, safe), 28f,
@@ -325,19 +328,32 @@ public sealed class MainMenuPlayVisualsPlayModeTests
     }
 
     static void AssertApprovedTitleApertures(
-        Component owner, TMP_Text soloTitle, TMP_Text friendTitle, int width, int height, string lane)
+        Component owner, TMP_Text soloTitle, TMP_Text friendTitle, int width, int height,
+        ref float expectedLineBoxHeight, string lane)
     {
-        float scale = (850f + .9f *
-            (MainMenuHomeVisualsPlayModeTests.ExpectedReferenceHeight(width, height) - 1920f)) / 920f;
+        float extraHeight = Mathf.Max(0f,
+            MainMenuHomeVisualsPlayModeTests.ExpectedReferenceHeight(width, height) - 1920f);
+        // The runtime geometry crosses stored IEEE-754 float boundaries.
+        // Mono may retain extra precision in this independent expression;
+        // round at those boundaries, not by loosening exact geometry checks.
+        float cardHeight = StoredSingle(850f + .9f * extraHeight);
+        float scale = StoredSingle(cardHeight / 920f);
+        // The approved glyph-centering owner retains the largest TMP metric
+        // box through viewport/language changes. Only the smaller artwork face
+        // limits visible ink. Pin both independently, including exact history.
+        expectedLineBoxHeight = Mathf.Max(expectedLineBoxHeight, 86.9f * scale + 32f);
         MainMenuHomeVisualsPlayModeTests.AssertApprovedCenteredTextRegion(
             owner, soloTitle, new Vector2(-16f, 361.6f * scale),
-            new Vector2(210f, 86.9f * scale), new Vector2(210f, 86.9f * scale + 32f),
+            new Vector2(210f, 86.9f * scale), new Vector2(210f, expectedLineBoxHeight),
             0f, lane + " VS AI title aperture");
         MainMenuHomeVisualsPlayModeTests.AssertApprovedCenteredTextRegion(
             owner, friendTitle, new Vector2(7f, 361.6f * scale),
-            new Vector2(210f, 86.9f * scale), new Vector2(210f, 86.9f * scale + 32f),
+            new Vector2(210f, 86.9f * scale), new Vector2(210f, expectedLineBoxHeight),
             0f, lane + " friend title aperture");
     }
+
+    static float StoredSingle(float value)
+        => BitConverter.ToSingle(BitConverter.GetBytes(value), 0);
 
     static IEnumerator LoadReadyMainMenu()
     {

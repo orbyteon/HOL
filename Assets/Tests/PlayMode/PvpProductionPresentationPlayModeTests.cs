@@ -1152,6 +1152,50 @@ public sealed class PvpProductionPresentationPlayModeTests
     }
 
     [UnityTest]
+    public IEnumerator LandingMascotsStayInsideSafeAreaWithoutCoveringTipAcrossPortraits()
+    {
+        yield return Build();
+        ShowPrematchCase("PrivateRoom");
+        foreach (var viewport in new[] { new Vector2(720, 1280), new Vector2(1080, 1920),
+            new Vector2(1080, 2100), new Vector2(1080, 2220), new Vector2(1080, 2340),
+            new Vector2(1080, 2400), new Vector2(1179, 2556) })
+        foreach (string language in new[] { "en", "el" })
+        {
+            SetLanguage(language);
+            var safe = (RectTransform)Find(root.transform, "PrivateRoomSafeRoot");
+            var viewportOwner = safe.GetComponent(T("ResponsiveSafeAreaRoot"));
+            float canvasScale = Mathf.Sqrt((viewport.x / 1080f) * (viewport.y / 1920f));
+            Invoke(viewportOwner, "ApplyViewport", new Rect(Vector2.zero, viewport),
+                new Rect(Vector2.zero, viewport), viewport / canvasScale);
+            Invoke(root.GetComponentInChildren(T("PrivateRoomVisuals"), true), "ApplyResponsiveLayout");
+            Canvas.ForceUpdateCanvases();
+            float halfHeight = Mathf.Max(1920f, 1080f * viewport.y / viewport.x) * .5f;
+            var tip = (RectTransform)Find(root.transform, "PrivateRoomTipCard");
+            var tipBounds = new Rect(tip.anchoredPosition - tip.sizeDelta * .5f, tip.sizeDelta);
+            foreach (string name in new[] { "PrivateRoomMascotSix", "PrivateRoomMascotSeven" })
+            {
+                var mascot = (RectTransform)Find(root.transform, name);
+                string context = language + " " + viewport + " " + name;
+                var bounds = new Rect(mascot.anchoredPosition - mascot.sizeDelta * .5f, mascot.sizeDelta);
+                Assert.That(mascot.parent, Is.SameAs(safe), context);
+                Assert.That(mascot.GetComponent<Image>().preserveAspect, Is.True, context);
+                Assert.That(mascot.GetComponent<Image>().raycastTarget, Is.False, context);
+                Assert.That(bounds.xMin, Is.GreaterThanOrEqualTo(-540f), context);
+                Assert.That(bounds.xMax, Is.LessThanOrEqualTo(540f), context);
+                Assert.That(bounds.yMin, Is.GreaterThanOrEqualTo(-halfHeight), context);
+                Assert.That(bounds.yMax, Is.LessThanOrEqualTo(halfHeight), context);
+                Assert.That(bounds.Overlaps(tipBounds), Is.False, context);
+                Assert.That(mascot.sizeDelta.x, Is.InRange(220f, 280f), context);
+                Assert.That(mascot.sizeDelta.y, Is.InRange(260f, 320f), context);
+                if (viewport.y == 1920 || viewport.y == 1280)
+                    Assert.That(mascot.sizeDelta, Is.EqualTo(new Vector2(220, 260)), context);
+                if (viewport.y == 2340 || viewport.y == 2400)
+                    Assert.That(mascot.sizeDelta, Is.EqualTo(new Vector2(280, 320)), context);
+            }
+        }
+    }
+
+    [UnityTest]
     public IEnumerator PrematchValidationKeyboardLanguageAndCancelRemainTruthful()
     {
         yield return Build();

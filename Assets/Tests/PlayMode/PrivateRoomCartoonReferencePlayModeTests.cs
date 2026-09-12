@@ -83,9 +83,9 @@ public sealed class PrivateRoomCartoonReferencePlayModeTests
         AssertRect(root, "PrivateRoomTipCard",
             new Vector2(0f, -805f), new Vector2(640f, 230f));
         AssertRect(root, "PrivateRoomMascotSix",
-            new Vector2(-425f, -815f), new Vector2(220f, 260f));
+            new Vector2(-430f, -815f), new Vector2(220f, 260f));
         AssertRect(root, "PrivateRoomMascotSeven",
-            new Vector2(425f, -815f), new Vector2(220f, 260f));
+            new Vector2(430f, -815f), new Vector2(220f, 260f));
 
         foreach (string objectName in new[]
         {

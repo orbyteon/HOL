@@ -8,13 +8,29 @@ using UnityEditor;
 using UnityEditor.TestTools.TestRunner.Api;
 using UnityEngine;
 
-// GUI-only evidence configuration. SessionState is Editor-local, not a
+// Evidence configuration. SessionState is Editor-local, not a
 // ProjectSettings change or a production preference. Never overwrites evidence.
 [InitializeOnLoad]
 public static class PvpPresentationReviewTools
 {
     const string OutputKey = "HOL.PvpPresentationReview.Output";
-    public static string OutputDirectory => SessionState.GetString(OutputKey, "");
+    public static string OutputDirectory
+    {
+        get
+        {
+            string output = SessionState.GetString(OutputKey, "");
+            if (!string.IsNullOrEmpty(output)) return output;
+            // Headful Test Runner automation uses the same validated external
+            // parent and unique-directory policy as the non-modal Editor UI.
+            string[] args = Environment.GetCommandLineArgs();
+            int index = Array.IndexOf(args, "-holPvpEvidenceParent");
+            if (index < 0) return "";
+            if (index + 1 >= args.Length)
+                throw new ArgumentException("Missing -holPvpEvidenceParent directory.");
+            SetExternalEvidenceParent(args[index + 1]);
+            return SessionState.GetString(OutputKey, "");
+        }
+    }
     [Serializable] sealed class ViewportMetrics
     {
         public int width, height;

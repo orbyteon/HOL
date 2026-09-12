@@ -569,14 +569,15 @@ public sealed class MainMenuHomeVisualsPlayModeTests
                     trophy, new Vector2(-220f, -18f),
                     new Vector2(62f, 62f), lane + " promo trophy");
 
-                float aspect = viewport.y / (float)viewport.x;
-                float tall = Mathf.InverseLerp(1.78f, 2.22f, aspect);
+                float referenceHeight = ExpectedReferenceHeight(viewport.x, viewport.y);
+                float extra = referenceHeight - 1920f;
+                float mascotY = -referenceHeight * .5f + 150f + .025f * extra;
                 AssertRectTransform(
-                    mascotSix, new Vector2(-398f, -780f - 42f * tall),
-                    new Vector2(230f, 255f), lane + " mascot 6");
+                    mascotSix, new Vector2(-390f, mascotY),
+                    new Vector2(280f, 280f + .05f * extra), lane + " mascot 6");
                 AssertRectTransform(
-                    mascotSeven, new Vector2(398f, -780f - 42f * tall),
-                    new Vector2(220f, 255f), lane + " mascot 7");
+                    mascotSeven, new Vector2(390f, mascotY),
+                    new Vector2(280f, 280f + .05f * extra), lane + " mascot 7");
             }
         }
 
@@ -692,12 +693,17 @@ public sealed class MainMenuHomeVisualsPlayModeTests
         Assert.That(matches, Is.EqualTo(1), label + " sole aperture");
         Rect actualSafe = (Rect)matchingRegion.GetType()
             .GetField("SafeRect", InstanceFlags).GetValue(matchingRegion);
-        Rect expectedSafe = new Rect(expectedCenter - expectedSize * 0.5f,
-            expectedSize);
+        Rect expectedSafe = new Rect(
+            expectedCenter.x - expectedSize.x * 0.5f,
+            expectedCenter.y - expectedSize.y * 0.5f,
+            expectedSize.x, expectedSize.y);
+        // Compare Rect with Rect. A non-integral center can round one ULP when
+        // represented as (minimum, size); this is not permission to expand the
+        // aperture or the zero-tolerance geometry assertion.
         Assert.That(actualSafe.center.x,
-            Is.EqualTo(expectedCenter.x).Within(geometryTolerance), label + " x");
+            Is.EqualTo(expectedSafe.center.x).Within(geometryTolerance), label + " x");
         Assert.That(actualSafe.center.y,
-            Is.EqualTo(expectedCenter.y).Within(geometryTolerance), label + " y");
+            Is.EqualTo(expectedSafe.center.y).Within(geometryTolerance), label + " y");
         Assert.That(actualSafe.width,
             Is.EqualTo(expectedSize.x).Within(geometryTolerance), label + " width");
         Assert.That(actualSafe.height,
@@ -911,8 +917,16 @@ public sealed class MainMenuHomeVisualsPlayModeTests
 
     // Independent authored portrait dimensions: no expected geometry is read
     // from MenuPortraitLayout or the controls under test.
-    internal static float ExpectedReferenceHeight(int width, int height) =>
-        Mathf.Max(1920f, 1080f * height / width);
+    internal static float ExpectedReferenceHeight(int width, int height)
+    {
+        // Independent CanvasScaler math, with float storage at the same two
+        // coordinate boundaries: pixels -> canvas -> authored safe area.
+        // Algebraically collapsing these ratios changes rounding at 1179x2556.
+        float pixelScale = Mathf.Sqrt((width / 1080f) * (height / 1920f));
+        var canvas = new Vector2(width, height) / pixelScale;
+        float authoringScale = Mathf.Min(1f, Mathf.Min(canvas.x / 1080f, canvas.y / 1920f));
+        return canvas.y / authoringScale;
+    }
 
     internal static void ApplyMenuViewport(Component owner, string safeName, int width, int height)
     {

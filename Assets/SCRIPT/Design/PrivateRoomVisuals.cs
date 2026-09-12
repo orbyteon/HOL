@@ -404,9 +404,28 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
             foreach (string suffix in new[] { "MascotSix", "MascotSeven" })
             {
                 var mascot = Find(header.safe, header.prefix + suffix) as RectTransform;
-                if (mascot != null) Place(mascot,
-                    new Vector2(suffix == "MascotSix" ? -425 : 425, landing ? top - 1775 - .85f * extra : -top + 100),
-                    landing ? new Vector2(220, 260) + Vector2.one * (60f * Mathf.Clamp01(extra / 420f)) : new Vector2(165, 190));
+                if (mascot == null) continue;
+                if (!landing)
+                {
+                    Place(mascot, new Vector2(suffix == "MascotSix" ? -425 : 425, -top + 100),
+                        new Vector2(165, 190));
+                    continue;
+                }
+
+                // Keep complete sprite rectangles outside the 640px tip and
+                // inside the 1080px safe width. The standard side gutters fit
+                // the approved 220px mascots exactly. Grow only when the tall
+                // viewport also has room below the tip, retaining the approved
+                // maximum size without letting hair/hands cross either region.
+                float tipBottom = top - 1765f - .2f * extra - 115f;
+                float belowTip = tipBottom + top;
+                float growth = Mathf.Min(60f * Mathf.Clamp01(extra / 420f),
+                    Mathf.Max(0f, belowTip - 262f));
+                var size = new Vector2(220f + growth, 260f + growth);
+                float x = (growth > 0f ? 539f : 540f) - size.x * .5f;
+                float y = top - 1775f - .85f * extra;
+                if (growth > 0f) y = Mathf.Min(y, tipBottom - size.y * .5f - 1f);
+                Place(mascot, new Vector2(suffix == "MascotSix" ? -x : x, y), size);
             }
         }
     }
