@@ -543,18 +543,24 @@ public sealed class PvpProductionPresentationPlayModeTests
         S(done, "revealedSecret", 73);
         S(done, "hostGuessCount", 4);
         S(done, "guestGuessCount", 3);
+        S(done, "resultReason", "range");
+        S(done, "resultHostCandidates", 49);
+        S(done, "resultGuestCandidates", 30);
         int matches = PlayerPrefs.GetInt("StatMatches");
         Emit(done);
         Emit(done);
         Assert.That(PlayerPrefs.GetInt("StatMatches"), Is.EqualTo(matches + 1), "One authoritative result records once.");
         var result = (Component)Get(controller, "resultPresentation");
         Assert.That(result.gameObject.activeSelf, Is.True);
+        var reason = (TMP_Text)Get(result, "explanationText");
         SetLanguage("en");
         yield return null;
+        Assert.That(reason.text, Is.EqualTo(L("pvp_reason_range", "Player", 30, 49, "")));
         var role = Find(root.transform, "OpponentAttemptsRowCaption").GetComponent<TMP_Text>();
         string english = role.text;
         SetLanguage("el");
         yield return null;
+        Assert.That(reason.text, Is.EqualTo(L("pvp_reason_range", "Player", 30, 49, "")));
         Assert.That(role.text, Is.Not.EqualTo(english));
         Assert.That(role.text, Is.EqualTo(L("prebattle_opponent")));
         S(done, "hostName", "Κωνσταντίνος");
@@ -569,6 +575,7 @@ public sealed class PvpProductionPresentationPlayModeTests
         S(again, "matchIndex", 1);
         Emit(again);
         Assert.That(result.gameObject.activeSelf, Is.False);
+        Assert.That(reason.text, Is.Empty, "A rematch cannot inherit the previous explanation.");
         Assert.That(((GameObject)Get(controller, "rematchButton")).activeSelf, Is.False);
         Assert.That(((GameObject)Get(controller, "keypadRoot")).activeSelf, Is.True);
         Assert.That(((TMP_InputField)Get(controller, "guessInput")).text, Is.Empty);
@@ -585,6 +592,217 @@ public sealed class PvpProductionPresentationPlayModeTests
         exit.onClick.Invoke();
         Assert.That(((GameObject)Get(controller, "pvpMenuPanel")).activeSelf, Is.True);
         Assert.That(((GameObject)Get(controller, "matchPanel")).activeSelf, Is.False);
+    }
+
+    [UnityTest]
+    public IEnumerator InviteSharingUsesCurrentCodeAndResumeRefreshesWithoutSendingOrResetting()
+    {
+        yield return Build();
+        string clipboard = GUIUtility.systemCopyBuffer;
+        var eventField = T("GameEvents").GetField("OnRoomShared");
+        var prior = (Action)eventField.GetValue(null);
+        int shared = 0, opened = 0;
+        Action observer = () => shared++;
+        eventField.SetValue(null, observer);
+        try
+        {
+            Set(controller, "OpenShareChooser", new Func<string, string, bool>((text, title) => {
+                opened++;
+                Assert.That(text, Is.EqualTo(L("pvp_invite_text", "MTW8H")));
+                Assert.That(title, Is.EqualTo(L("pvp_share_chooser")));
+                Assert.That(text, Does.Not.Contain("80"));
+                Assert.That(text, Does.Not.Contain("11CB9E"));
+                return true;
+            }));
+            Invoke(controller, "OnShareInvitePressed");
+            Assert.That(opened, Is.Zero, "No invitation before room creation.");
+            Find(root.transform, "CreateButton").GetComponent<Button>().onClick.Invoke();
+            ((TMP_InputField)Get(controller, "createSecretInput")).text = "80";
+            ((GameObject)Get(controller, "createConfirmButton")).GetComponent<Button>().onClick.Invoke();
+            Emit(State("waiting"));
+            yield return null;
+            foreach (string language in new[] { "en", "el" })
+            {
+                SetLanguage(language);
+                string before = ((TMP_Text)Get(controller, "createStatusText")).text;
+                ((GameObject)Get(controller, "createShareButton")).GetComponent<Button>().onClick.Invoke();
+                Assert.That(((TMP_Text)Get(controller, "createStatusText")).text, Is.EqualTo(before));
+            }
+            Assert.That(opened, Is.EqualTo(2));
+            Assert.That(shared, Is.Zero, "Opening/cancelling a chooser is not a sent invitation.");
+            Assert.That(GUIUtility.systemCopyBuffer, Is.EqualTo(clipboard));
+            Set(controller, "OpenShareChooser", new Func<string, string, bool>((text, title) => false));
+            Invoke(controller, "OnShareInvitePressed");
+            Assert.That(((TMP_Text)Get(controller, "createStatusText")).text, Is.EqualTo(L("pvp_share_unavailable")));
+            Assert.That(shared, Is.Zero, "An unavailable chooser is not a sent invitation.");
+            Assert.That(GUIUtility.systemCopyBuffer, Is.EqualTo(clipboard));
+            ((GameObject)Get(controller, "createCopyButton")).GetComponent<Button>().onClick.Invoke();
+            Assert.That(GUIUtility.systemCopyBuffer, Is.EqualTo(L("pvp_invite_text", "MTW8H")));
+            Assert.That(shared, Is.EqualTo(1), "Preserve the existing deliberate copy event.");
+            int polls = (int)Get(backend, "PollCalls");
+            var staleObserver = (Delegate)Get(backend, "observer");
+            Invoke(controller, "OnApplicationFocus", false);
+            Invoke(controller, "OnApplicationPause", true);
+            Invoke(controller, "OnApplicationFocus", true);
+            Assert.That((int)Get(backend, "PollCalls"), Is.EqualTo(polls));
+            Invoke(controller, "OnApplicationPause", false);
+            Invoke(controller, "OnApplicationFocus", true);
+            Assert.That((int)Get(backend, "PollCalls"), Is.EqualTo(polls + 1));
+            Emit(State("play")); // friend joined while WhatsApp was open
+            Assert.That(((GameObject)Get(controller, "matchPanel")).activeSelf, Is.True);
+            staleObserver.DynamicInvoke(State("waiting"));
+            Assert.That(Get(controller, "lastState").GetType().GetField("phase").GetValue(Get(controller, "lastState")), Is.EqualTo("play"));
+            Invoke(controller, "OnShareInvitePressed");
+            Assert.That(opened, Is.EqualTo(2), "No stale room invitation from the match.");
+            Set(controller, "myMin", 26); Set(controller, "myMax", 49);
+            Invoke(controller, "OnApplicationPause", true);
+            Invoke(controller, "OnApplicationPause", false);
+            Assert.That((int)Get(controller, "myMin"), Is.EqualTo(26));
+            Assert.That((int)Get(controller, "myMax"), Is.EqualTo(49));
+            Invoke(controller, "OnLeaveMatchPressed");
+            Invoke(controller, "OnShareInvitePressed");
+            Assert.That(opened, Is.EqualTo(2));
+        }
+        finally
+        {
+            GUIUtility.systemCopyBuffer = clipboard;
+            eventField.SetValue(null, prior);
+        }
+    }
+
+    [UnityTest]
+    public IEnumerator ReturnedSnapshotsPropagateResultFactsWithoutChangingMatchOrIdentity()
+    {
+        yield return Build();
+        var client = root.AddComponent(T("PlayFabPvpClient"));
+        ((Behaviour)client).enabled = false;
+        var current = State("play");
+        var final = State("done");
+        S(final, "winner", "host"); S(final, "resultReason", "only_correct");
+        S(final, "resultHostCandidates", 30); S(final, "resultForfeitedSide", "guest");
+        string wire = JsonUtility.ToJson(final);
+        // The CloudScript wrapper's state is itself a JSON string.
+        string response = "{\"ok\":true,\"state\":\"" + wire.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"}";
+        Invoke(client, "ApplyReturnedState", current, response);
+        foreach (var field in new[] { "phase", "winner", "resultReason", "resultHostCandidates", "resultGuestCandidates",
+            "resultForfeitedSide", "hostName", "guestName", "hostAvatarId", "guestAvatarId" })
+            Assert.That(current.GetType().GetField(field).GetValue(current), Is.EqualTo(final.GetType().GetField(field).GetValue(final)), field);
+        S(current, "matchIndex", 1); S(current, "phase", "play"); S(current, "resultReason", "");
+        Invoke(client, "ApplyReturnedState", current, response);
+        Assert.That(current.GetType().GetField("resultReason").GetValue(current), Is.EqualTo(""));
+        UnityEngine.Object.DestroyImmediate(client);
+    }
+
+    [UnityTest]
+    public IEnumerator InvitationAndFinalReasonsFitEnElPortraitRegions()
+    {
+        yield return ShareResultLayout(false);
+    }
+
+    [UnityTest, Explicit("Bounded sharing/result evidence through the existing native Game View workflow.")]
+    public IEnumerator CaptureNativeInvitationAndFinalReasons()
+    {
+        yield return ShareResultLayout(true);
+    }
+
+    IEnumerator ShareResultLayout(bool native)
+    {
+        yield return Build();
+        var errors = new List<string>();
+        string output = null;
+        if (native)
+        {
+            string parent = (string)T("PvpPresentationReviewTools").GetProperty("OutputDirectory").GetValue(null);
+            Assert.That(Directory.Exists(parent), Is.True, "Select the external evidence folder.");
+            output = Path.Combine(parent, "ShareResult-" + DateTime.UtcNow.ToString("yyyyMMdd_HHmmss_fff"));
+            Directory.CreateDirectory(output);
+        }
+        foreach (var viewport in new[] { new Vector2Int(720, 1280), new Vector2Int(1080, 1920),
+            new Vector2Int(1080, 2400), new Vector2Int(1179, 2556) })
+        foreach (string language in new[] { "en", "el" })
+        {
+            SetLanguage(language);
+            if (native)
+            {
+                T("OnboardingGameViewCapture").GetMethod("SetResolution").Invoke(null, new object[] { viewport.x, viewport.y });
+                Screen.SetResolution(viewport.x, viewport.y, false);
+                yield return (IEnumerator)T("PvpPresentationReviewTools").GetMethod("WaitForStableNativeViewport")
+                    .Invoke(null, new object[] { root.transform, viewport.x, viewport.y });
+            }
+            foreach (string kind in new[] { "waiting", "only_correct", "lock", "range", "draw", "forfeit", "legacy" })
+            {
+                ShowCase("Waiting");
+                if (kind != "waiting")
+                {
+                    var done = State("done");
+                    S(done, "hostName", "Κωνσταντίνος"); S(done, "guestName", "Αλεξάνδρα");
+                    S(done, "winner", kind == "draw" ? "draw" : "host");
+                    S(done, "revealedSecret", 77);
+                    S(done, "resultReason", kind == "forfeit" ? "only_correct" : kind == "legacy" ? "" : kind);
+                    S(done, "resultHostCandidates", kind == "lock" || kind == "draw" ? 100 : 30);
+                    S(done, "resultGuestCandidates", kind == "range" ? 49 : kind == "lock" || kind == "draw" ? 100 : 0);
+                    S(done, "resultForfeitedSide", kind == "forfeit" ? "guest" : "");
+                    Emit(done);
+                }
+                yield return null;
+                yield return null;
+                if (!native)
+                    foreach (var safe in root.GetComponentsInChildren(T("ResponsiveSafeAreaRoot"), true))
+                        Invoke(safe, "ApplyViewport", new Rect(0, 0, viewport.x, viewport.y),
+                            new Rect(0, 44, viewport.x, viewport.y - 88), new Vector2(1080, 1920));
+                Canvas.ForceUpdateCanvases();
+                string context = language + " " + viewport + " " + kind;
+                if (kind == "waiting")
+                {
+                    foreach (var spec in new[] { new { Name = "NativeShareButton", Face = new Rect(-131.2f, -43.79f, 262.4f, 98.15f), Font = 36f },
+                        new { Name = "CopyInviteButton", Face = new Rect(-116, -28, 232, 67.2f), Font = 30f } })
+                    {
+                        var button = (RectTransform)Find(root.transform, spec.Name);
+                        var label = button.GetComponentInChildren<TMP_Text>();
+                        Assert.That(button.GetComponent<Button>().interactable, Is.True, context);
+                        Assert.That(label.fontSize, Is.EqualTo(spec.Font), context);
+                        AuditFace(label, button, spec.Face, context, errors);
+                        Assert.That(label.isTextOverflowing || label.isTextTruncated, Is.False, context);
+                    }
+                }
+                else
+                {
+                    var reason = Find(root.transform, "PvpResultExplanation").GetComponent<TMP_Text>();
+                    Assert.That(reason.fontSize, Is.EqualTo(28), context);
+                    Assert.That(reason.isTextTruncated || reason.isTextOverflowing, Is.False, context + " " + reason.text);
+                    AuditFace(reason, (RectTransform)reason.transform.parent, new Rect(-390, -175, 780, 120), context, errors);
+                    var streak = (RectTransform)Find(root.transform, "PvpResultStreak");
+                    Assert.That(streak.anchoredPosition.y - streak.rect.height / 2, Is.GreaterThan(-55),
+                        context + " streak cannot overlap the explanation's padded region");
+                    // The explanation has its own padded region inside the stats
+                    // face; neither it nor the new stats edge can cover rematch.
+                    var stats = (RectTransform)reason.transform.parent;
+                    var actions = (RectTransform)Find(root.transform, "PvpResultActions");
+                    Assert.That(stats.anchoredPosition.y - stats.rect.height / 2,
+                        Is.GreaterThan(actions.anchoredPosition.y + actions.rect.height / 2), context);
+                }
+                AuditGlyphs(context, errors);
+                // Only representative NEW surfaces, not the full capture matrix.
+                if (native && ((viewport.y == 1920 && (kind == "waiting" || kind == "range" || kind == "forfeit")) ||
+                    (viewport.y == 2400 && language == "el" && (kind == "waiting" || kind == "draw"))))
+                {
+                    // Capture the resting presentation after the real celebration,
+                    // without disabling or replacing any production effect.
+                    if (kind != "waiting") yield return new WaitForSecondsRealtime(1.9f);
+                    yield return new WaitForEndOfFrame();
+                    string path = Path.Combine(output, language + "-" + viewport.x + "x" + viewport.y + "-" + kind + ".png");
+                    ScreenCapture.CaptureScreenshot(path);
+                    for (int i = 0; i < 120 && !File.Exists(path); i++) yield return null;
+                    Assert.That(File.Exists(path), Is.True);
+                    var image = new Texture2D(2, 2);
+                    Assert.That(image.LoadImage(File.ReadAllBytes(path)), Is.True);
+                    Assert.That(image.width, Is.EqualTo(viewport.x));
+                    Assert.That(image.height, Is.EqualTo(viewport.y));
+                    UnityEngine.Object.Destroy(image);
+                }
+            }
+        }
+        Assert.That(errors, Is.Empty, string.Join("\n", errors));
     }
 
     static readonly string[] Cases = { "PrivateRoom", "CreateEntry", "JoinEntry", "Waiting",

@@ -9,7 +9,7 @@ public static class PvpIsolatedPlaytest
     public const string PackageId = "com.Orbyteon.HOL.pvptest";
     public const string ProductName = "HOL PvP Test";
     public const string CloudScriptSha256 =
-        "EBB9DEE03FE4D147E63B555DA36EA5D56AAFEE85DB91F72BC56938B7963DEEB5";
+        "121556521FF8633DE5035FD8462C50D85A80363539211FB7F318C4D470BEABF0";
 
     public static bool Enabled
     {

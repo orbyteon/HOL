@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import test from 'node:test';
 import { verifyManifest } from '../playfab/verify-isolated-playtest.mjs';
 
@@ -11,7 +12,7 @@ const workflow = read('.github/workflows/private-room-android-preview.yml');
 const valid = () => ({
   titleId: '11CB9E', packageId: 'com.Orbyteon.HOL.pvptest', productName: 'HOL PvP Test',
   unityVersion: '2022.3.62f3', development: true, operatorProvisioningOnly: true,
-  cloudScriptSha256: 'EBB9DEE03FE4D147E63B555DA36EA5D56AAFEE85DB91F72BC56938B7963DEEB5',
+  cloudScriptSha256: '121556521FF8633DE5035FD8462C50D85A80363539211FB7F318C4D470BEABF0',
   scenes: ['Assets/Scenes/SplashScene.unity', 'Assets/Scenes/MainMenu.unity'],
 });
 
@@ -23,6 +24,13 @@ test('isolated APK manifest accepts only the exact non-production target and pin
     { operatorProvisioningOnly: false }, { unityVersion: '2022.3.61f1' },
     { cloudScriptSha256: 'wrong' }, { scenes: ['Assets/Scenes/MainMenu.unity'] },
   ]) assert.throws(() => verifyManifest({ ...valid(), ...patch }));
+});
+
+test('test build pins match the exact normalized committed CloudScript source', () => {
+  const source = read('playfab/cloudscript.js').replace(/\r\n/g, '\n');
+  const hash = crypto.createHash('sha256').update(source, 'utf8').digest('hex').toUpperCase();
+  assert.equal(hash, valid().cloudScriptSha256);
+  assert.ok(runtime.includes(`"${hash}"`));
 });
 
 test('isolated build uses a temporary define and separate installation without touching saves', () => {

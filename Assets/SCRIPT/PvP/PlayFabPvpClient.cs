@@ -32,6 +32,7 @@ public class PlayFabPvpClient : PvpBackend
 
     string sessionTicket = "";
     Coroutine pollRoutine;
+    int readGeneration;
     PlayIntegrityProvisioner provisioner;
     int lastObservedMatchIndex = -1;
 
@@ -354,6 +355,7 @@ public class PlayFabPvpClient : PvpBackend
 
     public override void StopPolling()
     {
+        readGeneration++;
         if (pollRoutine != null) StopCoroutine(pollRoutine);
         pollRoutine = null;
     }
@@ -485,9 +487,14 @@ public class PlayFabPvpClient : PvpBackend
 
     void ReadState(string code, Action<bool, RoomState> done)
     {
+        int read = readGeneration;
+        int epoch = roomRequestEpoch;
         string args = "{\"roomId\":\"" + EscapeJson(code) + "\"}";
         ExecuteCloudScript("getRoom", args, (ok, resp) =>
         {
+            // A response from before backgrounding/leaving must not replace the
+            // resumed room's match index or be delivered to its observer.
+            if (read != readGeneration || epoch != roomRequestEpoch || code != RoomCode) return;
             if (!ok) { done?.Invoke(false, null); return; }
             if (HasCloudError(resp, "room not found")) { done?.Invoke(true, null); return; }
             if (!CloudOk(resp)) { done?.Invoke(false, null); return; }
@@ -549,6 +556,10 @@ public class PlayFabPvpClient : PvpBackend
             current.lastGuess = applied.lastGuess;
             current.lastBy = applied.lastBy;
             current.winner = applied.winner;
+            current.resultReason = applied.resultReason;
+            current.resultHostCandidates = applied.resultHostCandidates;
+            current.resultGuestCandidates = applied.resultGuestCandidates;
+            current.resultForfeitedSide = applied.resultForfeitedSide;
             current.lastHint = applied.lastHint;
             current.revealedSecret = applied.revealedSecret;
             current.hostGuessCount = applied.hostGuessCount;

@@ -23,6 +23,11 @@ public class PvpRoomState
     public int lastGuess;
     public string lastBy = "";
     public string winner = "";  // "host" | "guest" | "draw"
+    // Server-authored, finalized-result facts. Empty on live/legacy snapshots.
+    public string resultReason = ""; // only_correct | lock | range | draw
+    public int resultHostCandidates; // interval size BEFORE the correct guess
+    public int resultGuestCandidates;
+    public string resultForfeitedSide = ""; // consumed missed-LOCK slot in final round
 
     // Server-computed public view. PlayFab never sends live secrets.
     public string lastHint = ""; // "higher" | "lower" | "correct"

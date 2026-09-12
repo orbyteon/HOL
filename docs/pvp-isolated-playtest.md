@@ -8,12 +8,14 @@ Human visual and real two-device gameplay acceptance remain pending; PR #90 stay
 - New Title: **HOL-PvP-Test / 11CB9E**, My Game Studio; Development mode,
   new player namespace, zero players verified at creation.
 - Protected Titles **HOL / 195DDC** and **My Game / 23E1A** must not be changed.
-- Gameplay/server checkpoint: `7b36303abcd0ee7a2b1154e42f5d7e1222930ede`.
-- Committed `playfab/cloudscript.js`: 33,456 LF bytes, SHA-256
+- Original gameplay/server checkpoint: `7b36303abcd0ee7a2b1154e42f5d7e1222930ede`.
+- Rollback source (Version 1 / Revision 2): 33,456 LF bytes, SHA-256
   `EBB9DEE03FE4D147E63B555DA36EA5D56AAFEE85DB91F72BC56938B7963DEEB5`.
-- Pinned source uploaded through Game Manager; **Revision 2 (live)** observed.
-  Admin API read-back must independently confirm Version, Revision, source hash,
-  and `IsPublished` before calling deployment verification complete.
+- Current sharing/result source: **Version 1 / Revision 3**, 34,840 LF bytes,
+  SHA-256 `121556521FF8633DE5035FD8462C50D85A80363539211FB7F318C4D470BEABF0`.
+  On 2026-09-12 the Admin API verified the uploaded unpublished source byte-for-byte,
+  then independently verified the published revision/hash. Existing policy and
+  cleanup schedule were read and preserved. No production deployment occurred.
 
 ## Separate installation and build
 
@@ -34,6 +36,18 @@ Android package isolation preserves HOL's existing saves and gives this test its
 own profile/Onboarding. Choose the desired saved name and avatar inside the test
 app. No real secret key, production release config or provisioning endpoint belongs
 in this APK, its manifest, Git, screenshots or logs.
+
+### Update compatibility gate for the next test APK
+
+The installed run `34301075426` APK has versionCode `2`, package
+`com.Orbyteon.HOL.pvptest`, and signer certificate SHA-256
+`8F9C013303AFADB815A7A817DA7562B50F1DFD28587CB51D1BF700DA02DD13C6`.
+The next in-place update requires that same signer and a versionCode greater than
+2. The previous workflow used an ephemeral Android debug keystore, not the local
+debug keystore (which has a different certificate). No matching private signing
+key has been located. Do not dispatch another build as an update until it is
+available; do not uninstall, clear data, or claim a differently signed APK can
+preserve this installation. No new APK is delivered by the source-only checkpoint.
 
 ## Device-bound authentication
 
@@ -74,6 +88,18 @@ logic. Verify/add the repository's five Client Shared Group deny statements on
 Never modify production workflows, credentials, permissions or guards.
 
 ## Two-device acceptance
+
+- After creating a room, tap **SHARE / ΜΟΙΡΑΣΟΥ**, select WhatsApp, recipient and
+  Send yourself. Only the current room code is included. Cancelling the chooser
+  must not claim delivery; **Copy invite / Αντιγραφή** remains a separate fallback.
+- Return to HOL after the guest joins while it is backgrounded. The current room
+  should refresh without resetting identities, range, history or rematch state.
+- Compare both result explanations: sole correct answer in the resolved round;
+  correct LOCK; equal LOCK with smaller pre-correct candidate range; or true draw.
+  A consumed missed-LOCK forfeited turn is mentioned only when relevant. Older
+  finalized snapshots show a truthful generic explanation, never a guess from
+  attempt counts. Repeated snapshots and EN/EL refresh retain the reason; rematch
+  clears it. Reverse host/guest and repeat.
 
 - Use distinct names and selectable avatar IDs 1 and 6. Both devices must show
   the correct two identities in waiting, match and result.

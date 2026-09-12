@@ -62,6 +62,7 @@ public class PvpRuntimeUI : MonoBehaviour
         controller.roomCodeText = prebattleCreate.codeText;
         controller.createStatusText = prebattleCreate.status;
         controller.createCopyButton = prebattleCreate.copy.gameObject;
+        controller.createShareButton = prebattleCreate.share.gameObject;
         controller.joinCodeInput = prebattleJoin.codeInput;
         controller.joinSecretInput = prebattleJoin.secret;
         controller.joinConfirmButton = prebattleJoin.confirm;
@@ -84,6 +85,7 @@ public class PvpRuntimeUI : MonoBehaviour
         prebattleCreate.confirm.GetComponent<Button>().onClick.AddListener(
             controller.OnCreateRoomPressed);
         prebattleCreate.copy.onClick.AddListener(controller.OnCopyInvitePressed);
+        prebattleCreate.share.onClick.AddListener(controller.OnShareInvitePressed);
         prebattleCreate.back.onClick.AddListener(controller.CancelRoomAndLeave);
         prebattleJoin.confirm.GetComponent<Button>().onClick.AddListener(
             controller.OnJoinRoomPressed);

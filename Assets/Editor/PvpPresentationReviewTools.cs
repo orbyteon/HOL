@@ -186,6 +186,50 @@ public static class PvpPresentationReviewTools
         }));
     }
 
+    [MenuItem("HOL/PvP/Run Invitation Result Regressions")]
+    public static void RunInvitationResultRegressions()
+    {
+        if (EditorApplication.isPlayingOrWillChangePlaymode || EditorApplication.isCompiling || EditorApplication.isUpdating)
+            throw new InvalidOperationException("Wait for the Editor to be idle before focused validation.");
+        if (!Directory.Exists(OutputDirectory)) ChooseCaptureFolder();
+        if (!Directory.Exists(OutputDirectory)) return;
+        OnboardingGameViewCapture.SetResolution(1080, 1920);
+        FocusNativeGameView();
+        string fixture = "PvpProductionPresentationPlayModeTests.";
+        Api.Execute(new ExecutionSettings(new Filter { testMode = TestMode.PlayMode, testNames = new[] {
+            fixture + "InviteSharingUsesCurrentCodeAndResumeRefreshesWithoutSendingOrResetting",
+            fixture + "ReturnedSnapshotsPropagateResultFactsWithoutChangingMatchOrIdentity",
+            fixture + "InvitationAndFinalReasonsFitEnElPortraitRegions",
+            fixture + "RealCreateJoinValidationWaitingCancelAndLateCallbackRemainWired",
+            fixture + "ResultCaptionsRepaintOpponentArrivesAndRealRematchResets",
+            fixture + "PrematchValidationKeyboardLanguageAndCancelRemainTruthful",
+            fixture + "RoomIdentitiesStayAuthoritativeAcrossSeatsRefreshRematchAndExit"
+        } }));
+    }
+
+    [MenuItem("HOL/PvP/Run Invitation Result EditMode")]
+    public static void RunInvitationResultEditMode()
+    {
+        if (EditorApplication.isPlayingOrWillChangePlaymode || EditorApplication.isCompiling || EditorApplication.isUpdating)
+            throw new InvalidOperationException("Wait for the Editor to be idle before focused validation.");
+        if (!Directory.Exists(OutputDirectory)) ChooseCaptureFolder();
+        if (!Directory.Exists(OutputDirectory)) return;
+        Api.Execute(new ExecutionSettings(new Filter { testMode = TestMode.EditMode,
+            testNames = new[] { "PvpResultExplanationTests", "PvpRoomStateTests" } }));
+    }
+
+    [MenuItem("HOL/PvP/Capture Invitation Result Review")]
+    public static void CaptureInvitationResultReview()
+    {
+        if (EditorApplication.isPlayingOrWillChangePlaymode || EditorApplication.isCompiling || EditorApplication.isUpdating)
+            throw new InvalidOperationException("Wait for the Editor to be idle before focused capture.");
+        if (!Directory.Exists(OutputDirectory)) ChooseCaptureFolder();
+        if (!Directory.Exists(OutputDirectory)) return;
+        FocusNativeGameView();
+        Api.Execute(new ExecutionSettings(new Filter { testMode = TestMode.PlayMode,
+            testNames = new[] { "PvpProductionPresentationPlayModeTests.CaptureNativeInvitationAndFinalReasons" } }));
+    }
+
     [MenuItem("HOL/PvP/Run Focused Pre-match Regressions")]
     public static void RunPrematchRegressions()
     {

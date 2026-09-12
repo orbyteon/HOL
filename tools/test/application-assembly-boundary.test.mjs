@@ -173,6 +173,18 @@ test("fixed Signal protocol belongs to HOL.Application with direct tests", () =>
   assert.doesNotMatch(tests, /AppDomain\.CurrentDomain/);
 });
 
+test("final PvP explanation captures server facts without inferring rules or reading player storage", () => {
+  const source = read(`${appDir}/PvpResultExplanation.cs`);
+  assert.match(source, /public sealed class PvpResultExplanation/);
+  assert.match(source, /state\.phase != "done"/);
+  for (const field of ["resultReason", "resultHostCandidates", "resultGuestCandidates", "resultForfeitedSide"])
+    assert.ok(source.includes(`state.${field}`), field);
+  assert.doesNotMatch(source, /state\.(?:hostGuessCount|guestGuessCount|history|hostLockUsed|guestLockUsed)/);
+  assert.doesNotMatch(source, /\bDuelRules\b|ExecuteCloudScript|JsonUtility|System\.Reflection/);
+  assert.match(read("Assets/Tests/EditMode/PvpResultExplanationTests.cs"), /PvpResultExplanation\.Capture/);
+  assert.doesNotMatch(read("Assets/Tests/EditMode/PvpResultExplanationTests.cs"), /System\.Reflection/);
+});
+
 test("Phase 1B keeps scoped agent, validation and release-note contracts", () => {
   const scopedAgent = read(scopedAgentPath);
   assert.match(scopedAgent, /HOL\.Application — Mandatory Agent Contract/);

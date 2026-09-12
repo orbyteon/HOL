@@ -51,6 +51,7 @@ public sealed class PvpDuelCartoonVisuals : MonoBehaviour
     readonly List<TMP_Text> nameLabels = new List<TMP_Text>();
     readonly List<TMP_Text> chipLabels = new List<TMP_Text>();
     TMP_Text resultStreak;
+    MainMenuCenteredTextRegion resultReasonRegion;
     TMP_Text playerBadgeText, opponentBadgeText, playerLastGuess, opponentLastGuess;
     TMP_Text playerWins, opponentAttempts, currentHeading, currentRange, latestOutcome;
     TMP_Text lockHelp, lockSuggestion, signalPlaceholder;
@@ -120,6 +121,7 @@ public sealed class PvpDuelCartoonVisuals : MonoBehaviour
         ApplyResponsiveLayoutForViewport(Screen.safeArea.width, Screen.safeArea.height);
         RefreshMatchPresentation();
         CenterButtonFaces();
+        if (resultReasonRegion != null) resultReasonRegion.Apply();
     }
 
     public void RefreshRoomIdentity() { RefreshIdentity(); }
@@ -635,16 +637,22 @@ public sealed class PvpDuelCartoonVisuals : MonoBehaviour
             new Vector2(0, -100), new Vector2(280, 65));
 
         var stats = Frame(safe, "PvpResultStatsCard", PurpleFrameResource,
-            new Vector2(0, -100), new Vector2(900, 390));
-        var mine = Stat(stats.transform, "PlayerAttemptsRow", "you", 125, Cyan);
-        var theirs = Stat(stats.transform, "OpponentAttemptsRow", "prebattle_opponent", 35, new Color(1, .3f, .62f));
+            new Vector2(0, -155), new Vector2(900, 500));
+        var mine = Stat(stats.transform, "PlayerAttemptsRow", "you", 185, Cyan);
+        var theirs = Stat(stats.transform, "OpponentAttemptsRow", "prebattle_opponent", 95, new Color(1, .3f, .62f));
         var revealed = Text(stats.transform, "RevealedNumber", "", 31,
-            new Vector2(0, -35), new Vector2(780, 62), Gold);
+            new Vector2(0, 25), new Vector2(780, 62), Gold);
         resultStreak = Text(stats.transform, "PvpResultStreak", "", 26,
-            new Vector2(0, -85), new Vector2(780, 52), Muted, false);
+            new Vector2(0, -25), new Vector2(780, 52), Muted, false);
+        var reason = Text(stats.transform, "PvpResultExplanation", "", 28,
+            new Vector2(0, -115), new Vector2(780, 120), White, false);
+        reason.enableAutoSizing = false;
+        reason.enableWordWrapping = true;
+        reason.overflowMode = TextOverflowModes.Overflow;
+        resultReasonRegion = new MainMenuCenteredTextRegion(reason, 0, -115, 780, 120);
 
         var actions = Frame(safe, "PvpResultActions", PurpleFrameResource,
-            new Vector2(0, -480), new Vector2(850, 270));
+            new Vector2(0, -555), new Vector2(850, 270));
         // This field intentionally retains the native number keyboard. Unlike
         // live guessing, no replacement keypad owns rematch secret entry.
         pvp.rematchSecretInput = Input(actions.transform, "RematchSecret", "rematch_prompt",
@@ -661,8 +669,8 @@ public sealed class PvpDuelCartoonVisuals : MonoBehaviour
         pvp.rematchSecretInput.onSubmit.AddListener(_ => pvp.OnRematchPressed());
         exit.onClick.AddListener(pvp.OnLeaveMatchPressed);
         pvp.resultSignalFeedText = Text(safe, "ResultSignalFeed", "", 25,
-            new Vector2(0, -665), new Vector2(780, 64), White, false);
-        pvp.resultSignalsRoot = SignalsPanel(safe, "ResultSignals", new Vector2(0, -788), 720);
+            new Vector2(0, -730), new Vector2(780, 54), White, false);
+        pvp.resultSignalsRoot = SignalsPanel(safe, "ResultSignals", new Vector2(0, -840), 720);
         AddSprite(safe, "PvpResultMascotSix", "reference/mascot_6_exact",
             new Vector2(-455, -817), new Vector2(155, 210));
         AddSprite(safe, "PvpResultMascotSeven", "reference/mascot_7_exact",
@@ -673,6 +681,7 @@ public sealed class PvpDuelCartoonVisuals : MonoBehaviour
         result.playerAttemptsText = mine;
         result.opponentAttemptsText = theirs;
         result.revealedNumberText = revealed;
+        result.explanationText = reason;
         result.opponentNameText = opponentName;
         result.trophy = trophy.gameObject;
         pvp.resultPresentation = result;

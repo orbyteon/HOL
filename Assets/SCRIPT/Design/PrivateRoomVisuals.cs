@@ -51,7 +51,7 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
         public GameObject panel, entryRoot, waitingRoot, confirm;
         public TMP_InputField secret, codeInput;
         public TMP_Text codeText, entryStatus, opponentStatus, status;
-        public Button copy, back;
+        public Button copy, share, back;
         internal bool createMode;
         internal TMP_Text playerName, opponentName;
         internal Image playerPortrait, opponentPortrait;
@@ -301,8 +301,12 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
                 new Vector2(0, -114), new Vector2(730, 146));
             parts.codeText = Text(code.transform, "RoomCode", "-----", 67,
                 new Rect(-265, -45, 530, 103), White);
-            parts.copy = NewButton(waiting, "ShareButton", "pvp_copy",
-                new Vector2(0, -291), new Vector2(730, 151), 40, true);
+            // One code/invitation region, primary native share and explicit copy fallback.
+            var inviteActions = Rect(waiting, "ShareButton", new Vector2(0, -291), new Vector2(730, 151));
+            parts.share = NewButton(inviteActions, "NativeShareButton", "pvp_share",
+                new Vector2(-160, 0), new Vector2(410, 151), 36, true);
+            parts.copy = NewButton(inviteActions, "CopyInviteButton", "pvp_copy_short",
+                new Vector2(220, 0), new Vector2(290, 112), 30, false);
             Copy(waiting, "ShareHelp", "private_room_share_help", 28,
                 new Rect(-335, -466, 670, 99), Muted, false);
         }
@@ -386,8 +390,9 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
             bool validCode = form.createMode || ValidCode(form.codeInput.text);
             form.confirm.GetComponent<Button>().interactable = validSecret && validCode;
             if (form.copy != null)
-                form.copy.interactable = pvp != null && pvp.client != null &&
-                    !string.IsNullOrEmpty(pvp.client.RoomCode);
+                form.copy.interactable = pvp != null && pvp.CanShareInvite;
+            if (form.share != null)
+                form.share.interactable = pvp != null && pvp.CanShareInvite;
         }
     }
 

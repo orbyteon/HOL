@@ -30,6 +30,9 @@ public class PvpGameController : MonoBehaviour
     public TMP_Text createStatusText;
     public AnimatedEllipsis createStatusEllipsis;
     public GameObject createCopyButton;
+    public GameObject createShareButton;
+    // Platform boundary, injectable by deterministic tests without launching another app.
+    public System.Func<string, string, bool> OpenShareChooser = PvpInvitationSharing.OpenChooser;
 
     [Header("Join flow")]
     public TMP_InputField joinCodeInput;
@@ -130,6 +133,7 @@ public class PvpGameController : MonoBehaviour
 
     void ClearRoomIdentity()
     {
+        if (resultPresentation != null) resultPresentation.SetResultSnapshot(null);
         lastState = null;
         presentationRoomCode = "";
         RefreshRoomIdentity();
@@ -150,6 +154,8 @@ public class PvpGameController : MonoBehaviour
     const int MaxDonePolls = 80;
 
     int flowGeneration;
+    int pollingGeneration;
+    bool applicationPaused, applicationFocused = true, pollingSuspended;
     bool joinCreateInFlight;
     string createStatusKey = "";
 
@@ -169,6 +175,37 @@ public class PvpGameController : MonoBehaviour
         flowGeneration++;
         CancelInvoke();
         if (client != null) client.StopPolling();
+    }
+
+    void OnApplicationPause(bool paused)
+    {
+        applicationPaused = paused;
+        RefreshApplicationActivity();
+    }
+
+    void OnApplicationFocus(bool focused)
+    {
+        applicationFocused = focused;
+        RefreshApplicationActivity();
+    }
+
+    void RefreshApplicationActivity()
+    {
+        if (applicationPaused || !applicationFocused)
+        {
+            if (pollingSuspended) return;
+            pollingSuspended = true;
+            pollingGeneration++;
+            if (client != null) client.StopPolling();
+            return;
+        }
+        if (!pollingSuspended) return;
+        pollingSuspended = false;
+        // Immediate fresh read after WhatsApp, without resetting history, range,
+        // result, rematch or identity. Focus+pause callbacks coalesce to one restart.
+        if (client != null && !abnormalTerminal && !string.IsNullOrEmpty(client.RoomCode) &&
+            presentationRoomCode == client.RoomCode)
+            StartRoomPolling();
     }
 
     // Repaint only: never replay OnState, record a result, advance rematch
@@ -259,13 +296,28 @@ public class PvpGameController : MonoBehaviour
 
     public void OnCopyInvitePressed()
     {
-        if (string.IsNullOrEmpty(client.RoomCode)) return;
+        if (!CanShareInvite) return;
 
         GUIUtility.systemCopyBuffer = L10n.Get("pvp_invite_text", client.RoomCode);
         GameEvents.RoomShared();
         SetCreateStatus("pvp_invite_copied", false);
         CancelInvoke(nameof(ResumeWaitingStatus));
         Invoke(nameof(ResumeWaitingStatus), 2.5f);
+    }
+
+    public bool CanShareInvite => client != null && client.IsHost && !joinCreateInFlight &&
+        !abnormalTerminal && !matchOver && createPanel != null && createPanel.activeInHierarchy &&
+        createWaitingRoot != null && createWaitingRoot.activeInHierarchy &&
+        !string.IsNullOrWhiteSpace(client.RoomCode) && presentationRoomCode == client.RoomCode &&
+        (lastState == null || lastState.phase == "waiting");
+
+    public void OnShareInvitePressed()
+    {
+        if (!CanShareInvite) return;
+        string invitation = L10n.Get("pvp_invite_text", client.RoomCode);
+        // No 'sent' status and no sharing/reward event: the player can cancel.
+        if (OpenShareChooser == null || !OpenShareChooser(invitation, L10n.Get("pvp_share_chooser")))
+            SetCreateStatus("pvp_share_unavailable", false);
     }
 
     void ResumeWaitingStatus()
@@ -287,6 +339,7 @@ public class PvpGameController : MonoBehaviour
         if (createStatusEllipsis != null)
             createStatusEllipsis.enabled = false;
         if (createCopyButton != null) createCopyButton.SetActive(true);
+        if (createShareButton != null) createShareButton.SetActive(true);
 
         SetPrebattleMessage(createStatusText, key);
 
@@ -639,16 +692,23 @@ public class PvpGameController : MonoBehaviour
         RefreshSignalsAvailability();
         if (signalFeedText != null) signalFeedText.text = "";
         if (resultSignalFeedText != null) resultSignalFeedText.text = "";
+        StartRoomPolling();
+    }
+
+    void StartRoomPolling()
+    {
+        if (pollingSuspended) return;
+        int poll = ++pollingGeneration;
         int generation = flowGeneration;
         string room = client.RoomCode;
         client.OnRoomClosed = () => {
-            if (generation == flowGeneration && room == client.RoomCode) HandleRoomClosed();
+            if (poll == pollingGeneration && generation == flowGeneration && room == client.RoomCode) HandleRoomClosed();
         };
         client.OnConnectionLost = () => {
-            if (generation == flowGeneration && room == client.RoomCode) HandleConnectionLost();
+            if (poll == pollingGeneration && generation == flowGeneration && room == client.RoomCode) HandleConnectionLost();
         };
         client.StartPolling(state => {
-            if (generation == flowGeneration && room == client.RoomCode) OnState(state);
+            if (poll == pollingGeneration && generation == flowGeneration && room == client.RoomCode) OnState(state);
         });
     }
 
@@ -690,6 +750,7 @@ public class PvpGameController : MonoBehaviour
             if (createStatusEllipsis != null)
                 createStatusEllipsis.enabled = false;
             if (createCopyButton != null) createCopyButton.SetActive(false);
+            if (createShareButton != null) createShareButton.SetActive(false);
             if (terminalPresentation != null)
                 terminalPresentation.ShowStatus(reason, createStatusText);
         }
@@ -728,6 +789,7 @@ public class PvpGameController : MonoBehaviour
 
         lastState = s;
         RefreshRoomIdentity();
+        if (resultPresentation != null) resultPresentation.SetResultSnapshot(s);
 
         string me = client.IsHost ? "host" : "guest";
 
@@ -851,6 +913,7 @@ public class PvpGameController : MonoBehaviour
                     : iWon
                         ? "result_win_title"
                         : "result_loss_title";
+                resultPresentation.SetResultSnapshot(s);
                 resultPresentation.ShowLocalized(titleKey, myGuessCount,
                     opponentGuessCount, huntedSecret, iWon);
             }

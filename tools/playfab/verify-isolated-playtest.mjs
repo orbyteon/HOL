@@ -7,7 +7,7 @@ export function verifyManifest(m) {
   assert.equal(m.packageId, 'com.Orbyteon.HOL.pvptest');
   assert.equal(m.productName, 'HOL PvP Test');
   assert.equal(m.unityVersion, '2022.3.62f3');
-  assert.equal(m.cloudScriptSha256, 'EBB9DEE03FE4D147E63B555DA36EA5D56AAFEE85DB91F72BC56938B7963DEEB5');
+  assert.equal(m.cloudScriptSha256, '121556521FF8633DE5035FD8462C50D85A80363539211FB7F318C4D470BEABF0');
   assert.equal(m.development, true);
   assert.equal(m.operatorProvisioningOnly, true);
   assert.deepEqual(m.scenes, ['Assets/Scenes/SplashScene.unity', 'Assets/Scenes/MainMenu.unity']);
