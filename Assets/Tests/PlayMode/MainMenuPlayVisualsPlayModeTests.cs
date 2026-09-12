@@ -127,8 +127,10 @@ public sealed class MainMenuPlayVisualsPlayModeTests
             back, "solo/production/solo_back_button_v1");
         Assert.That(safe.GetComponentsInChildren<Button>(false), Has.Length.EqualTo(3),
             "Selector must expose exactly VS AI, one Private Room route, and Back.");
-        Assert.That(root.GetComponentsInChildren<TMP_Text>(false), Has.Length.EqualTo(8),
-            "Selector must expose one heading/helper and three live labels per real mode.");
+        Assert.That(root.GetComponentsInChildren<TMP_Text>(false), Has.Length.EqualTo(10),
+            "Selector exposes heading/helper, three labels per mode, and the shared profile name/score.");
+        Assert.That(Find(root, "PlayPlayerName"), Is.Not.Null);
+        Assert.That(Find(root, "PlayPlayerScore"), Is.Not.Null);
         Assert.That(CountNamedButtons(canvas.transform, "ButtonPvP"), Is.EqualTo(1),
             "There must be exactly one active Private Room/PvP entry.");
         Assert.That(CountNamedButtons(canvas.transform, "ButtonPrivateRoom"), Is.Zero,
@@ -255,7 +257,10 @@ public sealed class MainMenuPlayVisualsPlayModeTests
             hubTitle, hubSubtitle, soloTitle, soloSubtitle,
             soloAction, friendTitle, friendSubtitle, friendAction,
         };
-        AssertApprovedTitleApertures(owner, soloTitle, friendTitle, "initial");
+        MainMenuHomeVisualsPlayModeTests.ApplyMenuViewport(owner, "PlaySafeAreaRoot", 1080, 1920);
+        float expectedTitleLineBoxHeight = 0f;
+        AssertApprovedTitleApertures(owner, soloTitle, friendTitle, 1080, 1920,
+            ref expectedTitleLineBoxHeight, "initial");
         MethodInfo applyViewport = owner.GetType().GetMethod(
             "ApplyResponsiveLayoutForViewport", InstanceFlags);
         Assert.That(applyViewport, Is.Not.Null,
@@ -269,10 +274,8 @@ public sealed class MainMenuPlayVisualsPlayModeTests
             {
                 string lane = (language == 0 ? "EN " : "EL ") +
                               viewport.x + "x" + viewport.y;
-                applyViewport.Invoke(owner, new object[]
-                {
-                    viewport.x, viewport.y, true,
-                });
+                MainMenuHomeVisualsPlayModeTests.ApplyMenuViewport(
+                    owner, "PlaySafeAreaRoot", viewport.x, viewport.y);
                 Canvas.ForceUpdateCanvases();
                 foreach (TMP_Text text in texts)
                 {
@@ -283,10 +286,20 @@ public sealed class MainMenuPlayVisualsPlayModeTests
                         lane + " " + text.name);
                 }
 
-                AssertApprovedTitleApertures(owner, soloTitle, friendTitle, lane);
-                AssertContained(safe.rect, GlyphBounds(hubTitle, safe), 28f,
+                AssertApprovedTitleApertures(owner, soloTitle, friendTitle, viewport.x, viewport.y,
+                    ref expectedTitleLineBoxHeight, lane);
+                // ApplyMenuViewport supplies a virtual portrait canvas. In
+                // batch CI the actual Game View may still be landscape, so
+                // safe.rect is not that virtual viewport's authored bounds.
+                // Keep the same 28-unit inset against the independent portrait
+                // expectation, not the unrelated host window dimensions.
+                float referenceHeight = MainMenuHomeVisualsPlayModeTests
+                    .ExpectedReferenceHeight(viewport.x, viewport.y);
+                Rect expectedSafe = new Rect(-540f, -referenceHeight * .5f,
+                    1080f, referenceHeight);
+                AssertContained(expectedSafe, GlyphBounds(hubTitle, safe), 28f,
                     lane + " hub title");
-                AssertContained(safe.rect, GlyphBounds(hubSubtitle, safe), 28f,
+                AssertContained(expectedSafe, GlyphBounds(hubSubtitle, safe), 28f,
                     lane + " hub subtitle");
                 AssertContained(solo.rect, GlyphBounds(soloTitle, solo), 20f,
                     lane + " VS AI title");
@@ -310,8 +323,10 @@ public sealed class MainMenuPlayVisualsPlayModeTests
                 Assert.That(soloAction.fontSize, Is.GreaterThanOrEqualTo(36f), lane);
                 Assert.That(friendAction.fontSize, Is.GreaterThanOrEqualTo(36f), lane);
 
-                AssertRectSize(solo, new Vector2(560f, 920f), lane + " VS AI");
-                AssertRectSize(friend, new Vector2(560f, 920f), lane + " friend");
+                float expectedHeight = 850f + .9f *
+                    (MainMenuHomeVisualsPlayModeTests.ExpectedReferenceHeight(viewport.x, viewport.y) - 1920f);
+                AssertRectSize(solo, new Vector2(560f, expectedHeight), lane + " VS AI");
+                AssertRectSize(friend, new Vector2(560f, expectedHeight), lane + " friend");
                 AssertRectSize(back, new Vector2(118f, 118f), lane + " Back");
                 AssertHorizontalSeparation(solo, friend, lane + " mode cards");
                 Assert.That(solo.sizeDelta.y, Is.GreaterThanOrEqualTo(48f));
@@ -322,23 +337,51 @@ public sealed class MainMenuPlayVisualsPlayModeTests
     }
 
     static void AssertApprovedTitleApertures(
-        Component owner, TMP_Text soloTitle, TMP_Text friendTitle, string lane)
+        Component owner, TMP_Text soloTitle, TMP_Text friendTitle, int width, int height,
+        ref float expectedLineBoxHeight, string lane)
     {
+        float extraHeight = Mathf.Max(0f,
+            MainMenuHomeVisualsPlayModeTests.ExpectedReferenceHeight(width, height) - 1920f);
+        // The runtime geometry crosses stored IEEE-754 float boundaries.
+        // Mono may retain extra precision in this independent expression;
+        // round at those boundaries, not by loosening exact geometry checks.
+        float cardHeight = StoredSingle(850f + .9f * extraHeight);
+        float scale = StoredSingle(cardHeight / 920f);
+        // The approved glyph-centering owner retains the largest TMP metric
+        // box through viewport/language changes. Only the smaller artwork face
+        // limits visible ink. Pin both independently, including exact history.
+        expectedLineBoxHeight = Mathf.Max(expectedLineBoxHeight, 86.9f * scale + 32f);
         MainMenuHomeVisualsPlayModeTests.AssertApprovedCenteredTextRegion(
-            owner, soloTitle, new Vector2(-16f, 361.6f),
-            new Vector2(210f, 86.9f), new Vector2(210f, 118.9f),
+            owner, soloTitle, new Vector2(-16f, 361.6f * scale),
+            new Vector2(210f, 86.9f * scale), new Vector2(210f, expectedLineBoxHeight),
             0f, lane + " VS AI title aperture");
         MainMenuHomeVisualsPlayModeTests.AssertApprovedCenteredTextRegion(
-            owner, friendTitle, new Vector2(7f, 361.6f),
-            new Vector2(210f, 86.9f), new Vector2(210f, 118.9f),
+            owner, friendTitle, new Vector2(7f, 361.6f * scale),
+            new Vector2(210f, 86.9f * scale), new Vector2(210f, expectedLineBoxHeight),
             0f, lane + " friend title aperture");
     }
+
+    static float StoredSingle(float value)
+        => BitConverter.ToSingle(BitConverter.GetBytes(value), 0);
 
     static IEnumerator LoadReadyMainMenu()
     {
 #if UNITY_EDITOR
         FirstLaunchSoloEndToEndPlayModeTests
             .FocusGameViewForEndOfFrameSettlement();
+        if (!Application.isBatchMode)
+        {
+            // Earlier native capture cases can leave a tall Game View. Start
+            // this fixture at its declared reference before constructing TMP
+            // owners; otherwise their retained metric boxes inherit that case.
+            Type.GetType("OnboardingGameViewCapture, Assembly-CSharp-Editor", true)
+                .GetMethod("SetResolution").Invoke(null, new object[] { 1080, 1920 });
+            for (int frame = 0; frame < 120 &&
+                (Screen.width != 1080 || Screen.height != 1920); frame++)
+                yield return null;
+            Assert.That(new Vector2Int(Screen.width, Screen.height),
+                Is.EqualTo(new Vector2Int(1080, 1920)), "Initial native fixture viewport");
+        }
 #endif
         SetLanguage(0);
         InvokeInstaller("MainMenuHomeVisuals");

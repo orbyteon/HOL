@@ -51,7 +51,8 @@ public sealed class PrivateRoomVisualsPlayModeTests
             "Approved Private Room visual root was not built.");
         Assert.That(visualRoot.gameObject.activeInHierarchy, Is.True);
 
-        yield return CapturePrivateRoomScreenshot();
+        // Native screenshot evidence is captured by the explicit, external
+        // pre-match review seam, never by overwriting a prior artifact here.
 
         string[] requiredObjects =
         {
@@ -60,12 +61,8 @@ public sealed class PrivateRoomVisualsPlayModeTests
             "PrivateRoomLogo",
             "PrivateRoomTitleRibbon",
             "PrivateRoomCreateCard",
-            "PrivateRoomCreateBoy",
-            "PrivateRoomCreateGirl",
             "PrivateRoomJoinCard",
-            "PrivateRoomJoinDoor",
             "PrivateRoomLandingCodeInput",
-            "PrivateRoomShareButton",
             "PrivateRoomTipCard",
             "PrivateRoomMascotSix",
             "PrivateRoomMascotSeven"
@@ -156,7 +153,8 @@ public sealed class PrivateRoomVisualsPlayModeTests
 
     static bool IsAllowedProductionGraphic(Graphic graphic)
     {
-        if (graphic is Image || graphic is TMP_Text)
+        if (graphic is Image || graphic is TMP_Text ||
+            graphic.GetType().FullName == "Unity.VectorGraphics.SVGImage")
             return true;
 
         var subMesh = graphic as TMP_SubMeshUI;
@@ -167,37 +165,6 @@ public sealed class PrivateRoomVisualsPlayModeTests
 
         return graphic.GetType().Name == "TMP_SelectionCaret" &&
                graphic.GetComponentInParent<TMP_InputField>() != null;
-    }
-
-    static IEnumerator CapturePrivateRoomScreenshot()
-    {
-        // ScreenCapture.CaptureScreenshot is a player/device paint seam and is
-        // a no-op in Linux batchmode. The native Android preview remains the
-        // authoritative capture gate; skip only this file-write step in CI so
-        // the hierarchy, artwork, callback and input assertions still execute.
-        if (Application.isBatchMode)
-            yield break;
-
-        yield return new WaitForEndOfFrame();
-
-        string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
-        string artifactDirectory = Path.Combine(projectRoot, "artifacts", "private-room-render");
-        Directory.CreateDirectory(artifactDirectory);
-        string path = Path.Combine(artifactDirectory, "private-room-1080x1920.png");
-
-        if (File.Exists(path))
-            File.Delete(path);
-
-        ScreenCapture.CaptureScreenshot(path);
-
-        for (int frame = 0; frame < 120 && !File.Exists(path); frame++)
-            yield return null;
-
-        Assert.That(File.Exists(path), Is.True,
-            "Private Room screenshot was not written to the PlayMode artifact directory.");
-        var info = new FileInfo(path);
-        Assert.That(info.Length, Is.GreaterThan(1024),
-            "Private Room screenshot artifact is unexpectedly empty.");
     }
 
     static void RegisterInstaller()

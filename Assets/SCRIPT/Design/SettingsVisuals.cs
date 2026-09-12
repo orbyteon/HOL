@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -28,7 +29,7 @@ public sealed class SettingsVisuals : MonoBehaviour
     const string GoldButtonResource = "mainmenu/mainmenu_cta_gold_9s";
     const string NeutralButtonResource = "mainmenu/mainmenu_tip_frame_9s";
     const string MagentaButtonResource = "mainmenu/mainmenu_cta_magenta_9s";
-    const string PlayerChipResource = "mainmenu/mainmenu_player_chip_frame_9s";
+    const string PlayerChipResource = MenuPortraitLayout.ChipResource;
     const string ChevronResource = "phase2a/hol_chevron_r2";
     const string DisplayFontResource = "phase2a/fonts/HOL Menu Display SDF";
     const string BodyFontResource = "phase2a/fonts/HOL Menu Body SDF";
@@ -60,6 +61,8 @@ public sealed class SettingsVisuals : MonoBehaviour
     bool subscribed;
     int waitFrames;
     float nextRefresh;
+    float layoutHeight = -1f;
+    readonly List<MainMenuCenteredTextRegion> centered = new List<MainMenuCenteredTextRegion>();
 
     public bool IsReady => built && root != null && safeRoot != null;
 
@@ -137,6 +140,11 @@ public sealed class SettingsVisuals : MonoBehaviour
             nextRefresh = Time.unscaledTime + 0.25f;
             RefreshPresentation();
         }
+        if (visible)
+        {
+            ApplyResponsiveLayout();
+            foreach (var region in centered) region.Apply();
+        }
     }
 
     void OnLanguageChanged()
@@ -190,6 +198,7 @@ public sealed class SettingsVisuals : MonoBehaviour
         BuildShell();
         BuildMascots();
         HideLegacyPresentation();
+        ApplyResponsiveLayout();
         RefreshPresentation();
     }
 
@@ -201,6 +210,9 @@ public sealed class SettingsVisuals : MonoBehaviour
             new Vector2(124f, 124f));
         HideChildGraphics(back.transform);
         StyleButton(back, NeutralButtonResource, false, 30f);
+        // This is an icon-only navigation control, not two competing labels.
+        foreach (var label in back.GetComponentsInChildren<TMP_Text>(true))
+            label.gameObject.SetActive(false);
         var icon = AddSprite(back.transform, "BackIcon", ChevronResource,
             Vector2.zero, new Vector2(62f, 78f));
         if (icon != null)
@@ -213,22 +225,21 @@ public sealed class SettingsVisuals : MonoBehaviour
         Place(go.transform as RectTransform, new Vector2(356f, 812f),
             new Vector2(345f, 124f));
         var chip = go.AddComponent<Image>();
-        SetProductionImage(chip, PlayerChipResource, 1f);
+        SetSimpleSprite(chip, PlayerChipResource, false);
         chip.raycastTarget = false;
 
-        chipAvatarImage = AddSprite(
-            go.transform, "PlayerAvatar",
-            PlayerProfileAvatarResolver.FallbackResourcePath,
-            new Vector2(-126f, -2f), new Vector2(76f, 82f));
-        if (chipAvatarImage != null)
-            chipAvatarImage.sprite = PlayerProfileAvatarResolver.Resolve();
+        chipAvatarImage = MenuPortraitLayout.CreatePortrait(go.transform, "PlayerAvatar");
+        MenuPortraitLayout.PaintPortrait(chipAvatarImage, PlayerProfileAvatarResolver.Resolve());
 
-        chipName = AddText(go.transform, "PlayerName", "", 31,
-            new Vector2(35f, 23f), new Vector2(210f, 46f), NearWhite,
-            TextAlignmentOptions.Center, ResponsiveTextRole.Heading, bodyFont);
+        chipName = AddText(go.transform, "PlayerName", "", 34,
+            MenuPortraitLayout.NameFace.center, MenuPortraitLayout.NameFace.size, NearWhite,
+            TextAlignmentOptions.Center, ResponsiveTextRole.Heading, displayFont);
+        MenuPortraitLayout.StyleName(chipName);
         chipStreak = AddText(go.transform, "Streak", "", 30,
-            new Vector2(35f, -27f), new Vector2(170f, 40f), NearWhite,
+            MenuPortraitLayout.ScoreFace.center, MenuPortraitLayout.ScoreFace.size, NearWhite,
             TextAlignmentOptions.Center, ResponsiveTextRole.Action, bodyFont);
+        centered.Add(MenuPortraitLayout.Region(chipName, MenuPortraitLayout.NameFace));
+        centered.Add(MenuPortraitLayout.Region(chipStreak, MenuPortraitLayout.ScoreFace));
     }
 
     void BuildTitle()
@@ -246,6 +257,7 @@ public sealed class SettingsVisuals : MonoBehaviour
         copy.enableAutoSizing = true;
         copy.fontSizeMin = 42f;
         copy.fontSizeMax = 58f;
+        centered.Add(new MainMenuCenteredTextRegion(copy, 0, 5, 520, 80));
     }
 
     void BuildShell()
@@ -388,7 +400,7 @@ public sealed class SettingsVisuals : MonoBehaviour
         string player = string.IsNullOrWhiteSpace(stored)
             ? L10n.Get("player_default") : stored;
         if (chipAvatarImage != null)
-            chipAvatarImage.sprite = PlayerProfileAvatarResolver.Resolve();
+            MenuPortraitLayout.PaintPortrait(chipAvatarImage, PlayerProfileAvatarResolver.Resolve());
         if (chipName != null) chipName.text = player;
         if (chipStreak != null)
             chipStreak.text = L10n.Get("stats_streak") + " " + GameStats.CurrentStreak;
@@ -420,6 +432,30 @@ public sealed class SettingsVisuals : MonoBehaviour
         }
     }
 
+    void ApplyResponsiveLayout()
+    {
+        if (safeRoot == null || shell == null) return;
+        float height = MenuPortraitLayout.Height(safeRoot);
+        if (Mathf.Approximately(layoutHeight, height)) return;
+        layoutHeight = height;
+        float top = height * .5f;
+        float extra = Mathf.Max(0, height - 1920f);
+        Place(Find<RectTransform>(safeRoot, "SettingsLogo"), MenuPortraitLayout.LogoPosition(safeRoot), MenuPortraitLayout.LogoSize);
+        Place(Find<RectTransform>(safeRoot, "SettingsPlayerChip"), MenuPortraitLayout.HeaderPosition(safeRoot), MenuPortraitLayout.ChipSize);
+        Place(Find<RectTransform>(safeRoot, "Buttonback"), new Vector2(-454, top - 103), new Vector2(118, 118));
+        Place(Find<RectTransform>(safeRoot, "SettingsReferenceTitle"), new Vector2(0, top - 545), new Vector2(680, 118));
+        float shellHeight = 1040f + .8f * extra;
+        Place(shell, new Vector2(0, top - 620 - shellHeight * .5f), new Vector2(1000, shellHeight));
+        string[] rows = { "SettingsNameRow", "SettingsLanguageRow", "SettingsMusicRow", "SettingsDifficultyRow", "SettingsPrivacyRow" };
+        for (int index = 0; index < rows.Length; index++)
+            Place(Find<RectTransform>(shell, rows[index]), new Vector2(0, (.4f - .2f * index) * shellHeight),
+                new Vector2(900, shellHeight * .18f));
+        foreach (string suffix in new[] { "Six", "Seven" })
+            Place(Find<RectTransform>(safeRoot, "SettingsMascot" + suffix),
+                new Vector2(suffix == "Six" ? -385 : 385, -top + 130 + extra * .025f),
+                new Vector2(240, 240 + extra * .05f));
+    }
+
     void StyleInput(TMP_InputField input)
     {
         var image = input.GetComponent<Image>();
@@ -434,6 +470,7 @@ public sealed class SettingsVisuals : MonoBehaviour
             input.textComponent.fontStyle = FontStyles.Normal;
             input.textComponent.color = NearWhite;
             input.textComponent.alignment = TextAlignmentOptions.MidlineLeft;
+            input.textComponent.margin = new Vector4(10f, 0f, 10f, 0f);
             ResponsiveTextPolicy.Configure(input.textComponent,
                 ResponsiveTextRole.Input, 32f);
         }
@@ -444,6 +481,7 @@ public sealed class SettingsVisuals : MonoBehaviour
             placeholder.fontSize = 30f;
             placeholder.color = new Color(0.78f, 0.80f, 0.92f, 0.82f);
             placeholder.alignment = TextAlignmentOptions.MidlineLeft;
+            placeholder.margin = new Vector4(10f, 0f, 10f, 0f);
         }
     }
 
@@ -481,6 +519,10 @@ public sealed class SettingsVisuals : MonoBehaviour
             text.overflowMode = TextOverflowModes.Ellipsis;
             text.raycastTarget = false;
             ResponsiveTextPolicy.Configure(text, ResponsiveTextRole.Action, fontSize);
+            text.transform.SetParent(button.transform, false);
+            var size = ((RectTransform)button.transform).sizeDelta;
+            centered.RemoveAll(region => region.Text == text);
+            centered.Add(new MainMenuCenteredTextRegion(text, 0, 4, size.x - 36, size.y - 24));
             EnsureTextShadow(text,
                 selected
                     ? new Color(0.32f, 0.16f, 0f, 0.35f)

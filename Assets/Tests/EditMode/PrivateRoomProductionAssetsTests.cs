@@ -1,5 +1,7 @@
 using System;
+using System.IO;
 using System.Reflection;
+using System.Security.Cryptography;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -7,11 +9,17 @@ public sealed class PrivateRoomProductionAssetsTests
 {
     static readonly string[] RequiredSprites =
     {
-        "phase2a/hol_neon_reference_bg_r3",
+        "solo/production/solo_background_v1",
+        "reference/hol_private_create_card_v1",
+        "reference/hol_private_join_card_v1",
+        "phase2a/hol_cta_blue_r2_9s",
+        "solo/production/solo_interaction_board_v2",
+        "solo/production/solo_prompt_ribbon_v1",
+        "solo/production/solo_primary_cta_v1",
+        "solo/production/solo_input_field_v1",
+        "solo/production/solo_player_chip_v1",
+        "solo/production/solo_back_button_v1",
         "reference/hol_logo_exact",
-        "reference/char_boy_exact",
-        "reference/char_girl_exact",
-        "reference/board_join_exact",
         "reference/mascot_6_exact",
         "reference/mascot_7_exact",
         "reference/player_cyan_exact",
@@ -40,6 +48,32 @@ public sealed class PrivateRoomProductionAssetsTests
             Assert.That(sprite, Is.Not.Null,
                 "Private Room requires Resources/" + path + ".");
         }
+    }
+
+    [TestCase("hol_private_create_card_v1", "da86c32890f115d48a31041227500608", 1616, 745,
+        "784C62495A962E668E0379977E5F511F80BBF4056159B86CF4FF805277146B9F")]
+    [TestCase("hol_private_join_card_v1", "f9b90c04d60e15542a13e464e367c07c", 1635, 778,
+        "E25D95453F7E267104DA5F3342C23B1F8429D1F2117C4C784B16A8676CDF6713")]
+    public void IllustratedPanelsKeepTheirExactApprovedBytesGuidAndNativeSize(
+        string name, string guid, int width, int height, string expectedHash)
+    {
+        string path = "Assets/newdesign/Resources/reference/" + name + ".png";
+        using (var sha = SHA256.Create())
+        {
+            string actual = BitConverter.ToString(sha.ComputeHash(File.ReadAllBytes(path))).Replace("-", "");
+            Assert.That(actual, Is.EqualTo(expectedHash), "Do not redraw or bake localized text into the approved panel.");
+        }
+        Assert.That(UnityEditor.AssetDatabase.AssetPathToGUID(path), Is.EqualTo(guid));
+        var sprite = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>(path);
+        Assert.That(sprite, Is.Not.Null);
+        Assert.That(sprite.rect.width, Is.EqualTo(width));
+        Assert.That(sprite.rect.height, Is.EqualTo(height));
+        var importer = (UnityEditor.TextureImporter)UnityEditor.AssetImporter.GetAtPath(path);
+        Assert.That(importer.textureType, Is.EqualTo(UnityEditor.TextureImporterType.Sprite));
+        Assert.That(importer.maxTextureSize, Is.EqualTo(2048));
+        Assert.That(importer.mipmapEnabled, Is.False);
+        Assert.That(importer.alphaIsTransparency, Is.True);
+        Assert.That(importer.npotScale, Is.EqualTo(UnityEditor.TextureImporterNPOTScale.None));
     }
 
     [Test]

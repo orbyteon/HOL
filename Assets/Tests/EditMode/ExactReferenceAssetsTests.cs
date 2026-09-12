@@ -117,13 +117,16 @@ public class ExactReferenceAssetsTests
         {
             var ui = host.AddComponent(RuntimeType("PvpRuntimeUI"));
             var controller = host.AddComponent(RuntimeType("PvpGameController"));
-            var match = Child(host.transform, "PvPMatchPanel");
+            // Exercise the real construction seam: runtime wiring delegates
+            // directly to the sole final owner, not a removed overlay builder.
+            InvokePrivate(ui, "BuildPanels", controller);
+            var match = FindDescendant(host.transform, "PvPMatchPanel");
 
-            InvokePrivate(ui, "BuildResultOverlay", controller, match);
-
-            Assert.AreEqual(1, DescendantCount(match.transform, "ResultVisualRoot"));
+            Assert.AreEqual(1, host.GetComponents(RuntimeType("PvpDuelCartoonVisuals")).Length);
+            Assert.AreEqual(1, DirectChildCount(host.transform, "PvPMatchPanel"));
+            Assert.AreEqual(1, DescendantCount(match, "ResultVisualRoot"));
             for (int i = 0; i < 6; i++)
-                Assert.AreEqual(1, DescendantCount(match.transform,
+                Assert.AreEqual(1, DescendantCount(match,
                     "ResultSignal" + i));
         }
         finally
@@ -354,19 +357,31 @@ public class ExactReferenceAssetsTests
             roomType.GetField("matchIndex").SetValue(current, 1);
             roomType.GetField("hostGuessCount").SetValue(current, 0);
             roomType.GetField("phase").SetValue(current, "play");
+            roomType.GetField("hostAvatarId").SetValue(current, "1");
+            roomType.GetField("guestAvatarId").SetValue(current, "6");
 
             InvokePrivate(client, "ApplyReturnedState", current,
                 "{\"ok\":true,\"state\":\"{\\\"matchIndex\\\":0," +
-                "\\\"hostGuessCount\\\":9,\\\"phase\\\":\\\"done\\\"}\"}");
+                "\\\"hostGuessCount\\\":9,\\\"phase\\\":\\\"done\\\",\\\"hostAvatarId\\\":\\\"0\\\",\\\"guestAvatarId\\\":\\\"2\\\"}\"}");
 
             Assert.AreEqual(1, roomType.GetField("matchIndex").GetValue(current));
             Assert.AreEqual(0, roomType.GetField("hostGuessCount").GetValue(current));
             Assert.AreEqual("play", roomType.GetField("phase").GetValue(current));
+            Assert.AreEqual("1", roomType.GetField("hostAvatarId").GetValue(current));
+            Assert.AreEqual("6", roomType.GetField("guestAvatarId").GetValue(current));
 
             InvokePrivate(client, "ApplyReturnedState", current,
                 "{\"ok\":true,\"state\":\"{\\\"matchIndex\\\":1," +
-                "\\\"hostGuessCount\\\":2,\\\"phase\\\":\\\"play\\\"}\"}");
+                "\\\"hostGuessCount\\\":2,\\\"phase\\\":\\\"play\\\",\\\"hostAvatarId\\\":\\\"0\\\",\\\"guestAvatarId\\\":\\\"6\\\"}\"}");
             Assert.AreEqual(2, roomType.GetField("hostGuessCount").GetValue(current));
+            Assert.AreEqual("0", roomType.GetField("hostAvatarId").GetValue(current));
+            Assert.AreEqual("6", roomType.GetField("guestAvatarId").GetValue(current));
+
+            InvokePrivate(client, "ApplyReturnedState", current,
+                "{\"ok\":true,\"state\":\"{\\\"matchIndex\\\":1,\\\"phase\\\":\\\"play\\\"}\"}");
+            Assert.That(string.IsNullOrEmpty((string)roomType.GetField("hostAvatarId").GetValue(current)), Is.True,
+                "A legacy snapshot must clear, not retain, a stale host portrait.");
+            Assert.That(string.IsNullOrEmpty((string)roomType.GetField("guestAvatarId").GetValue(current)), Is.True);
         }
         finally
         {

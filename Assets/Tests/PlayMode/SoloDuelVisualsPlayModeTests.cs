@@ -107,6 +107,77 @@ public sealed class SoloDuelVisualsPlayModeTests
         yield return null;
     }
 
+    [UnityTest, Explicit("Native current Solo reference for the PvP presentation comparison; external evidence only.")]
+    public IEnumerator CaptureCurrentSoloReferenceForPvp()
+    {
+        string output = null;
+        bool hadLanguage = PlayerPrefs.HasKey("Language");
+        int oldLanguage = PlayerPrefs.GetInt("Language", 0);
+        object originalLanguage = RuntimeType("L10n").GetProperty("Current").GetValue(null);
+        try
+        {
+            yield return SceneManager.LoadSceneAsync("MainMenu", LoadSceneMode.Single);
+            // The output coordinator and Game View bridge are Editor tools,
+            // not production runtime types in Assembly-CSharp.
+            Type tools = Type.GetType("PvpPresentationReviewTools, Assembly-CSharp-Editor", true);
+            string parent = (string)tools.GetProperty("OutputDirectory").GetValue(null);
+            Assert.That(System.IO.Directory.Exists(parent), Is.True);
+            output = System.IO.Path.Combine(parent, "Solo-Reference-" + DateTime.UtcNow.ToString("yyyyMMdd_HHmmss_fff"));
+            Assert.That(System.IO.Directory.Exists(output), Is.False);
+            System.IO.Directory.CreateDirectory(output);
+            Component layout = null;
+            yield return EnterSoloThroughProductionPath(ready => layout = ready);
+            Assert.That(layout, Is.Not.Null);
+            foreach (var viewport in new[] { new Vector2Int(1080, 1920), new Vector2Int(1080, 2400) })
+            foreach (string language in new[] { "English", "Greek" })
+            {
+                Type.GetType("OnboardingGameViewCapture, Assembly-CSharp-Editor", true).GetMethod("SetResolution")
+                    .Invoke(null, new object[] { viewport.x, viewport.y });
+                Screen.SetResolution(viewport.x, viewport.y, false);
+                SetLanguage(language);
+                InvokeLayout(layout, "BeginNewMatch", language == "Greek" ? "Κωνσταντίνος" : "Konstantinos");
+                InvokeLayout(layout, "SetPlayerSecret", 80);
+                InvokeLayout(layout, "RevealStarter", RuntimeEnum("SoloBoardActor", "Player"), 1, 1, 100, 1, 100);
+                InvokeLayout(layout, "BeginPlayerTurn", 1, 1, 100, 1, 100, false);
+                InvokeLayout(layout, "RecordPlayerMove", 1, 50, RuntimeEnum("DuelRules+Hint", "Lower"), false, 100, 1, 49, 1, 100);
+                InvokeLayout(layout, "BeginOpponentThinking", 1, 1, 49, 1, 100);
+                InvokeLayout(layout, "RecordOpponentMove", 1, 50, RuntimeEnum("DuelRules+Hint", "Higher"), false, 100, 1, 49, 51, 100);
+                InvokeLayout(layout, "RevealOpponentOutcome");
+                InvokeLayout(layout, "BeginPlayerTurn", 2, 1, 49, 51, 100, false);
+                InvokeLayout(layout, "DismissLatestAiHandoff");
+                InvokeLayout(layout, "UpdateLockState", true, true, false, false, 49);
+                yield return null;
+                yield return null;
+                yield return (IEnumerator)tools.GetMethod("WaitForStableNativeViewport")
+                    .Invoke(null, new object[] { layout.transform, viewport.x, viewport.y });
+                Canvas.ForceUpdateCanvases();
+                Assert.That(Screen.width, Is.EqualTo(viewport.x));
+                Assert.That(Screen.height, Is.EqualTo(viewport.y));
+                string file = System.IO.Path.Combine(output, "solo-PlayerTurn-" +
+                    (language == "Greek" ? "el" : "en") + "-" + viewport.x + "x" + viewport.y + ".png");
+                tools.GetMethod("WriteViewportMetrics").Invoke(null, new object[] { file + ".geometry.json", layout.transform,
+                    new[] { "SoloDuelSafeRoot", "SoloDuelLogo", "PlayerCard", "SoloInteractionCard", "HistoryCard" } });
+                ScreenCapture.CaptureScreenshot(file);
+                float deadline = Time.realtimeSinceStartup + 10;
+                while ((!System.IO.File.Exists(file) || new System.IO.FileInfo(file).Length == 0) && Time.realtimeSinceStartup < deadline)
+                    yield return null;
+                Assert.That(System.IO.File.Exists(file), Is.True, file);
+                var png = new Texture2D(2, 2);
+                Assert.That(png.LoadImage(System.IO.File.ReadAllBytes(file)), Is.True);
+                Assert.That(png.width, Is.EqualTo(viewport.x));
+                Assert.That(png.height, Is.EqualTo(viewport.y));
+                UnityEngine.Object.Destroy(png);
+            }
+        }
+        finally
+        {
+            RuntimeType("L10n").GetMethod("SetLanguage").Invoke(null, new[] { originalLanguage });
+            RestoreInt("Language", hadLanguage, oldLanguage);
+            PlayerPrefs.Save();
+        }
+        Debug.Log("HOL_SOLO_REFERENCE_CAPTURE_COMPLETE " + output);
+    }
+
     [UnityTest]
     public IEnumerator ValidateSoloDuelRequiredViewportMatrix()
     {
