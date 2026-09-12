@@ -360,6 +360,19 @@ public sealed class MainMenuPlayVisualsPlayModeTests
 #if UNITY_EDITOR
         FirstLaunchSoloEndToEndPlayModeTests
             .FocusGameViewForEndOfFrameSettlement();
+        if (!Application.isBatchMode)
+        {
+            // Earlier native capture cases can leave a tall Game View. Start
+            // this fixture at its declared reference before constructing TMP
+            // owners; otherwise their retained metric boxes inherit that case.
+            Type.GetType("OnboardingGameViewCapture, Assembly-CSharp-Editor", true)
+                .GetMethod("SetResolution").Invoke(null, new object[] { 1080, 1920 });
+            for (int frame = 0; frame < 120 &&
+                (Screen.width != 1080 || Screen.height != 1920); frame++)
+                yield return null;
+            Assert.That(new Vector2Int(Screen.width, Screen.height),
+                Is.EqualTo(new Vector2Int(1080, 1920)), "Initial native fixture viewport");
+        }
 #endif
         SetLanguage(0);
         InvokeInstaller("MainMenuHomeVisuals");

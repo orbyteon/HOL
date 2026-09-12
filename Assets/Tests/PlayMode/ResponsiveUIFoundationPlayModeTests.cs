@@ -383,6 +383,15 @@ public sealed class ResponsiveUIFoundationPlayModeTests
             new Rect(Vector2.zero, viewport), safePixels, canvasSize
         });
         Rect safeRect = Property<Rect>(owner, "LastSafeRect");
+        if (root.name == "PvpResultCartoonRootSafeRoot")
+        {
+            // Result has its own responsive composition on the same sole PvP
+            // owner. Apply it after the virtual safe area, just as LateUpdate
+            // does for a real resize; never measure a prior capture's layout.
+            var resultOwner = root.GetComponentInParent(RuntimeType("PvpDuelCartoonVisuals"));
+            Assert.That(resultOwner, Is.Not.Null);
+            resultOwner.GetType().GetMethod("LayoutResult", InstanceFlags).Invoke(resultOwner, null);
+        }
         var privateRoom = root.GetComponentInParent(RuntimeType("PrivateRoomVisuals"));
         if (privateRoom != null && (root.name == "PrivateRoomSafeRoot" ||
             root.name == "PvPCreatePanelVisualsSafeRoot" || root.name == "PvPJoinPanelVisualsSafeRoot"))
