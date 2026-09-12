@@ -17,7 +17,7 @@ test("PvP constructs its final owner directly without a second reskin installer"
 });
 
 test("Rematch keeps native mobile input while only live guessing owns a keypad", () => {
-  assert.match(owner, /"RematchSecret", "rematch_prompt",\s*new Vector2\(0, 68\), new Vector2\(740, 80\), false\)/);
+  assert.match(owner, /"RematchSecret", "rematch_prompt",\s*new Vector2\(0, 88\), new Vector2\(880, 100\), false\)/);
   assert.match(owner, /"GuessInput", "number_placeholder",\s*new Vector2\(-13, 285\), new Vector2\(520, 140\), true\)/);
   assert.match(owner, /field\.shouldHideSoftKeyboard = keypadOnly;/);
   assert.match(owner, /field\.shouldHideMobileInput = keypadOnly;/);

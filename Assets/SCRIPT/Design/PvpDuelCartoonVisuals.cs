@@ -52,6 +52,10 @@ public sealed class PvpDuelCartoonVisuals : MonoBehaviour
     readonly List<TMP_Text> chipLabels = new List<TMP_Text>();
     TMP_Text resultStreak;
     MainMenuCenteredTextRegion resultReasonRegion;
+    RectTransform resultSafe;
+    float resultLayoutHeight = -1;
+    readonly Dictionary<string, MainMenuCenteredTextRegion> resultTextFaces =
+        new Dictionary<string, MainMenuCenteredTextRegion>();
     TMP_Text playerBadgeText, opponentBadgeText, playerLastGuess, opponentLastGuess;
     TMP_Text playerWins, opponentAttempts, currentHeading, currentRange, latestOutcome;
     TMP_Text lockHelp, lockSuggestion, signalPlaceholder;
@@ -76,6 +80,7 @@ public sealed class PvpDuelCartoonVisuals : MonoBehaviour
         internal Button Button;
         internal TMP_Text Label;
         internal bool Primary;
+        internal bool Result;
         internal Vector2 Size;
         internal MainMenuCenteredTextRegion Region;
     }
@@ -119,9 +124,16 @@ public sealed class PvpDuelCartoonVisuals : MonoBehaviour
             RefreshIdentity();
         }
         ApplyResponsiveLayoutForViewport(Screen.safeArea.width, Screen.safeArea.height);
+        LayoutResult();
         RefreshMatchPresentation();
         CenterButtonFaces();
+        CenterResultText();
+    }
+
+    void CenterResultText()
+    {
         if (resultReasonRegion != null) resultReasonRegion.Apply();
+        foreach (var region in resultTextFaces.Values) region.Apply();
     }
 
     public void RefreshRoomIdentity() { RefreshIdentity(); }
@@ -606,6 +618,9 @@ public sealed class PvpDuelCartoonVisuals : MonoBehaviour
                 float y = size.y * (face.Primary ? .035f : .02f);
                 float width = size.x * (face.Primary ? .86f : .84f);
                 float height = size.y * (face.Primary ? .65f : .70f);
+                // Result actions use the same Solo gold face. The stars are
+                // reserved artwork, not part of the usable live-text region.
+                if (face.Result && face.Primary) width = size.x * .64f;
                 face.Region = new MainMenuCenteredTextRegion(face.Label, 0, y, width, height);
             }
             face.Region.Apply();
@@ -615,66 +630,78 @@ public sealed class PvpDuelCartoonVisuals : MonoBehaviour
     void BuildResult()
     {
         var root = CreateScreen(pvp.matchPanel.transform, "ResultVisualRoot", ResultRootName, out Transform safe);
-        AddSprite(safe, "PvpResultLogo", LogoResource, new Vector2(0, 820), new Vector2(330, 165));
+        resultSafe = (RectTransform)safe;
+        AddSprite(safe, "PvpResultLogo", LogoResource, new Vector2(-140, 842), new Vector2(430, 225));
         Chip(safe, "PvpResultPlayerChip");
-        var titleRibbon = Frame(safe, "PvpResultTitleRibbon", PurpleFrameResource,
-            new Vector2(0, 650), new Vector2(900, 160));
+        var titleRibbon = Frame(safe, "PvpResultTitleRibbon", PromptResource,
+            new Vector2(0, 680), new Vector2(990, 170));
         var title = Text(titleRibbon.transform, "ResultTitle", "", 65,
-            Vector2.zero, new Vector2(790, 112));
-        RoomPortrait(safe, "PvpResultHero", false,
-            new Vector2(-220, 335), new Vector2(420, 360));
-        nameLabels.Add(Text(safe, "PvpResultPlayerName", "", 30,
-            new Vector2(-220, 125), new Vector2(420, 50)));
-        var trophy = AddVectorSprite(safe, "PvpResultTrophy", "reference/board_trophy_exact",
-            new Vector2(65, 345), new Vector2(250, 280));
-        var opponent = Frame(safe, "PvpResultOpponentCard", MagentaFrameResource,
-            new Vector2(330, 285), new Vector2(330, 420));
+            Vector2.zero, new Vector2(810, 106));
+        var player = Frame(safe, "PvpResultPlayerCard", PlayerCardResource,
+            new Vector2(-266, 300), new Vector2(510, 640));
+        var opponent = Frame(safe, "PvpResultOpponentCard", OpponentCardResource,
+            new Vector2(266, 300), new Vector2(510, 640));
+        RoomPortrait(player.transform, "PvpResultHero", false,
+            new Vector2(0, 30), new Vector2(400, 400));
         RoomPortrait(opponent.transform, "PvpResultOpponentCharacter", true,
-            new Vector2(0, 40), new Vector2(210, 180));
-        Label(opponent.transform, "PvpResultOpponentLabel", "prebattle_opponent", 25,
-            new Vector2(0, 165), new Vector2(280, 42));
-        var opponentName = Text(opponent.transform, "PvpResultOpponentName", "", 30,
-            new Vector2(0, -100), new Vector2(280, 65));
+            new Vector2(0, 30), new Vector2(400, 400));
+        Label(player.transform, "PvpResultPlayerLabel", "you", 32,
+            new Vector2(0, 244), new Vector2(260, 54));
+        Label(opponent.transform, "PvpResultOpponentLabel", "prebattle_opponent", 32,
+            new Vector2(0, 244), new Vector2(260, 54));
+        var playerName = Text(player.transform, "PvpResultPlayerName", "", 40,
+            new Vector2(0, -180), new Vector2(420, 62));
+        var opponentName = Text(opponent.transform, "PvpResultOpponentName", "", 40,
+            new Vector2(0, -180), new Vector2(420, 62));
+        NameTypography(playerName); NameTypography(opponentName);
+        playerName.fontSizeMax = opponentName.fontSizeMax = 40;
+        nameLabels.Add(playerName);
+        var mine = Stat(player.transform, "PlayerAttemptsRow", "guesses", -254, Cyan);
+        var theirs = Stat(opponent.transform, "OpponentAttemptsRow", "guesses", -254, White);
+        var trophy = AddSprite(safe, "PvpResultTrophy", TrophyResource,
+            new Vector2(0, 418), new Vector2(138, 138));
 
         var stats = Frame(safe, "PvpResultStatsCard", PurpleFrameResource,
-            new Vector2(0, -155), new Vector2(900, 500));
-        var mine = Stat(stats.transform, "PlayerAttemptsRow", "you", 185, Cyan);
-        var theirs = Stat(stats.transform, "OpponentAttemptsRow", "prebattle_opponent", 95, new Color(1, .3f, .62f));
-        var revealed = Text(stats.transform, "RevealedNumber", "", 31,
-            new Vector2(0, 25), new Vector2(780, 62), Gold);
+            new Vector2(0, -215), new Vector2(1000, 360));
+        var revealed = Text(stats.transform, "RevealedNumber", "", 34,
+            new Vector2(0, 116), new Vector2(860, 54), Gold);
         resultStreak = Text(stats.transform, "PvpResultStreak", "", 26,
-            new Vector2(0, -25), new Vector2(780, 52), Muted, false);
-        var reason = Text(stats.transform, "PvpResultExplanation", "", 28,
-            new Vector2(0, -115), new Vector2(780, 120), White, false);
+            new Vector2(0, 62), new Vector2(860, 42), Muted, false);
+        var reason = Text(stats.transform, "PvpResultExplanation", "", 32,
+            new Vector2(0, -70), new Vector2(860, 150), White, false);
         reason.enableAutoSizing = false;
         reason.enableWordWrapping = true;
         reason.overflowMode = TextOverflowModes.Overflow;
-        resultReasonRegion = new MainMenuCenteredTextRegion(reason, 0, -115, 780, 120);
+        resultReasonRegion = new MainMenuCenteredTextRegion(reason, 0, -70, 860, 150);
 
         var actions = Frame(safe, "PvpResultActions", PurpleFrameResource,
-            new Vector2(0, -555), new Vector2(850, 270));
+            new Vector2(0, -570), new Vector2(1000, 310));
         // This field intentionally retains the native number keyboard. Unlike
         // live guessing, no replacement keypad owns rematch secret entry.
         pvp.rematchSecretInput = Input(actions.transform, "RematchSecret", "rematch_prompt",
-            new Vector2(0, 68), new Vector2(740, 80), false);
-        var rematch = Button(actions.transform, "ResultConfirmRematchButton", "rematch", GoldFrameResource,
-            new Vector2(-190, -35), new Vector2(350, 88), 32, Ink);
-        var exit = Button(actions.transform, "ResultExitButton", "result_exit", BlueFrameResource,
-            new Vector2(190, -35), new Vector2(350, 88), 32, White);
-        pvp.rematchStatusText = Text(actions.transform, "ResultRematchStatus", "", 25,
-            new Vector2(0, -102), new Vector2(750, 46), Muted, false);
+            new Vector2(0, 88), new Vector2(880, 100), false);
+        var placeholder = pvp.rematchSecretInput.placeholder as TMP_Text;
+        if (placeholder != null) placeholder.fontSize = placeholder.fontSizeMin = placeholder.fontSizeMax = 32;
+        var rematch = Button(actions.transform, "ResultConfirmRematchButton", "rematch", PrimaryResource,
+            new Vector2(-231, -25), new Vector2(432, 120), 40, Ink);
+        var exit = Button(actions.transform, "ResultExitButton", "result_exit", PrimaryResource,
+            new Vector2(231, -25), new Vector2(432, 120), 40, Ink);
+        // A dedicated feedback line below the action artwork avoids putting
+        // pending-room copy on its lower bevel or over either button.
+        pvp.rematchStatusText = Text(safe, "ResultRematchStatus", "", 25,
+            new Vector2(0, -704), new Vector2(860, 44), Muted, false);
         pvp.rematchButton = rematch.gameObject;
         pvp.resultExitButton = exit.gameObject;
         rematch.onClick.AddListener(pvp.OnRematchPressed);
         pvp.rematchSecretInput.onSubmit.AddListener(_ => pvp.OnRematchPressed());
         exit.onClick.AddListener(pvp.OnLeaveMatchPressed);
         pvp.resultSignalFeedText = Text(safe, "ResultSignalFeed", "", 25,
-            new Vector2(0, -730), new Vector2(780, 54), White, false);
-        pvp.resultSignalsRoot = SignalsPanel(safe, "ResultSignals", new Vector2(0, -840), 720);
+            new Vector2(0, -740), new Vector2(860, 52), White, false);
+        pvp.resultSignalsRoot = SignalsPanel(safe, "ResultSignals", new Vector2(0, -858), 780);
         AddSprite(safe, "PvpResultMascotSix", "reference/mascot_6_exact",
-            new Vector2(-455, -817), new Vector2(155, 210));
+            new Vector2(-467, -842), new Vector2(145, 200));
         AddSprite(safe, "PvpResultMascotSeven", "reference/mascot_7_exact",
-            new Vector2(455, -817), new Vector2(155, 210));
+            new Vector2(467, -842), new Vector2(145, 200));
 
         var result = root.AddComponent<PvpResultPresentation>();
         result.titleText = title;
@@ -695,11 +722,78 @@ public sealed class PvpDuelCartoonVisuals : MonoBehaviour
 
     TMP_Text Stat(Transform parent, string name, string captionKey, float y, Color color)
     {
-        var row = Frame(parent, name, PurpleFrameResource, new Vector2(0, y), new Vector2(800, 72));
+        // The approved card already owns an inset text face. Do not stack a
+        // second frame or repeat identities in a competing central scoreboard.
+        var row = Rect(parent, name, new Vector2(0, y), new Vector2(420, 56));
         Label(row.transform, name + "Caption", captionKey, 28,
-            new Vector2(-140, 0), new Vector2(470, 48));
-        return Text(row.transform, name + "Value", "", 40,
-            new Vector2(275, 0), new Vector2(175, 54), color);
+            new Vector2(-44, 0), new Vector2(270, 44));
+        return Text(row.transform, name + "Value", "", 44,
+            new Vector2(142, 0), new Vector2(78, 54), color);
+    }
+
+    void LayoutResult()
+    {
+        if (resultSafe == null) return;
+        var owner = resultSafe.GetComponent<ResponsiveSafeAreaRoot>();
+        float height = owner.LastSafeRect.height / Mathf.Max(.001f, resultSafe.localScale.y);
+        if (Mathf.Abs(height - resultLayoutHeight) < .1f) return;
+        resultLayoutHeight = height;
+        // Allocate tall-portrait space to the actual card/content regions.
+        // This never scales a Canvas or changes the match's accepted layout.
+        float extra = Mathf.Max(0, height - 1920);
+        ResultRect("PvpResultLogo", -140, 842 + extra / 2, 430, 225);
+        ResultRect("PvpResultPlayerChip", 339, 860 + extra / 2, 370, 150);
+        ResultRect("PvpResultTitleRibbon", 0, 680 + extra / 2, 990, 170);
+        ResultFace("ResultTitle", 0, 8, 810, 94);
+        foreach (bool opponent in new[] { false, true })
+        {
+            string prefix = opponent ? "PvpResultOpponent" : "PvpResultPlayer";
+            float cardHeight = 640 + extra * .5f;
+            ResultRect(prefix + "Card", opponent ? 266 : -266, 300 + extra * .25f, 510, cardHeight);
+            float portraitSize = Mathf.Min(430, 400 + extra * .1f);
+            ResultRect(opponent ? "PvpResultOpponentCharacterAperture" : "PvpResultHeroAperture",
+                0, 30 + extra * .08f, portraitSize, portraitSize);
+            ResultFace(prefix + "Label", 0, cardHeight * .382f, 260, 54);
+            ResultFace(prefix + "Name", 0, -cardHeight * .5f + 155, 420, 62);
+            string row = opponent ? "OpponentAttemptsRow" : "PlayerAttemptsRow";
+            ResultRect(row, 0, -cardHeight * .5f + 96, 420, 56);
+            ResultFace(row + "Caption", -44, 0, 270, 44);
+            ResultFace(row + "Value", 142, 0, 78, 54);
+        }
+        ResultRect("PvpResultTrophy", 0, 418 + extra * .25f, 138, 138);
+        ResultRect("PvpResultStatsCard", 0, -215 - extra * .075f, 1000, 360 + extra * .15f);
+        ResultFace("RevealedNumber", 0, 116 + extra * .075f, 860, 54);
+        ResultFace("PvpResultStreak", 0, 80 + extra * .075f, 860, 34);
+        resultReasonRegion = new MainMenuCenteredTextRegion(pvp.resultPresentation.explanationText,
+            0, -28, 860, 150 + extra * .15f);
+        ResultRect("PvpResultActions", 0, -570 - extra * .225f, 1000, 310 + extra * .15f);
+        ResultRect("RematchSecret", 0, 88 + extra * .05f, 880, 100 + extra * .05f);
+        ResultRect("ResultConfirmRematchButton", -231, -25 - extra * .015f, 432, 120 + extra * .1f);
+        ResultRect("ResultExitButton", 231, -25 - extra * .015f, 432, 120 + extra * .1f);
+        ResultFace("ResultRematchStatus", 0, -704 - extra * .3f, 860, 32);
+        ResultFace("ResultSignalFeed", 0, -740 - extra * .3f, 860, 32);
+        ResultRect("ResultSignals", 0, -858 - extra * .4f, 780, 180 + extra * .2f);
+        for (int i = 0; i < Signals.Count; i++)
+            ResultRect("ResultSignal" + i, (i % 3 - 1) * 260,
+                (i < 3 ? 1 : -1) * (47 + extra * .05f), 246, 86 + extra * .1f);
+        ResultRect("PvpResultMascotSix", -467, -842 - extra / 2, 145, 200);
+        ResultRect("PvpResultMascotSeven", 467, -842 - extra / 2, 145, 200);
+        RefreshIdentity();
+    }
+
+    void ResultRect(string name, float x, float y, float width, float height)
+    {
+        RectTransform rect;
+        if (!namedRects.TryGetValue(name, out rect)) return;
+        Place(rect, new Vector2(x, y), new Vector2(width, height));
+        var image = rect.GetComponent<Image>();
+        if (image != null) FitSliceScale(image, rect.sizeDelta);
+    }
+
+    void ResultFace(string name, float x, float y, float width, float height)
+    {
+        var text = namedRects[name].GetComponent<TMP_Text>();
+        resultTextFaces[name] = new MainMenuCenteredTextRegion(text, x, y, width, height);
     }
 
     void BuildTerminal()
@@ -762,9 +856,9 @@ public sealed class PvpDuelCartoonVisuals : MonoBehaviour
         {
             int id = i;
             var button = Button(root.transform, name == "ResultSignals" ? "ResultSignal" + i : "Signal" + i,
-                Signals.Key(i), PurpleFrameResource,
+                Signals.Key(i), name == "ResultSignals" ? KeyResource : PurpleFrameResource,
                 new Vector2((i % 3 - 1) * width / 3, i < 3 ? 43 : -43),
-                new Vector2(width / 3 - 14, 78), 23, White);
+                new Vector2(width / 3 - 14, 78), name == "ResultSignals" ? 27 : 23, White);
             button.onClick.AddListener(() => pvp.OnSignalPressed(id));
         }
         return root;
@@ -928,7 +1022,8 @@ public sealed class PvpDuelCartoonVisuals : MonoBehaviour
         var text = Text(root.transform, "Label", key == null ? "" : L10n.Get(key), fontSize,
             Vector2.zero, size - new Vector2(32, 20), textColor);
         if (key != null) RuntimeUI.Localize(text, key);
-        buttonFaces.Add(new ButtonFace { Button = button, Label = text, Primary = resource == PrimaryResource });
+        buttonFaces.Add(new ButtonFace { Button = button, Label = text, Primary = resource == PrimaryResource,
+            Result = name.StartsWith("Result", System.StringComparison.Ordinal) });
         RuntimeUI.AttachJuice(button);
         return button;
     }

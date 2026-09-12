@@ -173,6 +173,10 @@ public sealed class OnboardingFlowPlayModeTests
         Click(root, "WelcomeContinue");
         TMP_InputField input = Find(root, "OnboardingNameInput")
             .GetComponent<TMP_InputField>();
+        Assert.That(input.GetComponent<RectTransform>().rect.size,
+            Is.EqualTo(new Vector2(980f, 190f)));
+        Assert.That((Find(root, "NameNeutralEnsemble") as RectTransform).rect.size,
+            Is.EqualTo(new Vector2(850f, 777f)));
         input.text = "Marinos";
         yield return null;
         Click(root, "NameContinue");
@@ -272,6 +276,7 @@ public sealed class OnboardingFlowPlayModeTests
         Button nameContinue = Find(root, "NameContinue").GetComponent<Button>();
         Assert.That(nameContinue.interactable, Is.False,
             "Name must still begin disabled and non-interactable.");
+        AssertPrimaryContinueCta(root, "NameContinue");
         TMP_Text disabledLabel = Find(nameContinue.transform, "Label")
             .GetComponent<TMP_Text>();
         TMP_Text disabledArrow = Find(nameContinue.transform, "Arrow")
@@ -289,13 +294,22 @@ public sealed class OnboardingFlowPlayModeTests
         yield return null;
 
         Transform genderScreen = Find(root, "OnboardingGenderScreen");
+        AssertPrimaryContinueCta(root, "GenderContinue");
         Button genderContinue = Find(genderScreen, "GenderContinue")
             .GetComponent<Button>();
         Assert.That(genderContinue.interactable, Is.False,
             "Gender must still begin unselected.");
         for (int index = 0; index < 3; index++)
+        {
+            RectTransform card = Find(genderScreen, "GenderCard" + index) as RectTransform;
+            Assert.That(card.rect.size, Is.EqualTo(new Vector2(310f, 1030f)));
+            Assert.That(card.anchoredPosition, Is.EqualTo(new Vector2(-330f + index * 330f, 0f)));
+            Assert.That((Find(card, "GenderArtworkViewport") as RectTransform).rect.size,
+                Is.EqualTo(new Vector2(286f, 540f)));
+            Assert.That(Find(card, "Character").GetComponent<Image>().preserveAspect, Is.True);
             AssertSelectionCue(
                 Find(genderScreen, "GenderCard" + index), false);
+        }
         Click(genderScreen, "GenderCard0");
         yield return null;
         AssertSelectionCue(Find(genderScreen, "GenderCard0"), true);
@@ -324,17 +338,25 @@ public sealed class OnboardingFlowPlayModeTests
                 "The All filter must keep all 12 avatars visible.");
             Assert.That(rect.rect.width, Is.GreaterThanOrEqualTo(184f));
             Assert.That(rect.rect.height, Is.GreaterThanOrEqualTo(208f));
+            Assert.That(rect.rect.size, Is.EqualTo(new Vector2(316f, 260f)));
+            Assert.That(rect.anchoredPosition, Is.EqualTo(new Vector2(
+                -334f + ((index - 1) % 3) * 334f, 258f - ((index - 1) / 3) * 274f)));
+            RectTransform portrait = Find(card, "Portrait") as RectTransform;
+            Assert.That(portrait.localScale, Is.EqualTo(Vector3.one));
+            Assert.That(portrait.GetComponent<Image>().preserveAspect, Is.True);
             TMP_Text availability = Find(card, "Availability")
                 .GetComponent<TMP_Text>();
             Assert.That(availability.fontSizeMax, Is.GreaterThanOrEqualTo(24f));
             Assert.That(availability.fontSizeMin, Is.GreaterThanOrEqualTo(20f));
             AssertSelectionCue(card, false);
         }
+        AssertAvatarArtwork(avatarScreen);
         Assert.That(Find(avatarScreen, "AvatarContinue").GetComponent<Button>()
             .interactable, Is.False, "Avatar must still begin unselected.");
         Click(avatarScreen, "AvatarCard1");
         yield return null;
         AssertSelectionCue(Find(avatarScreen, "AvatarCard1"), true);
+        AssertAvatarArtwork(avatarScreen);
         Assert.That(Find(avatarScreen, "AvatarContinue").GetComponent<Button>()
             .interactable, Is.True);
         Click(avatarScreen, "AvatarContinue");
@@ -402,6 +424,145 @@ public sealed class OnboardingFlowPlayModeTests
                 AssertInside(canvasRect, safeRect, (RectTransform)target,
                     target.name + " escaped the deterministic notch safe area.");
         }
+    }
+
+    // Decode the actual approved PNG independently of production metrics. This
+    // protects every hair/body pixel, not merely the transparent Image rect.
+    public static void AssertAvatarArtwork(Transform avatarScreen)
+    {
+        for (int index = 1; index <= 12; index++)
+        {
+            Transform card = Find(avatarScreen, "AvatarCard" + index);
+            Image portrait = Find(card, "Portrait").GetComponent<Image>();
+            Rect ink = ReadAvatarInk(portrait, card, out Vector2 sourceInkSize);
+            Assert.That(ink.height, Is.EqualTo(198f).Within(.1f), card.name);
+            Assert.That(ink.center.x, Is.EqualTo(0f).Within(.1f), card.name);
+            Assert.That(ink.center.y, Is.EqualTo(19f).Within(.1f), card.name);
+            RectTransform badge = Find(card, "SelectedBadge") as RectTransform;
+            Assert.That(badge.anchoredPosition, Is.EqualTo(new Vector2(122f, 94f)));
+            Assert.That(badge.rect.size, Is.EqualTo(new Vector2(56f, 56f)));
+            Assert.That(ink.width / ink.height,
+                Is.EqualTo(sourceInkSize.x / sourceInkSize.y).Within(.001f), card.name);
+            float previousVisibleHeight = sourceInkSize.y * 190f / 362f;
+            Assert.That(ink.height / previousVisibleHeight,
+                Is.InRange(1.07f, 1.23f), card.name + " actual artwork zoom");
+            RectMask2D mask = portrait.GetComponentInParent<RectMask2D>();
+            Assert.That(mask, Is.Not.Null);
+            Rect local = ReadAvatarInk(portrait, mask.transform, out _);
+            Rect aperture = mask.rectTransform.rect;
+            Assert.That(local.xMin, Is.GreaterThanOrEqualTo(aperture.xMin + mask.padding.x));
+            Assert.That(local.xMax, Is.LessThanOrEqualTo(aperture.xMax - mask.padding.z));
+            Assert.That(local.yMin, Is.GreaterThanOrEqualTo(aperture.yMin + mask.padding.y));
+            Assert.That(local.yMax, Is.LessThanOrEqualTo(aperture.yMax - mask.padding.w));
+            Assert.That(ink.yMax, Is.LessThanOrEqualTo(118.1f), card.name + " frame rim");
+            TMP_Text label = Find(card, "Availability").GetComponent<TMP_Text>();
+            label.ForceMeshUpdate(true);
+            float glyphTop = float.NegativeInfinity;
+            for (int c = 0; c < label.textInfo.characterCount; c++)
+            {
+                TMP_CharacterInfo glyph = label.textInfo.characterInfo[c];
+                if (glyph.isVisible)
+                    glyphTop = Mathf.Max(glyphTop, card.InverseTransformPoint(
+                        label.transform.TransformPoint(glyph.topRight)).y);
+            }
+            Assert.That(float.IsInfinity(glyphTop), Is.False, card.name + " label glyphs");
+            Assert.That(ink.yMin - glyphTop, Is.GreaterThanOrEqualTo(3f),
+                card.name + " must leave breathing space above live availability text");
+        }
+        Image preview = Find(avatarScreen, "AvatarSelectedPreview").GetComponent<Image>();
+        RectTransform previewPanel = (RectTransform)preview.transform.parent;
+        Assert.That(previewPanel.anchoredPosition, Is.EqualTo(new Vector2(380f, 790f)));
+        Assert.That(previewPanel.rect.size, Is.EqualTo(new Vector2(280f, 300f)));
+        // The enlarged preview keeps a 20px authored top/right safe margin
+        // and leaves the logo and progress strip in their existing regions.
+        Assert.That(previewPanel.anchoredPosition.y + previewPanel.rect.yMax,
+            Is.LessThanOrEqualTo(940f));
+        Assert.That(previewPanel.anchoredPosition.x + previewPanel.rect.xMax,
+            Is.LessThanOrEqualTo(520f));
+        Assert.That(previewPanel.anchoredPosition.x + previewPanel.rect.xMin,
+            Is.GreaterThanOrEqualTo(240f));
+        if (preview.gameObject.activeInHierarchy)
+        {
+            Rect ink = ReadAvatarInk(preview, preview.transform.parent, out _);
+            Assert.That(ink.height, Is.EqualTo(220f).Within(.1f));
+            Assert.That(ink.center.x, Is.EqualTo(0f).Within(.1f));
+            Assert.That(ink.center.y, Is.EqualTo(25f).Within(.1f));
+            Assert.That(ink.xMin, Is.GreaterThanOrEqualTo(-118f));
+            Assert.That(ink.xMax, Is.LessThanOrEqualTo(118f));
+            Assert.That(ink.yMax, Is.LessThanOrEqualTo(136f));
+            Assert.That(ink.yMin, Is.GreaterThanOrEqualTo(-86f));
+            TMP_Text status = Find(previewPanel, "AvatarSelectedStatus").GetComponent<TMP_Text>();
+            status.ForceMeshUpdate(true);
+            float statusTop = float.NegativeInfinity;
+            float statusBottom = float.PositiveInfinity;
+            for (int c = 0; c < status.textInfo.characterCount; c++)
+            {
+                TMP_CharacterInfo glyph = status.textInfo.characterInfo[c];
+                if (glyph.isVisible)
+                {
+                    statusTop = Mathf.Max(statusTop, previewPanel.InverseTransformPoint(
+                        status.transform.TransformPoint(glyph.topRight)).y);
+                    statusBottom = Mathf.Min(statusBottom, previewPanel.InverseTransformPoint(
+                        status.transform.TransformPoint(glyph.bottomLeft)).y);
+                }
+            }
+            Assert.That(float.IsInfinity(statusTop), Is.False, "Selected avatar status glyphs");
+            Assert.That(ink.yMin - statusTop, Is.GreaterThanOrEqualTo(8f),
+                "Enlarged preview must not cover its live status");
+            Assert.That(statusBottom, Is.GreaterThanOrEqualTo(-120f),
+                "Selected status must remain above the visible bottom bevel");
+        }
+    }
+
+    static Rect ReadAvatarInk(Image image, Transform owner, out Vector2 sourceInkSize)
+    {
+#if UNITY_EDITOR
+        var texture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+        try
+        {
+            string path = UnityEditor.AssetDatabase.GetAssetPath(image.sprite);
+            Assert.That(texture.LoadImage(System.IO.File.ReadAllBytes(path)), Is.True, path);
+            Color32[] pixels = texture.GetPixels32();
+            int minX = texture.width, minY = texture.height, maxX = -1, maxY = -1;
+            for (int y = 0; y < texture.height; y++)
+                for (int x = 0; x < texture.width; x++)
+                    if (pixels[y * texture.width + x].a > 0)
+                    {
+                        minX = Mathf.Min(minX, x); maxX = Mathf.Max(maxX, x);
+                        minY = Mathf.Min(minY, y); maxY = Mathf.Max(maxY, y);
+                    }
+            Assert.That(maxX, Is.GreaterThanOrEqualTo(minX), path);
+            sourceInkSize = new Vector2(maxX - minX + 1, maxY - minY + 1);
+            Rect rect = image.rectTransform.rect;
+            float scale = Mathf.Min(rect.width / texture.width, rect.height / texture.height);
+            Vector2 offset = rect.center - new Vector2(texture.width, texture.height) * scale * .5f;
+            if (owner.name.StartsWith("AvatarCard", StringComparison.Ordinal))
+            {
+                // The unchanged 56px selection cue reserves a circular corner
+                // even when inactive. Check actual pixels, not empty PNG corners.
+                Vector2 badgeCenter = new Vector2(122f, 94f);
+                float nearest = float.PositiveInfinity;
+                for (int y = minY; y <= maxY; y++)
+                    for (int x = minX; x <= maxX; x++)
+                        if (pixels[y * texture.width + x].a > 0)
+                        {
+                            Vector2 point = owner.InverseTransformPoint(image.transform.TransformPoint(
+                                offset + new Vector2(x + .5f, y + .5f) * scale));
+                            nearest = Mathf.Min(nearest, Vector2.Distance(point, badgeCenter));
+                        }
+                Assert.That(nearest, Is.GreaterThanOrEqualTo(30f),
+                    owner.name + " hair must not touch the selection badge");
+            }
+            Vector2 min = owner.InverseTransformPoint(image.transform.TransformPoint(
+                offset + new Vector2(minX, minY) * scale));
+            Vector2 max = owner.InverseTransformPoint(image.transform.TransformPoint(
+                offset + new Vector2(maxX + 1, maxY + 1) * scale));
+            return Rect.MinMaxRect(min.x, min.y, max.x, max.y);
+        }
+        finally { UnityEngine.Object.DestroyImmediate(texture); }
+#else
+        throw new NotSupportedException("Source alpha validation requires the Editor asset database.");
+#endif
     }
 
     static IEnumerator LoadFreshOnboarding()
@@ -528,10 +689,13 @@ public sealed class OnboardingFlowPlayModeTests
         TMP_Text arrow = Find(rect, "Arrow").GetComponent<TMP_Text>();
         Assert.That(label.alignment, Is.EqualTo(TextAlignmentOptions.Center));
         Assert.That(arrow.alignment, Is.EqualTo(TextAlignmentOptions.Center));
-        Assert.That(Mathf.Abs(label.rectTransform.anchoredPosition.y),
-            Is.LessThanOrEqualTo(4f), name + " label must remain centered.");
-        Assert.That(Mathf.Abs(arrow.rectTransform.anchoredPosition.y),
-            Is.LessThanOrEqualTo(4f), name + " arrow must remain centered.");
+        // Structural checks also run before activation; ink checks run on the
+        // real active screen (and all five states in the EN/EL capture gate).
+        if (rect.gameObject.activeInHierarchy)
+        {
+            AssertGlyphCentered(label, new Vector2(0f, 10.25f), name + " label");
+            AssertGlyphCentered(arrow, new Vector2(340.4f, 10.25f), name + " arrow");
+        }
         AssertContained(rect.rect, RectInParent(label.rectTransform),
             name + " label escaped the CTA bounds.");
         AssertContained(rect.rect, RectInParent(arrow.rectTransform),
@@ -544,6 +708,26 @@ public sealed class OnboardingFlowPlayModeTests
         Assert.That(inner.xMax, Is.LessThanOrEqualTo(outer.xMax), message);
         Assert.That(inner.yMin, Is.GreaterThanOrEqualTo(outer.yMin), message);
         Assert.That(inner.yMax, Is.LessThanOrEqualTo(outer.yMax), message);
+    }
+
+    static void AssertGlyphCentered(TMP_Text text, Vector2 expected, string context)
+    {
+        text.ForceMeshUpdate();
+        Vector2 min = Vector2.positiveInfinity, max = Vector2.negativeInfinity;
+        int visible = 0;
+        for (int index = 0; index < text.textInfo.characterCount; index++)
+        {
+            TMP_CharacterInfo glyph = text.textInfo.characterInfo[index];
+            if (!glyph.isVisible) continue;
+            min = Vector2.Min(min, glyph.bottomLeft);
+            max = Vector2.Max(max, glyph.topRight);
+            visible++;
+        }
+        Assert.That(visible, Is.GreaterThan(0), context);
+        Vector2 center = text.transform.parent.InverseTransformPoint(
+            text.transform.TransformPoint((min + max) * .5f));
+        Assert.That(center.x, Is.EqualTo(expected.x).Within(4f), context + " horizontal ink center");
+        Assert.That(center.y, Is.EqualTo(expected.y).Within(4f), context + " vertical ink center");
     }
 
     static Rect RectInParent(RectTransform target)

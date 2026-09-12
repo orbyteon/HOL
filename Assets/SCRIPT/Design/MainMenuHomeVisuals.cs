@@ -10,8 +10,8 @@ using UnityEngine.UI;
 internal sealed class MainMenuCenteredTextRegion
 {
     internal readonly TMP_Text Text;
-    internal readonly Rect SafeRect;
-    readonly Vector2 layoutSize;
+    internal Rect SafeRect;
+    Vector2 layoutSize;
     string lastText;
     Vector2 lastPosition;
     bool applied;
@@ -69,6 +69,21 @@ internal sealed class MainMenuCenteredTextRegion
         lastText = Text.text;
         lastPosition = rect.anchoredPosition;
         applied = true;
+    }
+
+    // An explicit resize by the sole screen owner changes the artwork face,
+    // not the containment tolerance or the visible-glyph centering algorithm.
+    internal void ResizeFace(float factor)
+    {
+        SafeRect = new Rect(SafeRect.position * factor, SafeRect.size * factor);
+        layoutSize *= factor;
+        applied = false;
+    }
+
+    internal void MoveFace(Vector2 center)
+    {
+        SafeRect = new Rect(center - SafeRect.size * .5f, SafeRect.size);
+        applied = false;
     }
 }
 
@@ -136,9 +151,7 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
     const string PromoFrameResource =
         "solo/production/solo_prompt_ribbon_v1";
     const string ChipFrameResource =
-        "dailyhunt/production/daily_player_chip_shell_v3";
-    const string ChipAvatarRingResource =
-        "dailyhunt/production/daily_player_avatar_ring_v1";
+        MenuPortraitLayout.ChipResource;
     const string GearResource = "phase2a/hol_settings_gear_r2";
     const string DisplayFontResource = "phase2a/fonts/HOL Menu Display SDF";
     const string BodyFontResource = "phase2a/fonts/HOL Menu Body SDF";
@@ -174,7 +187,6 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         DailyCardResource,
         PromoFrameResource,
         ChipFrameResource,
-        ChipAvatarRingResource,
         GearResource,
     };
 
@@ -212,6 +224,7 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
     bool laidOut;
     int lastLayoutWidth = -1;
     int lastLayoutHeight = -1;
+    float lastLayoutSafeHeight = -1f;
     L10n.Language lastLanguage;
 
     public bool IsReady { get; private set; }
@@ -344,7 +357,6 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         Sprite dailyCard = LoadRequired(DailyCardResource);
         Sprite promoFrame = LoadRequired(PromoFrameResource);
         Sprite chipFrame = LoadRequired(ChipFrameResource);
-        Sprite avatarRing = LoadRequired(ChipAvatarRingResource);
         Sprite gear = LoadRequired(GearResource);
         displayFont = Resources.Load<TMP_FontAsset>(DisplayFontResource);
         bodyFont = Resources.Load<TMP_FontAsset>(BodyFontResource);
@@ -353,7 +365,7 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
             background, decorations, logo, avatar, heroBoy, heroGirl, six,
             seven, trophy,
             daily, dailyGift, speech, outerFrame, portal, promoStar, stars,
-            confetti, playCard, dailyCard, promoFrame, chipFrame, avatarRing,
+            confetti, playCard, dailyCard, promoFrame, chipFrame,
             gear) &&
             displayFont != null &&
             bodyFont != null &&
@@ -415,7 +427,7 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
             safeRoot, (RectTransform)canvas.transform,
             new Vector2(ReferenceWidth, ReferenceHeight));
 
-        BuildTopBar(safeRoot, gear, chipFrame, avatarRing, avatar, trophy);
+        BuildTopBar(safeRoot, gear, chipFrame, avatar, trophy);
 
         var logoImage = EnsureImage(safeRoot, LogoName);
         ConfigureImage(logoImage, logo, true, Image.Type.Simple);
@@ -497,7 +509,6 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         Transform safe,
         Sprite gear,
         Sprite chipFrame,
-        Sprite avatarRing,
         Sprite avatar,
         Sprite trophy)
     {
@@ -520,23 +531,14 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         ConfigureImage(chip, chipFrame, false, Image.Type.Simple);
         chipRect = chip.rectTransform;
 
-        var avatarRingImage = EnsureImage(chip.transform, "HomePlayerAvatarRing");
-        ConfigureImage(avatarRingImage, avatarRing, true, Image.Type.Simple);
-        Place(
-            avatarRingImage.rectTransform, new Vector2(-126f, 0f),
-            new Vector2(108f, 108f));
-
-        chipAvatarImage = EnsureImage(chip.transform, "HomePlayerAvatar");
-        ConfigureImage(chipAvatarImage, avatar, true, Image.Type.Simple);
-        Place(
-            chipAvatarImage.rectTransform, new Vector2(-126f, 0f),
-            new Vector2(92f, 92f));
+        chipAvatarImage = MenuPortraitLayout.CreatePortrait(chip.transform, "HomePlayerAvatar");
+        MenuPortraitLayout.PaintPortrait(chipAvatarImage, avatar);
 
         var trophyImage = EnsureImage(chip.transform, "HomeTrophyIcon");
         ConfigureImage(trophyImage, trophy, true, Image.Type.Simple);
         Place(
-            trophyImage.rectTransform, new Vector2(0f, -30f),
-            new Vector2(44f, 44f));
+            trophyImage.rectTransform, new Vector2(-151f, -32f),
+            new Vector2(34f, 34f));
 
         chipText = EnsureText(
             chip.transform, ChipTextName, 35f, displayFont, NearWhite,
@@ -711,7 +713,7 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
     void RefreshChip()
     {
         if (chipAvatarImage != null)
-            chipAvatarImage.sprite = PlayerProfileAvatarResolver.Resolve();
+            MenuPortraitLayout.PaintPortrait(chipAvatarImage, PlayerProfileAvatarResolver.Resolve());
 
         if (chipText == null || chipScoreText == null) return;
 
@@ -747,20 +749,27 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
             return;
 
         L10n.Language language = L10n.Current;
+        float safeHeight = MenuPortraitLayout.Height(safeRoot);
         if (!force &&
             width == lastLayoutWidth &&
             height == lastLayoutHeight &&
+            Mathf.Approximately(safeHeight, lastLayoutSafeHeight) &&
             language == lastLanguage)
             return;
 
         lastLayoutWidth = width;
         lastLayoutHeight = height;
+        lastLayoutSafeHeight = safeHeight;
         lastLanguage = language;
 
         float aspect = width > 0
             ? Mathf.Max(1, height) / (float)width
             : ReferenceHeight / ReferenceWidth;
         float tall = Mathf.InverseLerp(1.78f, 2.22f, aspect);
+        float top = MenuPortraitLayout.Top(safeRoot);
+        float extra = MenuPortraitLayout.Extra(safeRoot);
+        float cardHeight = 1160f + .9f * extra;
+        float cardTop = top - 460f;
 
         // The compatibility bezel stays inactive.  Size it deterministically
         // for tests without allowing its retired horizontal chrome to render.
@@ -769,24 +778,24 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
             new Vector2(ReferenceWidth, visibleReferenceHeight));
 
         Place(
-            gearRect, new Vector2(-454f, 838f + 45f * tall),
+            gearRect, new Vector2(-454f, top - 103f),
             new Vector2(118f, 118f));
         Place(
-            chipRect, new Vector2(330f, 838f + 45f * tall),
-            new Vector2(370f, 150f));
+            chipRect, MenuPortraitLayout.HeaderPosition(safeRoot),
+            MenuPortraitLayout.ChipSize);
         Place(
-            logoRect, new Vector2(0f, 600f + 40f * tall),
-            new Vector2(512.3f, 304.11f));
+            logoRect, MenuPortraitLayout.LogoPosition(safeRoot),
+            MenuPortraitLayout.LogoSize);
 
         // Enlarge the authored card rects, not the Canvas or a transform scale.
         // The sprite's transparent side gutters can share layout space; inset
         // raycasts keep the two visible interactive surfaces independently owned.
         Place(
-            playButtonRect, new Vector2(-260f, -100f + 18f * tall),
-            new Vector2(560f, 1140f));
+            playButtonRect, new Vector2(-260f, cardTop - cardHeight * .5f),
+            new Vector2(560f, cardHeight));
         Place(
-            dailyButtonRect, new Vector2(260f, -100f + 18f * tall),
-            new Vector2(560f, 1140f));
+            dailyButtonRect, new Vector2(260f, cardTop - cardHeight * .5f),
+            new Vector2(560f, cardHeight));
         playButtonRect.GetComponent<Image>().raycastPadding = new Vector4(40f, 0f, 40f, 0f);
         dailyButtonRect.GetComponent<Image>().raycastPadding = new Vector4(40f, 0f, 40f, 0f);
 
@@ -795,15 +804,15 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         // stagger vertically so the girl's hair cannot cover the boy's eyes.
         // Both full silhouettes remain inside PLAY's framed art aperture.
         Place(
-            heroBoyRect, new Vector2(-98f, 115f),
-            new Vector2(410f, 410f));
+            heroBoyRect, new Vector2(-98f, cardHeight * .13f),
+            new Vector2(430f, 430f));
         Place(
-            heroGirlRect, new Vector2(58f, 60f),
-            new Vector2(410f, 410f));
+            heroGirlRect, new Vector2(58f, cardHeight * .06f),
+            new Vector2(430f, 430f));
 
         Transform dailyArt = DeepFind(dailyButtonRect, DailyIconName);
         if (dailyArt != null)
-            Place((RectTransform)dailyArt, new Vector2(0f, 82f),
+            Place((RectTransform)dailyArt, new Vector2(0f, cardHeight * .08f),
                 new Vector2(500f, 468f));
 
         // Retained inactive compatibility node; it has no visual ownership.
@@ -811,17 +820,17 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
             speechBubbleRect, new Vector2(0f, 430f),
             new Vector2(300f, 200f));
         Place(
-            promoRect, new Vector2(0f, -748f - 18f * tall),
+            promoRect, new Vector2(0f, -top + 160f),
             new Vector2(600f, 182f));
         Place(
-            portalRect, new Vector2(0f, -890f - 62f * tall),
-            new Vector2(610f, 165f));
+            portalRect, new Vector2(0f, -top + 40f),
+            new Vector2(450f, 80f));
         Place(
-            mascotSixRect, new Vector2(-398f, -780f - 42f * tall),
-            new Vector2(230f, 255f));
+            mascotSixRect, new Vector2(-390f, -top + 150f + .025f * extra),
+            new Vector2(280f, 280f + .05f * extra));
         Place(
-            mascotSevenRect, new Vector2(398f, -780f - 42f * tall),
-            new Vector2(220f, 255f));
+            mascotSevenRect, new Vector2(390f, -top + 150f + .025f * extra),
+            new Vector2(280f, 280f + .05f * extra));
 
         // Greek needs the full title bounds, never a tiny-font fallback.
         foreach (string textName in new[]
@@ -894,12 +903,12 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         {
             chipText.alignment = TextAlignmentOptions.Center;
             chipText.enableAutoSizing = true;
-            chipText.fontSizeMin = 27f;
-            chipText.fontSizeMax = 36f;
+            chipText.fontSizeMin = 24f;
+            chipText.fontSizeMax = 34f;
             chipText.enableWordWrapping = false;
             chipText.overflowMode = TextOverflowModes.Overflow;
-            Place(chipText.rectTransform, new Vector2(72f, 29f),
-                new Vector2(220f, 48f));
+            Place(chipText.rectTransform, MenuPortraitLayout.NameFace.center,
+                MenuPortraitLayout.NameFace.size);
         }
 
         if (chipScoreText != null)
@@ -910,8 +919,8 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
             chipScoreText.fontSizeMax = 40f;
             chipScoreText.enableWordWrapping = false;
             chipScoreText.overflowMode = TextOverflowModes.Overflow;
-            Place(chipScoreText.rectTransform, new Vector2(108f, -30f),
-                new Vector2(164f, 52f));
+            Place(chipScoreText.rectTransform, MenuPortraitLayout.ScoreFace.center,
+                MenuPortraitLayout.ScoreFace.size);
         }
 
         ConfigureCtaTypography(
@@ -923,14 +932,15 @@ public sealed class MainMenuHomeVisuals : MonoBehaviour
         // asymmetric transparent gutters. Card-local vertical regions follow
         // the taller tab and inset faces; the approved glyph-centering math and
         // its strict containment/centre guarantees remain unchanged.
+        float cardScaleY = playButtonRect.sizeDelta.y / 1140f;
         CenteredTextRegions = new[]
         {
-            new MainMenuCenteredTextRegion(chipText, 72f, 29f, 220f, 48f),
-            new MainMenuCenteredTextRegion(chipScoreText, 108f, -30f, 164f, 52f),
-            new MainMenuCenteredTextRegion(FindText("HomePlayTitle"), -16f, 448.4f, 222f, 101.3f),
-            new MainMenuCenteredTextRegion(FindText("HomeDailyTitle"), 7f, 448.4f, 210f, 101.3f),
-            new MainMenuCenteredTextRegion(FindText("HomePlaySubtitle"), -16f, -342f, 340f, 183.6f),
-            new MainMenuCenteredTextRegion(FindText("HomeDailySubtitle"), 7f, -342f, 364f, 183.6f),
+            MenuPortraitLayout.Region(chipText, MenuPortraitLayout.NameFace),
+            MenuPortraitLayout.Region(chipScoreText, MenuPortraitLayout.ScoreFace),
+            new MainMenuCenteredTextRegion(FindText("HomePlayTitle"), -16f, 448.4f * cardScaleY, 222f, 101.3f * cardScaleY),
+            new MainMenuCenteredTextRegion(FindText("HomeDailyTitle"), 7f, 448.4f * cardScaleY, 210f, 101.3f * cardScaleY),
+            new MainMenuCenteredTextRegion(FindText("HomePlaySubtitle"), -16f, -342f * cardScaleY, 340f, 183.6f * cardScaleY),
+            new MainMenuCenteredTextRegion(FindText("HomeDailySubtitle"), 7f, -342f * cardScaleY, 364f, 183.6f * cardScaleY),
             new MainMenuCenteredTextRegion(promoTitleText, 18f, 43f, 382f, 34f),
             new MainMenuCenteredTextRegion(promoBodyText, 18f, -10f, 382f, 64f),
         };

@@ -39,6 +39,13 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
     readonly List<TMP_Text> streaks = new List<TMP_Text>();
     readonly List<Image> portraits = new List<Image>();
     readonly List<PrebattleParts> forms = new List<PrebattleParts>();
+    readonly List<HeaderParts> headers = new List<HeaderParts>();
+    sealed class HeaderParts
+    {
+        internal RectTransform safe, chip, back, step, logo, ribbon;
+        internal float height = -1f;
+        internal string prefix;
+    }
     PvpGameController pvp;
     TMP_FontAsset displayFont, bodyFont;
     TMP_InputField landingCodeInput;
@@ -84,6 +91,7 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
     void LateUpdate()
     {
         if (!built) return;
+        ApplyResponsiveLayout();
         if (Time.unscaledTime >= nextIdentityRefresh)
         {
             nextIdentityRefresh = Time.unscaledTime + .25f;
@@ -157,8 +165,11 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
         Copy(tip.transform, "PrivateRoomTip", "private_room_tip",
             32, new Rect(-270, -65, 540, 130), White, false);
         Mascots(safe, "PrivateRoom");
+        EnlargeIllustratedCard(createCard.rectTransform, 1.0625f);
+        EnlargeIllustratedCard(joinCard.rectTransform, 1.0625f);
         built = true;
         IsReady = true;
+        ApplyResponsiveLayout();
         RefreshCopy();
     }
 
@@ -187,32 +198,39 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
         var step = Copy(safe, prefix + "StepText", "private_room_step",
             24, new Rect(-374, 807, 400, 74), White);
         var chip = Sprite(safe, prefix + "PlayerChip", ChipResource,
-            new Vector2(330, 840), new Vector2(356, 138));
-        var aperture = Sprite(chip.transform, prefix + "PlayerAvatarAperture",
-            PlayerProfileAvatarResolver.CircularApertureResourcePath,
-            new Vector2(114, 0), new Vector2(102, 102), true);
-        aperture.gameObject.AddComponent<Mask>().showMaskGraphic = false;
-        var portrait = Sprite(aperture.transform, prefix + "PlayerAvatar",
-            null, Vector2.zero, new Vector2(86, 86), true);
-        portrait.sprite = PlayerProfileAvatarResolver.Resolve();
-        PlayerProfileAvatarFraming.Apply(portrait, aperture.rectTransform);
+            MenuPortraitLayout.HeaderPosition(safe as RectTransform), MenuPortraitLayout.ChipSize);
+        var portrait = MenuPortraitLayout.CreatePortrait(chip.transform, prefix + "PlayerAvatar");
+        MenuPortraitLayout.PaintPortrait(portrait, PlayerProfileAvatarResolver.Resolve());
         portraits.Add(portrait);
-        names.Add(Text(chip.transform, prefix + "PlayerName", "", 26,
-            new Rect(-147, 1, 191, 50), White, false));
-        streaks.Add(Text(chip.transform, prefix + "Streak", "", 28,
-            new Rect(-63, -48, 100, 37), Gold, false));
+        var playerName = Text(chip.transform, prefix + "PlayerName", "", 34,
+            MenuPortraitLayout.NameFace, White);
+        MenuPortraitLayout.StyleName(playerName);
+        names.Add(playerName);
+        streaks.Add(Text(chip.transform, prefix + "Streak", "", 32,
+            MenuPortraitLayout.ScoreFace, Gold, false));
         Sprite(chip.transform, prefix + "StreakIcon", "mainmenu/mainmenu_icon_streak",
-            new Vector2(-91, -29), new Vector2(32, 32), true);
+            new Vector2(-151, -32), new Vector2(34, 34), true);
+        // The step label's own neutral holder moves with the header row; its
+        // existing glyph-safe region remains local and is never counter-moved.
+        var stepHolder = Rect(safe, prefix + "StepRegion", new Vector2(-174, 844), new Vector2(400, 74));
+        step.transform.SetParent(stepHolder, false);
+        centered.RemoveAll(region => region.Text == step);
+        centered.Add(new MainMenuCenteredTextRegion(step, 0, 0, 400, 74));
+        headers.Add(new HeaderParts { safe = safe as RectTransform, chip = chip.rectTransform,
+            back = back.transform as RectTransform, step = stepHolder, prefix = prefix });
     }
 
     void Title(Transform safe, string prefix, string key)
     {
-        Sprite(safe, prefix + "Logo", LogoResource,
-            new Vector2(0, 696), new Vector2(500, 232), true);
+        var logo = Sprite(safe, prefix + "Logo", LogoResource,
+            MenuPortraitLayout.LogoPosition(safe as RectTransform), MenuPortraitLayout.LogoSize, true);
         var ribbon = Sprite(safe, prefix + "TitleRibbon", RibbonResource,
             new Vector2(0, 493), new Vector2(938, 181));
         Copy(ribbon.transform, prefix + "Title", key, 45,
             new Rect(-355, -40, 710, 95), White);
+        var header = headers.Find(item => item.safe == safe);
+        header.logo = logo.rectTransform;
+        header.ribbon = ribbon.rectTransform;
     }
 
     void Mascots(Transform safe, string prefix)
@@ -244,10 +262,11 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
         // A non-raycasting image can still visually cover an earlier sibling.
         // Keep the board behind Header, the title ribbon and both Back controls.
         board.transform.SetAsFirstSibling();
-        parts.entryRoot = Rect(safe, "EntryState", Vector2.zero, Vector2.zero).gameObject;
-        RuntimeUI.Stretch(parts.entryRoot);
-        parts.waitingRoot = Rect(safe, "WaitingState", Vector2.zero, Vector2.zero).gameObject;
-        RuntimeUI.Stretch(parts.waitingRoot);
+        // Fixed, centered authoring containers are already inside our safe root.
+        // A second full-screen root would register inputs with the generic page
+        // layout and reapply their original positions on language/viewport change.
+        parts.entryRoot = Rect(safe, "EntryState", Vector2.zero, new Vector2(1080, 1920)).gameObject;
+        parts.waitingRoot = Rect(safe, "WaitingState", Vector2.zero, new Vector2(1080, 1920)).gameObject;
         Transform entry = parts.entryRoot.transform, waiting = parts.waitingRoot.transform;
 
         Copy(entry, "SecretPrivacy", "private_room_secret_privacy", 32,
@@ -325,7 +344,108 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
             new Vector2(427, -784), new Vector2(123, 146), true);
         forms.Add(parts);
         parts.waitingRoot.SetActive(false);
+        ApplyResponsiveLayout();
         return parts;
+    }
+
+    void EnlargeIllustratedCard(RectTransform card, float factor)
+    {
+        // Preserve the recovered illustrations' aspect. Resize the actual card
+        // and its live direct content rects, never a scaled Canvas/overlay.
+        card.sizeDelta *= factor;
+        foreach (RectTransform child in card)
+        {
+            child.anchoredPosition *= factor;
+            child.sizeDelta *= factor;
+        }
+        foreach (var region in centered)
+            if (region.Text != null && region.Text.transform.parent == card)
+                region.ResizeFace(factor);
+    }
+
+    void ApplyResponsiveLayout()
+    {
+        foreach (var header in headers)
+        {
+            float height = MenuPortraitLayout.Height(header.safe);
+            if (Mathf.Approximately(header.height, height)) continue;
+            header.height = height;
+            float top = MenuPortraitLayout.Top(header.safe);
+            float extra = Mathf.Max(0f, height - 1920f);
+            Place(header.chip, MenuPortraitLayout.HeaderPosition(header.safe), MenuPortraitLayout.ChipSize);
+            Place(header.back, new Vector2(-454, top - 103), new Vector2(118, 118));
+            Place(header.step, new Vector2(-174, top - 103), new Vector2(400, 74));
+            if (header.logo != null) Place(header.logo, MenuPortraitLayout.LogoPosition(header.safe), MenuPortraitLayout.LogoSize);
+            if (header.ribbon != null) Place(header.ribbon, new Vector2(0, top - 545), new Vector2(938, 181));
+            bool landing = header.prefix == "PrivateRoom";
+            if (landing)
+            {
+                var create = Find(header.safe, "PrivateRoomCreateCard") as RectTransform;
+                var join = Find(header.safe, "PrivateRoomJoinCard") as RectTransform;
+                if (create != null) create.anchoredPosition = new Vector2(0, top - 885);
+                if (join != null) join.anchoredPosition = new Vector2(0, top - 1382);
+                var tip = Find(header.safe, "PrivateRoomTipCard") as RectTransform;
+                if (tip != null) tip.anchoredPosition = new Vector2(0, top - 1765 - .2f * extra);
+            }
+            else
+            {
+                var board = Find(header.safe, "PrebattleBoard") as RectTransform;
+                if (board != null) Place(board, new Vector2(0, -252.5f),
+                    new Vector2(1000, MenuPortraitLayout.Height(header.safe) - 765));
+                foreach (string state in new[] { "EntryState", "WaitingState" })
+                {
+                    var content = Find(header.safe, state) as RectTransform;
+                    if (content != null) content.anchoredPosition = Vector2.zero;
+                }
+                ReflowForm(header.safe, height - 765f);
+                var cancel = Find(header.safe, "CancelButton") as RectTransform;
+                if (cancel != null) cancel.anchoredPosition = new Vector2(0, -top + 70);
+            }
+            foreach (string suffix in new[] { "MascotSix", "MascotSeven" })
+            {
+                var mascot = Find(header.safe, header.prefix + suffix) as RectTransform;
+                if (mascot != null) Place(mascot,
+                    new Vector2(suffix == "MascotSix" ? -425 : 425, landing ? top - 1775 - .85f * extra : -top + 100),
+                    landing ? new Vector2(220, 260) + Vector2.one * (60f * Mathf.Clamp01(extra / 420f)) : new Vector2(165, 190));
+            }
+        }
+    }
+
+    void ReflowForm(Transform safe, float boardHeight)
+    {
+        // The board PNG has transparent gutters and a thick rounded border.
+        // Reflow real controls inside its central 78% x 80% face. Extra height
+        // becomes deliberate spacing, never a stretched font or hidden copy.
+        float top = -252.5f + .4f * boardHeight;
+        float span = .8f * boardHeight;
+        Transform entry = Find(safe, "EntryState"), waiting = Find(safe, "WaitingState");
+        bool join = Find(entry, "CodeInput") != null;
+        MoveFormRegion(entry, "SecretPrivacy", top - .09f * span);
+        MoveFormRegion(entry, "RoomCodeCaption", top - .21f * span);
+        MoveFormRegion(entry, "CodeInput", top - .315f * span);
+        MoveFormRegion(entry, "SecretCaption", top - (join ? .427f : .30f) * span);
+        MoveFormRegion(entry, "SecretInput", top - (join ? .525f : .42f) * span);
+        MoveFormRegion(entry, "SecretHelp", top - (join ? .65f : .57f) * span);
+        MoveFormRegion(entry, join ? "ConfirmJoinButton" : "ConfirmCreateButton", top - .79f * span);
+        MoveFormRegion(entry, "EntryStatus", top - .915f * span);
+        MoveFormRegion(waiting, "YouCard", top - .17f * span);
+        MoveFormRegion(waiting, "OpponentCard", top - .17f * span);
+        MoveFormRegion(waiting, "CodeCaption", top - .365f * span);
+        MoveFormRegion(waiting, "RoomCodeFrame", top - .46f * span);
+        MoveFormRegion(waiting, "ShareButton", top - .63f * span);
+        MoveFormRegion(waiting, "ShareHelp", top - .755f * span);
+        MoveFormRegion(waiting, "JoiningHint", top - .48f * span);
+        MoveFormRegion(waiting, "WaitingPlate", top - .90f * span);
+    }
+
+    void MoveFormRegion(Transform content, string name, float y)
+    {
+        var rect = Find(content, name) as RectTransform;
+        if (rect == null) return;
+        var text = rect.GetComponent<TMP_Text>();
+        var region = text == null ? null : centered.Find(item => item.Text == text);
+        if (region != null) region.MoveFace(new Vector2(region.SafeRect.center.x, y));
+        else rect.anchoredPosition = new Vector2(rect.anchoredPosition.x, y);
     }
 
     void RefreshCopy()

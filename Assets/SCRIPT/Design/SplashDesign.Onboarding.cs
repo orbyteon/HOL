@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -79,7 +80,12 @@ public sealed partial class SplashDesign
     static readonly Vector2 OnboardingContinueCtaSize =
         new Vector2(920f, 205f);
     static readonly Vector2 AvatarFilterSize = new Vector2(170f, 82f);
-    static readonly Vector2 AvatarCardSize = new Vector2(184f, 208f);
+    static readonly Vector2 AvatarCardSize = new Vector2(316f, 260f);
+
+    // Glyph correction remains owned by SplashDesign, using the same pure
+    // geometry helper as the approved menus (no additional layout component).
+    readonly List<MainMenuCenteredTextRegion> onboardingCenteredCopy =
+        new List<MainMenuCenteredTextRegion>();
 
     readonly RectTransform[] onboardingScreens = new RectTransform[5];
     readonly RectTransform[] onboardingHeaderGroups = new RectTransform[5];
@@ -274,6 +280,7 @@ public sealed partial class SplashDesign
             ageUnder13Mascot, ageTeenMascot, ageAdultMascot, privacyIcon,
             ageUnder13Icon, ageTeenIcon, ageAdultIcon, stars);
 
+        RegisterOnboardingTextRegions();
         onboardingController.StateChanged += RefreshOnboardingState;
         RefreshOnboardingState();
         ApplyOnboardingResponsiveLayout(true);
@@ -322,12 +329,12 @@ public sealed partial class SplashDesign
             content, "WelcomeMascotSeven", mascotSeven,
             new Vector2(395f, -405f), new Vector2(260f, 300f), true);
 
-        CreateLocalizedText(
+        TMP_Text welcomeHeading = CreateLocalizedText(
             content, "WelcomeHeading", "onboarding_welcome_title",
             58f, new Vector2(0f, -475f), new Vector2(900f, 260f),
             onboardingDisplayFont, OnboardingWhite,
             TextAlignmentOptions.Center, ResponsiveTextRole.Heading);
-        CreateLocalizedText(
+        TMP_Text welcomeBody = CreateLocalizedText(
             content, "WelcomeBody", "onboarding_welcome_body",
             35f, new Vector2(0f, -660f), new Vector2(820f, 125f),
             onboardingBodyFont, OnboardingWhite,
@@ -337,6 +344,15 @@ public sealed partial class SplashDesign
             footer, "WelcomeContinue", "onboarding_go",
             new Vector2(0f, -825f), new Vector2(780f, 180f),
             () => onboardingController.Advance());
+        onboardingCenteredCopy.Add(new MainMenuCenteredTextRegion(
+            welcomeHeading, 0f, -475f, 900f, 260f));
+        onboardingCenteredCopy.Add(new MainMenuCenteredTextRegion(
+            welcomeBody, 0f, -660f, 820f, 125f));
+        // Keep the approved button and arrow; center the live title on the
+        // visible gold face rather than TMP's asymmetric line metrics.
+        onboardingCenteredCopy.Add(new MainMenuCenteredTextRegion(
+            onboardingContinueButtons[0].transform.Find("Label").GetComponent<TMP_Text>(),
+            0f, 9f, 580f, 110f));
     }
 
     void BuildNameScreen(Sprite neutralEnsemble, Sprite inputIcon, Sprite stars)
@@ -373,21 +389,21 @@ public sealed partial class SplashDesign
 
         CreateSprite(
             content, "NameNeutralEnsemble", neutralEnsemble,
-            new Vector2(0f, 70f), new Vector2(640f, 585f), true);
+            new Vector2(0f, 25f), new Vector2(850f, 777f), true);
         onboardingNameInput = CreateNameInput(
             content, inputIcon,
-            new Vector2(0f, -330f), new Vector2(780f, 145f));
+            new Vector2(0f, -475f), new Vector2(980f, 190f));
         onboardingNameInput.onValueChanged.AddListener(
             onboardingController.SetName);
 
         CreateLocalizedText(
             content, "NameHint", "onboarding_name_hint",
-            26f, new Vector2(-260f, -440f), new Vector2(340f, 52f),
+            28f, new Vector2(-300f, -610f), new Vector2(340f, 52f),
             onboardingBodyFont, OnboardingMuted,
             TextAlignmentOptions.Left, ResponsiveTextRole.Compact);
         onboardingNameCounter = CreateText(
-            content, "NameCounter", "0 / 12", 26f,
-            new Vector2(300f, -440f), new Vector2(220f, 52f),
+            content, "NameCounter", "0 / 12", 28f,
+            new Vector2(360f, -610f), new Vector2(220f, 52f),
             onboardingBodyFont, OnboardingWhite,
             TextAlignmentOptions.Right, ResponsiveTextRole.Compact);
 
@@ -505,7 +521,7 @@ public sealed partial class SplashDesign
         // One deterministic container owns the complete three-card group.
         // This keeps equal card bounds, gaps and outer margins by construction.
         RectTransform cardGroup = EnsureRect(content, "GenderCards");
-        Place(cardGroup, new Vector2(0f, 90f),
+        Place(cardGroup, new Vector2(0f, -70f),
             new Vector2(ReferenceWidth, ReferenceHeight));
 
         Sprite[] frames = { onboardingBlue, onboardingMagenta, onboardingPanel };
@@ -516,24 +532,25 @@ public sealed partial class SplashDesign
             "onboarding_gender_girl",
             "onboarding_gender_other",
         };
-        float[] xs = { -292f, 0f, 292f };
+        float[] xs = { -330f, 0f, 330f };
         for (int index = 0; index < 3; index++)
         {
             int captured = index;
             Button card = CreateSelectionCard(
                 cardGroup, "GenderCard" + index, frames[index], art[index],
                 labels[index], new Vector2(xs[index], 0f),
-                new Vector2(270f, 690f),
+                new Vector2(310f, 1030f),
                 () => onboardingController.SelectGender(captured),
                 out genderCardImages[index],
                 out genderSelectionBadges[index],
                 out genderSelectionOutlines[index]);
+            FitGenderArtwork(card.transform.Find("Character").GetComponent<Image>(), index);
             if (index == 2)
             {
                 CreateLocalizedText(
                     card.transform, "GenderOtherHint",
-                    "onboarding_gender_other_hint", 21f,
-                    new Vector2(0f, -245f), new Vector2(220f, 92f),
+                    "onboarding_gender_other_hint", 25f,
+                    new Vector2(0f, -407f), new Vector2(254f, 106f),
                     onboardingBodyFont, OnboardingWhite,
                     TextAlignmentOptions.Center,
                     ResponsiveTextRole.Compact);
@@ -634,6 +651,10 @@ public sealed partial class SplashDesign
         BuildOnboardingHeader(
             header, 4, "onboarding_avatar_title",
             "onboarding_avatar_subtitle");
+        Place(header.Find("OnboardingTitle") as RectTransform,
+            new Vector2(0f, 615f), new Vector2(940f, 78f));
+        Place(header.Find("OnboardingSubtitle") as RectTransform,
+            new Vector2(0f, 535f), new Vector2(900f, 66f));
 
         Image leftAccents = CreateSprite(
             content, "AvatarStarsLeft", stars,
@@ -648,7 +669,7 @@ public sealed partial class SplashDesign
         rightAccents.raycastTarget = false;
 
         RectTransform filters = EnsureRect(content, "AvatarFilters");
-        Place(filters, new Vector2(0f, 408f),
+        Place(filters, new Vector2(0f, 440f),
             new Vector2(ReferenceWidth, AvatarFilterSize.y));
         OnboardingAvatarCatalog.Category[] filterValues =
         {
@@ -676,25 +697,30 @@ public sealed partial class SplashDesign
                 () => SetAvatarFilter(captured));
         }
 
+        // Move the existing selected-preview into the unused header corner.
+        // All twelve choices now own the full width; no new scroll or selection
+        // flow, catalog filtering, unlock rule or persistence writer is added.
         Image previewPanel = CreateProductionImage(
-            content, "AvatarPreviewPanel", onboardingPanel,
-            new Vector2(-326f, -20f), new Vector2(350f, 660f), false, true);
+            header, "AvatarPreviewPanel", onboardingPanel,
+            new Vector2(380f, 790f), new Vector2(280f, 300f), false, true);
         previewPanel.pixelsPerUnitMultiplier = 6f;
         onboardingAvatarPreview = CreateSprite(
             previewPanel.transform, "AvatarSelectedPreview", avatars[0],
-            new Vector2(0f, 62f), new Vector2(320f, 430f), true);
+            new Vector2(0f, 25f), new Vector2(236f, 220f), true);
         onboardingAvatarPreview.gameObject.SetActive(false);
         onboardingAvatarPreviewPrompt = CreateLocalizedText(
             previewPanel.transform, "AvatarPreviewPrompt",
-            "onboarding_avatar_choose_preview", 29f,
-            new Vector2(0f, 45f), new Vector2(285f, 150f),
+            "onboarding_avatar_choose_preview", 25f,
+            new Vector2(0f, 15f), new Vector2(180f, 170f),
             onboardingDisplayFont, OnboardingWhite,
             TextAlignmentOptions.Center, ResponsiveTextRole.Action);
         onboardingAvatarStatus = CreateText(
             previewPanel.transform, "AvatarSelectedStatus", string.Empty, 22f,
-            new Vector2(0f, -255f), new Vector2(300f, 78f),
+            new Vector2(0f, -105f), new Vector2(248f, 30f),
             onboardingBodyFont, OnboardingCyan,
             TextAlignmentOptions.Center, ResponsiveTextRole.Compact);
+        onboardingCenteredCopy.Add(new MainMenuCenteredTextRegion(
+            onboardingAvatarStatus, 0f, -105f, 248f, 30f));
 
         RectTransform grid = EnsureRect(content, "AvatarGrid");
         Place(grid, Vector2.zero,
@@ -704,7 +730,7 @@ public sealed partial class SplashDesign
         {
             int captured = index;
             Button card = CreateAvatarCard(
-                grid, "AvatarCard" + (index + 1), avatars[index],
+                grid, "AvatarCard" + (index + 1), avatars[index], index,
                 AvatarGridPosition(index), AvatarCardSize,
                 () => onboardingController.SelectAvatar(captured),
                 out avatarCardImages[index],
@@ -714,7 +740,7 @@ public sealed partial class SplashDesign
             avatarCardRects[index] = card.GetComponent<RectTransform>();
             avatarAvailabilityLabels[index] = CreateText(
                 card.transform, "Availability", GetAvatarAvailabilityLabel(index),
-                24f, new Vector2(0f, -79f), new Vector2(168f, 46f),
+                28f, new Vector2(0f, -99f), new Vector2(280f, 46f),
                 onboardingDisplayFont, OnboardingGold,
                 TextAlignmentOptions.Center, ResponsiveTextRole.Compact);
             avatarAvailabilityLabels[index].fontSizeMin = 20f;
@@ -723,7 +749,7 @@ public sealed partial class SplashDesign
 
         onboardingContinueButtons[3] = CreateCta(
             footer, "AvatarContinue", "onboarding_continue",
-            new Vector2(0f, -780f), OnboardingContinueCtaSize,
+            new Vector2(0f, -815f), OnboardingContinueCtaSize,
             () => onboardingController.Advance());
     }
 
@@ -1096,7 +1122,7 @@ public sealed partial class SplashDesign
         input.textViewport = viewport;
 
         TMP_Text value = CreateText(
-            viewport, "Text", string.Empty, 43f,
+            viewport, "Text", string.Empty, 48f,
             Vector2.zero, Vector2.zero, onboardingBodyFont,
             OnboardingWhite, TextAlignmentOptions.Left,
             ResponsiveTextRole.Input);
@@ -1105,7 +1131,7 @@ public sealed partial class SplashDesign
         input.textComponent = value;
 
         TMP_Text placeholder = CreateLocalizedText(
-            viewport, "Placeholder", "onboarding_name_placeholder", 40f,
+            viewport, "Placeholder", "onboarding_name_placeholder", 46f,
             Vector2.zero, Vector2.zero, onboardingBodyFont,
             OnboardingMuted, TextAlignmentOptions.Left,
             ResponsiveTextRole.Input);
@@ -1115,7 +1141,7 @@ public sealed partial class SplashDesign
 
         Image icon = CreateSprite(
             shell.transform, "NameInputIcon", inputIcon,
-            new Vector2(-320f, 0f), new Vector2(72f, 72f), true);
+            new Vector2(-size.x * 0.5f + 76f, 0f), new Vector2(94f, 94f), true);
         icon.raycastTarget = false;
         return input;
     }
@@ -1187,7 +1213,7 @@ public sealed partial class SplashDesign
     {
         int row = visibleIndex / 3;
         int column = visibleIndex % 3;
-        return new Vector2(58f + column * 190f, 245f - row * 212f);
+        return new Vector2(-334f + column * 334f, 258f - row * 274f);
     }
 
     void SetAvatarFilter(OnboardingAvatarCatalog.Category filter)
@@ -1271,25 +1297,50 @@ public sealed partial class SplashDesign
 
         CreateSprite(
             button.transform, "Character", art,
-            new Vector2(0f, 115f),
-            new Vector2(280f, 280f), true);
+            new Vector2(0f, 120f),
+            new Vector2(286f, 500f), true);
         CreateLocalizedText(
-            button.transform, "Label", labelKey, 34f,
-            new Vector2(0f, -145f),
+            button.transform, "Label", labelKey, 38f,
+            new Vector2(0f, -330f),
             new Vector2(size.x - 36f, 70f),
             onboardingDisplayFont, OnboardingWhite,
             TextAlignmentOptions.Center, ResponsiveTextRole.Action);
         selectionBadge = CreateSelectionBadge(
             button.transform,
-            new Vector2(size.x * 0.30f, size.y * 0.36f), 72f);
+            new Vector2(size.x * 0.30f, size.y * 0.40f), 72f);
         selectionOutline = CreateSelectionOutline(cardImage, 7f);
         return button;
+    }
+
+    void FitGenderArtwork(Image image, int index)
+    {
+        // Measured alpha bounds of the three unchanged approved source PNGs,
+        // in top-left pixel coordinates. Fit visible art, not transparent canvas.
+        Rect[] ink =
+        {
+            new Rect(266f, 32f, 655f, 1197f),
+            new Rect(306f, 12f, 761f, 1231f),
+            new Rect(164f, 16f, 939f, 1255f),
+        };
+        RectTransform aperture = EnsureRect(image.transform.parent, "GenderArtworkViewport");
+        Place(aperture, Vector2.zero, new Vector2(286f, 540f));
+        aperture.gameObject.AddComponent<RectMask2D>();
+        image.transform.SetParent(aperture, false);
+        Vector2 source = image.sprite.rect.size;
+        Rect bounds = ink[index];
+        // The usable face is narrower than the full 310px beveled frame.
+        // Leave breathing space around hair, sleeves and the raised hand.
+        float fit = Mathf.Min(240f / bounds.width, 500f / bounds.height);
+        Vector2 center = new Vector2(bounds.center.x - source.x * .5f,
+            source.y * .5f - bounds.center.y);
+        Place(image.rectTransform, -center * fit, source * fit);
     }
 
     Button CreateAvatarCard(
         Transform parent,
         string name,
         Sprite avatar,
+        int avatarIndex,
         Vector2 position,
         Vector2 size,
         Action callback,
@@ -1310,20 +1361,55 @@ public sealed partial class SplashDesign
         button.onClick.AddListener(() => callback());
         RuntimeUI.AttachJuice(button);
         RectTransform viewport = EnsureRect(button.transform, "PortraitViewport");
-        Place(viewport, new Vector2(0f, 23f),
-            new Vector2(size.x - 24f, size.y - 66f));
+        Place(viewport, new Vector2(0f, 19f),
+            new Vector2(size.x - 24f, 204f));
         RectMask2D mask = viewport.GetComponent<RectMask2D>();
         if (mask == null) mask = viewport.gameObject.AddComponent<RectMask2D>();
         mask.padding = new Vector4(2f, 2f, 2f, 2f);
-        CreateSprite(
+        Image portrait = CreateSprite(
             viewport, "Portrait", avatar,
             Vector2.zero, new Vector2(size.x - 30f, size.y - 70f),
             true);
+        FitOnboardingAvatarArtwork(portrait, avatarIndex, Vector2.zero,
+            new Vector2(270f, 198f));
         selectionBadge = CreateSelectionBadge(
             button.transform,
-            new Vector2(size.x * 0.32f, size.y * 0.34f), 56f);
+            // Reserve the corner for the check, clear of wider hairstyles.
+            new Vector2(size.x * .5f - 36f, size.y * .5f - 36f), 56f);
         selectionOutline = CreateSelectionOutline(cardImage, 5f);
         return button;
+    }
+
+    // Alpha > 0 bounds of the unchanged 362px onboarding PNGs (top-left
+    // coordinates). Their transparent padding differs: center and fit the
+    // actual character, without enlarging cards or moving approved text faces.
+    static readonly Rect[] OnboardingAvatarInk =
+    {
+        new Rect(77f, 23f, 253f, 339f),
+        new Rect(62f, 36f, 282f, 326f),
+        new Rect(50f, 26f, 259f, 336f),
+        new Rect(27f, 24f, 276f, 338f),
+        new Rect(44f, 0f, 307f, 351f),
+        new Rect(47f, 0f, 305f, 351f),
+        new Rect(32f, 0f, 304f, 351f),
+        new Rect(27f, 0f, 296f, 351f),
+        new Rect(56f, 5f, 276f, 320f),
+        new Rect(49f, 11f, 268f, 315f),
+        new Rect(25f, 0f, 283f, 325f),
+        new Rect(42f, 16f, 247f, 310f),
+    };
+
+    static void FitOnboardingAvatarArtwork(
+        Image image, int index, Vector2 center, Vector2 usableSize)
+    {
+        if (image == null || image.sprite == null ||
+            index < 0 || index >= OnboardingAvatarInk.Length) return;
+        Rect ink = OnboardingAvatarInk[index];
+        Vector2 source = image.sprite.rect.size;
+        float fit = Mathf.Min(usableSize.x / ink.width, usableSize.y / ink.height);
+        Vector2 inkCenter = new Vector2(ink.center.x - source.x * .5f,
+            source.y * .5f - ink.center.y);
+        Place(image.rectTransform, center - inkCenter * fit, source * fit);
     }
 
     Button CreateAgeCard(
@@ -1629,8 +1715,12 @@ public sealed partial class SplashDesign
         if (onboardingAvatarPreview != null)
         {
             onboardingAvatarPreview.gameObject.SetActive(hasSelection);
-            if (hasSelection) onboardingAvatarPreview.sprite =
-                onboardingAvatars[selected];
+            if (hasSelection)
+            {
+                onboardingAvatarPreview.sprite = onboardingAvatars[selected];
+                FitOnboardingAvatarArtwork(onboardingAvatarPreview, selected,
+                    new Vector2(0f, 25f), new Vector2(236f, 220f));
+            }
         }
         if (onboardingAvatarPreviewPrompt != null)
             onboardingAvatarPreviewPrompt.gameObject.SetActive(!hasSelection);
@@ -1671,6 +1761,42 @@ public sealed partial class SplashDesign
     void UpdateOnboardingLayout()
     {
         ApplyOnboardingResponsiveLayout(false);
+        foreach (MainMenuCenteredTextRegion region in onboardingCenteredCopy)
+            region.Apply();
+    }
+
+    void RegisterOnboardingTextRegions()
+    {
+        // Capture each authored text region once, after all screen-specific
+        // geometry is built. Only this presentation owner applies corrections;
+        // never rebase the target on an already-corrected glyph position.
+        Canvas.ForceUpdateCanvases();
+        foreach (TMP_Text text in onboardingRoot.GetComponentsInChildren<TMP_Text>(true))
+        {
+            if (onboardingCenteredCopy.Exists(region => region.Text == text)) continue;
+            RectTransform rect = text.rectTransform;
+            Vector2 center = rect.anchoredPosition;
+            Vector2 size = rect.rect.size;
+            if (text.GetComponentInParent<TMP_InputField>() != null)
+            {
+                // Keep the icon-reserved viewport and input/caret owner intact.
+                // Center the live value and placeholder within its usable face.
+                center = Vector2.zero;
+                size = new Vector2(806f, 128f);
+            }
+            else if (rect.parent.name.EndsWith("Continue", StringComparison.Ordinal))
+            {
+                RectTransform button = (RectTransform)rect.parent;
+                // The gold face sits above the lower shadow. The arrow has its
+                // own reserved region; it must not shift the title leftward.
+                center = new Vector2(text.name == "Arrow" ? button.rect.width * .37f : 0f,
+                    button.rect.height * .05f);
+                size = text.name == "Arrow" ? new Vector2(90f, 70f)
+                    : new Vector2(button.rect.width - 180f, 110f);
+            }
+            onboardingCenteredCopy.Add(new MainMenuCenteredTextRegion(
+                text, center.x, center.y, size.x, size.y));
+        }
     }
 
     void ApplyOnboardingResponsiveLayout(bool force)

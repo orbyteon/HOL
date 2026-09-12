@@ -312,8 +312,7 @@ public sealed class PvpProductionPresentationPlayModeTests
     public IEnumerator ApprovedSpritesKeepTheirMeshCornersAndOpaqueNormalFace()
     {
         yield return Build();
-        // The match now uses the exact approved Solo v2 burst. The unchanged
-        // result trophy retains its original SVG mesh, never a UI rectangle.
+        // Both match and result use the approved production Solo artwork.
         var burst = Find(root.transform, "PvpVsBurst").GetComponent<Image>();
         Assert.That(burst.sprite, Is.SameAs(Resources.Load<Sprite>("solo/production/solo_vs_burst_v2")));
         Assert.That(burst.type, Is.EqualTo(Image.Type.Simple));
@@ -322,11 +321,14 @@ public sealed class PvpProductionPresentationPlayModeTests
         {
             var node = Find(root.transform, name);
             Assert.That(node, Is.Not.Null, name + " must be constructed by its owner");
-            var art = node.GetComponent<Graphic>();
-            Assert.That(art.GetType().FullName, Is.EqualTo("Unity.VectorGraphics.SVGImage"), name);
-            var sprite = (Sprite)art.GetType().GetProperty("sprite").GetValue(art);
+            var art = node.GetComponent<Image>();
+            Assert.That(art, Is.Not.Null, name);
+            var sprite = art.sprite;
             Assert.That(sprite, Is.Not.Null, name);
+            Assert.That(sprite, Is.SameAs(Resources.Load<Sprite>("solo/production/solo_trophy_v1")), name);
             Assert.That(sprite.vertices.Length, Is.GreaterThan(3), name);
+            Assert.That(art.preserveAspect, Is.True, name);
+            Assert.That(art.raycastTarget, Is.False, name);
             Assert.That(art.color, Is.EqualTo(Color.white), name);
         }
         foreach (string name in new[] { "PrivateRoomCreateCard", "PrivateRoomJoinCard" })
@@ -358,7 +360,7 @@ public sealed class PvpProductionPresentationPlayModeTests
         Assert.That(Find(root.transform, "PrivateRoomConfetti"), Is.Null);
         Assert.That(Find(root.transform, "PvpSignalBubbleArtwork").GetComponent<Image>().sprite,
             Is.SameAs(Resources.Load<Sprite>("solo/production/solo_opponent_speech_bubble_v2")));
-        foreach (var name in new[] { "LockButton", "ResultConfirmRematchButton" })
+        foreach (var name in new[] { "LockButton" })
         {
             var image = Find(root.transform, name).GetComponent<Image>();
             Assert.That(image.sprite, Is.Not.Null, name);
@@ -556,13 +558,15 @@ public sealed class PvpProductionPresentationPlayModeTests
         SetLanguage("en");
         yield return null;
         Assert.That(reason.text, Is.EqualTo(L("pvp_reason_range", "Player", 30, 49, "")));
-        var role = Find(root.transform, "OpponentAttemptsRowCaption").GetComponent<TMP_Text>();
+        var role = Find(root.transform, "PvpResultOpponentLabel").GetComponent<TMP_Text>();
         string english = role.text;
         SetLanguage("el");
         yield return null;
         Assert.That(reason.text, Is.EqualTo(L("pvp_reason_range", "Player", 30, 49, "")));
         Assert.That(role.text, Is.Not.EqualTo(english));
         Assert.That(role.text, Is.EqualTo(L("prebattle_opponent")));
+        Assert.That(Find(root.transform, "OpponentAttemptsRowCaption").GetComponent<TMP_Text>().text,
+            Is.EqualTo(L("guesses")), "The count stays clearly labeled inside the opponent's card.");
         S(done, "hostName", "Κωνσταντίνος");
         Emit(done);
         Assert.That(Find(root.transform, "PvpResultOpponentName").GetComponent<TMP_Text>().text,
@@ -699,6 +703,160 @@ public sealed class PvpProductionPresentationPlayModeTests
         yield return ShareResultLayout(false);
     }
 
+    [UnityTest]
+    public IEnumerator ResultCompositionUsesSoloCardsAndFacesAcrossPortraits()
+    {
+        yield return ResultComposition(false);
+    }
+
+    [UnityTest, Explicit("Bounded native result-only visual review; no network or build.")]
+    public IEnumerator CaptureNativeResultComposition()
+    {
+        yield return ResultComposition(true);
+    }
+
+    IEnumerator ResultComposition(bool native)
+    {
+        yield return Build();
+        var errors = new List<string>();
+        string output = null;
+        if (native)
+        {
+            string parent = (string)T("PvpPresentationReviewTools").GetProperty("OutputDirectory").GetValue(null);
+            Assert.That(Directory.Exists(parent), Is.True);
+            output = Path.Combine(parent, "ResultComposition-" + DateTime.UtcNow.ToString("yyyyMMdd_HHmmss_fff"));
+            Directory.CreateDirectory(output);
+        }
+        foreach (var viewport in new[] { new Vector2Int(720, 1280), new Vector2Int(1080, 1920),
+            new Vector2Int(1080, 2400), new Vector2Int(1179, 2556) })
+        foreach (string language in new[] { "en", "el" })
+        {
+            if (native && (viewport.x != 1080 || (viewport.y == 2400 && language != "el"))) continue;
+            SetLanguage(language);
+            if (native)
+            {
+                T("OnboardingGameViewCapture").GetMethod("SetResolution").Invoke(null, new object[] { viewport.x, viewport.y });
+                Screen.SetResolution(viewport.x, viewport.y, false);
+                yield return (IEnumerator)T("PvpPresentationReviewTools").GetMethod("WaitForStableNativeViewport")
+                    .Invoke(null, new object[] { root.transform, viewport.x, viewport.y });
+            }
+            foreach (string state in new[] { "ResultWin", "ResultLoss", "ResultDraw", "RematchWaiting" })
+            {
+                if (native && viewport.y == 2400 && state != "ResultDraw" && state != "RematchWaiting") continue;
+                ShowCase("PlayerTurn");
+                var done = State("done");
+                S(done, "hostName", "Κωνσταντίνος"); S(done, "guestName", "Αλεξάνδρα");
+                S(done, "winner", state == "ResultDraw" ? "draw" : state == "ResultLoss" ? "host" : "guest");
+                S(done, "hostGuessCount", 4); S(done, "guestGuessCount", 4); S(done, "revealedSecret", 77);
+                S(done, "resultReason", state == "ResultDraw" ? "draw" : "range");
+                S(done, "resultHostCandidates", state == "ResultLoss" || state == "ResultDraw" ? 30 : 49);
+                S(done, "resultGuestCandidates", state == "ResultLoss" ? 49 : 30);
+                Emit(done);
+                if (state == "RematchWaiting")
+                {
+                    ((TMP_InputField)Get(controller, "rematchSecretInput")).text = "64";
+                    ((GameObject)Get(controller, "rematchButton")).GetComponent<Button>().onClick.Invoke();
+                }
+                yield return null;
+                yield return null;
+                if (!native)
+                    foreach (var safe in root.GetComponentsInChildren(T("ResponsiveSafeAreaRoot"), true))
+                        Invoke(safe, "ApplyViewport", new Rect(0, 0, viewport.x, viewport.y),
+                            new Rect(0, 44, viewport.x, viewport.y - 88), ResultCanvasSize(viewport));
+                var owner = root.GetComponent(T("PvpDuelCartoonVisuals"));
+                Invoke(owner, "LayoutResult"); Invoke(owner, "CenterButtonFaces"); Invoke(owner, "CenterResultText");
+                Canvas.ForceUpdateCanvases();
+                string context = language + " " + state + " " + viewport;
+                float extra = Mathf.Max(0, 1080f * (viewport.y - (native ? 0 : 88)) / viewport.x - 1920);
+                foreach (bool opponent in new[] { false, true })
+                {
+                    string prefix = opponent ? "PvpResultOpponent" : "PvpResultPlayer";
+                    var card = (RectTransform)Find(root.transform, prefix + "Card");
+                    Assert.That(card.sizeDelta.x, Is.EqualTo(510), context);
+                    Assert.That(card.sizeDelta.y, Is.EqualTo(640 + extra * .5f).Within(.01f), context);
+                    Assert.That(card.localScale, Is.EqualTo(Vector3.one), context);
+                    Assert.That(card.GetComponent<Image>().sprite, Is.SameAs(Resources.Load<Sprite>(opponent
+                        ? "solo/production/solo_opponent_card_shell_v1" : "solo/production/solo_player_card_shell_v1")), context);
+                    AuditFace(Find(root.transform, prefix + "Label").GetComponent<TMP_Text>(), card,
+                        new Rect(-130, (640 + extra * .5f) * .382f - 27, 260, 54), context, errors);
+                    AuditFace(Find(root.transform, prefix + "Name").GetComponent<TMP_Text>(), card,
+                        new Rect(-210, -196 - extra * .25f, 420, 62), context, errors);
+                    var count = (RectTransform)Find(root.transform, opponent ? "OpponentAttemptsRow" : "PlayerAttemptsRow");
+                    AuditFace(count.Find(count.name + "Caption").GetComponent<TMP_Text>(), count,
+                        new Rect(-179, -22, 270, 44), context, errors);
+                    AuditFace(count.Find(count.name + "Value").GetComponent<TMP_Text>(), count,
+                        new Rect(103, -27, 78, 54), context, errors);
+                    Assert.That(count.anchoredPosition.y - 27,
+                        Is.GreaterThan(-card.rect.height * .5f + 58), context + " count clears the lower inset rim");
+                    var portrait = (RectTransform)Find(root.transform,
+                        opponent ? "PvpResultOpponentCharacterAperture" : "PvpResultHeroAperture");
+                    Assert.That(portrait.rect.width, Is.InRange(400f, 430f), context);
+                    Assert.That(portrait.rect.width, Is.EqualTo(portrait.rect.height), context);
+                    Assert.That(portrait.GetComponent<Mask>().showMaskGraphic, Is.False, context);
+                }
+                foreach (string name in new[] { "ResultConfirmRematchButton", "ResultExitButton" })
+                {
+                    var button = (RectTransform)Find(root.transform, name);
+                    var image = button.GetComponent<Image>();
+                    Assert.That(image.sprite, Is.SameAs(Resources.Load<Sprite>("solo/production/solo_primary_cta_v1")), context);
+                    Assert.That(image.type, Is.EqualTo(Image.Type.Simple), context);
+                    Assert.That(image.raycastTarget, Is.True, context);
+                    Assert.That(button.sizeDelta.x, Is.EqualTo(432), context);
+                    Assert.That(button.sizeDelta.y, Is.EqualTo(120 + extra * .1f).Within(.01f), context);
+                    if (!button.gameObject.activeInHierarchy) continue;
+                    var label = button.GetComponentInChildren<TMP_Text>();
+                    Assert.That(label.fontSize, Is.EqualTo(40), context);
+                    float h = 120 + extra * .1f;
+                    AuditFace(label, button, new Rect(-138.24f, -.29f * h, 276.48f, .65f * h), context, errors);
+                }
+                var input = (TMP_InputField)Get(controller, "rematchSecretInput");
+                // TMP 3.0.7 forces both setter and getter to true on desktop.
+                // Retain its mobile branch, not a fake Editor keyboard override.
+                bool mobile = Application.platform == RuntimePlatform.Android ||
+                    Application.platform == RuntimePlatform.IPhonePlayer || Application.platform == RuntimePlatform.tvOS;
+                Assert.That(input.shouldHideSoftKeyboard, Is.EqualTo(!mobile), context);
+                Assert.That(input.keyboardType, Is.EqualTo(TouchScreenKeyboardType.NumberPad), context);
+                Assert.That(((GameObject)Get(controller, "resultExitButton")).activeInHierarchy, Is.True, context);
+                var stats = (RectTransform)Find(root.transform, "PvpResultStatsCard");
+                var actions = (RectTransform)Find(root.transform, "PvpResultActions");
+                Assert.That(stats.anchoredPosition.y - stats.rect.height / 2,
+                    Is.GreaterThan(actions.anchoredPosition.y + actions.rect.height / 2), context);
+                var reason = Find(root.transform, "PvpResultExplanation").GetComponent<TMP_Text>();
+                Assert.That(reason.fontSize, Is.EqualTo(32), context);
+                AuditFace(reason, stats, new Rect(-430, -103 - extra * .075f, 860, 150 + extra * .15f), context, errors);
+                if (state == "RematchWaiting")
+                {
+                    var status = (TMP_Text)Get(controller, "rematchStatusText");
+                    Assert.That(status.transform.parent, Is.SameAs(actions.parent), context + " separate feedback lane");
+                    AuditFace(status, (RectTransform)status.transform.parent,
+                        new Rect(-430, -720 - extra * .3f, 860, 32), context, errors);
+                }
+                AuditGlyphs(context, errors);
+                if (!native) continue;
+                yield return new WaitForSecondsRealtime(1.9f);
+                yield return new WaitForEndOfFrame();
+                string path = Path.Combine(output, language + "-" + viewport.x + "x" + viewport.y + "-" + state + ".png");
+                ScreenCapture.CaptureScreenshot(path);
+                for (int i = 0; i < 120 && !File.Exists(path); i++) yield return null;
+                Assert.That(File.Exists(path), Is.True);
+                var capture = new Texture2D(2, 2);
+                Assert.That(capture.LoadImage(File.ReadAllBytes(path)), Is.True);
+                Assert.That(capture.width, Is.EqualTo(viewport.x)); Assert.That(capture.height, Is.EqualTo(viewport.y));
+                UnityEngine.Object.Destroy(capture);
+            }
+        }
+        if (native) Debug.Log("HOL_PVP_RESULT_COMPOSITION_CAPTURE " + output);
+        Assert.That(errors, Is.Empty, string.Join("\n", errors));
+    }
+
+    static Vector2 ResultCanvasSize(Vector2Int viewport)
+    {
+        // Match the real fixture CanvasScaler (.5 width/height), rather than
+        // injecting a 16:9 canvas into a tall-portrait geometry test.
+        float scale = Mathf.Sqrt(viewport.x / 1080f * viewport.y / 1920f);
+        return new Vector2(viewport.x / scale, viewport.y / scale);
+    }
+
     [UnityTest, Explicit("Bounded sharing/result evidence through the existing native Game View workflow.")]
     public IEnumerator CaptureNativeInvitationAndFinalReasons()
     {
@@ -749,7 +907,11 @@ public sealed class PvpProductionPresentationPlayModeTests
                 if (!native)
                     foreach (var safe in root.GetComponentsInChildren(T("ResponsiveSafeAreaRoot"), true))
                         Invoke(safe, "ApplyViewport", new Rect(0, 0, viewport.x, viewport.y),
-                            new Rect(0, 44, viewport.x, viewport.y - 88), new Vector2(1080, 1920));
+                            new Rect(0, 44, viewport.x, viewport.y - 88), ResultCanvasSize(viewport));
+                var visuals = root.GetComponent(T("PvpDuelCartoonVisuals"));
+                Invoke(visuals, "LayoutResult");
+                Invoke(visuals, "CenterButtonFaces");
+                Invoke(visuals, "CenterResultText");
                 Canvas.ForceUpdateCanvases();
                 string context = language + " " + viewport + " " + kind;
                 if (kind == "waiting")
@@ -768,9 +930,11 @@ public sealed class PvpProductionPresentationPlayModeTests
                 else
                 {
                     var reason = Find(root.transform, "PvpResultExplanation").GetComponent<TMP_Text>();
-                    Assert.That(reason.fontSize, Is.EqualTo(28), context);
+                    float extra = Mathf.Max(0, 1080f * (viewport.y - (native ? 0 : 88)) / viewport.x - 1920);
+                    Assert.That(reason.fontSize, Is.EqualTo(32), context);
                     Assert.That(reason.isTextTruncated || reason.isTextOverflowing, Is.False, context + " " + reason.text);
-                    AuditFace(reason, (RectTransform)reason.transform.parent, new Rect(-390, -175, 780, 120), context, errors);
+                    AuditFace(reason, (RectTransform)reason.transform.parent,
+                        new Rect(-430, -103 - extra * .075f, 860, 150 + extra * .15f), context, errors);
                     var streak = (RectTransform)Find(root.transform, "PvpResultStreak");
                     Assert.That(streak.anchoredPosition.y - streak.rect.height / 2, Is.GreaterThan(-55),
                         context + " streak cannot overlap the explanation's padded region");
@@ -1277,7 +1441,7 @@ public sealed class PvpProductionPresentationPlayModeTests
                 var owner = (RectTransform)text.transform.parent;
                 var bottom = owner.InverseTransformPoint(text.transform.TransformPoint(new Vector3(minX, minY)));
                 var top = owner.InverseTransformPoint(text.transform.TransformPoint(new Vector3(maxX, maxY)));
-                if (bottom.x < -398 || top.x > 398 || bottom.y < -105 || top.y > 160)
+                if (bottom.x < -430 || top.x > 430 || bottom.y < 20 || top.y > owner.rect.height / 2 - 24)
                     errors.Add(context + " " + text.name + " touches stats frame: " + bottom + " to " + top);
             }
             if (hasGlyph && (text.transform.parent.name == "YouCard" || text.transform.parent.name == "OpponentCard"))

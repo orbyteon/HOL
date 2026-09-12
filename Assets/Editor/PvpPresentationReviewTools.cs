@@ -78,12 +78,44 @@ public static class PvpPresentationReviewTools
     static readonly TestRunnerApi Api;
     static readonly ResultsObserver Observer;
 
+    [MenuItem("HOL/PvP/Review Shared Menu Portrait Layout")]
+    public static void ReviewSharedMenuPortraitLayout()
+    {
+        if (EditorApplication.isPlayingOrWillChangePlaymode || EditorApplication.isCompiling || EditorApplication.isUpdating)
+            throw new InvalidOperationException("Wait for the Editor to be idle before menu review.");
+        if (!Directory.Exists(OutputDirectory)) ChooseCaptureFolder();
+        if (!Directory.Exists(OutputDirectory)) return;
+        OnboardingGameViewCapture.SetResolution(1080, 1920);
+        FocusNativeGameView();
+        Api.Execute(new ExecutionSettings(new Filter { testMode = TestMode.PlayMode,
+            testNames = new[] { "MenuPortraitConsistencyPlayModeTests.NativeEnElSharedHeadersCardsAndButtonGlyphs" } }));
+    }
+
     static PvpPresentationReviewTools()
     {
         Api = ScriptableObject.CreateInstance<TestRunnerApi>();
         Observer = new ResultsObserver();
         Api.RegisterCallbacks(Observer);
         AssemblyReloadEvents.beforeAssemblyReload += () => Api.UnregisterCallbacks(Observer);
+    }
+
+    [MenuItem("HOL/PvP/Run Shared Menu Navigation Regressions")]
+    public static void RunSharedMenuNavigationRegressions()
+    {
+        if (EditorApplication.isPlayingOrWillChangePlaymode || EditorApplication.isCompiling || EditorApplication.isUpdating)
+            throw new InvalidOperationException("Wait for the Editor to be idle before menu validation.");
+        if (!Directory.Exists(OutputDirectory)) ChooseCaptureFolder();
+        if (!Directory.Exists(OutputDirectory)) return;
+        OnboardingGameViewCapture.SetResolution(1080, 1920);
+        FocusNativeGameView();
+        Api.Execute(new ExecutionSettings(new Filter { testMode = TestMode.PlayMode,
+            testNames = new[] {
+                "MainMenuPlayVisualsPlayModeTests.PlayHubExposesOnlyAuthoritativeSoloAndPrivateRoomRoutes",
+                "PrivateRoomVisualsPlayModeTests.PrivateRoomUsesOneProductionOwnerAndPreservesCreateJoinFlows",
+                "PvpProductionPresentationPlayModeTests.PrematchValidationKeyboardLanguageAndCancelRemainTruthful",
+                "PvpProductionPresentationPlayModeTests.RealCreateJoinValidationWaitingCancelAndLateCallbackRemainWired",
+                "PvpProductionPresentationPlayModeTests.RoomIdentitiesStayAuthoritativeAcrossSeatsRefreshRematchAndExit"
+            } }));
     }
 
     sealed class ResultsObserver : ICallbacks
@@ -228,6 +260,27 @@ public static class PvpPresentationReviewTools
         FocusNativeGameView();
         Api.Execute(new ExecutionSettings(new Filter { testMode = TestMode.PlayMode,
             testNames = new[] { "PvpProductionPresentationPlayModeTests.CaptureNativeInvitationAndFinalReasons" } }));
+    }
+
+    [MenuItem("HOL/PvP/Review Result Composition")]
+    public static void ReviewResultComposition()
+    {
+        if (EditorApplication.isPlayingOrWillChangePlaymode || EditorApplication.isCompiling || EditorApplication.isUpdating)
+            throw new InvalidOperationException("Wait for the Editor to be idle before result review.");
+        if (!Directory.Exists(OutputDirectory)) ChooseCaptureFolder();
+        if (!Directory.Exists(OutputDirectory)) return;
+        OnboardingGameViewCapture.SetResolution(1080, 1920);
+        FocusNativeGameView();
+        string fixture = "PvpProductionPresentationPlayModeTests.";
+        Api.Execute(new ExecutionSettings(new Filter { testMode = TestMode.PlayMode,
+            testNames = new[] {
+                fixture + "ResultCompositionUsesSoloCardsAndFacesAcrossPortraits",
+                fixture + "InvitationAndFinalReasonsFitEnElPortraitRegions",
+                fixture + "ResultCaptionsRepaintOpponentArrivesAndRealRematchResets",
+                fixture + "RoomIdentitiesStayAuthoritativeAcrossSeatsRefreshRematchAndExit",
+                fixture + "ApprovedSpritesKeepTheirMeshCornersAndOpaqueNormalFace",
+                fixture + "CaptureNativeResultComposition"
+            } }));
     }
 
     [MenuItem("HOL/PvP/Run Focused Pre-match Regressions")]

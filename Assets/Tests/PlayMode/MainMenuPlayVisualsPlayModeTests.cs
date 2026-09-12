@@ -127,8 +127,10 @@ public sealed class MainMenuPlayVisualsPlayModeTests
             back, "solo/production/solo_back_button_v1");
         Assert.That(safe.GetComponentsInChildren<Button>(false), Has.Length.EqualTo(3),
             "Selector must expose exactly VS AI, one Private Room route, and Back.");
-        Assert.That(root.GetComponentsInChildren<TMP_Text>(false), Has.Length.EqualTo(8),
-            "Selector must expose one heading/helper and three live labels per real mode.");
+        Assert.That(root.GetComponentsInChildren<TMP_Text>(false), Has.Length.EqualTo(10),
+            "Selector exposes heading/helper, three labels per mode, and the shared profile name/score.");
+        Assert.That(Find(root, "PlayPlayerName"), Is.Not.Null);
+        Assert.That(Find(root, "PlayPlayerScore"), Is.Not.Null);
         Assert.That(CountNamedButtons(canvas.transform, "ButtonPvP"), Is.EqualTo(1),
             "There must be exactly one active Private Room/PvP entry.");
         Assert.That(CountNamedButtons(canvas.transform, "ButtonPrivateRoom"), Is.Zero,
