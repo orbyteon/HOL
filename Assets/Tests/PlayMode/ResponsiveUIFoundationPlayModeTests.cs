@@ -72,8 +72,6 @@ public sealed class ResponsiveUIFoundationPlayModeTests
         var pvpCreate = (GameObject)Field(pvp, "createPanel");
         var pvpJoin = (GameObject)Field(pvp, "joinPanel");
         var pvpMatch = (GameObject)Field(pvp, "matchPanel");
-        AddTargets(targets, pvpMenu.transform,
-            "CreateButton", "JoinButton", "PrivateRoomTipCard");
         Transform result = Find(pvpMatch.transform, "ResultVisualRoot");
         Transform terminal = Find(pvpMatch.transform, "PvpTerminalRoot");
         Assert.That(result, Is.Not.Null);
@@ -83,6 +81,8 @@ public sealed class ResponsiveUIFoundationPlayModeTests
         // same viewport/safe-area containment gate using the real final names.
         var pvpSafeTargets = new Dictionary<Transform, string[]>
         {
+            { Find(pvpMenu.transform, "PrivateRoomSafeRoot"), new[] {
+                "CreateButton", "JoinButton", "PrivateRoomTipCard" } },
             { Find(pvpCreate.transform, "PvPCreatePanelVisualsSafeRoot"), new[] {
                 "YouCard", "OpponentCard", "PrebattleBoard", "CancelButton", "ConfirmCreateButton", "SecretInput", "RoomCodeFrame" } },
             { Find(pvpJoin.transform, "PvPJoinPanelVisualsSafeRoot"), new[] {
@@ -246,25 +246,39 @@ public sealed class ResponsiveUIFoundationPlayModeTests
     [UnityTest]
     public IEnumerator SplashUsesTheSameSafeRootContractForEveryViewport()
     {
-        yield return SceneManager.LoadSceneAsync("SplashScene", LoadSceneMode.Single);
-        var loader = FindInScene(RuntimeType("SplashLoader"));
-        if (loader != null) ((MonoBehaviour)loader).CancelInvoke();
-        yield return null;
+        // Select the returning-player branch explicitly. A fresh CI machine
+        // legitimately opens onboarding; unrelated tests must not decide which
+        // presentation this Splash-only contract sees.
+        bool hadVersion = PlayerPrefs.HasKey("HOL.Onboarding.Version");
+        int version = PlayerPrefs.GetInt("HOL.Onboarding.Version", 0);
+        try
+        {
+            PlayerPrefs.SetInt("HOL.Onboarding.Version", 1);
+            yield return SceneManager.LoadSceneAsync("SplashScene", LoadSceneMode.Single);
+            var loader = FindInScene(RuntimeType("SplashLoader"));
+            if (loader != null) ((MonoBehaviour)loader).CancelInvoke();
+            yield return null;
 
-        Transform safe = Find(SceneManager.GetActiveScene(), "SplashSafeAreaRoot");
-        AssertSingleSafeOwner(safe);
-        Vector2[] viewports =
+            Transform safe = Find(SceneManager.GetActiveScene(), "SplashSafeAreaRoot");
+            AssertSingleSafeOwner(safe);
+            Vector2[] viewports =
+            {
+                new Vector2(720f, 1280f), new Vector2(1080f, 1920f),
+                new Vector2(1080f, 2400f), new Vector2(1440f, 3200f)
+            };
+            foreach (Vector2 viewport in viewports)
+            {
+                Rect safePixels = new Rect(0f, viewport.y * 0.05f,
+                    viewport.x, viewport.y * 0.87f);
+                AssertSafeRoot(safe, viewport, safePixels, CanvasSize(viewport),
+                    "SplashLogo", "SplashHeroBoy", "SplashHeroGirl",
+                    "SplashProgressTrack");
+            }
+        }
+        finally
         {
-            new Vector2(720f, 1280f), new Vector2(1080f, 1920f),
-            new Vector2(1080f, 2400f), new Vector2(1440f, 3200f)
-        };
-        foreach (Vector2 viewport in viewports)
-        {
-            Rect safePixels = new Rect(0f, viewport.y * 0.05f,
-                viewport.x, viewport.y * 0.87f);
-            AssertSafeRoot(safe, viewport, safePixels, CanvasSize(viewport),
-                "SplashLogo", "SplashHeroBoy", "SplashHeroGirl",
-                "SplashProgressTrack");
+            if (hadVersion) PlayerPrefs.SetInt("HOL.Onboarding.Version", version);
+            else PlayerPrefs.DeleteKey("HOL.Onboarding.Version");
         }
     }
 
@@ -309,16 +323,33 @@ public sealed class ResponsiveUIFoundationPlayModeTests
             new Rect(Vector2.zero, viewport), safePixels, canvasSize
         });
         Rect safeRect = Property<Rect>(owner, "LastSafeRect");
+        if (root.name == "HomeSafeAreaRoot" || root.name == "PlaySafeAreaRoot")
+        {
+            var presentation = root.GetComponentInParent(RuntimeType(
+                root.name == "HomeSafeAreaRoot" ? "MainMenuHomeVisuals" : "MainMenuPlayVisuals"));
+            presentation.GetType().GetMethod("ApplyResponsiveLayoutForViewport", InstanceFlags)
+                .Invoke(presentation, new object[] { (int)viewport.x, (int)viewport.y, true });
+        }
         float scale = ((RectTransform)root).localScale.x;
         foreach (string childName in childNames)
         {
             var child = Find(root, childName) as RectTransform;
             Assert.That(child, Is.Not.Null, root.name + " missing " + childName);
-            Vector2 size = child.sizeDelta * scale;
-            Rect bounds = new Rect(
-                safeRect.center + child.anchoredPosition * scale - size * 0.5f,
-                size);
-            AssertContained(safeRect, bounds, viewport + " / " + childName);
+            // Titles may belong to a ribbon inside the safe root. Measure the
+            // full parent chain, not a nested anchoredPosition as root-local.
+            var corners = new Vector3[4];
+            child.GetWorldCorners(corners);
+            Vector2 minimum = new Vector2(float.PositiveInfinity, float.PositiveInfinity);
+            Vector2 maximum = new Vector2(float.NegativeInfinity, float.NegativeInfinity);
+            foreach (var corner in corners)
+            {
+                Vector2 local = root.InverseTransformPoint(corner);
+                Vector2 point = safeRect.center + local * scale;
+                minimum = Vector2.Min(minimum, point);
+                maximum = Vector2.Max(maximum, point);
+            }
+            AssertContained(safeRect, Rect.MinMaxRect(minimum.x, minimum.y, maximum.x, maximum.y),
+                viewport + " / " + childName);
         }
     }
 
@@ -352,6 +383,13 @@ public sealed class ResponsiveUIFoundationPlayModeTests
             new Rect(Vector2.zero, viewport), safePixels, canvasSize
         });
         Rect safeRect = Property<Rect>(owner, "LastSafeRect");
+        var privateRoom = root.GetComponentInParent(RuntimeType("PrivateRoomVisuals"));
+        if (privateRoom != null && (root.name == "PrivateRoomSafeRoot" ||
+            root.name == "PvPCreatePanelVisualsSafeRoot" || root.name == "PvPJoinPanelVisualsSafeRoot"))
+        {
+            privateRoom.GetType().GetMethod("ApplyResponsiveLayout", InstanceFlags)
+                .Invoke(privateRoom, null);
+        }
         Vector2 scale = ((RectTransform)root).localScale;
         foreach (string name in childNames)
         {

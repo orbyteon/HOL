@@ -257,7 +257,8 @@ public sealed class MainMenuPlayVisualsPlayModeTests
             hubTitle, hubSubtitle, soloTitle, soloSubtitle,
             soloAction, friendTitle, friendSubtitle, friendAction,
         };
-        AssertApprovedTitleApertures(owner, soloTitle, friendTitle, "initial");
+        MainMenuHomeVisualsPlayModeTests.ApplyMenuViewport(owner, "PlaySafeAreaRoot", 1080, 1920);
+        AssertApprovedTitleApertures(owner, soloTitle, friendTitle, 1080, 1920, "initial");
         MethodInfo applyViewport = owner.GetType().GetMethod(
             "ApplyResponsiveLayoutForViewport", InstanceFlags);
         Assert.That(applyViewport, Is.Not.Null,
@@ -271,10 +272,8 @@ public sealed class MainMenuPlayVisualsPlayModeTests
             {
                 string lane = (language == 0 ? "EN " : "EL ") +
                               viewport.x + "x" + viewport.y;
-                applyViewport.Invoke(owner, new object[]
-                {
-                    viewport.x, viewport.y, true,
-                });
+                MainMenuHomeVisualsPlayModeTests.ApplyMenuViewport(
+                    owner, "PlaySafeAreaRoot", viewport.x, viewport.y);
                 Canvas.ForceUpdateCanvases();
                 foreach (TMP_Text text in texts)
                 {
@@ -285,7 +284,7 @@ public sealed class MainMenuPlayVisualsPlayModeTests
                         lane + " " + text.name);
                 }
 
-                AssertApprovedTitleApertures(owner, soloTitle, friendTitle, lane);
+                AssertApprovedTitleApertures(owner, soloTitle, friendTitle, viewport.x, viewport.y, lane);
                 AssertContained(safe.rect, GlyphBounds(hubTitle, safe), 28f,
                     lane + " hub title");
                 AssertContained(safe.rect, GlyphBounds(hubSubtitle, safe), 28f,
@@ -312,8 +311,10 @@ public sealed class MainMenuPlayVisualsPlayModeTests
                 Assert.That(soloAction.fontSize, Is.GreaterThanOrEqualTo(36f), lane);
                 Assert.That(friendAction.fontSize, Is.GreaterThanOrEqualTo(36f), lane);
 
-                AssertRectSize(solo, new Vector2(560f, 920f), lane + " VS AI");
-                AssertRectSize(friend, new Vector2(560f, 920f), lane + " friend");
+                float expectedHeight = 850f + .9f *
+                    (MainMenuHomeVisualsPlayModeTests.ExpectedReferenceHeight(viewport.x, viewport.y) - 1920f);
+                AssertRectSize(solo, new Vector2(560f, expectedHeight), lane + " VS AI");
+                AssertRectSize(friend, new Vector2(560f, expectedHeight), lane + " friend");
                 AssertRectSize(back, new Vector2(118f, 118f), lane + " Back");
                 AssertHorizontalSeparation(solo, friend, lane + " mode cards");
                 Assert.That(solo.sizeDelta.y, Is.GreaterThanOrEqualTo(48f));
@@ -324,15 +325,17 @@ public sealed class MainMenuPlayVisualsPlayModeTests
     }
 
     static void AssertApprovedTitleApertures(
-        Component owner, TMP_Text soloTitle, TMP_Text friendTitle, string lane)
+        Component owner, TMP_Text soloTitle, TMP_Text friendTitle, int width, int height, string lane)
     {
+        float scale = (850f + .9f *
+            (MainMenuHomeVisualsPlayModeTests.ExpectedReferenceHeight(width, height) - 1920f)) / 920f;
         MainMenuHomeVisualsPlayModeTests.AssertApprovedCenteredTextRegion(
-            owner, soloTitle, new Vector2(-16f, 361.6f),
-            new Vector2(210f, 86.9f), new Vector2(210f, 118.9f),
+            owner, soloTitle, new Vector2(-16f, 361.6f * scale),
+            new Vector2(210f, 86.9f * scale), new Vector2(210f, 86.9f * scale + 32f),
             0f, lane + " VS AI title aperture");
         MainMenuHomeVisualsPlayModeTests.AssertApprovedCenteredTextRegion(
-            owner, friendTitle, new Vector2(7f, 361.6f),
-            new Vector2(210f, 86.9f), new Vector2(210f, 118.9f),
+            owner, friendTitle, new Vector2(7f, 361.6f * scale),
+            new Vector2(210f, 86.9f * scale), new Vector2(210f, 86.9f * scale + 32f),
             0f, lane + " friend title aperture");
     }
 

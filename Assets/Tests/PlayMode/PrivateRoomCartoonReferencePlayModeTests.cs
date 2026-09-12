@@ -60,22 +60,32 @@ public sealed class PrivateRoomCartoonReferencePlayModeTests
         for (int frame = 0; frame < 60 && !PortraitEnvelopeReady(root); frame++)
             yield return null;
 
+        // Pin the standard approved composition independently of the Game View
+        // left by a preceding tall-portrait test, then let the final owner reflow.
+        var safeRoot = Find(root, "PrivateRoomSafeRoot");
+        var safeOwner = safeRoot.GetComponent(Type.GetType("ResponsiveSafeAreaRoot, Assembly-CSharp"));
+        safeOwner.GetType().GetMethod("ApplyViewport").Invoke(safeOwner, new object[] {
+            new Rect(0, 0, 1080, 1920), new Rect(0, 0, 1080, 1920), new Vector2(1080, 1920) });
+        visuals.GetType().GetMethod("ApplyResponsiveLayout", BindingFlags.Instance | BindingFlags.NonPublic)
+            .Invoke(visuals, null);
+        Canvas.ForceUpdateCanvases();
+
         AssertRect(root, "PrivateRoomPlayerChip",
-            new Vector2(330f, 840f), new Vector2(356f, 138f));
+            new Vector2(298f, 857f), new Vector2(430f, 167f));
         AssertRect(root, "PrivateRoomLogo",
-            new Vector2(0f, 696f), new Vector2(500f, 232f));
+            new Vector2(0f, 620f), new Vector2(640f, 310f));
         AssertRect(root, "PrivateRoomTitleRibbon",
-            new Vector2(0f, 493f), new Vector2(938f, 181f));
+            new Vector2(0f, 415f), new Vector2(938f, 181f));
         AssertRect(root, "PrivateRoomCreateCard",
-            new Vector2(0f, 173f), new Vector2(960f, 442.5743f));
+            new Vector2(0f, 75f), new Vector2(1020f, 470.2352f));
         AssertRect(root, "PrivateRoomJoinCard",
-            new Vector2(0f, -297f), new Vector2(960f, 456.8073f));
+            new Vector2(0f, -422f), new Vector2(1020f, 485.3578f));
         AssertRect(root, "PrivateRoomTipCard",
-            new Vector2(0f, -666f), new Vector2(640f, 230f));
+            new Vector2(0f, -805f), new Vector2(640f, 230f));
         AssertRect(root, "PrivateRoomMascotSix",
-            new Vector2(-428f, -775f), new Vector2(197f, 235f));
+            new Vector2(-425f, -815f), new Vector2(220f, 260f));
         AssertRect(root, "PrivateRoomMascotSeven",
-            new Vector2(428f, -775f), new Vector2(197f, 235f));
+            new Vector2(425f, -815f), new Vector2(220f, 260f));
 
         foreach (string objectName in new[]
         {

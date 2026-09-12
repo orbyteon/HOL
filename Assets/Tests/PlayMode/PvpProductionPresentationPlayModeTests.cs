@@ -993,6 +993,10 @@ public sealed class PvpProductionPresentationPlayModeTests
             foreach (var safe in root.GetComponentsInChildren(T("ResponsiveSafeAreaRoot"), true))
                 Invoke(safe, "ApplyViewport", new Rect(Vector2.zero, viewport),
                     new Rect(0, 44, viewport.x, viewport.y - 88), new Vector2(1080, 1920));
+            // The menu owner now reflows the forms after safe-area changes.
+            // This fixture deliberately retains its 1080x1920 authoring canvas;
+            // native aspect-ratio growth is covered by the native capture lane.
+            Invoke(root.GetComponentInChildren(T("PrivateRoomVisuals"), true), "ApplyResponsiveLayout");
             Canvas.ForceUpdateCanvases();
             string context = language + " " + state + " " + viewport;
             AuditGlyphs(context, errors);
@@ -1001,18 +1005,20 @@ public sealed class PvpProductionPresentationPlayModeTests
                 var panel = ((GameObject)Get(controller,
                     state == "Joining" ? "joinPanel" : "createPanel")).transform;
                 var board = (RectTransform)Find(panel, "PrebattleBoard");
-                Assert.That(board.sizeDelta, Is.EqualTo(new Vector2(960, 1280)), context);
-                Assert.That(board.anchoredPosition, Is.EqualTo(new Vector2(0, -165)), context);
+                Assert.That(board.sizeDelta, Is.EqualTo(new Vector2(1000, 1155)), context);
+                Assert.That(board.anchoredPosition, Is.EqualTo(new Vector2(0, -252.5f)), context);
                 // Conservative inner face measured from the unchanged board
                 // artwork. Its transparent outer rect is not usable space.
-                var innerFace = new Rect(-390, -525, 780, 1040);
+                var innerFace = new Rect(-390f * 1000f / 960f, -525f * 1155f / 1280f,
+                    780f * 1000f / 960f, 1040f * 1155f / 1280f);
                 foreach (string cardName in new[] { "YouCard", "OpponentCard" })
                 {
                     var card = (RectTransform)Find(panel, cardName);
                     Assert.That(card.gameObject.activeInHierarchy, Is.True, context);
                     Assert.That(card.sizeDelta, Is.EqualTo(new Vector2(340, 252)), context);
                     Assert.That(card.anchoredPosition, Is.EqualTo(new Vector2(
-                        cardName == "YouCard" ? -200 : 200, 205)), context);
+                        cardName == "YouCard" ? -200 : 200,
+                        -252.5f + .4f * 1155f - .17f * (.8f * 1155f))), context);
                     Assert.That(card.localScale, Is.EqualTo(Vector3.one), context);
                     var image = card.GetComponent<Image>();
                     Assert.That(image.sprite, Is.SameAs(Resources.Load<Sprite>(
@@ -1056,7 +1062,7 @@ public sealed class PvpProductionPresentationPlayModeTests
                 foreach (string name in new[] { "PrivateRoomMascotSix", "PrivateRoomMascotSeven" })
                 {
                     var mascot = (RectTransform)Find(root.transform, name);
-                    Assert.That(mascot.sizeDelta, Is.EqualTo(new Vector2(197, 235)), context);
+                    Assert.That(mascot.sizeDelta, Is.EqualTo(new Vector2(220, 260)), context);
                     Assert.That(mascot.GetComponent<Image>().preserveAspect, Is.True);
                     Assert.That(mascot.GetComponent<Image>().raycastTarget, Is.False);
                     // Authoring-space apertures share this one safe root. Full
@@ -1075,30 +1081,30 @@ public sealed class PvpProductionPresentationPlayModeTests
             {
                 if (text.name == "PrivateRoomCreateHeading")
                     AuditFace(text, (RectTransform)text.transform.parent,
-                        new Rect(65, 42, 380, 120), context, errors);
+                        new Rect(69.0625f, 44.625f, 403.75f, 127.5f), context, errors);
                 if (text.name == "PrivateRoomJoinHeading")
                     AuditFace(text, (RectTransform)text.transform.parent,
-                        new Rect(-5, 79, 420, 110), context, errors);
+                        new Rect(-5.3125f, 83.9375f, 446.25f, 116.875f), context, errors);
                 if (text.name == "PrivateRoomCreateHint")
                     AuditFace(text, (RectTransform)text.transform.parent,
-                        new Rect(72, -53, 366, 84), context, errors);
+                        new Rect(76.5f, -56.3125f, 388.875f, 89.25f), context, errors);
                 if (text.name == "PrivateRoomCodeCaption")
                     AuditFace(text, (RectTransform)text.transform.parent,
-                        new Rect(5, 36, 400, 36), context, errors);
+                        new Rect(5.3125f, 38.25f, 425f, 38.25f), context, errors);
                 if (text.name == "PrivateRoomTip")
                     AuditFace(text, (RectTransform)text.transform.parent,
                         new Rect(-270, -65, 540, 130), context, errors);
                 if (text.name == "PrivateRoomPlayerName" || text.name == "PvPCreatePanelPlayerName" ||
                     text.name == "PvPJoinPanelPlayerName")
                     AuditFace(text, (RectTransform)text.transform.parent,
-                        new Rect(-147, 1, 191, 50), context, errors);
+                        new Rect(-180, 1, 240, 50), context, errors);
             }
             foreach (string prefix in new[] { "PrivateRoom", "PvPCreatePanel", "PvPJoinPanel" })
             {
                 var aperture = (RectTransform)Find(root.transform, prefix + "PlayerAvatarAperture");
-                Assert.That(aperture.anchoredPosition, Is.EqualTo(new Vector2(114, 0)),
+                Assert.That(aperture.anchoredPosition, Is.EqualTo(new Vector2(138, 0)),
                     "The actual Solo chip portrait ring is on the right, not the name area.");
-                Assert.That(aperture.sizeDelta, Is.EqualTo(new Vector2(102, 102)));
+                Assert.That(aperture.sizeDelta, Is.EqualTo(new Vector2(126, 126)));
                 Assert.That(aperture.GetComponent<Mask>().showMaskGraphic, Is.False);
             }
             foreach (var button in root.GetComponentsInChildren<Button>(false))
