@@ -943,19 +943,34 @@ public sealed class PvpProductionPresentationPlayModeTests
                     .FirstOrDefault(t => t.name == "PrivateRoomActionLabel");
                 if (label == null) continue; // Back is an icon, never a hidden third mode.
                 var image = button.GetComponent<Image>();
-                bool secondary = button.name == "CancelButton";
+                bool copyInvite = button.name == "CopyInviteButton";
+                bool nativeShare = button.name == "NativeShareButton";
+                bool secondary = button.name == "CancelButton" || copyInvite;
                 bool illustratedCreate = button.name == "CreateButton";
                 Assert.That(image.sprite, Is.SameAs(Resources.Load<Sprite>(illustratedCreate
                     ? "phase2a/hol_cta_blue_r2_9s" : secondary
                         ? "phase2a/hol_tip_frame_r2_9s" : "solo/production/solo_primary_cta_v1")), context);
-                if (illustratedCreate) Assert.That(image.type, Is.EqualTo(Image.Type.Sliced), context);
+                if (illustratedCreate || secondary)
+                    Assert.That(image.type, Is.EqualTo(Image.Type.Sliced), context);
                 Assert.That(label.font, Is.SameAs(Resources.Load<TMP_FontAsset>("phase2a/fonts/HOL Menu Display SDF")));
                 Assert.That(label.fontStyle & FontStyles.Bold, Is.EqualTo(FontStyles.Bold));
-                Assert.That(label.fontSize, Is.GreaterThanOrEqualTo(34), context);
+                // The invitation region now has a primary SHARE and a separate
+                // compact COPY fallback. Keep the original >=34px contract on
+                // every existing CTA; pin both new controls independently.
+                if (copyInvite || nativeShare)
+                {
+                    Assert.That(((RectTransform)button.transform).sizeDelta,
+                        Is.EqualTo(copyInvite ? new Vector2(290, 112) : new Vector2(410, 151)), context);
+                    Assert.That(label.fontSize, Is.EqualTo(copyInvite ? 30f : 36f), context);
+                }
+                else
+                    Assert.That(label.fontSize, Is.GreaterThanOrEqualTo(34), context);
                 Assert.That(label.fontSizeMin, Is.EqualTo(label.fontSizeMax), "Never shrink a CTA into tiny text.");
-                // Independent measured faces for the two actual production
+                // Independent measured faces for the actual production
                 // button sizes, not the runtime centering helper's SafeRect.
-                Rect face = secondary ? new Rect(-144, -27, 288, 64.8f)
+                Rect face = copyInvite ? new Rect(-116, -28, 232, 67.2f)
+                    : nativeShare ? new Rect(-131.2f, -43.79f, 262.4f, 98.15f)
+                    : secondary ? new Rect(-144, -27, 288, 64.8f)
                     : illustratedCreate ? new Rect(-152, -24.2f, 304, 55)
                     : button.name == "JoinButton"
                         ? new Rect(-137.6f, -31.9f, 275.2f, 71.5f)
