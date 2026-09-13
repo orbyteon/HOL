@@ -905,8 +905,11 @@ public sealed class PvpDuelCartoonVisuals : MonoBehaviour
         RuntimeUI.Stretch(visual);
         var background = AddSprite(visual.transform, visualName + "Background", BackgroundResource,
             Vector2.zero, new Vector2(1080, 1920));
-        RuntimeUI.Stretch(background.gameObject);
-        background.preserveAspect = false; // identical to Solo's full-bleed background
+        // Uniformly cover the viewport, cropping overflow instead of stretching art.
+        PrivateRoomPortraitArtEnvelope.Attach(background);
+        background.GetComponent<AspectRatioFitter>().aspectRatio =
+            background.sprite.rect.width / background.sprite.rect.height;
+        background.preserveAspect = true;
         background.raycastTarget = true;
         var safeObject = RuntimeUI.CreateObject(visualName + "SafeRoot", visual.transform);
         RuntimeUI.Stretch(safeObject);
