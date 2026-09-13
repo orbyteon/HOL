@@ -37,6 +37,19 @@ public class GuessHistoryRail : MonoBehaviour
     public int MatchIndex { get; private set; } = -1;
     public int EventCount { get { return events.Count; } }
 
+    // Value-copy access for the screen's structured Solo-style rows. The
+    // retained event list and duplicate/late-snapshot fences stay here.
+    public bool TryGetEvent(int newestFirstIndex, out PvpGuessHistoryEvent item)
+    {
+        if (newestFirstIndex < 0 || newestFirstIndex >= events.Count)
+        {
+            item = default(PvpGuessHistoryEvent);
+            return false;
+        }
+        item = events[newestFirstIndex];
+        return true;
+    }
+
     void OnEnable()
     {
         L10n.OnLanguageChanged -= Repaint;

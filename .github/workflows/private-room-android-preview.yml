@@ -8,6 +8,11 @@ on:
   pull_request:
     types: [labeled]
   workflow_dispatch:
+    inputs:
+      isolated_playtest:
+        description: 'Build HOL PvP Test for Title 11CB9E; no emulator/capture run'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -106,7 +111,7 @@ jobs:
         with:
           targetPlatform: Android
           androidExportType: androidPackage
-          buildMethod: MainMenuPreviewBuild.Build
+          buildMethod: ${{ inputs.isolated_playtest && 'MainMenuPreviewBuild.BuildIsolatedPvpPlaytest' || 'MainMenuPreviewBuild.Build' }}
           versioning: None
 
       - name: Require exact APK output
@@ -116,7 +121,27 @@ jobs:
           sudo chown -R "$(id -u):$(id -g)" build
           test -f build/Android/HOL-mainmenu-debug.apk
 
+      - name: Verify isolated playtest APK and record provenance
+        if: inputs.isolated_playtest
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tools/playfab/verify-isolated-playtest.mjs build/Android/isolated-playtest-manifest.json
+          git rev-parse HEAD > build/Android/checkout-sha.txt
+          git rev-parse 'HEAD^{tree}' > build/Android/checkout-tree.txt
+          (cd build/Android && sha256sum HOL-mainmenu-debug.apk > SHA256SUMS)
+
+      - name: Preserve isolated two-device APK without capture execution
+        if: inputs.isolated_playtest
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hol-pvp-test-11CB9E-development
+          path: build/Android/
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Transfer APK to emulator job
+        if: ${{ !inputs.isolated_playtest }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: private-room-preview-apk-transfer
@@ -125,6 +150,7 @@ jobs:
           retention-days: 1
 
   capture:
+    if: ${{ !inputs.isolated_playtest }}
     name: Capture Private Room EN + EL at 1080x1920
     needs: [preflight, build]
     runs-on: ubuntu-latest
