@@ -112,3 +112,7 @@ Never modify production workflows, credentials, permissions or guards.
   create a fresh room. Check Back/cancel during waiting.
 - Record APK SHA, deployed Version/Revision/hash, device labels and failures.
   Fixtures and green CI cannot substitute for this human acceptance.
+
+## Enforced delivery hold
+
+The shared builder now rejects isolated builds before changing project settings or producing an APK. Ordinary previews remain available. Remove the hold only in a reviewed change that verifies the original installed certificate, injects its matching private signer through secure build configuration, sets versionCode above 2, and verifies the resulting APK certificate. A newly generated key cannot update the installed application. No matching private key was available during the audit fixes.

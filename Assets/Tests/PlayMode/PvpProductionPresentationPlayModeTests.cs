@@ -80,6 +80,33 @@ public sealed class PvpProductionPresentationPlayModeTests
     }
 
     [UnityTest]
+    public IEnumerator BackgroundsCoverTallViewportsWithoutChangingArtworkProportions()
+    {
+        yield return Build();
+        var backgrounds = root.GetComponentsInChildren<Image>(true)
+            .Where(image => image.name.StartsWith("Pvp") && image.name.EndsWith("Background") &&
+                image.GetComponent<AspectRatioFitter>() != null).ToArray();
+        Assert.That(backgrounds.Length, Is.GreaterThanOrEqualTo(3));
+        foreach (var background in backgrounds)
+        {
+            var viewport = new GameObject("TallBackgroundViewport", typeof(RectTransform));
+            viewport.transform.SetParent(root.transform, false);
+            var rect = (RectTransform)viewport.transform;
+            rect.anchorMin = rect.anchorMax = new Vector2(.5f, .5f);
+            rect.sizeDelta = new Vector2(1080, 2400);
+            background.transform.SetParent(viewport.transform, false);
+            background.gameObject.SetActive(true);
+            yield return null;
+            Canvas.ForceUpdateCanvases();
+            Vector2 size = background.rectTransform.rect.size;
+            float aspect = background.sprite.rect.width / background.sprite.rect.height;
+            Assert.That(size.x / size.y, Is.EqualTo(aspect).Within(.001f));
+            Assert.That(size.x, Is.GreaterThanOrEqualTo(1079.9f));
+            Assert.That(size.y, Is.GreaterThanOrEqualTo(2399.9f));
+        }
+    }
+
+    [UnityTest]
     public IEnumerator ExplicitRoomAvatarIdsUseCanonicalCatalogAndNeverTheLocalSelection()
     {
         yield return Build();

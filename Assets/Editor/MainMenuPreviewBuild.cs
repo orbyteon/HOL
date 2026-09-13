@@ -31,6 +31,11 @@ public static class MainMenuPreviewBuild
         string previousPackage = PlayerSettings.GetApplicationIdentifier(group);
         string previousProduct = PlayerSettings.productName;
         if (isolated)
+            throw new BuildFailedException(
+                "Isolated APK delivery is blocked: recover and verify the installed test signer " +
+                "(8F9C013303AFADB815A7A817DA7562B50F1DFD28587CB51D1BF700DA02DD13C6) " +
+                "and configure a versionCode above 2 before enabling this build path.");
+        if (isolated)
         {
             if (Application.unityVersion != "2022.3.62f3")
                 throw new BuildFailedException("Isolated playtest requires Unity 2022.3.62f3.");
