@@ -15,7 +15,7 @@ public sealed class PvpProductionPresentationPlayModeTests
     const BindingFlags Flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
     static readonly string[] StatKeys = { "StatWins", "StatLosses", "StatStreak", "StatBestStreak",
         "StatBestGuesses", "StatDraws", "StatMatches", "StatRecentBits", "StatRecentCount",
-        "Language", "LockIntroShown", "LockEverUsed", "HOL.Onboarding.Avatar", "HOL.Onboarding.Version" };
+        "Language", "LockIntroShown", "LockEverUsed", "HOL.Onboarding.Avatar", "HOL.Onboarding.Version", "HOL.Onboarding.AgeCategory" };
     readonly Dictionary<string, int?> savedStats = new Dictionary<string, int?>();
     object savedLanguage;
     string savedPlayerName;
@@ -601,6 +601,8 @@ public sealed class PvpProductionPresentationPlayModeTests
     [UnityTest]
     public IEnumerator InviteSharingUsesCurrentCodeAndResumeRefreshesWithoutSendingOrResetting()
     {
+        PlayerPrefs.SetInt("HOL.Onboarding.Version", 1);
+        PlayerPrefs.SetInt("HOL.Onboarding.AgeCategory", 2);
         yield return Build();
         string clipboard = GUIUtility.systemCopyBuffer;
         var eventField = T("GameEvents").GetField("OnRoomShared");
@@ -635,6 +637,16 @@ public sealed class PvpProductionPresentationPlayModeTests
             Assert.That(opened, Is.EqualTo(2));
             Assert.That(shared, Is.Zero, "Opening/cancelling a chooser is not a sent invitation.");
             Assert.That(GUIUtility.systemCopyBuffer, Is.EqualTo(clipboard));
+            foreach (int age in new[] { 0, 1, -1, 99 })
+            {
+                PlayerPrefs.SetInt("HOL.Onboarding.AgeCategory", age);
+                Invoke(controller, "OnShareInvitePressed");
+                Assert.That(opened, Is.EqualTo(2), "Protected and invalid ages cannot launch the chooser.");
+            }
+            PlayerPrefs.DeleteKey("HOL.Onboarding.AgeCategory");
+            Invoke(controller, "OnShareInvitePressed");
+            Assert.That(opened, Is.EqualTo(2), "Missing legacy age cannot launch the chooser.");
+            PlayerPrefs.SetInt("HOL.Onboarding.AgeCategory", 2);
             Set(controller, "OpenShareChooser", new Func<string, string, bool>((text, title) => false));
             Invoke(controller, "OnShareInvitePressed");
             Assert.That(((TMP_Text)Get(controller, "createStatusText")).text, Is.EqualTo(L("pvp_share_unavailable")));

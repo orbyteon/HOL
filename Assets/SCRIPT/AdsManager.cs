@@ -48,6 +48,7 @@ public class AdsManager : MonoBehaviour
     static AdsManager activeInstance;
 
     bool adsAllowedThisSession;
+    bool MayUseAds => adsAllowedThisSession && OnboardingProfile.HasAdultAgeChoice;
 
     System.Action onRewardEarned;
     System.Action onRewardUnavailable;
@@ -103,7 +104,7 @@ public class AdsManager : MonoBehaviour
         // Consent is an opt-in to initialize the third-party ads SDK at all.
         // A stored decline keeps LevelPlay completely uninitialized on launch.
         adsAllowedThisSession = PlayerPrefs.GetInt(ConsentPrefKey, 0) == 1;
-        if (adsAllowedThisSession)
+        if (MayUseAds)
             InitAds();
     }
 
@@ -131,7 +132,8 @@ public class AdsManager : MonoBehaviour
         PlayerPrefs.Save();
 
         adsAllowedThisSession = consent;
-        LevelPlayPrivacySettings.SetGDPRConsent(consent);
+        if (OnboardingProfile.HasAdultAgeChoice)
+            LevelPlayPrivacySettings.SetGDPRConsent(consent);
 
         if (consent)
         {
@@ -149,7 +151,7 @@ public class AdsManager : MonoBehaviour
 
     void InitAds()
     {
-        if (!adsAllowedThisSession)
+        if (!MayUseAds)
             return;
 
         // Already-initialized SDK (consent re-granted mid-session, or a fresh
@@ -175,7 +177,7 @@ public class AdsManager : MonoBehaviour
         initRetries = 0;
 
         // Consent could have been withdrawn while initialization was in flight.
-        if (!adsAllowedThisSession)
+        if (!MayUseAds)
             return;
 
         EnsureAdObjects();
@@ -183,12 +185,13 @@ public class AdsManager : MonoBehaviour
 
     void HandleInitFailed()
     {
-        if (adsAllowedThisSession && initRetries < MaxInitRetries)
+        if (MayUseAds && initRetries < MaxInitRetries)
             Invoke(nameof(RetryInit), 60f);
     }
 
     void EnsureAdObjects()
     {
+        if (!MayUseAds) return;
         if (interstitialAd == null)
         {
             interstitialAd = new LevelPlayInterstitialAd(InterstitialUnit);
@@ -217,7 +220,7 @@ public class AdsManager : MonoBehaviour
         lastAdShowTime = Time.realtimeSinceStartup;
         FinishAndContinue();
 
-        if (adsAllowedThisSession && interstitialAd != null)
+        if (MayUseAds && interstitialAd != null)
             interstitialAd.LoadAd();
     }
 
@@ -226,14 +229,14 @@ public class AdsManager : MonoBehaviour
         Debug.Log("Ad display failed: " + error);
         FinishAndContinue();
 
-        if (adsAllowedThisSession && interstitialAd != null)
+        if (MayUseAds && interstitialAd != null)
             interstitialAd.LoadAd();
     }
 
     void OnAdLoadFailed(LevelPlayAdError error)
     {
         Debug.Log("Ad load failed: " + error);
-        if (adsAllowedThisSession)
+        if (MayUseAds)
             Invoke(nameof(RetryLoad), 30f);
     }
 
@@ -241,7 +244,7 @@ public class AdsManager : MonoBehaviour
 
     public bool IsRewardedReady()
     {
-        return adsAllowedThisSession && rewardedAd != null && rewardedAd.IsAdReady();
+        return MayUseAds && rewardedAd != null && rewardedAd.IsAdReady();
     }
 
     public bool ShowRewardedAd(System.Action onReward, System.Action onUnavailable = null)
@@ -287,7 +290,7 @@ public class AdsManager : MonoBehaviour
         else
             Invoke(nameof(FinishRewardedAfterGrace), RewardGraceSeconds);
 
-        if (adsAllowedThisSession && rewardedAd != null)
+        if (MayUseAds && rewardedAd != null)
             rewardedAd.LoadAd();
     }
 
@@ -302,20 +305,20 @@ public class AdsManager : MonoBehaviour
         var unavailable = onRewardUnavailable;
         FinishRewarded();
         unavailable?.Invoke();
-        if (adsAllowedThisSession && rewardedAd != null)
+        if (MayUseAds && rewardedAd != null)
             rewardedAd.LoadAd();
     }
 
     void OnRewardedLoadFailed(LevelPlayAdError error)
     {
         Debug.Log("Rewarded load failed: " + error);
-        if (adsAllowedThisSession)
+        if (MayUseAds)
             Invoke(nameof(RetryRewardedLoad), 30f);
     }
 
     void RetryRewardedLoad()
     {
-        if (adsAllowedThisSession && rewardedAd != null)
+        if (MayUseAds && rewardedAd != null)
             rewardedAd.LoadAd();
     }
 
@@ -349,13 +352,13 @@ public class AdsManager : MonoBehaviour
 
     void RetryLoad()
     {
-        if (adsAllowedThisSession && interstitialAd != null)
+        if (MayUseAds && interstitialAd != null)
             interstitialAd.LoadAd();
     }
 
     public void ShowAd(System.Action callback)
     {
-        if (!adsAllowedThisSession)
+        if (!MayUseAds)
         {
             Debug.Log("Ads disabled by privacy choice → continue");
             callback?.Invoke();
@@ -410,7 +413,7 @@ public class AdsManager : MonoBehaviour
     void RetryInit()
     {
         initRetries++;
-        if (adsAllowedThisSession)
+        if (MayUseAds)
             InitAds();
     }
 }

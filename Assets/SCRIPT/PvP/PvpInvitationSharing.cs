@@ -7,6 +7,7 @@ public static class PvpInvitationSharing
 {
     public static bool OpenChooser(string invitation, string chooserTitle)
     {
+        if (!OnboardingProfile.HasAdultAgeChoice) return false;
 #if UNITY_ANDROID && !UNITY_EDITOR
         try
         {
