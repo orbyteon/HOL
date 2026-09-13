@@ -30,8 +30,8 @@ var SIGNAL_COUNT = 6;       // valid signal ids are 0..5, resolved to text on th
 var SIGNAL_CAP_PER_SIDE = 12; // per match; blocks spam and caps CloudScript spend
 var ROOM_REGISTRY_SHARDS = 8;
 // Keep scheduled executions well below Legacy CloudScript's four-second API
-// time budget. Two rooms plus eight registry reads is a bounded request count;
-// the five-minute schedule drains ordinary orphan volume continuously.
+// time budget. Bound attempted mutations, including stale and busy rooms.
+// Rotate both the first shard and the first key on the five-minute schedule.
 var ROOM_CLEANUP_LIMIT = 2;
 var MUTATION_LOCK_STALE_MS = 120000;
 var WAITING_ROOM_TTL_MS = 30 * 60 * 1000;
@@ -817,8 +817,11 @@ handlers.cleanupExpiredRooms = function (args, context) {
     var cleaned = 0;
     var busy = 0;
     var staleEntries = 0;
+    var attempted = 0;
+    var slot = Math.floor(now / (5 * 60 * 1000));
 
-    for (var shard = 0; shard < ROOM_REGISTRY_SHARDS && cleaned < ROOM_CLEANUP_LIMIT; shard++) {
+    for (var offset = 0; offset < ROOM_REGISTRY_SHARDS && attempted < ROOM_CLEANUP_LIMIT; offset++) {
+        var shard = (slot + offset) % ROOM_REGISTRY_SHARDS;
         var group;
         try {
             group = server.GetSharedGroupData({
@@ -830,10 +833,14 @@ handlers.cleanupExpiredRooms = function (args, context) {
         }
 
         var data = group && group.Data ? group.Data : {};
-        for (var roomId in data) {
-            if (!Object.prototype.hasOwnProperty.call(data, roomId)) continue;
-            if (cleaned >= ROOM_CLEANUP_LIMIT) break;
+        var keys = Object.keys(data).sort();
+        // Each shard gets a new starting key on its next turn as first shard.
+        // Repeated busy entries cannot permanently starve later registrations.
+        var start = keys.length ? Math.floor(slot / ROOM_REGISTRY_SHARDS) % keys.length : 0;
+        for (var index = 0; index < keys.length && attempted < ROOM_CLEANUP_LIMIT; index++) {
+            var roomId = keys[(start + index) % keys.length];
             if (Number(data[roomId].Value) > now) continue;
+            attempted++;
 
             var outcome = withRoomMutation(roomId, function (state) {
                 if (Number(state.expiresAt) > now)
@@ -858,5 +865,5 @@ handlers.cleanupExpiredRooms = function (args, context) {
         }
     }
 
-    return { ok: true, cleaned: cleaned, busy: busy, staleEntries: staleEntries };
+    return { ok: true, cleaned: cleaned, busy: busy, staleEntries: staleEntries, attempted: attempted };
 };

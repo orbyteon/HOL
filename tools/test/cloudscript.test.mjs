@@ -573,3 +573,45 @@ test("equally skilled players are not decided by who moves first", () => {
     "imperfect play should draw less often than flawless play, not more"
   );
 });
+
+test("cleanup charges stale registrations against its API work budget", () => {
+  let now = 1_900_000_000_000;
+  const cs = loadCloudScript({now: () => now, random: seededRandom(17)});
+  for (let i = 0; i < 25; i++) {
+    const room = cs.call('createRoom', 'HOST', {hostName: 'Host', hostSecret: 42});
+    assert.equal(room.ok, true);
+    cs.store.groups.delete(room.roomId);
+  }
+  now += 31 * 60 * 1000;
+  cs.store.calls = {create: 0, read: 0, write: 0, delete: 0};
+  const result = cs.call('cleanupExpiredRooms', '', {});
+  assert.equal(result.attempted, 2);
+  assert.equal(result.staleEntries, 2);
+  assert.equal(cs.store.calls.write, 2);
+  assert.ok(cs.store.calls.read <= 10);
+});
+
+test("cleanup rotates past persistent busy rooms without exceeding two attempts", () => {
+  let now = 1_900_000_000_000;
+  const cs = loadCloudScript({now: () => now, random: seededRandom(21)});
+  const rooms = [];
+  for (let i = 0; i < 24; i++) {
+    const room = cs.call('createRoom', 'HOST', {hostName: 'Host', hostSecret: 42});
+    assert.equal(room.ok, true);
+    rooms.push(room.roomId);
+  }
+  const busy = rooms.slice(0, 12);
+  now += 31 * 60 * 1000;
+  for (let run = 0; run < 200; run++) {
+    for (const id of busy) {
+      const state = JSON.parse(cs.store.groups.get(id).state);
+      cs.store.groups.set(`${id}-MUT-${state.revision | 0}-${state.lockEpoch | 0}`, {startedAt: String(now)});
+    }
+    const result = cs.call('cleanupExpiredRooms', '', {});
+    assert.ok(result.attempted <= 2);
+    assert.equal(result.attempted, result.cleaned + result.busy + result.staleEntries);
+    now += 5 * 60 * 1000;
+  }
+  assert.ok(busy.every(id => cs.store.groups.has(id)), 'active mutations stay protected');
+  assert.ok(rooms.slice(12).every(id => !cs.store.groups.has(id)), 'busy entries cannot starve other rooms');
+});
