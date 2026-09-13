@@ -53,6 +53,9 @@ public class DailyHunt : MonoBehaviour
     Button reviveButton;
     Button shareButton;
 
+    // Injectable per instance so UTC boundary tests do not change the device clock.
+    Func<int> currentUtcDay = () => DailyChallengeProgress.CurrentUtcDayNumber;
+
     int day;
     int secret;
     int used;
@@ -175,6 +178,7 @@ public class DailyHunt : MonoBehaviour
 
     public void Close()
     {
+        ReconcileDay();
         // Backing out of the revive offer settles the day as a loss —
         // leaving it unfinalized dropped the fail from the streak entirely.
         if (!done && used >= budget && !reviveInFlight)
@@ -187,17 +191,39 @@ public class DailyHunt : MonoBehaviour
     // owns the press while it is open; Update only runs while active.
     void Update()
     {
+        ReconcileDay();
         if (Input.GetKeyDown(KeyCode.Escape))
             Close();
     }
 
     // ------------------------------------------------------------ state
 
-    static int TodayNumber()
+    void OnApplicationFocus(bool focused)
+    {
+        if (focused) ReconcileDay();
+    }
+
+    void OnApplicationPause(bool paused)
+    {
+        if (!paused) ReconcileDay();
+    }
+
+    bool ReconcileDay()
+    {
+        // Ignore the construction window and never rewind persisted progress.
+        if (day == 0 || Math.Max(TodayNumber(), PlayerPrefs.GetInt(DayKey, 0)) <= day)
+            return false;
+        EnsureToday();
+        if (input != null) input.text = "";
+        if (title != null) Refresh();
+        return true;
+    }
+
+    int TodayNumber()
     {
         // One UTC clock contract now drives both mission reset and the number
         // hunt, so their visible day can never drift apart.
-        return DailyChallengeProgress.CurrentUtcDayNumber;
+        return currentUtcDay();
     }
 
     static int SecretFor(int dayNumber)
@@ -309,6 +335,8 @@ public class DailyHunt : MonoBehaviour
 
     void SubmitGuess()
     {
+        // A number typed for yesterday must not be submitted to the new puzzle.
+        if (ReconcileDay()) return;
         if (done || used >= budget) return;
 
         int guess;
@@ -371,6 +399,7 @@ public class DailyHunt : MonoBehaviour
 
     void OnRevivePressed()
     {
+        if (ReconcileDay()) return;
         if (reviveInFlight || done) return;
         if (ads == null) { FinalizeFail(); Refresh(); return; }
         reviveInFlight = true;
@@ -383,42 +412,43 @@ public class DailyHunt : MonoBehaviour
         PlayerPrefs.SetInt(PendingReviveKey, day);
         PlayerPrefs.Save();
 
-        ads.ShowRewardedAd(() =>
+        ads.ShowRewardedAd(
+            () => CompleteRevive(requestedDay, true),
+            () => CompleteRevive(requestedDay, false));
+    }
+
+    void CompleteRevive(int requestedDay, bool earned)
+    {
+        reviveInFlight = false;
+        ReconcileDay();
+        if (requestedDay != day || requestedDay != PlayerPrefs.GetInt(DayKey, 0))
         {
-            reviveInFlight = false;
-            if (requestedDay != PlayerPrefs.GetInt(DayKey, 0))
-            {
-                PlayerPrefs.DeleteKey(PendingReviveKey);
-                PlayerPrefs.DeleteKey(AdsManager.PendingRewardEarnedKey);
-                PlayerPrefs.Save();
-                return;
-            }
+            PlayerPrefs.DeleteKey(PendingReviveKey);
+            PlayerPrefs.DeleteKey(AdsManager.PendingRewardEarnedKey);
+            PlayerPrefs.Save();
+            return;
+        }
+        PlayerPrefs.DeleteKey(PendingReviveKey);
+        if (earned)
+        {
             revived = true;
             done = false;
             budget = GuessBudget + ReviveGuesses;
             Persist();
-            // On success AdsManager leaves the earned marker for the
-            // consumer to clear (FinishRewarded only deletes it when no
-            // reward was granted). Left behind, it would pair with a later
-            // abandoned streak-save attempt and fake a restore.
-            PlayerPrefs.DeleteKey(PendingReviveKey);
             PlayerPrefs.DeleteKey(AdsManager.PendingRewardEarnedKey);
-            PlayerPrefs.Save();
-            Refresh();
-        },
-        () =>
+        }
+        else
         {
-            reviveInFlight = false;
-            PlayerPrefs.DeleteKey(PendingReviveKey);
-            PlayerPrefs.Save();
             status.text = L10n.Get("ad_not_ready");
             FinalizeFail();
-            Refresh();
-        });
+        }
+        PlayerPrefs.Save();
+        Refresh();
     }
 
     void OnSharePressed()
     {
+        if (ReconcileDay()) return;
         string score = (found ? used.ToString() : "✗") + "/" + budget;
         GUIUtility.systemCopyBuffer = L10n.Get("daily_share", day, score, trail);
         status.text = L10n.Get("share_copied");
