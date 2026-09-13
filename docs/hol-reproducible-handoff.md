@@ -2,6 +2,7 @@
 
 ## Open the complete project
 
+- Current single-branch delivery: **`feature/pvp-production-design-20260907`** in `orbyteon/HOL`. Its complete visual/runtime baseline is `c7cd6c2dc4550074246cdbd9c561b18b33cab09e`; the September 13 follow-up adds only the existing local AAB helper, its meta, focused contracts and documentation. Use the latest remote head of this branch, not the older local branch tip or `main` before integration.
 - Unity **2022.3.62f3** (`96770f904ca7`), with Android Build Support, SDK/NDK and OpenJDK for Android work.
 - On Marinos's PC the actual canonical project is `C:\Users\orbyt\Desktop\HOL_GitHub_clean\HOL`. The differently nested `HOL\_GitHub\_clean\HOL` path does not exist there.
 - On Andreas's PC, clone the whole repository into one project folder. After integration, check out the verified `main` revision and add that folder in Unity Hub. Do not copy `Library`, `Temp`, signing material, credentials or another player's preferences.
@@ -9,6 +10,16 @@
 - Open **Assets/Scenes/SplashScene.unity** and press Play. This is the enabled startup scene. **Assets/Scenes/MainMenu.unity** is the second enabled scene and contains the runtime screen owners. Opening MainMenu directly skips the first-launch entry and is not the onboarding verification path.
 - A fresh local profile follows the existing onboarding; a completed local profile enters Home. Do not delete a real player's saved profile to demonstrate onboarding: use the existing isolated capture/test fixtures.
 - Most production UI is constructed by its screen owner in Play Mode. An empty/incomplete edit-time hierarchy is not a missing artwork package. Do not save a transient test scene or runtime UI back over a production scene.
+
+## September 13 source-completeness audit
+
+The saved canonical project was compared with all **934 tracked files** at `c7cd6c2...`, including both enabled scenes, artwork, SDF fonts, runtime owners, backend source, `.meta` files, dependencies and project settings. No visual, scene, prefab, gameplay or dependency change is missing from that baseline. There are no repository-owned `.prefab` files in this project; production composition is supplied by the scenes and runtime owners. No ignored source file under `Assets`, `Packages` or `ProjectSettings` was found.
+
+Binary artwork matches byte-for-byte. Text serialization differs only by line endings/trailing whitespace, except two already-audited machine settings: a generated PS4 field and the package-generated Standalone `LEVELPLAY_DEPENDENCIES_INSTALLED` symbol. Neither is required authoring data to copy from Marinos's machine. The existing package restores the Standalone symbol during import, as demonstrated by the clean-import evidence below.
+
+The four local-only source paths were the existing `HolLocalReleaseBuild.cs` and its `.meta`, now included, plus `Assets/InitTestScene639245022929278886.unity` and its `.meta`. The latter is a generated Unity Test Runner bootstrap, is not in the enabled build scenes, and remains locally preserved rather than shipped as gameplay content. All **938 saved source files / 159,388,805 bytes** were backed up and SHA-256 checked before this synchronization. No local branch switch, stash, cleanup or authoring overwrite was required.
+
+The AAB helper was used for the signed local 0.4.1 / versionCode 7 build; it does not alter runtime design or networking. See [Local AAB setup](local-release-build.md). Machine-specific launcher scripts, credentials, signing material, user preferences, caches, logs, captures and built APK/AAB files are not project dependencies and are intentionally outside Git.
 
 ## Preservation and reconstruction
 
