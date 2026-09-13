@@ -58,6 +58,21 @@ public sealed class OnboardingProfileTests
         PlayerPrefs.Save();
     }
 
+    [TestCase(-1, false)]
+    [TestCase(0, false)]
+    [TestCase(1, false)]
+    [TestCase(2, true)]
+    [TestCase(99, false)]
+    public void OnlyACommittedExplicitAdultChoiceEnablesExternalServices(int age, bool allowed)
+    {
+        PlayerPrefs.SetInt(AgeKey, age);
+        Assert.That(GetBool("HasAdultAgeChoice"), Is.False, "Uncommitted profile");
+        PlayerPrefs.SetInt(VersionKey, 1);
+        Assert.That(GetBool("HasAdultAgeChoice"), Is.EqualTo(allowed));
+        PlayerPrefs.DeleteKey(AgeKey);
+        Assert.That(GetBool("HasAdultAgeChoice"), Is.False, "Legacy profile with no age");
+    }
+
     [Test]
     public void FreshInstallRunsButLegacyPlayerSkipsOnboarding()
     {

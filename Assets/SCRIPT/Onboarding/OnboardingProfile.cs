@@ -53,6 +53,12 @@ public static class OnboardingProfile
     public const string AvatarKey = "HOL.Onboarding.Avatar";
     public const string AgeKey = "HOL.Onboarding.AgeCategory";
 
+    // Current age bands cannot distinguish 13-14 from 15-17. Until a finer
+    // approved policy exists, only an explicitly committed adult choice enables
+    // ads and the external app chooser. Missing/invalid legacy data stays protected.
+    public static bool HasAdultAgeChoice => IsComplete && PlayerPrefs.HasKey(AgeKey) &&
+        PlayerPrefs.GetInt(AgeKey, -1) == (int)AgeCategory.Adult18Plus;
+
     public static bool IsComplete =>
         PlayerPrefs.GetInt(VersionKey, 0) >= CurrentVersion;
 
@@ -126,7 +132,7 @@ public static class OnboardingProfile
                 GenderKey, (int)GenderChoice.PreferNotToSay),
             Mathf.Clamp(PlayerPrefs.GetInt(AvatarKey, 0), 0, AvatarCount - 1),
             (AgeCategory)PlayerPrefs.GetInt(
-                AgeKey, (int)AgeCategory.Adult18Plus),
+                AgeKey, -1),
             PlayerPrefs.GetInt(VersionKey, 0));
     }
 }

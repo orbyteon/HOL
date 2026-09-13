@@ -314,6 +314,7 @@ public class PvpGameController : MonoBehaviour
     public void OnShareInvitePressed()
     {
         if (!CanShareInvite) return;
+        if (!OnboardingProfile.HasAdultAgeChoice) return;
         string invitation = L10n.Get("pvp_invite_text", client.RoomCode);
         // No 'sent' status and no sharing/reward event: the player can cancel.
         if (OpenShareChooser == null || !OpenShareChooser(invitation, L10n.Get("pvp_share_chooser")))
@@ -339,7 +340,7 @@ public class PvpGameController : MonoBehaviour
         if (createStatusEllipsis != null)
             createStatusEllipsis.enabled = false;
         if (createCopyButton != null) createCopyButton.SetActive(true);
-        if (createShareButton != null) createShareButton.SetActive(true);
+        if (createShareButton != null) createShareButton.SetActive(OnboardingProfile.HasAdultAgeChoice);
 
         SetPrebattleMessage(createStatusText, key);
 

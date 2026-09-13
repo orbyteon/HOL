@@ -14,6 +14,11 @@ public class ConsentManager : MonoBehaviour
 
     void Start()
     {
+        if (!OnboardingProfile.HasAdultAgeChoice)
+        {
+            if (consentPanel != null) consentPanel.SetActive(false);
+            return;
+        }
         bool alreadyAnswered = PlayerPrefs.HasKey(ConsentPrefKey);
 
         if (consentPanel == null && !alreadyAnswered)
@@ -33,6 +38,7 @@ public class ConsentManager : MonoBehaviour
 
     public void ReopenConsent()
     {
+        if (!OnboardingProfile.HasAdultAgeChoice) return;
         if (consentPanel == null)
             consentPanel = BuildRuntimeDialog();
 

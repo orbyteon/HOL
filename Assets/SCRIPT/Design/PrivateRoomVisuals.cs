@@ -531,7 +531,7 @@ public sealed class PrivateRoomVisuals : MonoBehaviour
             if (form.copy != null)
                 form.copy.interactable = pvp != null && pvp.CanShareInvite;
             if (form.share != null)
-                form.share.interactable = pvp != null && pvp.CanShareInvite;
+                form.share.interactable = pvp != null && pvp.CanShareInvite && OnboardingProfile.HasAdultAgeChoice;
         }
     }
 
