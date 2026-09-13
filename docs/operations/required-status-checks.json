@@ -1,0 +1,12 @@
+{
+  "strict": true,
+  "contexts": [
+    "Static integrity",
+    "Require Unity credentials",
+    "Provisioner tests",
+    "Duel rule tests",
+    "EditMode tests",
+    "Build Android (compile check)",
+    "Visual system integrity"
+  ]
+}
