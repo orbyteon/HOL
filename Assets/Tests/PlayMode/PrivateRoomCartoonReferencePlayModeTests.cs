@@ -15,8 +15,6 @@ public sealed class PrivateRoomCartoonReferencePlayModeTests
     static readonly string[] PortraitOverlayNames =
     {
         "PrivateRoomBackground",
-        "PrivateRoomStars",
-        "PrivateRoomConfetti",
     };
 
     [UnityTest]
@@ -62,45 +60,58 @@ public sealed class PrivateRoomCartoonReferencePlayModeTests
         for (int frame = 0; frame < 60 && !PortraitEnvelopeReady(root); frame++)
             yield return null;
 
-        AssertRect(root, "PrivateRoomStepPill",
-            new Vector2(-292f, 842f), new Vector2(350f, 82f));
+        // Pin the standard approved composition independently of the Game View
+        // left by a preceding tall-portrait test, then let the final owner reflow.
+        var safeRoot = Find(root, "PrivateRoomSafeRoot");
+        var safeOwner = safeRoot.GetComponent(Type.GetType("ResponsiveSafeAreaRoot, Assembly-CSharp"));
+        safeOwner.GetType().GetMethod("ApplyViewport").Invoke(safeOwner, new object[] {
+            new Rect(0, 0, 1080, 1920), new Rect(0, 0, 1080, 1920), new Vector2(1080, 1920) });
+        visuals.GetType().GetMethod("ApplyResponsiveLayout", BindingFlags.Instance | BindingFlags.NonPublic)
+            .Invoke(visuals, null);
+        Canvas.ForceUpdateCanvases();
+
         AssertRect(root, "PrivateRoomPlayerChip",
-            new Vector2(352f, 842f), new Vector2(360f, 118f));
+            new Vector2(298f, 857f), new Vector2(430f, 167f));
         AssertRect(root, "PrivateRoomLogo",
-            new Vector2(0f, 690f), new Vector2(585f, 310f));
+            new Vector2(0f, 620f), new Vector2(640f, 310f));
         AssertRect(root, "PrivateRoomTitleRibbon",
-            new Vector2(0f, 500f), new Vector2(900f, 150f));
+            new Vector2(0f, 415f), new Vector2(938f, 181f));
         AssertRect(root, "PrivateRoomCreateCard",
-            new Vector2(0f, 205f), new Vector2(930f, 430f));
+            new Vector2(0f, 75f), new Vector2(1020f, 470.2352f));
         AssertRect(root, "PrivateRoomJoinCard",
-            new Vector2(0f, -250f), new Vector2(930f, 390f));
-        AssertRect(root, "PrivateRoomShareButton",
-            new Vector2(0f, -515f), new Vector2(430f, 92f));
+            new Vector2(0f, -422f), new Vector2(1020f, 485.3578f));
         AssertRect(root, "PrivateRoomTipCard",
-            new Vector2(0f, -715f), new Vector2(760f, 170f));
+            new Vector2(0f, -805f), new Vector2(640f, 230f));
         AssertRect(root, "PrivateRoomMascotSix",
-            new Vector2(-430f, -805f), new Vector2(250f, 285f));
+            new Vector2(-430f, -815f), new Vector2(220f, 260f));
         AssertRect(root, "PrivateRoomMascotSeven",
-            new Vector2(430f, -805f), new Vector2(250f, 285f));
+            new Vector2(430f, -815f), new Vector2(220f, 260f));
 
         foreach (string objectName in new[]
         {
             "PrivateRoomBackground",
-            "PrivateRoomStars",
-            "PrivateRoomConfetti",
-            "PrivateRoomOuterFrame",
-            "PrivateRoomCreateBoy",
-            "PrivateRoomCreateGirl",
-            "PrivateRoomCreateIcon",
-            "PrivateRoomJoinDoor",
+            "PrivateRoomCreateCard",
+            "PrivateRoomJoinCard",
             "PrivateRoomLandingCodeInput",
-            "PrivateRoomShareIcon",
-            "PrivateRoomTipIcon",
-            "PrivateRoomBackIcon",
+            "PrivateRoomStepText",
         })
         {
             Assert.That(Find(root, objectName), Is.Not.Null,
                 "Missing approved modular object: " + objectName);
+        }
+
+        foreach (string retired in new[] { "PrivateRoomCreateBoy", "PrivateRoomCreateGirl", "PrivateRoomJoinDoor" })
+            Assert.That(Find(root, retired), Is.Null, "Do not overlay substitute art on the approved illustrated panels.");
+        foreach (string cardName in new[] { "PrivateRoomCreateCard", "PrivateRoomJoinCard" })
+        {
+            var card = Find(root, cardName).GetComponent<Image>();
+            string resource = cardName == "PrivateRoomCreateCard"
+                ? "reference/hol_private_create_card_v1" : "reference/hol_private_join_card_v1";
+            Assert.That(card.sprite, Is.SameAs(Resources.Load<Sprite>(resource)));
+            Assert.That(card.type, Is.EqualTo(Image.Type.Simple));
+            Assert.That(card.preserveAspect, Is.True, "Never stretch or 9-slice the high-five pair / illustrated door.");
+            Assert.That(card.color, Is.EqualTo(Color.white));
+            Assert.That(card.raycastTarget, Is.False);
         }
 
         foreach (string overlayName in PortraitOverlayNames)
@@ -124,7 +135,8 @@ public sealed class PrivateRoomCartoonReferencePlayModeTests
                 image.name + " hides approved artwork.");
             bool interactive =
                 image.GetComponent<Button>() != null ||
-                image.GetComponent<TMP_InputField>() != null;
+                image.GetComponent<TMP_InputField>() != null ||
+                image.name == "PrivateRoomBackground";
             Assert.That(
                 image.raycastTarget,
                 interactive ? Is.True : Is.False,
@@ -133,14 +145,14 @@ public sealed class PrivateRoomCartoonReferencePlayModeTests
 
         var create = Find(menuPanel.transform, "CreateButton")?.GetComponent<Button>();
         var join = Find(menuPanel.transform, "JoinButton")?.GetComponent<Button>();
-        var back = Find(menuPanel.transform, "PrivateRoomBackIcon")
-            ?.GetComponentInParent<Button>();
-        var share = Find(menuPanel.transform, "PrivateRoomShareButton")
-            ?.GetComponent<Button>();
+        var back = Find(menuPanel.transform, "BackButton")?.GetComponent<Button>();
+        var share = GetField<GameObject>(controller, "createCopyButton")?.GetComponent<Button>();
         Assert.That(create, Is.Not.Null);
         Assert.That(join, Is.Not.Null);
         Assert.That(back, Is.Not.Null);
         Assert.That(share, Is.Not.Null);
+        Assert.That(share.transform.IsChildOf(GetField<GameObject>(controller, "createWaitingRoot").transform),
+            Is.True, "Only the real waiting state offers a room invite, not a decorative landing share.");
         Assert.That(create.onClick.GetPersistentEventCount() +
                     RuntimeListenerCount(create), Is.GreaterThan(0));
         Assert.That(join.onClick.GetPersistentEventCount() +

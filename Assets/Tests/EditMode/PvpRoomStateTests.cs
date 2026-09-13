@@ -10,6 +10,30 @@ public class PvpRoomStateTests
     [System.Serializable]
     sealed class DerivedRoomState : PvpRoomState { }
 
+    [TestCase(true, "Host", "0")]
+    [TestCase(false, "Guest", "6")]
+    public void IdentityHelpersUseTheRequestedSeat(bool host, string name, string avatar)
+    {
+        var state = new PvpRoomState { hostName = "Host", guestName = "Guest",
+            hostAvatarId = "0", guestAvatarId = "6" };
+        Assert.AreEqual(name, state.NameFor(host));
+        Assert.AreEqual(avatar, state.AvatarIdFor(host));
+    }
+
+    [TestCase("{}", "", "")]
+    [TestCase("{\"hostAvatarId\":null,\"guestAvatarId\":\"\"}", "", "")]
+    [TestCase("{\"hostAvatarId\":\"0\",\"guestAvatarId\":\"6\"}", "0", "6")]
+    [TestCase("{\"hostAvatarId\":\"1\"}", "1", "")]
+    public void InheritedAvatarWireFieldsPreserveZeroAndMissingSeparately(string json, string host, string guest)
+    {
+        var state = UnityEngine.JsonUtility.FromJson<DerivedRoomState>(json);
+        Assert.AreEqual(host, state.AvatarIdFor(true));
+        Assert.AreEqual(guest, state.AvatarIdFor(false));
+        var roundTrip = UnityEngine.JsonUtility.FromJson<DerivedRoomState>(UnityEngine.JsonUtility.ToJson(state));
+        Assert.AreEqual(host, roundTrip.AvatarIdFor(true));
+        Assert.AreEqual(guest, roundTrip.AvatarIdFor(false));
+    }
+
     [Test]
     public void SideHelpersReadTheMatchingPublicFields()
     {

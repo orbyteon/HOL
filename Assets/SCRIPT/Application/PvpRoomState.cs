@@ -11,12 +11,23 @@ public class PvpRoomState
 {
     public string hostName = "";
     public string guestName = "";
+    // Canonical catalog indices as strings: "0" is valid, absent/empty is not.
+    public string hostAvatarId = "";
+    public string guestAvatarId = "";
+
+    public string NameFor(bool host) => (host ? hostName : guestName) ?? "";
+    public string AvatarIdFor(bool host) => (host ? hostAvatarId : guestAvatarId) ?? "";
 
     public string turn = "";    // "host" | "guest"
     public string phase = "";   // "waiting" | "play" | "done" | "closed"
     public int lastGuess;
     public string lastBy = "";
     public string winner = "";  // "host" | "guest" | "draw"
+    // Server-authored, finalized-result facts. Empty on live/legacy snapshots.
+    public string resultReason = ""; // only_correct | lock | range | draw
+    public int resultHostCandidates; // interval size BEFORE the correct guess
+    public int resultGuestCandidates;
+    public string resultForfeitedSide = ""; // consumed missed-LOCK slot in final round
 
     // Server-computed public view. PlayFab never sends live secrets.
     public string lastHint = ""; // "higher" | "lower" | "correct"

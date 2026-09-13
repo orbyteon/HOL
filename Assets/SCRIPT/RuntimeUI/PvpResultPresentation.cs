@@ -10,13 +10,43 @@ public sealed class PvpResultPresentation : MonoBehaviour
     public TMP_Text playerAttemptsText;
     public TMP_Text opponentAttemptsText;
     public TMP_Text revealedNumberText;
+    public TMP_Text explanationText;
     public TMP_Text playerChipText;
+    public TMP_Text opponentNameText;
     public GameObject trophy;
 
     string localizedTitleKey = "";
     string displayedTitle = "";
     int displayedRevealedNumber;
     bool isShown;
+    string opponentName = "";
+    PvpResultExplanation explanation = PvpResultExplanation.Capture(null);
+
+    public void SetResultSnapshot(PvpRoomState state)
+    {
+        explanation = PvpResultExplanation.Capture(state);
+        PaintExplanation();
+    }
+
+    void PaintExplanation()
+    {
+        if (explanationText == null) return;
+        explanationText.richText = false;
+        if (!explanation.Final) { explanationText.text = ""; return; }
+        string key = "pvp_reason_" + (string.IsNullOrEmpty(explanation.Reason) ? "legacy" : explanation.Reason);
+        if (explanation.Reason == "only_correct" && !string.IsNullOrWhiteSpace(explanation.ForfeitedName))
+            key = "pvp_reason_forfeit";
+        explanationText.text = L10n.Get(key, explanation.WinnerName,
+            explanation.WinnerCandidates, explanation.OtherCandidates, explanation.ForfeitedName);
+    }
+
+    // Called for every arriving room snapshot, including later finished-room
+    // polls. Never freeze an empty construction-time label as opponent identity.
+    public void SetOpponentName(string value)
+    {
+        opponentName = value ?? "";
+        if (opponentNameText != null) opponentNameText.text = opponentName;
+    }
 
     void OnEnable()
     {
@@ -42,6 +72,8 @@ public sealed class PvpResultPresentation : MonoBehaviour
             revealedNumberText.text =
                 L10n.Get("number_was", displayedRevealedNumber);
         RefreshPlayerChip();
+        SetOpponentName(opponentName);
+        PaintExplanation();
     }
 
     public void Show(string title, int playerAttempts, int opponentAttempts,
@@ -101,6 +133,8 @@ public sealed class PvpResultPresentation : MonoBehaviour
     public void Hide()
     {
         isShown = false;
+        explanation = PvpResultExplanation.Capture(null);
+        PaintExplanation();
         if (gameObject.activeSelf)
             gameObject.SetActive(false);
     }

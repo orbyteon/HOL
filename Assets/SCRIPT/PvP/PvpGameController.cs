@@ -30,6 +30,9 @@ public class PvpGameController : MonoBehaviour
     public TMP_Text createStatusText;
     public AnimatedEllipsis createStatusEllipsis;
     public GameObject createCopyButton;
+    public GameObject createShareButton;
+    // Platform boundary, injectable by deterministic tests without launching another app.
+    public System.Func<string, string, bool> OpenShareChooser = PvpInvitationSharing.OpenChooser;
 
     [Header("Join flow")]
     public TMP_InputField joinCodeInput;
@@ -84,6 +87,7 @@ public class PvpGameController : MonoBehaviour
     public AudioClip loseSound;
 
     PvpBackend.RoomState lastState;
+    string presentationRoomCode = "";
     bool matchOver;
     bool guessInFlight;
     bool abnormalTerminal;
@@ -96,6 +100,44 @@ public class PvpGameController : MonoBehaviour
     int myMin = 1;
     int myMax = 100;
     bool lockArmed;
+
+    // Read-only presentation bridge. The screen paints the same accepted
+    // snapshot/range as the controller; it never advances rules or networking.
+    public PvpBackend.RoomState PresentationState => lastState;
+    public int PlayerRangeMinimum => myMin;
+    public int PlayerRangeMaximum => myMax;
+    public bool PresentationMatchOver => matchOver || abnormalTerminal;
+    public bool PresentationGuessInFlight => guessInFlight;
+    public bool PresentationLockArmed => lockArmed;
+
+    // Both visual owners read the same accepted room identity, including on
+    // language/periodic repaint. They must not substitute this device's prefs.
+    public bool TryGetPresentationIdentity(bool opponent, out string name, out string avatarId)
+    {
+        name = avatarId = "";
+        if (lastState == null || client == null ||
+            presentationRoomCode != client.RoomCode) return false;
+        bool host = opponent ? !client.IsHost : client.IsHost;
+        name = lastState.NameFor(host);
+        avatarId = lastState.AvatarIdFor(host);
+        if (string.IsNullOrWhiteSpace(name) && !(opponent && lastState.phase == "waiting"))
+            name = L10n.Get("player_default");
+        return true;
+    }
+
+    void RefreshRoomIdentity()
+    {
+        GetComponent<PrivateRoomVisuals>()?.RefreshRoomIdentity();
+        GetComponent<PvpDuelCartoonVisuals>()?.RefreshRoomIdentity();
+    }
+
+    void ClearRoomIdentity()
+    {
+        if (resultPresentation != null) resultPresentation.SetResultSnapshot(null);
+        lastState = null;
+        presentationRoomCode = "";
+        RefreshRoomIdentity();
+    }
 
     int lastSignalSeq;
     int signalsSent;
@@ -112,7 +154,80 @@ public class PvpGameController : MonoBehaviour
     const int MaxDonePolls = 80;
 
     int flowGeneration;
+    int pollingGeneration;
+    bool applicationPaused, applicationFocused = true, pollingSuspended;
     bool joinCreateInFlight;
+    string createStatusKey = "";
+
+    void OnEnable()
+    {
+        L10n.OnLanguageChanged -= RefreshLocalizedPresentation;
+        L10n.OnLanguageChanged += RefreshLocalizedPresentation;
+    }
+
+    void OnDisable()
+    {
+        L10n.OnLanguageChanged -= RefreshLocalizedPresentation;
+    }
+
+    void OnDestroy()
+    {
+        flowGeneration++;
+        CancelInvoke();
+        if (client != null) client.StopPolling();
+    }
+
+    void OnApplicationPause(bool paused)
+    {
+        applicationPaused = paused;
+        RefreshApplicationActivity();
+    }
+
+    void OnApplicationFocus(bool focused)
+    {
+        applicationFocused = focused;
+        RefreshApplicationActivity();
+    }
+
+    void RefreshApplicationActivity()
+    {
+        if (applicationPaused || !applicationFocused)
+        {
+            if (pollingSuspended) return;
+            pollingSuspended = true;
+            pollingGeneration++;
+            if (client != null) client.StopPolling();
+            return;
+        }
+        if (!pollingSuspended) return;
+        pollingSuspended = false;
+        // Immediate fresh read after WhatsApp, without resetting history, range,
+        // result, rematch or identity. Focus+pause callbacks coalesce to one restart.
+        if (client != null && !abnormalTerminal && !string.IsNullOrEmpty(client.RoomCode) &&
+            presentationRoomCode == client.RoomCode)
+            StartRoomPolling();
+    }
+
+    // Repaint only: never replay OnState, record a result, advance rematch
+    // polling, or send a request merely because the language changed.
+    void RefreshLocalizedPresentation()
+    {
+        RefreshRoomIdentity();
+        // Repaint pre-match copy without issuing a room request or changing
+        // the flow generation. Animated waiting feedback keeps the new base.
+        if (createStatusEllipsis != null && createStatusEllipsis.enabled &&
+            !string.IsNullOrEmpty(createStatusKey))
+            createStatusEllipsis.SetBaseText(L10n.Get(createStatusKey));
+        if (lastState == null || abnormalTerminal) return;
+        string opponent = client.IsHost ? lastState.guestName : lastState.hostName;
+        if (opponentNameText != null) opponentNameText.text = opponent;
+        if (resultPresentation != null) resultPresentation.SetOpponentName(opponent);
+        if (lastState.phase != "play" || matchOver) return;
+        if (roundText != null) roundText.text = L10n.Get("round_label_open", lastState.roundIndex + 1);
+        if (!guessInFlight) UpdateTurnText(lastState, client.IsHost ? "host" : "guest", opponent);
+        UpdateRangeText();
+        RefreshLockButton();
+    }
 
     string MyName
     {
@@ -125,6 +240,7 @@ public class PvpGameController : MonoBehaviour
 
     public void OpenPvpMenu()
     {
+        if (client == null || string.IsNullOrEmpty(client.RoomCode)) ClearRoomIdentity();
         abnormalTerminal = false;
         authoritativeResultShown = false;
         if (terminalPresentation != null) terminalPresentation.Hide();
@@ -145,7 +261,7 @@ public class PvpGameController : MonoBehaviour
         if (!TryReadSecret(createSecretInput, out secret))
         {
             if (createEntryStatusText != null)
-                createEntryStatusText.text = L10n.Get("pvp_secret");
+                SetPrebattleMessage(createEntryStatusText, "pvp_secret");
             createPanel.SetActive(true);
             pvpMenuPanel.SetActive(false);
             return;
@@ -154,38 +270,54 @@ public class PvpGameController : MonoBehaviour
         pvpMenuPanel.SetActive(false);
         createPanel.SetActive(true);
         ShowCreateWaiting();
-        SetCreateStatus(L10n.Get("pvp_creating"), true);
+        SetCreateStatus("pvp_creating", true);
         roomCodeText.text = "-----";
 
         joinCreateInFlight = true;
         int gen = flowGeneration;
-        client.CreateRoom(MyName, secret, (ok, codeOrError) =>
+        ClearRoomIdentity();
+        client.CreateRoom(MyName, PlayerProfileAvatarResolver.ReadCommittedId(), secret, (ok, codeOrError) =>
         {
-            joinCreateInFlight = false;
             if (gen != flowGeneration)
             {
                 return;
             }
+            joinCreateInFlight = false;
             if (!ok)
             {
-                ShowCreateEntry(L10n.Get("pvp_network_error"));
+                ShowCreateEntry("pvp_network_error");
                 return;
             }
             roomCodeText.text = codeOrError;
-            SetCreateStatus(L10n.Get("prebattle_waiting"), true);
+            SetCreateStatus("prebattle_waiting", true);
             BeginMatchPolling();
         });
     }
 
     public void OnCopyInvitePressed()
     {
-        if (string.IsNullOrEmpty(client.RoomCode)) return;
+        if (!CanShareInvite) return;
 
         GUIUtility.systemCopyBuffer = L10n.Get("pvp_invite_text", client.RoomCode);
         GameEvents.RoomShared();
-        SetCreateStatus(L10n.Get("pvp_invite_copied"), false);
+        SetCreateStatus("pvp_invite_copied", false);
         CancelInvoke(nameof(ResumeWaitingStatus));
         Invoke(nameof(ResumeWaitingStatus), 2.5f);
+    }
+
+    public bool CanShareInvite => client != null && client.IsHost && !joinCreateInFlight &&
+        !abnormalTerminal && !matchOver && createPanel != null && createPanel.activeInHierarchy &&
+        createWaitingRoot != null && createWaitingRoot.activeInHierarchy &&
+        !string.IsNullOrWhiteSpace(client.RoomCode) && presentationRoomCode == client.RoomCode &&
+        (lastState == null || lastState.phase == "waiting");
+
+    public void OnShareInvitePressed()
+    {
+        if (!CanShareInvite) return;
+        string invitation = L10n.Get("pvp_invite_text", client.RoomCode);
+        // No 'sent' status and no sharing/reward event: the player can cancel.
+        if (OpenShareChooser == null || !OpenShareChooser(invitation, L10n.Get("pvp_share_chooser")))
+            SetCreateStatus("pvp_share_unavailable", false);
     }
 
     void ResumeWaitingStatus()
@@ -197,16 +329,19 @@ public class PvpGameController : MonoBehaviour
         if (lastState != null && lastState.phase != "waiting")
             return;
 
-        SetCreateStatus(L10n.Get("prebattle_waiting"), true);
+        SetCreateStatus("prebattle_waiting", true);
     }
 
-    void SetCreateStatus(string message, bool animateDots)
+    void SetCreateStatus(string key, bool animateDots)
     {
+        createStatusKey = key;
+        string message = L10n.Get(key);
         if (createStatusEllipsis != null)
             createStatusEllipsis.enabled = false;
         if (createCopyButton != null) createCopyButton.SetActive(true);
+        if (createShareButton != null) createShareButton.SetActive(true);
 
-        createStatusText.text = message;
+        SetPrebattleMessage(createStatusText, key);
 
         if (animateDots && createStatusEllipsis != null)
         {
@@ -223,12 +358,13 @@ public class PvpGameController : MonoBehaviour
         ShowCreateEntry("");
         ShowJoinEntry("");
         if (roomCodeText != null) roomCodeText.text = "-----";
-        if (createStatusText != null) createStatusText.text = "";
-        if (joinStatusText != null) joinStatusText.text = "";
+        createStatusKey = "";
+        SetPrebattleMessage(createStatusText, "");
+        SetPrebattleMessage(joinStatusText, "");
         if (createOpponentStatusText != null)
-            createOpponentStatusText.text = L10n.Get("prebattle_waiting_short");
+            SetPrebattleMessage(createOpponentStatusText, "prebattle_waiting_short");
         if (joinOpponentStatusText != null)
-            joinOpponentStatusText.text = L10n.Get("prebattle_waiting_short");
+            SetPrebattleMessage(joinOpponentStatusText, "prebattle_waiting_short");
         if (createStatusEllipsis != null)
             createStatusEllipsis.enabled = false;
     }
@@ -239,7 +375,7 @@ public class PvpGameController : MonoBehaviour
         if (createWaitingRoot != null) createWaitingRoot.SetActive(false);
         if (createSecretInput != null) createSecretInput.gameObject.SetActive(true);
         if (createConfirmButton != null) createConfirmButton.SetActive(true);
-        if (createEntryStatusText != null) createEntryStatusText.text = message;
+        SetPrebattleMessage(createEntryStatusText, message);
     }
 
     void ShowCreateWaiting()
@@ -255,7 +391,7 @@ public class PvpGameController : MonoBehaviour
         if (joinCodeInput != null) joinCodeInput.gameObject.SetActive(true);
         if (joinSecretInput != null) joinSecretInput.gameObject.SetActive(true);
         if (joinConfirmButton != null) joinConfirmButton.SetActive(true);
-        if (joinEntryStatusText != null) joinEntryStatusText.text = message;
+        SetPrebattleMessage(joinEntryStatusText, message);
     }
 
     void ShowJoinWaiting()
@@ -272,37 +408,65 @@ public class PvpGameController : MonoBehaviour
         if (!TryReadSecret(joinSecretInput, out secret))
         {
             if (joinEntryStatusText != null)
-                joinEntryStatusText.text = L10n.Get("pvp_secret");
+                SetPrebattleMessage(joinEntryStatusText, "pvp_secret");
             return;
         }
         if (string.IsNullOrEmpty(joinCodeInput.text.Trim()))
         {
             if (joinEntryStatusText != null)
-                joinEntryStatusText.text = L10n.Get("pvp_enter_code");
+                SetPrebattleMessage(joinEntryStatusText, "pvp_enter_code");
             return;
         }
 
         ShowJoinWaiting();
-        joinStatusText.text = L10n.Get("pvp_joining");
+        SetPrebattleMessage(joinStatusText, "pvp_joining");
         joinCreateInFlight = true;
         int gen = flowGeneration;
-        client.JoinRoom(joinCodeInput.text, MyName, secret, (ok, error) =>
+        ClearRoomIdentity();
+        client.JoinRoom(joinCodeInput.text, MyName, PlayerProfileAvatarResolver.ReadCommittedId(), secret, (ok, error) =>
         {
-            joinCreateInFlight = false;
             if (gen != flowGeneration)
             {
                 return;
             }
+            joinCreateInFlight = false;
             if (!ok)
             {
-                ShowJoinEntry(error);
+                // The transport returns these existing localized errors. Keep
+                // their exact meaning and retain a key for live EN/EL repaint.
+                string key = "";
+                foreach (string known in new[] { "pvp_room_not_found", "pvp_room_full", "pvp_network_error" })
+                    if (error == L10n.Get(known)) { key = known; break; }
+                ShowJoinEntry(key);
+                if (string.IsNullOrEmpty(key) && joinEntryStatusText != null)
+                    joinEntryStatusText.text = error;
                 return;
             }
             if (joinOpponentStatusText != null)
-                joinOpponentStatusText.text = L10n.Get("prebattle_found");
-            joinStatusText.text = L10n.Get("prebattle_waiting");
+                SetPrebattleMessage(joinOpponentStatusText, "prebattle_found");
+            SetPrebattleMessage(joinStatusText, "prebattle_waiting");
             BeginMatchPolling();
         });
+    }
+
+    static void SetPrebattleMessage(TMP_Text text, string key)
+    {
+        if (text == null) return;
+        var localized = text.GetComponent<LocalizedText>();
+        if (string.IsNullOrEmpty(key))
+        {
+            if (localized != null) localized.enabled = false;
+            text.text = "";
+            return;
+        }
+        if (localized == null)
+        {
+            RuntimeUI.Localize(text, key);
+            localized = text.GetComponent<LocalizedText>();
+        }
+        localized.key = key;
+        localized.enabled = true;
+        text.text = L10n.Get(key);
     }
 
     public void OnSubmitGuessPressed()
@@ -328,6 +492,7 @@ public class PvpGameController : MonoBehaviour
         guessInput.text = "";
         turnText.text = L10n.Get("pvp_sending");
         guessInFlight = true;
+        RefreshGuessAvailability();
         int gen = flowGeneration;
         int sentMatchIndex = lastState.matchIndex;
         client.SubmitGuess(guess, staked, lastState, ok =>
@@ -341,6 +506,7 @@ public class PvpGameController : MonoBehaviour
 
             guessInFlight = false;
             if (abnormalTerminal) return;
+            RefreshGuessAvailability();
             if (ok)
             {
                 lockArmed = false;
@@ -502,6 +668,8 @@ public class PvpGameController : MonoBehaviour
 
     void BeginMatchPolling()
     {
+        ClearRoomIdentity();
+        presentationRoomCode = client.RoomCode;
         matchOver = false;
         guessInFlight = false;
         abnormalTerminal = false;
@@ -524,9 +692,24 @@ public class PvpGameController : MonoBehaviour
         RefreshSignalsAvailability();
         if (signalFeedText != null) signalFeedText.text = "";
         if (resultSignalFeedText != null) resultSignalFeedText.text = "";
-        client.OnRoomClosed = HandleRoomClosed;
-        client.OnConnectionLost = HandleConnectionLost;
-        client.StartPolling(OnState);
+        StartRoomPolling();
+    }
+
+    void StartRoomPolling()
+    {
+        if (pollingSuspended) return;
+        int poll = ++pollingGeneration;
+        int generation = flowGeneration;
+        string room = client.RoomCode;
+        client.OnRoomClosed = () => {
+            if (poll == pollingGeneration && generation == flowGeneration && room == client.RoomCode) HandleRoomClosed();
+        };
+        client.OnConnectionLost = () => {
+            if (poll == pollingGeneration && generation == flowGeneration && room == client.RoomCode) HandleConnectionLost();
+        };
+        client.StartPolling(state => {
+            if (poll == pollingGeneration && generation == flowGeneration && room == client.RoomCode) OnState(state);
+        });
     }
 
     void HandleRoomClosed()
@@ -567,6 +750,7 @@ public class PvpGameController : MonoBehaviour
             if (createStatusEllipsis != null)
                 createStatusEllipsis.enabled = false;
             if (createCopyButton != null) createCopyButton.SetActive(false);
+            if (createShareButton != null) createShareButton.SetActive(false);
             if (terminalPresentation != null)
                 terminalPresentation.ShowStatus(reason, createStatusText);
         }
@@ -604,6 +788,8 @@ public class PvpGameController : MonoBehaviour
         }
 
         lastState = s;
+        RefreshRoomIdentity();
+        if (resultPresentation != null) resultPresentation.SetResultSnapshot(s);
 
         string me = client.IsHost ? "host" : "guest";
 
@@ -638,7 +824,10 @@ public class PvpGameController : MonoBehaviour
         }
 
         string opponentName = client.IsHost ? s.guestName : s.hostName;
-        opponentNameText.text = L10n.Get("opponent_label", opponentName);
+        // The final card already owns its localized Opponent caption.
+        opponentNameText.text = opponentName;
+        if (resultPresentation != null)
+            resultPresentation.SetOpponentName(opponentName);
 
         // Optional HUD: the live round number, blank once the match is over so
         // the result banner has the slot to itself.
@@ -724,6 +913,7 @@ public class PvpGameController : MonoBehaviour
                     : iWon
                         ? "result_win_title"
                         : "result_loss_title";
+                resultPresentation.SetResultSnapshot(s);
                 resultPresentation.ShowLocalized(titleKey, myGuessCount,
                     opponentGuessCount, huntedSecret, iWon);
             }
@@ -901,6 +1091,9 @@ public class PvpGameController : MonoBehaviour
     {
         if (rematchButton != null) rematchButton.SetActive(visible);
         if (rematchSecretInput != null) rematchSecretInput.gameObject.SetActive(visible);
+        // An earlier disconnected room hid this control. A later, legitimate
+        // completed match must restore Exit as well as the rematch controls.
+        if (visible && resultExitButton != null) resultExitButton.SetActive(true);
 
         // The guess controls are dead once the match is decided, so the rematch
         // controls take their slot rather than sitting beside a field that can
@@ -946,12 +1139,13 @@ public class PvpGameController : MonoBehaviour
         rangeText.text = L10n.Get("between_range", myMin, myMax);
     }
 
-    // The Lock button doubles as the tutorial for the mechanic: once the range
-    // is down to a few candidates it stops saying "LOCK" and starts asking.
+    // Once the range is down to a few candidates the presentation asks about
+    // LOCK beside number entry, while its button keeps a concise action label.
     // Two players who never lock draw roughly a quarter of their duels, so the
     // prompt is what keeps the draw rate down in practice.
     void RefreshLockButton()
     {
+        RefreshGuessAvailability();
         if (lockButton == null) return;
 
         string me = client != null && client.IsHost ? "host" : "guest";
@@ -982,12 +1176,36 @@ public class PvpGameController : MonoBehaviour
         if (lockButtonLabel == null) return;
 
         int left = CandidatesLeft();
+        var presentation = GetComponent<PvpDuelCartoonVisuals>();
+        if (presentation != null && presentation.IsReady)
+        {
+            presentation.PresentLockCaption(lockArmed, DuelRules.ShouldSuggestLock(left, true), left);
+            return;
+        }
         if (lockArmed)
             lockButtonLabel.text = L10n.Get("lock_armed");
         else if (DuelRules.ShouldSuggestLock(left, true))
             lockButtonLabel.text = L10n.Get("lock_suggest", left);
         else
             lockButtonLabel.text = L10n.Get("lock");
+    }
+
+    // Reflect the existing authoritative submit guard in the visible native
+    // controls. No rule or room mutation is performed by this presentation pass.
+    void RefreshGuessAvailability()
+    {
+        string me = client != null && client.IsHost ? "host" : "guest";
+        bool canGuess = !matchOver && !abnormalTerminal && !guessInFlight &&
+            lastState != null && lastState.phase == "play" && lastState.turn == me;
+        if (guessInput != null) guessInput.interactable = canGuess;
+        foreach (var control in new[] { guessButton, lockButton })
+        {
+            var button = control != null ? control.GetComponent<UnityEngine.UI.Button>() : null;
+            if (button != null) button.interactable = canGuess;
+        }
+        if (keypadRoot != null)
+            foreach (var button in keypadRoot.GetComponentsInChildren<UnityEngine.UI.Button>(true))
+                button.interactable = canGuess;
     }
 
     void RefreshSignalsAvailability()

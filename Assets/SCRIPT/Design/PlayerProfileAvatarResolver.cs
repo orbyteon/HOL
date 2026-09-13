@@ -1,3 +1,4 @@
+using System.Globalization;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -14,8 +15,24 @@ public static class PlayerProfileAvatarResolver
 
     public static Sprite Resolve()
     {
+        return ResolveId(ReadCommittedId());
+    }
+
+    // Wire ids are canonical decimal strings. Missing is not avatar zero.
+    public static string ReadCommittedId()
+    {
+        return OnboardingProfile.TryLoadCommittedAvatar(out int index)
+            ? index.ToString(CultureInfo.InvariantCulture) : "";
+    }
+
+    // Explicit room identity never consults this device's saved selection.
+    public static Sprite ResolveId(string avatarId)
+    {
         Sprite fallback = Resources.Load<Sprite>(FallbackResourcePath);
-        if (!OnboardingProfile.TryLoadCommittedAvatar(out int avatarIndex))
+        if (!int.TryParse(avatarId, NumberStyles.None, CultureInfo.InvariantCulture,
+                out int avatarIndex) ||
+            avatarId != avatarIndex.ToString(CultureInfo.InvariantCulture) ||
+            !OnboardingAvatarCatalog.CanEverSelect(avatarIndex))
             return fallback;
 
         OnboardingAvatarCatalog.Entry entry =
