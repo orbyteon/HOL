@@ -325,16 +325,20 @@ function advanceTurn(state) {
             if (state.pendingWin) {
                 state.phase = "done";
                 state.winner = state.pendingWin;
+                // Presentation metadata only: never participates in winner selection.
+                state.resultForfeitedSide = String(state.roundForfeitedSide || "");
                 state.turn = "";
                 return;
             }
             state.actedHost = false;
             state.actedGuest = false;
             state.roundIndex = (state.roundIndex | 0) + 1;
+            state.roundForfeitedSide = "";
         }
 
         var next = hasActed(state, state.opener) ? otherSide(state.opener) : state.opener;
         if (consumeSkip(state, next)) {
+            state.roundForfeitedSide = next;
             markActed(state, next);
             continue;
         }
@@ -350,15 +354,28 @@ function advanceTurn(state) {
 // whoever staked it and was right takes the match. Failing that, the tighter
 // search wins: fewer candidates left means the win was earned, not stumbled on.
 function resolveTie(state, latestSide, latestLocked, latestCandidates) {
-    if (latestLocked && !state.pendingWinLocked) return latestSide;
-    if (!latestLocked && state.pendingWinLocked) return state.pendingWin;
+    if (latestLocked && !state.pendingWinLocked) {
+        state.resultReason = "lock";
+        return latestSide;
+    }
+    if (!latestLocked && state.pendingWinLocked) {
+        state.resultReason = "lock";
+        return state.pendingWin;
+    }
 
     var held = state.pendingWinCandidates | 0;
     if (latestCandidates > 0 && held > 0) {
-        if (latestCandidates < held) return latestSide;
-        if (held < latestCandidates) return state.pendingWin;
+        if (latestCandidates < held) {
+            state.resultReason = "range";
+            return latestSide;
+        }
+        if (held < latestCandidates) {
+            state.resultReason = "range";
+            return state.pendingWin;
+        }
     }
 
+    state.resultReason = "draw";
     return "draw";
 }
 
@@ -383,6 +400,15 @@ function narrowFor(state, side, guess, hint) {
     }
 }
 
+// Cosmetic catalog membership only, not purchase/ownership authorization.
+// Parity with OnboardingAvatarCatalog.CanEverSelect is enforced by Node tests.
+function validAvatarId(value) {
+    if (typeof value !== "string") return "";
+    var index = Number(value);
+    return value === String(index) && index >= 0 && index <= 10 &&
+        Math.floor(index) === index ? value : "";
+}
+
 function viewFor(state, playerId) {
     var side = sideForPlayer(state, playerId);
     var revealed = 0;
@@ -392,11 +418,19 @@ function viewFor(state, playerId) {
     return {
         hostName: String(state.hostName || ""),
         guestName: String(state.guestName || ""),
+        hostAvatarId: validAvatarId(state.hostAvatarId),
+        guestAvatarId: validAvatarId(state.guestAvatarId),
         turn: String(state.turn || ""),
         phase: String(state.phase || ""),
         lastGuess: state.lastGuess | 0,
         lastBy: String(state.lastBy || ""),
         winner: String(state.winner || ""),
+        // Final-only facts authored at the actual decision point. Legacy rooms
+        // return empty metadata; clients must not guess from counts/history.
+        resultReason: state.phase === "done" ? String(state.resultReason || "") : "",
+        resultHostCandidates: state.phase === "done" ? state.resultHostCandidates | 0 : 0,
+        resultGuestCandidates: state.phase === "done" ? state.resultGuestCandidates | 0 : 0,
+        resultForfeitedSide: state.phase === "done" ? String(state.resultForfeitedSide || "") : "",
         lastHint: String(state.lastHint || ""),
         revealedSecret: revealed,
         hostGuessCount: state.hostGuessCount | 0,
@@ -459,6 +493,11 @@ function resetForRematch(state) {
     state.pendingWin = "";
     state.pendingWinLocked = false;
     state.pendingWinCandidates = 0;
+    state.resultReason = "";
+    state.resultHostCandidates = 0;
+    state.resultGuestCandidates = 0;
+    state.resultForfeitedSide = "";
+    state.roundForfeitedSide = "";
     state.hostLo = 1;
     state.hostHi = 100;
     state.guestLo = 1;
@@ -496,6 +535,8 @@ handlers.createRoom = function (args, context) {
             guestId: "",
             hostName: hostName,
             guestName: "",
+            hostAvatarId: validAvatarId(args && args.hostAvatarId),
+            guestAvatarId: "",
             hostSecret: hostSecret,
             guestSecret: 0,
             // The opener is drawn when the guest arrives, so neither side can
@@ -563,6 +604,7 @@ handlers.joinRoom = function (args, context) {
 
         state.guestId = playerId;
         state.guestName = cleanName(args.guestName, "Player");
+        state.guestAvatarId = validAvatarId(args.guestAvatarId);
         state.guestSecret = guestSecret;
         state.phase = "play";
         state.opener = Math.random() < 0.5 ? "host" : "guest";
@@ -633,11 +675,13 @@ handlers.submitGuess = function (args, context) {
         narrowFor(state, side, guess, state.lastHint);
 
         if (correct) {
+            state[side === "host" ? "resultHostCandidates" : "resultGuestCandidates"] = candidates;
             // A win is provisional until the round closes, so the responder
             // always gets the answering guess the opener just had.
             if (state.pendingWin)
                 state.pendingWin = resolveTie(state, side, locked, candidates);
             else {
+                state.resultReason = "only_correct";
                 state.pendingWin = side;
                 state.pendingWinLocked = locked;
                 state.pendingWinCandidates = candidates;

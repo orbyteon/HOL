@@ -130,9 +130,7 @@ public sealed class MainMenuHomeVisualsPlayModeTests
 
         RectTransform outerFrame = Find(root, "HomeOuterFrame") as RectTransform;
         Assert.That(outerFrame, Is.Not.Null);
-        owner.GetType().GetMethod(
-            "ApplyResponsiveLayoutForViewport", InstanceFlags)
-            .Invoke(owner, new object[] { 1080, 1920, true });
+        ApplyMenuViewport(owner, "HomeSafeAreaRoot", 1080, 1920);
         Assert.That(outerFrame.rect.height, Is.EqualTo(1920f).Within(0.01f));
         Assert.That(outerFrame.gameObject.activeInHierarchy, Is.False,
             "The retired chrome-bearing Home frame must stay invisible.");
@@ -277,7 +275,12 @@ public sealed class MainMenuHomeVisualsPlayModeTests
             Assert.That(root, Is.Not.Null);
             Transform chip = Find(root, "HomePlayerChip");
             Image portrait = Find(chip, "HomePlayerAvatar").GetComponent<Image>();
-            Image ring = Find(chip, "HomePlayerAvatarRing").GetComponent<Image>();
+            Image ring = Find(chip, "HomePlayerAvatarAperture").GetComponent<Image>();
+            Assert.That(ring.GetComponent<Mask>(), Is.Not.Null);
+            Assert.That(ring.GetComponent<Mask>().showMaskGraphic, Is.False,
+                "The circular aperture masks the portrait; the approved chip owns the visible ring.");
+            Assert.That(chip.GetComponent<Image>().sprite, Is.SameAs(
+                Resources.Load<Sprite>("solo/production/solo_player_chip_v1")));
             Sprite cyan = Resources.Load<Sprite>("reference/player_cyan_exact");
             MethodInfo refresh = owner.GetType().GetMethod("RefreshChip", InstanceFlags);
             MethodInfo applyViewport = owner.GetType().GetMethod(
@@ -303,6 +306,8 @@ public sealed class MainMenuHomeVisualsPlayModeTests
                 Sprite expected = valid ? CatalogAvatarSprite(index) : cyan;
                 Assert.That(portrait.sprite, Is.SameAs(expected),
                     "Canonical avatar " + index);
+                PlayerProfileAvatarFramingTestAssertions.AssertLayout(
+                    portrait, ring.rectTransform, "Home canonical avatar " + index);
             }
 
             PlayerPrefs.DeleteKey(avatarKey);
@@ -353,17 +358,14 @@ public sealed class MainMenuHomeVisualsPlayModeTests
             };
             string[] trackedNames =
             {
-                "Buttonsettings", "HomePlayerChip", "HomePlayerAvatarRing",
-                "HomePlayerAvatar", "HomeLogo", "HomeHeroBoy", "HomeHeroGirl",
+                "Buttonsettings", "HomePlayerChip", "HomePlayerAvatarAperture",
+                "HomeLogo", "HomeHeroBoy", "HomeHeroGirl",
                 "HomeSpeechBubble", "ButtonPlay", "DailyHuntButton", "HomeDailyPromo",
                 "HomePortal", "HomeMascotSix", "HomeMascotSeven",
             };
             foreach (Vector2Int viewport in viewports)
             {
-                applyViewport.Invoke(owner, new object[]
-                {
-                    viewport.x, viewport.y, true,
-                });
+                ApplyMenuViewport(owner, "HomeSafeAreaRoot", viewport.x, viewport.y);
                 string lane = viewport.x + "x" + viewport.y;
                 RectTransform[] tracked = FindRects(root, trackedNames);
 
@@ -373,52 +375,56 @@ public sealed class MainMenuHomeVisualsPlayModeTests
                 PlayerPrefs.SetInt(avatarKey, 6);
                 refresh.Invoke(owner, null);
                 AssertLayout(tracked, baseline, lane + " second avatar");
+                PlayerProfileAvatarFramingTestAssertions.AssertLayout(
+                    portrait, ring.rectTransform, lane + " second avatar");
                 PlayerPrefs.DeleteKey(avatarKey);
                 refresh.Invoke(owner, null);
                 AssertLayout(tracked, baseline, lane + " fallback avatar");
+                PlayerProfileAvatarFramingTestAssertions.AssertLayout(
+                    portrait, ring.rectTransform, lane + " fallback avatar");
 
-                float tall = Mathf.InverseLerp(
-                    1.78f, 2.22f, viewport.y / (float)viewport.x);
+                float referenceHeight = ExpectedReferenceHeight(viewport.x, viewport.y);
+                float top = referenceHeight * .5f;
+                float extra = referenceHeight - 1920f;
+                float cardHeight = 1160f + .9f * extra;
                 AssertRectTransform(tracked[0],
-                    new Vector2(-454f, 838f + 45f * tall),
+                    new Vector2(-454f, top - 103f),
                     new Vector2(118f, 118f), lane + " settings");
                 AssertRectTransform(tracked[1],
-                    new Vector2(330f, 838f + 45f * tall),
-                    new Vector2(370f, 150f), lane + " chip");
-                AssertRectTransform(tracked[2], new Vector2(-126f, 0f),
-                    new Vector2(108f, 108f), lane + " avatar ring");
-                AssertRectTransform(tracked[3], new Vector2(-126f, 0f),
-                    new Vector2(92f, 92f), lane + " avatar portrait");
+                    new Vector2(298f, top - 103f),
+                    new Vector2(430f, 167f), lane + " chip");
+                AssertRectTransform(tracked[2], new Vector2(138f, 0f),
+                    new Vector2(126f, 126f), lane + " avatar ring aperture");
+                AssertRectTransform(tracked[3],
+                    new Vector2(0f, top - 340f),
+                    new Vector2(640f, 310f), lane + " logo");
                 AssertRectTransform(tracked[4],
-                    new Vector2(0f, 600f + 40f * tall),
-                    new Vector2(512.3f, 304.11f), lane + " logo");
+                    new Vector2(-98f, cardHeight * .13f),
+                    new Vector2(430f, 430f), lane + " hero boy");
                 AssertRectTransform(tracked[5],
-                    new Vector2(-98f, 115f),
-                    new Vector2(410f, 410f), lane + " hero boy");
+                    new Vector2(58f, cardHeight * .06f),
+                    new Vector2(430f, 430f), lane + " hero girl");
                 AssertRectTransform(tracked[6],
-                    new Vector2(58f, 60f),
-                    new Vector2(410f, 410f), lane + " hero girl");
-                AssertRectTransform(tracked[7],
                     new Vector2(0f, 430f),
                     new Vector2(300f, 200f), lane + " speech bubble");
+                AssertRectTransform(tracked[7],
+                    new Vector2(-260f, top - 460f - cardHeight * .5f),
+                    new Vector2(560f, cardHeight), lane + " play");
                 AssertRectTransform(tracked[8],
-                    new Vector2(-260f, -100f + 18f * tall),
-                    new Vector2(560f, 1140f), lane + " play");
+                    new Vector2(260f, top - 460f - cardHeight * .5f),
+                    new Vector2(560f, cardHeight), lane + " daily");
                 AssertRectTransform(tracked[9],
-                    new Vector2(260f, -100f + 18f * tall),
-                    new Vector2(560f, 1140f), lane + " daily");
-                AssertRectTransform(tracked[10],
-                    new Vector2(0f, -748f - 18f * tall),
+                    new Vector2(0f, -top + 160f),
                     new Vector2(600f, 182f), lane + " promo");
+                AssertRectTransform(tracked[10],
+                    new Vector2(0f, -top + 40f),
+                    new Vector2(450f, 80f), lane + " portal");
                 AssertRectTransform(tracked[11],
-                    new Vector2(0f, -890f - 62f * tall),
-                    new Vector2(610f, 165f), lane + " portal");
+                    new Vector2(-390f, -top + 150f + .025f * extra),
+                    new Vector2(280f, 280f + .05f * extra), lane + " mascot six");
                 AssertRectTransform(tracked[12],
-                    new Vector2(-398f, -780f - 42f * tall),
-                    new Vector2(230f, 255f), lane + " mascot six");
-                AssertRectTransform(tracked[13],
-                    new Vector2(398f, -780f - 42f * tall),
-                    new Vector2(220f, 255f), lane + " mascot seven");
+                    new Vector2(390f, -top + 150f + .025f * extra),
+                    new Vector2(280f, 280f + .05f * extra), lane + " mascot seven");
             }
         }
         finally
@@ -486,8 +492,7 @@ public sealed class MainMenuHomeVisualsPlayModeTests
             {
                 string lane = (language == 0 ? "EN " : "EL ") +
                               viewport.x + "x" + viewport.y;
-                applyViewport.Invoke(
-                    owner, new object[] { viewport.x, viewport.y, true });
+                ApplyMenuViewport(owner, "HomeSafeAreaRoot", viewport.x, viewport.y);
                 Canvas.ForceUpdateCanvases();
                 playTitle.ForceMeshUpdate(true, true);
                 playSubtitle.ForceMeshUpdate(true, true);
@@ -515,9 +520,11 @@ public sealed class MainMenuHomeVisualsPlayModeTests
                 Assert.That(promoTitle.fontSize, Is.GreaterThanOrEqualTo(22f), lane);
                 Assert.That(promoBody.fontSize, Is.GreaterThanOrEqualTo(20f), lane);
 
+                float tabScale = (1160f + .9f *
+                    (ExpectedReferenceHeight(viewport.x, viewport.y) - 1920f)) / 1140f;
                 AssertApprovedCenteredTextRegion(
-                    owner, dailyTitle, new Vector2(7f, 448.4f),
-                    new Vector2(210f, 101.3f), new Vector2(210f, 133.3f),
+                    owner, dailyTitle, new Vector2(7f, 448.4f * tabScale),
+                    new Vector2(210f, 101.3f * tabScale), new Vector2(210f, 101.3f * tabScale + 32f),
                     0.01f, lane + " Daily title aperture");
 
                 AssertContained(playButton.rect,
@@ -562,14 +569,15 @@ public sealed class MainMenuHomeVisualsPlayModeTests
                     trophy, new Vector2(-220f, -18f),
                     new Vector2(62f, 62f), lane + " promo trophy");
 
-                float aspect = viewport.y / (float)viewport.x;
-                float tall = Mathf.InverseLerp(1.78f, 2.22f, aspect);
+                float referenceHeight = ExpectedReferenceHeight(viewport.x, viewport.y);
+                float extra = referenceHeight - 1920f;
+                float mascotY = -referenceHeight * .5f + 150f + .025f * extra;
                 AssertRectTransform(
-                    mascotSix, new Vector2(-398f, -780f - 42f * tall),
-                    new Vector2(230f, 255f), lane + " mascot 6");
+                    mascotSix, new Vector2(-390f, mascotY),
+                    new Vector2(280f, 280f + .05f * extra), lane + " mascot 6");
                 AssertRectTransform(
-                    mascotSeven, new Vector2(398f, -780f - 42f * tall),
-                    new Vector2(220f, 255f), lane + " mascot 7");
+                    mascotSeven, new Vector2(390f, mascotY),
+                    new Vector2(280f, 280f + .05f * extra), lane + " mascot 7");
             }
         }
 
@@ -685,12 +693,17 @@ public sealed class MainMenuHomeVisualsPlayModeTests
         Assert.That(matches, Is.EqualTo(1), label + " sole aperture");
         Rect actualSafe = (Rect)matchingRegion.GetType()
             .GetField("SafeRect", InstanceFlags).GetValue(matchingRegion);
-        Rect expectedSafe = new Rect(expectedCenter - expectedSize * 0.5f,
-            expectedSize);
+        Rect expectedSafe = new Rect(
+            expectedCenter.x - expectedSize.x * 0.5f,
+            expectedCenter.y - expectedSize.y * 0.5f,
+            expectedSize.x, expectedSize.y);
+        // Compare Rect with Rect. A non-integral center can round one ULP when
+        // represented as (minimum, size); this is not permission to expand the
+        // aperture or the zero-tolerance geometry assertion.
         Assert.That(actualSafe.center.x,
-            Is.EqualTo(expectedCenter.x).Within(geometryTolerance), label + " x");
+            Is.EqualTo(expectedSafe.center.x).Within(geometryTolerance), label + " x");
         Assert.That(actualSafe.center.y,
-            Is.EqualTo(expectedCenter.y).Within(geometryTolerance), label + " y");
+            Is.EqualTo(expectedSafe.center.y).Within(geometryTolerance), label + " y");
         Assert.That(actualSafe.width,
             Is.EqualTo(expectedSize.x).Within(geometryTolerance), label + " width");
         Assert.That(actualSafe.height,
@@ -878,9 +891,9 @@ public sealed class MainMenuHomeVisualsPlayModeTests
         RectTransform six = Find(root, "HomeMascotSix") as RectTransform;
         RectTransform seven = Find(root, "HomeMascotSeven") as RectTransform;
 
-        Assert.That(logo.sizeDelta.x, Is.EqualTo(512.3f).Within(0.01f));
-        Assert.That(boy.sizeDelta, Is.EqualTo(new Vector2(410f, 410f)));
-        Assert.That(girl.sizeDelta, Is.EqualTo(new Vector2(410f, 410f)));
+        Assert.That(logo.sizeDelta.x, Is.EqualTo(640f).Within(0.01f));
+        Assert.That(boy.sizeDelta, Is.EqualTo(new Vector2(430f, 430f)));
+        Assert.That(girl.sizeDelta, Is.EqualTo(new Vector2(430f, 430f)));
         Assert.That(boy.IsChildOf(play.transform), Is.True);
         Assert.That(girl.IsChildOf(play.transform), Is.True);
         Assert.That(promo.sizeDelta.x, Is.EqualTo(600f).Within(0.01f));
@@ -889,8 +902,8 @@ public sealed class MainMenuHomeVisualsPlayModeTests
 
         RectTransform playHit = play.transform as RectTransform;
         RectTransform dailyHit = daily.transform as RectTransform;
-        Assert.That(playHit.sizeDelta, Is.EqualTo(new Vector2(560f, 1140f)));
-        Assert.That(dailyHit.sizeDelta, Is.EqualTo(new Vector2(560f, 1140f)));
+        Assert.That(playHit.sizeDelta, Is.EqualTo(new Vector2(560f, 1160f)));
+        Assert.That(dailyHit.sizeDelta, Is.EqualTo(new Vector2(560f, 1160f)));
 
         Vector4 playPadding = play.GetComponent<Image>().raycastPadding;
         Vector4 dailyPadding = daily.GetComponent<Image>().raycastPadding;
@@ -900,6 +913,34 @@ public sealed class MainMenuHomeVisualsPlayModeTests
         float dailyLeft = dailyHit.anchoredPosition.x - dailyHit.sizeDelta.x * 0.5f + dailyPadding.x;
         Assert.That(playRight, Is.LessThan(dailyLeft),
             "PLAY and Daily Hunt must not have overlapping touch ownership.");
+    }
+
+    // Independent authored portrait dimensions: no expected geometry is read
+    // from MenuPortraitLayout or the controls under test.
+    internal static float ExpectedReferenceHeight(int width, int height)
+    {
+        // Independent CanvasScaler math, with float storage at the same two
+        // coordinate boundaries: pixels -> canvas -> authored safe area.
+        // Algebraically collapsing these ratios changes rounding at 1179x2556.
+        float pixelScale = Mathf.Sqrt((width / 1080f) * (height / 1920f));
+        var canvas = new Vector2(width, height) / pixelScale;
+        float authoringScale = Mathf.Min(1f, Mathf.Min(canvas.x / 1080f, canvas.y / 1920f));
+        return canvas.y / authoringScale;
+    }
+
+    internal static void ApplyMenuViewport(Component owner, string safeName, int width, int height)
+    {
+        var safe = Find(owner.transform, safeName);
+        Assert.That(safe, Is.Not.Null, safeName);
+        var safeOwner = safe.GetComponent(RuntimeType("ResponsiveSafeAreaRoot"));
+        Assert.That(safeOwner, Is.Not.Null, safeName + " owner");
+        var viewport = new Vector2(width, height);
+        float canvasScale = Mathf.Sqrt((width / 1080f) * (height / 1920f));
+        safeOwner.GetType().GetMethod("ApplyViewport", InstanceFlags).Invoke(safeOwner,
+            new object[] { new Rect(Vector2.zero, viewport), new Rect(Vector2.zero, viewport),
+                viewport / canvasScale });
+        owner.GetType().GetMethod("ApplyResponsiveLayoutForViewport", InstanceFlags)
+            .Invoke(owner, new object[] { width, height, true });
     }
 
     static void AssertLocalizedHomeCopy(

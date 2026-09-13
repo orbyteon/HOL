@@ -192,8 +192,8 @@ public sealed class SettingsVisualsPlayModeTests
 
             var chipImage = Find(root, "SettingsPlayerChip").GetComponent<Image>();
             Assert.That(chipImage.sprite.name,
-                Is.EqualTo("mainmenu_player_chip_frame_9s"));
-            Assert.That(chipImage.type, Is.EqualTo(Image.Type.Sliced));
+                Is.EqualTo("solo_player_chip_v1"));
+            Assert.That(chipImage.type, Is.EqualTo(Image.Type.Simple));
             Assert.That(chipImage.color.a, Is.EqualTo(1f).Within(0.001f));
 
             Image profileAvatar = Find(root, "PlayerAvatar").GetComponent<Image>();
@@ -201,7 +201,12 @@ public sealed class SettingsVisualsPlayModeTests
                 "Settings must display the canonical committed avatar.");
             Assert.That(profileAvatar.preserveAspect, Is.True);
             Assert.That(profileAvatar.raycastTarget, Is.False);
-            RectTransform avatarRect = profileAvatar.rectTransform;
+            // Transparent padding differs per portrait. Keep the frame fixed
+            // and audit actual alpha framing, not an obsolete identical image rect.
+            RectTransform avatarRect = profileAvatar.transform.parent as RectTransform;
+            Assert.That(avatarRect.GetComponent<Mask>(), Is.Not.Null);
+            Assert.That(avatarRect.GetComponent<Mask>().showMaskGraphic, Is.False);
+            PlayerProfileAvatarFramingTestAssertions.AssertLayout(profileAvatar, avatarRect, "Settings first avatar");
             Vector2 avatarPosition = avatarRect.anchoredPosition;
             Vector2 avatarSize = avatarRect.sizeDelta;
             PlayerPrefs.SetInt("HOL.Onboarding.Avatar", 1);
@@ -212,6 +217,7 @@ public sealed class SettingsVisualsPlayModeTests
                 "Settings must refresh from the shared avatar owner.");
             Assert.That(avatarRect.anchoredPosition, Is.EqualTo(avatarPosition));
             Assert.That(avatarRect.sizeDelta, Is.EqualTo(avatarSize));
+            PlayerProfileAvatarFramingTestAssertions.AssertLayout(profileAvatar, avatarRect, "Settings second avatar");
             Assert.That(PlayerPrefs.GetInt("HOL.Onboarding.Avatar"), Is.EqualTo(1),
                 "Settings must not rewrite the persisted avatar.");
 
@@ -252,6 +258,8 @@ public sealed class SettingsVisualsPlayModeTests
                         new Rect(Vector2.zero, viewportSize),
                         canvasSize,
                     });
+                    InvokePrivate(root.GetComponentInParent(RuntimeType("SettingsVisuals")),
+                        "ApplyResponsiveLayout");
                     Canvas.ForceUpdateCanvases();
                     string lane = viewport.x + "x" + viewport.y;
                     Rect appliedSafeRect = Property<Rect>(
@@ -273,7 +281,7 @@ public sealed class SettingsVisualsPlayModeTests
                         text.ForceMeshUpdate();
                         Assert.That(text.isTextOverflowing, Is.False,
                             lane + " " + text.name + " overflowed.");
-                        AssertRenderedTextInsideAndRightOfAvatar(
+                        AssertRenderedTextInsideAndLeftOfAvatar(
                             text, chipRect, avatarRect, 1f,
                             lane + " " + text.name);
                     }
@@ -521,7 +529,7 @@ public sealed class SettingsVisualsPlayModeTests
         Assert.That(expanded.Overlaps(other), Is.False, context);
     }
 
-    static void AssertRenderedTextInsideAndRightOfAvatar(
+    static void AssertRenderedTextInsideAndLeftOfAvatar(
         TMP_Text text,
         RectTransform chip,
         RectTransform avatar,
@@ -541,8 +549,8 @@ public sealed class SettingsVisualsPlayModeTests
             context + " glyphs above chip");
         Bounds reserved = RectTransformUtility.CalculateRelativeRectTransformBounds(
             chip, avatar);
-        Assert.That(glyphs.xMin,
-            Is.GreaterThanOrEqualTo(reserved.max.x + gap),
+        Assert.That(glyphs.xMax,
+            Is.LessThanOrEqualTo(reserved.min.x - gap),
             context + " glyphs overlap the avatar");
     }
 
